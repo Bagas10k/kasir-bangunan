@@ -10,24 +10,26 @@
         }
     }
     input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
-        outline: 2px solid #111;
+        outline: 2px solid #2d6a4f;
         outline-offset: 2px;
     }
     .alert-error {
-        background: #fff;
-        border: 1px solid #111;
-        color: #111;
+        background: #fde8e8;
+        border: 1px solid #f5c2c7;
+        color: #842029;
         padding: 10px 14px;
         margin-bottom: 16px;
         font-size: 13px;
+        border-radius: 6px;
     }
     .alert-success {
-        background: #f5f5f5;
-        border: 1px solid #333;
-        color: #111;
+        background: #e8f5e9;
+        border: 1px solid #badbcc;
+        color: #0f5132;
         padding: 10px 14px;
         margin-bottom: 16px;
         font-size: 13px;
+        border-radius: 6px;
     }
     .form-group {
         margin-bottom: 12px;
@@ -38,24 +40,37 @@
         font-weight: bold;
         font-size: 12px;
         text-transform: uppercase;
-        color: #222;
+        color: #2d6a4f;
     }
     .form-control {
         width: 100%;
         box-sizing: border-box;
     }
+    .btn {
+        background: #2d6a4f;
+        color: #ffffff;
+        border: 1px solid #2d6a4f;
+        border-radius: 6px;
+    }
+    .btn:hover {
+        background: #1b4332;
+        border-color: #1b4332;
+    }
     .btn-secondary {
-        background: #eee;
-        color: #111;
-        border: 1px solid #ccc;
+        background: #e8f5e9;
+        color: #1b4332;
+        border: 1px solid #cbe3d3;
+        border-radius: 6px;
     }
     .btn-secondary:hover {
-        background: #ddd;
+        background: #d8f3dc;
+        color: #1b4332;
     }
     .summary-box {
-        background: #f9f9f9;
-        border: 1px solid #ddd;
-        padding: 12px;
+        background: #f0f7f3;
+        border: 1px solid #d8f3dc;
+        border-radius: 6px;
+        padding: 14px;
         margin-top: 14px;
     }
     .summary-row {
@@ -65,9 +80,10 @@
         font-size: 13px;
     }
     .summary-total {
-        font-size: 15px;
+        font-size: 16px;
         font-weight: bold;
-        border-top: 1px solid #111;
+        color: #1b4332;
+        border-top: 2px solid #2d6a4f;
         padding-top: 8px;
         margin-top: 8px;
     }

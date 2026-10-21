@@ -33,7 +33,6 @@ class AuthController extends Controller
         :root {
             --canvas: #f8faf8;
             --surface: #ffffff;
-            --surface-subtle: #f0f7f3;
             --primary: #2d6a4f;
             --primary-hover: #1b4332;
             --primary-light: #d8f3dc;
@@ -69,54 +68,19 @@ class AuthController extends Controller
             -webkit-font-smoothing: antialiased;
         }
 
-        .auth-container {
+        .auth-card {
             width: 100%;
-            max-width: 860px;
+            max-width: 420px;
             background-color: var(--surface);
             border: 1px solid var(--border-card);
             border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(45, 106, 79, 0.08);
-            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(45, 106, 79, 0.08);
+            padding: 36px 32px;
         }
 
-        .auth-grid {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .panel-form {
-            order: 1;
-            padding: 36px 30px;
-        }
-
-        .panel-info {
-            order: 2;
-            background-color: var(--surface-subtle);
-            border-top: 1px solid var(--border-card);
-            padding: 28px 24px;
-            font-size: 13px;
-        }
-
-        @media (min-width: 768px) {
-            .auth-grid {
-                display: grid;
-                grid-template-columns: 1fr 1.15fr;
-            }
-
-            .panel-info {
-                order: 1;
-                border-top: none;
-                border-right: 1px solid var(--border-card);
-                padding: 40px 32px;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-            }
-
-            .panel-form {
-                order: 2;
-                padding: 44px 38px;
-            }
+        .form-header {
+            text-align: center;
+            margin-bottom: 24px;
         }
 
         .badge-tag {
@@ -130,100 +94,21 @@ class AuthController extends Controller
             border: 1px solid var(--border);
             padding: 4px 10px;
             border-radius: 4px;
-            margin-bottom: 18px;
-        }
-
-        .info-title {
-            font-size: 20px;
-            font-weight: 700;
-            line-height: 1.3;
-            letter-spacing: -0.01em;
-            color: var(--primary-hover);
             margin-bottom: 12px;
-        }
-
-        .info-desc {
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-bottom: 24px;
-            line-height: 1.6;
-        }
-
-        .spec-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-            margin-bottom: 24px;
-        }
-
-        .spec-table tr {
-            border-bottom: 1px solid var(--border);
-        }
-
-        .spec-table td {
-            padding: 10px 0;
-            vertical-align: top;
-        }
-
-        .spec-label {
-            color: var(--text-caption);
-            width: 40%;
-            font-weight: 600;
-        }
-
-        .spec-value {
-            color: var(--text-main);
-            font-weight: 600;
-        }
-
-        .disclosure-card {
-            border-left: 3px solid var(--primary);
-            background-color: var(--surface);
-            border-top: 1px solid var(--border);
-            border-right: 1px solid var(--border);
-            border-bottom: 1px solid var(--border);
-            border-radius: 0 6px 6px 0;
-            padding: 14px 16px;
-            font-size: 12px;
-            line-height: 1.5;
-            color: var(--text-muted);
-        }
-
-        .disclosure-title {
-            font-weight: 700;
-            color: var(--primary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 4px;
-            font-size: 11px;
-        }
-
-        .form-header {
-            margin-bottom: 24px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 16px;
-        }
-
-        .system-tag {
-            font-size: 12px;
-            font-weight: 700;
-            color: var(--primary);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-bottom: 6px;
         }
 
         h1 {
             font-size: 22px;
             font-weight: 700;
-            letter-spacing: 0.02em;
             color: var(--primary-hover);
-            margin: 0 0 6px 0;
+            margin-bottom: 6px;
+            letter-spacing: -0.01em;
         }
 
         .form-subtitle {
             font-size: 13px;
             color: var(--text-muted);
+            line-height: 1.4;
         }
 
         .alert-box {
@@ -239,14 +124,14 @@ class AuthController extends Controller
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         label {
             display: block;
             font-size: 13px;
             font-weight: 600;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             color: var(--text-main);
         }
 
@@ -286,6 +171,7 @@ class AuthController extends Controller
             border-radius: 6px;
             padding: 10px 20px;
             transition: background-color 0.15s ease, border-color 0.15s ease;
+            margin-top: 4px;
         }
 
         .btn-submit:hover {
@@ -299,7 +185,7 @@ class AuthController extends Controller
         }
 
         .form-footer-note {
-            margin-top: 18px;
+            margin-top: 20px;
             font-size: 12px;
             color: var(--text-caption);
             text-align: center;
@@ -317,57 +203,26 @@ class AuthController extends Controller
     </style>
 </head>
 <body>
-    <main class="auth-container">
-        <div class="auth-grid">
-            <aside class="panel-info">
-                <div>
-                    <span class="badge-tag">Sistem Kasir Material</span>
-                    <h2 class="info-title">Terminal Kasir Bahan Bangunan</h2>
-                    <p class="info-desc">Sistem operasional modular untuk pencatatan transaksi kasir, kalkulasi muatan armada, dan manajemen persediaan material bangunan.</p>
-                    <table class="spec-table" aria-label="Modul operasional sistem">
-                        <tbody>
-                            <tr>
-                                <td class="spec-label">Kasir</td>
-                                <td class="spec-value">Penjualan material &amp; POS</td>
-                            </tr>
-                            <tr>
-                                <td class="spec-label">Gudang</td>
-                                <td class="spec-value">Stok &amp; penerimaan barang</td>
-                            </tr>
-                            <tr>
-                                <td class="spec-label">Laporan</td>
-                                <td class="spec-value">Laba rugi &amp; neraca</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="disclosure-card">
-                    <div class="disclosure-title">Prototipe Pengujian</div>
-                    <p>Halaman ini beroperasi untuk keperluan uji fungsional prototipe kasir bahan bangunan.</p>
-                </div>
-            </aside>
-            <section class="panel-form" aria-labelledby="login-heading">
-                <div class="form-header">
-                    <div class="system-tag">Autentikasi Pengguna</div>
-                    <h1 id="login-heading">LOGIN KASIR</h1>
-                    <p class="form-subtitle">Silakan masukkan identitas akun Anda untuk mengakses register kasir.</p>
-                </div>
-                ' . $errorMessage . '
-                <form method="POST" action="' . $escapedAction . '">
-                    <input type="hidden" name="_token" value="' . $escapedCsrf . '">
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" autocomplete="username" required autofocus>
-                    </div>
-                    <div class="form-group">
-                        <label for="password">Password</label>
-                        <input type="password" id="password" name="password" autocomplete="current-password" required>
-                    </div>
-                    <button type="submit" class="btn-submit">Masuk ke Kasir</button>
-                </form>
-                <div class="form-footer-note">Sistem internal terproteksi. Pastikan kredensial Anda sesuai hak akses.</div>
-            </section>
+    <main class="auth-card" aria-labelledby="login-heading">
+        <div class="form-header">
+            <span class="badge-tag">Kasir Bahan Bangunan</span>
+            <h1 id="login-heading">LOGIN KASIR</h1>
+            <p class="form-subtitle">Silakan masukkan identitas akun untuk mengakses sistem kasir.</p>
         </div>
+        ' . $errorMessage . '
+        <form method="POST" action="' . $escapedAction . '">
+            <input type="hidden" name="_token" value="' . $escapedCsrf . '">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" autocomplete="username" required autofocus>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" autocomplete="current-password" required>
+            </div>
+            <button type="submit" class="btn-submit">Masuk ke Kasir</button>
+        </form>
+        <div class="form-footer-note">Prototipe pengujian kasir material. Akses internal.</div>
     </main>
 </body>
 </html>';
