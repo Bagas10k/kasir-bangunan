@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DemoSetupController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\StockOpnameController;
 use App\Http\Controllers\ExpenseController;
@@ -11,10 +12,13 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\InventoryReceiptController;
 
-// Guest authentication routes
+// Guest authentication & demo setup routes
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+
+    Route::get('/demo-setup', [DemoSetupController::class, 'create'])->name('demo.setup');
+    Route::post('/demo-setup', [DemoSetupController::class, 'store'])->name('demo.setup.store');
 });
 
 // Authenticated cashier / store / accounting routes
