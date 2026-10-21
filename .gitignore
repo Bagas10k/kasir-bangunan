@@ -1,0 +1,53 @@
+*.log
+.DS_Store
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+/.codex
+/.cursor/
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+/node_modules
+/public/build
+/public/fonts-manifest.dev.json
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+_ide_helper.php
+Homestead.json
+Homestead.yaml
+Thumbs.db
+
+# Deploy environments
+deploy/**/.env
+deploy/**/.env.*
+!deploy/**/.env.example
+!deploy/**/.env.*.example
+
+# Backups
+/backups/*
+backups/*
+
+# Local database files
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.db
+database/*.sqlite*
+
+# Test & runtime cache
+.phpunit.cache
+.phpunit.result.cache
+
+# Python cache & runtime
+__pycache__/
+*.pyc
+*.pyo
