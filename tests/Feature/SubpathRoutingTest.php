@@ -5,12 +5,16 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Providers\AppServiceProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
 class SubpathRoutingTest extends TestCase
 {
     use RefreshDatabase;
+
+    private string $csrfToken = 'test-subpath-csrf-token';
 
     protected function beforeRefreshingDatabase(): void
     {
@@ -97,13 +101,15 @@ class SubpathRoutingTest extends TestCase
             'password' => Hash::make($syntheticPassword),
         ]);
 
-        $response = $this->withServerVariables([
-            'SCRIPT_NAME' => '/kasir-bangunan/index.php',
-            'SCRIPT_FILENAME' => base_path('public/index.php'),
-        ])->post(route('login'), [
-            'email' => 'synthetic.cashier@example.test',
-            'password' => $syntheticPassword,
-        ]);
+        $response = $this->withSession(['_token' => $this->csrfToken])
+            ->withServerVariables([
+                'SCRIPT_NAME' => '/kasir-bangunan/index.php',
+                'SCRIPT_FILENAME' => base_path('public/index.php'),
+            ])->post(route('login'), [
+                '_token' => $this->csrfToken,
+                'email' => 'synthetic.cashier@example.test',
+                'password' => $syntheticPassword,
+            ]);
 
         $response->assertRedirect(route('pos.index'));
         $this->assertSame(
@@ -123,11 +129,15 @@ class SubpathRoutingTest extends TestCase
         ]);
 
         // Simulate upstream receiving intended '/' or root before subpath was resolved
-        $response = $this->withSession(['url.intended' => '/'])
+        $response = $this->withSession([
+                '_token' => $this->csrfToken,
+                'url.intended' => '/',
+            ])
             ->withServerVariables([
                 'SCRIPT_NAME' => '/kasir-bangunan/index.php',
                 'SCRIPT_FILENAME' => base_path('public/index.php'),
             ])->post(route('login'), [
+                '_token' => $this->csrfToken,
                 'email' => 'synthetic.intended@example.test',
                 'password' => $syntheticPassword,
             ]);
@@ -139,5 +149,81 @@ class SubpathRoutingTest extends TestCase
             'Login with intended root must not escape subpath'
         );
         $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_invalid_credentials_redirects_to_subpath_login_route_without_escaping(): void
+    {
+        $response = $this->withSession(['_token' => $this->csrfToken])
+            ->withServerVariables([
+                'SCRIPT_NAME' => '/kasir-bangunan/index.php',
+                'SCRIPT_FILENAME' => base_path('public/index.php'),
+            ])->post(route('login'), [
+                '_token' => $this->csrfToken,
+                'email' => 'nonexistent.user@example.test',
+                'password' => 'WrongPassword999!',
+            ]);
+
+        $response->assertRedirect(route('login'));
+        $this->assertSame(
+            'https://example.test/kasir-bangunan/login',
+            $response->headers->get('Location'),
+            'Invalid credentials redirect must stay strictly under subpath route'
+        );
+        $response->assertSessionHasErrors(['email']);
+        $this->assertFalse(Auth::check(), 'No user should be authenticated on invalid login');
+    }
+
+    public function test_validation_failure_redirects_to_subpath_login_route_without_escaping(): void
+    {
+        $response = $this->withSession(['_token' => $this->csrfToken])
+            ->withServerVariables([
+                'SCRIPT_NAME' => '/kasir-bangunan/index.php',
+                'SCRIPT_FILENAME' => base_path('public/index.php'),
+            ])->post(route('login'), [
+                '_token' => $this->csrfToken,
+                'email' => 'invalid-email-format',
+                'password' => '',
+            ]);
+
+        $response->assertRedirect(route('login'));
+        $this->assertSame(
+            'https://example.test/kasir-bangunan/login',
+            $response->headers->get('Location'),
+            'Validation failure redirect must stay strictly under subpath route'
+        );
+        $response->assertSessionHasErrors(['email', 'password']);
+        $this->assertFalse(Auth::check(), 'No user should be authenticated on validation failure');
+    }
+
+    public function test_throttle_limit_redirects_to_subpath_login_route_without_escaping(): void
+    {
+        $email = 'throttled.user@example.test';
+        $ip = '127.0.0.1';
+        $throttleKey = mb_strtolower($email) . '|' . $ip;
+
+        // Exhaust the 5 attempts
+        for ($i = 0; $i < 5; $i++) {
+            RateLimiter::hit($throttleKey, 60);
+        }
+
+        $response = $this->withSession(['_token' => $this->csrfToken])
+            ->withServerVariables([
+                'REMOTE_ADDR' => $ip,
+                'SCRIPT_NAME' => '/kasir-bangunan/index.php',
+                'SCRIPT_FILENAME' => base_path('public/index.php'),
+            ])->post(route('login'), [
+                '_token' => $this->csrfToken,
+                'email' => $email,
+                'password' => 'RandomPassword123!',
+            ]);
+
+        $response->assertRedirect(route('login'));
+        $this->assertSame(
+            'https://example.test/kasir-bangunan/login',
+            $response->headers->get('Location'),
+            'Throttled redirect must stay strictly under subpath route'
+        );
+        $response->assertSessionHasErrors(['email']);
+        $this->assertFalse(Auth::check(), 'No user should be authenticated when throttled');
     }
 }

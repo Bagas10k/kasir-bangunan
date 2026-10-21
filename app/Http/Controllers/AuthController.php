@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
@@ -67,15 +68,23 @@ class AuthController extends Controller
 
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
-            return back()->withErrors([
+            return redirect()->route('login')->withErrors([
                 'email' => "Terlalu banyak percobaan login. Coba lagi dalam {$seconds} detik.",
-            ]);
+            ])->withInput($request->except('password'));
         }
 
-        $credentials = $request->validate([
+        $validator = Validator::make($request->all(), [
             'email' => 'required|email',
             'password' => 'required|string',
         ]);
+
+        if ($validator->fails()) {
+            return redirect()->route('login')
+                ->withErrors($validator)
+                ->withInput($request->except('password'));
+        }
+
+        $credentials = $validator->validated();
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
@@ -89,9 +98,9 @@ class AuthController extends Controller
 
         RateLimiter::hit($throttleKey, 60);
 
-        return back()->withErrors([
+        return redirect()->route('login')->withErrors([
             'email' => 'Kredensial tidak valid.',
-        ]);
+        ])->withInput($request->except('password'));
     }
 
     public function logout(Request $request)
