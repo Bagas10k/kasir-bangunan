@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kasir Material & Bangunan</title>
+    <title>Kasir Material &amp; Bangunan</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -11,79 +11,71 @@
         :root {
             --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            --text-xs: 11px;
-            --text-sm: 12.5px;
-            --text-base: 14px;
-            --text-md: 15px;
-            --text-lg: 16.5px;
-            --text-xl: 20px;
-            --text-2xl: 24px;
-            --leading-tight: 1.25;
-            --leading-normal: 1.5;
-            --leading-relaxed: 1.6;
-            --tracking-tight: -0.015em;
-            --tracking-wide: 0.04em;
-            --tracking-wider: 0.08em;
 
+            --canvas: #f3f6f4;
+            --surface: #ffffff;
+            --surface-hover: #fafdfb;
             --primary: #2d6a4f;
             --primary-hover: #1b4332;
+            --primary-light: #d8f3dc;
             --accent: #52b788;
             --mint-surface: #e8f5e9;
             --mint-border: #d8f3dc;
-            --canvas: #f8faf8;
-            --surface: #ffffff;
+
             --text-main: #1c2826;
-            --text-muted: #495057;
-            --border-subtle: #e8f5e9;
-            --border-control: #ced4da;
+            --text-muted: #5c6b64;
+            --text-caption: #8a9990;
+
+            --border-card: #e7eee9;
+            --border-control: #d9e2dc;
+            --border-subtle: #f0f4f1;
+
+            --danger: #b02a37;
             --danger-bg: #fde8e8;
             --danger-border: #f5c2c7;
             --danger-text: #842029;
-            --sidebar-bg: #1b4332;
-            --sidebar-dark: #163828;
-            --sidebar-text: #d8f3dc;
-            --sidebar-hover: #2d6a4f;
-            --sidebar-accent: #74c69d;
-            --sidebar-indicator: #52b788;
+
+            --sidebar-bg: #ffffff;
+            --sidebar-border: #e7eee9;
+            --sidebar-text: #4a5568;
+            --sidebar-active-bg: #e8f5e9;
+            --sidebar-active-text: #1b4332;
+            --sidebar-hover-bg: #f4f8f5;
+            --sidebar-label: #8a9990;
         }
 
         *, *::before, *::after {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         html, body {
-            margin: 0;
-            padding: 0;
             width: 100%;
+            min-height: 100vh;
+            background-color: var(--canvas);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            font-size: 14px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
             overflow-x: hidden;
         }
 
-        body {
-            font-family: var(--font-sans);
-            background-color: var(--canvas);
-            color: var(--text-main);
-            font-size: var(--text-base);
-            line-height: var(--leading-normal);
-            font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-
-        /* Layout Structure */
         .app-layout {
             display: flex;
             min-height: 100vh;
             width: 100%;
-            overflow-x: hidden;
         }
 
-        /* Sidebar Styling */
+        /* ─── SIDEBAR (Clean White SaaS Rail like Hireism) ──────────────── */
         .app-sidebar {
-            width: 250px;
-            min-width: 250px;
+            width: 260px;
+            min-width: 260px;
             flex-shrink: 0;
             background-color: var(--sidebar-bg);
-            color: #ffffff;
+            border-right: 1px solid var(--sidebar-border);
             display: flex;
             flex-direction: column;
             position: sticky;
@@ -91,38 +83,54 @@
             height: 100vh;
             overflow-y: auto;
             z-index: 100;
-            border-right: 1px solid rgba(0, 0, 0, 0.08);
         }
 
         .sidebar-header {
-            padding: 20px 18px 16px;
-            border-bottom: 1px solid rgba(216, 243, 220, 0.15);
+            padding: 24px 20px 18px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            border-bottom: 1px solid var(--border-subtle);
         }
 
-        .sidebar-brand {
+        .sidebar-brand-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .brand-icon-badge {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(45, 106, 79, 0.25);
+            flex-shrink: 0;
+        }
+
+        .sidebar-brand-text {
             display: flex;
             flex-direction: column;
-            gap: 4px;
         }
 
         .sidebar-title {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 800;
-            margin: 0;
+            color: var(--primary-hover);
             letter-spacing: -0.01em;
-            color: #ffffff;
             line-height: 1.2;
         }
 
         .sidebar-subtitle {
-            display: inline-block;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--sidebar-accent);
-            letter-spacing: 0.4px;
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.08em;
             text-transform: uppercase;
         }
 
@@ -130,39 +138,38 @@
             display: none;
             background: transparent;
             border: none;
-            color: var(--sidebar-text);
+            color: var(--text-muted);
             cursor: pointer;
             padding: 6px;
-            border-radius: 4px;
-            line-height: 0;
+            border-radius: 8px;
         }
 
         .sidebar-close-btn:hover {
-            background-color: var(--sidebar-hover);
-            color: #ffffff;
+            background-color: var(--sidebar-hover-bg);
+            color: var(--primary);
         }
 
         .sidebar-nav {
-            padding: 16px 12px;
+            padding: 20px 14px;
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 18px;
         }
 
         .nav-group {
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: 3px;
         }
 
         .nav-group-label {
-            font-size: 11px;
+            font-size: 10.5px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            color: var(--sidebar-accent);
-            padding: 0 10px 6px;
+            color: var(--sidebar-label);
+            padding: 0 12px 6px;
         }
 
         .sidebar-nav a {
@@ -170,83 +177,131 @@
             text-decoration: none;
             font-size: 13.5px;
             font-weight: 500;
-            min-height: 40px;
+            min-height: 42px;
             display: flex;
             align-items: center;
-            padding: 8px 12px;
-            border-radius: 6px;
-            border-left: 3px solid transparent;
-            transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+            gap: 12px;
+            padding: 9px 14px;
+            border-radius: 12px;
+            transition: all 0.15s ease;
+        }
+
+        .sidebar-nav a svg {
+            color: var(--sidebar-label);
+            transition: color 0.15s ease;
+            flex-shrink: 0;
         }
 
         .sidebar-nav a:hover {
-            color: #ffffff;
-            background-color: var(--sidebar-hover);
-            text-decoration: none;
+            background-color: var(--sidebar-hover-bg);
+            color: var(--primary-hover);
+        }
+
+        .sidebar-nav a:hover svg {
+            color: var(--primary);
         }
 
         .sidebar-nav a.active {
-            color: #ffffff;
-            background-color: var(--sidebar-hover);
-            border-left-color: var(--sidebar-indicator);
-            font-weight: 600;
+            background-color: var(--sidebar-active-bg);
+            color: var(--sidebar-active-text);
+            font-weight: 700;
+            box-shadow: inset 3.5px 0 0 var(--primary);
+        }
+
+        .sidebar-nav a.active svg {
+            color: var(--primary);
         }
 
         .sidebar-footer {
             padding: 16px;
-            background-color: var(--sidebar-dark);
-            border-top: 1px solid rgba(216, 243, 220, 0.12);
+            border-top: 1px solid var(--border-subtle);
             display: flex;
             flex-direction: column;
             gap: 12px;
+            background-color: #fbfdfc;
         }
 
-        .operator-info {
+        .operator-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background-color: var(--mint-surface);
+            border: 1px solid var(--mint-border);
+            padding: 10px 14px;
+            border-radius: 14px;
+        }
+
+        .operator-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2d6a4f, #52b788);
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .operator-meta {
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            min-width: 0;
         }
 
         .operator-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: #ffffff;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: var(--primary-hover);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .operator-desc {
             font-size: 11px;
-            color: var(--sidebar-accent);
+            color: var(--accent);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .operator-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: #22c55e;
+            display: inline-block;
         }
 
         .sidebar-logout-btn {
-            background-color: var(--primary);
-            color: #ffffff;
-            border: 1px solid rgba(216, 243, 220, 0.25);
+            background-color: #ffffff;
+            color: var(--primary-hover);
+            border: 1px solid var(--mint-border);
             min-height: 36px;
-            padding: 6px 14px;
+            padding: 8px 14px;
             font-family: inherit;
             font-size: 12px;
-            font-weight: 500;
+            font-weight: 600;
             cursor: pointer;
-            border-radius: 6px;
+            border-radius: 9999px;
             width: 100%;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.15s ease, border-color 0.15s ease;
+            gap: 8px;
+            transition: all 0.15s ease;
         }
 
         .sidebar-logout-btn:hover {
-            background-color: var(--sidebar-hover);
-            border-color: var(--sidebar-accent);
+            background-color: var(--mint-surface);
+            border-color: var(--accent);
         }
 
-        /* Backdrop */
-        .sidebar-backdrop {
-            display: none;
-        }
-
-        /* Main Area */
+        /* ─── MAIN CONTENT AREA ─────────────────────────────────────────── */
         .app-main {
             flex: 1;
             min-width: 0;
@@ -255,22 +310,27 @@
             min-height: 100vh;
         }
 
+        /* Topbar Header */
         .main-topbar {
             background-color: var(--surface);
-            border-bottom: 1px solid var(--mint-border);
-            padding: 12px 24px;
-            min-height: 56px;
+            border-bottom: 1px solid var(--sidebar-border);
+            padding: 14px 28px;
+            min-height: 64px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
+            gap: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 90;
         }
 
         .topbar-left {
             display: flex;
             align-items: center;
-            gap: 12px;
-            min-width: 0;
+            gap: 14px;
+            flex: 1;
+            max-width: 500px;
         }
 
         .hamburger-btn {
@@ -278,158 +338,244 @@
             background: transparent;
             border: 1px solid var(--border-control);
             color: var(--primary);
-            min-height: 40px;
-            min-width: 40px;
+            width: 40px;
+            height: 40px;
             padding: 8px;
-            border-radius: 6px;
+            border-radius: 10px;
             cursor: pointer;
             align-items: center;
             justify-content: center;
-            line-height: 0;
         }
 
-        .hamburger-btn:hover {
-            background-color: var(--mint-surface);
-            border-color: var(--accent);
+        .topbar-search-wrapper {
+            position: relative;
+            width: 100%;
         }
 
-        .topbar-title {
-            font-size: 14px;
-            font-weight: 600;
+        .topbar-search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-caption);
+            pointer-events: none;
+        }
+
+        .topbar-search-input {
+            width: 100%;
+            min-height: 40px;
+            background-color: var(--canvas);
+            border: 1px solid var(--border-control);
+            border-radius: 9999px;
+            padding: 8px 16px 8px 40px;
+            font-family: inherit;
+            font-size: 13px;
             color: var(--text-main);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            transition: all 0.15s ease;
+        }
+
+        .topbar-search-input:focus {
+            outline: none;
+            background-color: #ffffff;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.12);
         }
 
         .topbar-right {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
             flex-shrink: 0;
+        }
+
+        .topbar-btn-new {
+            background-color: var(--primary);
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 9px 18px;
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 8px rgba(45, 106, 79, 0.2);
+        }
+
+        .topbar-btn-new:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
         }
 
         .topbar-status {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
             font-size: 12px;
-            font-weight: 500;
-            color: var(--text-muted);
+            font-weight: 600;
+            color: var(--primary-hover);
             background-color: var(--mint-surface);
             border: 1px solid var(--mint-border);
-            padding: 4px 10px;
-            border-radius: 12px;
+            padding: 7px 14px;
+            border-radius: 9999px;
         }
 
         .status-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background-color: var(--accent);
-            display: inline-block;
+            background-color: #22c55e;
+            box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
         }
 
         .main-content {
-            padding: 24px;
+            padding: 28px;
             flex: 1;
-            min-width: 0;
+            max-width: 1360px;
             width: 100%;
+            margin: 0 auto;
         }
 
-        /* Generic Components */
+        /* ─── ELEVATED CARDS & COMPONENTS ───────────────────────────────── */
         .card {
             background-color: var(--surface);
-            border: 1px solid var(--mint-border);
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(45, 106, 79, 0.04);
-            padding: 20px;
+            border: 1px solid var(--border-card);
+            border-radius: 20px;
+            box-shadow: 0 4px 20px -2px rgba(27, 67, 50, 0.05);
+            padding: 24px;
             margin-bottom: 24px;
-        }
-
-        h1, h2 {
-            font-weight: 700;
-            letter-spacing: -0.015em;
-            text-wrap: balance;
         }
 
         h2 {
             font-size: 16px;
+            font-weight: 700;
             color: var(--primary-hover);
+            letter-spacing: -0.015em;
             margin-top: 0;
-            border-bottom: 2px solid var(--mint-surface);
-            padding-bottom: 10px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-subtle);
+            text-wrap: balance;
         }
 
+        /* Tables */
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 13.5px;
-            margin-top: 10px;
-            font-variant-numeric: tabular-nums;
+            margin-top: 12px;
         }
 
-        th, td {
+        th {
+            background-color: #f7faf8;
+            color: var(--text-muted);
+            font-size: 11.5px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-card);
             text-align: left;
-            padding: 10px 12px;
+        }
+
+        td {
+            padding: 13px 14px;
             border-bottom: 1px solid var(--border-subtle);
             vertical-align: middle;
-            font-variant-numeric: tabular-nums;
+            color: var(--text-main);
         }
 
-        .sku-code, .sku-cell, code, .font-mono {
-            font-family: var(--font-mono);
-            font-size: 12px;
-            font-weight: 600;
+        tr:hover td {
+            background-color: var(--surface-hover);
         }
 
         .tabular-nums {
             font-variant-numeric: tabular-nums;
         }
 
-        th {
-            background-color: #f0f7f3;
-            color: var(--text-main);
+        .sku-code {
+            font-family: var(--font-mono);
+            font-size: 12px;
             font-weight: 600;
-            border-bottom: 2px solid var(--mint-border);
+            color: var(--primary);
+            background-color: var(--mint-surface);
+            padding: 3px 8px;
+            border-radius: 6px;
+            display: inline-block;
         }
 
+        /* Buttons */
         .btn {
             background-color: var(--primary);
             color: #ffffff;
             border: 1px solid var(--primary);
             min-height: 44px;
-            min-width: 44px;
-            padding: 10px 18px;
+            padding: 10px 22px;
             font-family: inherit;
-            font-size: 14px;
-            font-weight: 500;
+            font-size: 13.5px;
+            font-weight: 600;
             cursor: pointer;
-            border-radius: 6px;
+            border-radius: 9999px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            gap: 8px;
             text-decoration: none;
-            transition: background-color 0.15s ease, border-color 0.15s ease;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 8px rgba(45, 106, 79, 0.2);
         }
 
         .btn:hover {
             background-color: var(--primary-hover);
             border-color: var(--primary-hover);
-            color: #ffffff;
+            transform: translateY(-1px);
         }
 
+        .btn:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        .btn-secondary {
+            background-color: var(--mint-surface);
+            color: var(--primary-hover);
+            border: 1px solid var(--mint-border);
+            min-height: 38px;
+            padding: 8px 18px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--primary-light);
+            border-color: var(--accent);
+        }
+
+        /* Form Controls */
         input, select, textarea {
             min-height: 44px;
-            padding: 8px 12px;
+            padding: 10px 14px;
             font-family: inherit;
-            font-size: 14px;
+            font-size: 13.5px;
             color: var(--text-main);
-            background-color: var(--surface);
+            background-color: #ffffff;
             border: 1px solid var(--border-control);
-            border-radius: 6px;
+            border-radius: 12px;
             width: 100%;
-            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            transition: all 0.15s ease;
+        }
+
+        input:hover, select:hover, textarea:hover {
+            border-color: #b5c4bc;
         }
 
         input:focus, select:focus, textarea:focus {
@@ -444,24 +590,30 @@
 
         .form-group label {
             display: block;
-            font-size: 13px;
-            font-weight: 600;
+            font-size: 11.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
             margin-bottom: 6px;
-            color: var(--text-main);
+            color: var(--primary);
         }
 
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            gap: 24px;
         }
 
+        /* Alerts */
         .alert {
-            padding: 12px 16px;
-            margin-bottom: 18px;
-            border-radius: 6px;
-            font-size: 13px;
+            padding: 14px 18px;
+            margin-bottom: 20px;
+            border-radius: 14px;
+            font-size: 13.5px;
             line-height: 1.5;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .alert-success {
@@ -478,18 +630,19 @@
 
         .badge {
             display: inline-block;
-            padding: 4px 8px;
+            padding: 4px 10px;
             font-size: 11px;
-            font-weight: 600;
+            font-weight: 700;
             text-transform: uppercase;
-            border-radius: 4px;
+            letter-spacing: 0.05em;
+            border-radius: 9999px;
             border: 1px solid var(--mint-border);
             background-color: var(--mint-surface);
             color: var(--primary);
         }
 
-        /* Responsive Mobile Styles */
-        @media (max-width: 768px) {
+        /* ─── RESPONSIVE MOBILE ─────────────────────────────────────────── */
+        @media (max-width: 900px) {
             .grid-2 {
                 grid-template-columns: 1fr;
             }
@@ -499,17 +652,16 @@
                 top: 0;
                 left: 0;
                 bottom: 0;
-                width: 260px;
-                max-width: 80vw;
+                width: 270px;
+                max-width: 82vw;
                 height: 100vh;
                 transform: translateX(-100%);
                 transition: transform 0.25s ease-in-out;
-                z-index: 1050;
+                box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
             }
 
             .app-sidebar.open {
                 transform: translateX(0);
-                box-shadow: 4px 0 16px rgba(0, 0, 0, 0.25);
             }
 
             .sidebar-close-btn {
@@ -524,7 +676,7 @@
                 width: 100%;
                 height: 100%;
                 background-color: rgba(0, 0, 0, 0.45);
-                z-index: 1040;
+                z-index: 95;
                 opacity: 0;
                 transition: opacity 0.25s ease;
             }
@@ -539,11 +691,11 @@
             }
 
             .main-topbar {
-                padding: 10px 16px;
+                padding: 12px 18px;
             }
 
             .main-content {
-                padding: 16px;
+                padding: 18px;
             }
         }
     </style>
@@ -553,13 +705,22 @@
         <!-- Sidebar Backdrop for Mobile -->
         <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
 
-        <!-- Sidebar Navigation -->
+        <!-- Sidebar Navigation (Clean White SaaS Rail) -->
         <aside id="app-sidebar" class="app-sidebar" aria-label="Navigasi Utama">
             <div class="sidebar-header">
-                <div class="sidebar-brand">
-                    <h1 class="sidebar-title">Kasir Bangunan</h1>
-                    <span class="sidebar-subtitle">Terminal Material</span>
-                </div>
+                <a href="{{ route('pos.index') }}" class="sidebar-brand-wrapper">
+                    <div class="brand-icon-badge">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                        </svg>
+                    </div>
+                    <div class="sidebar-brand-text">
+                        <h1 class="sidebar-title">Kasir Bangunan</h1>
+                        <span class="sidebar-subtitle">Terminal Material</span>
+                    </div>
+                </a>
                 <button type="button" id="sidebar-close" class="sidebar-close-btn" aria-label="Tutup Menu">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -572,42 +733,118 @@
                 <!-- Kategori: TRANSAKSI -->
                 <div class="nav-group">
                     <div class="nav-group-label">Transaksi</div>
-                    <a href="{{ route('pos.index') }}" class="{{ request()->routeIs('pos.*') ? 'active' : '' }}">Kasir (POS)</a>
+                    <a href="{{ route('pos.index') }}" class="{{ request()->routeIs('pos.*') ? 'active' : '' }}">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="9" cy="21" r="1"></circle>
+                            <circle cx="20" cy="21" r="1"></circle>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                        </svg>
+                        <span>Kasir (POS)</span>
+                    </a>
                 </div>
 
                 <!-- Kategori: INVENTORI -->
                 <div class="nav-group">
                     <div class="nav-group-label">Inventori</div>
-                    <a href="{{ route('products.index') }}" class="{{ request()->routeIs('products.*') ? 'active' : '' }}">Produk</a>
-                    <a href="{{ route('inventory.receipts') }}" class="{{ request()->routeIs('inventory.*') ? 'active' : '' }}">Penerimaan Barang</a>
-                    <a href="{{ route('opname.index') }}" class="{{ request()->routeIs('opname.*') ? 'active' : '' }}">Stock Opname</a>
+                    <a href="{{ route('products.index') }}" class="{{ request()->routeIs('products.*') ? 'active' : '' }}">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m7.5 4.27 9 5.15"></path>
+                            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                            <path d="m3.3 7 8.7 5 8.7-5"></path>
+                            <path d="M12 22V12"></path>
+                        </svg>
+                        <span>Produk</span>
+                    </a>
+                    <a href="{{ route('inventory.receipts') }}" class="{{ request()->routeIs('inventory.*') ? 'active' : '' }}">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="9 11 12 14 22 4"></polyline>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                        </svg>
+                        <span>Penerimaan Barang</span>
+                    </a>
+                    <a href="{{ route('opname.index') }}" class="{{ request()->routeIs('opname.*') ? 'active' : '' }}">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                            <path d="M9 14h6"></path>
+                            <path d="M9 10h6"></path>
+                            <path d="M9 18h6"></path>
+                        </svg>
+                        <span>Stock Opname</span>
+                    </a>
                 </div>
 
                 <!-- Kategori: OPERASIONAL -->
                 <div class="nav-group">
                     <div class="nav-group-label">Operasional</div>
-                    <a href="{{ route('vehicles.index') }}" class="{{ request()->routeIs('vehicles.*') ? 'active' : '' }}">Armada Kendaraan</a>
-                    <a href="{{ route('ritase.index') }}" class="{{ request()->routeIs('ritase.*') ? 'active' : '' }}">Ritase</a>
-                    <a href="{{ route('expenses.index') }}" class="{{ request()->routeIs('expenses.*') ? 'active' : '' }}">Pengeluaran</a>
+                    <a href="{{ route('vehicles.index') }}" class="{{ request()->routeIs('vehicles.*') ? 'active' : '' }}">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="1" y="3" width="15" height="13"></rect>
+                            <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                        </svg>
+                        <span>Armada Kendaraan</span>
+                    </a>
+                    <a href="{{ route('ritase.index') }}" class="{{ request()->routeIs('ritase.*') ? 'active' : '' }}">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>Ritase</span>
+                    </a>
+                    <a href="{{ route('expenses.index') }}" class="{{ request()->routeIs('expenses.*') ? 'active' : '' }}">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                        <span>Pengeluaran</span>
+                    </a>
                 </div>
 
                 <!-- Kategori: LAPORAN -->
                 <div class="nav-group">
                     <div class="nav-group-label">Laporan</div>
-                    <a href="{{ route('reports.profit_loss') }}" class="{{ request()->routeIs('reports.profit_loss') ? 'active' : '' }}">Laba Rugi</a>
-                    <a href="{{ route('reports.balance_sheet') }}" class="{{ request()->routeIs('reports.balance_sheet') ? 'active' : '' }}">Neraca</a>
+                    <a href="{{ route('reports.profit_loss') }}" class="{{ request()->routeIs('reports.profit_loss') ? 'active' : '' }}">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        <span>Laba Rugi</span>
+                    </a>
+                    <a href="{{ route('reports.balance_sheet') }}" class="{{ request()->routeIs('reports.balance_sheet') ? 'active' : '' }}">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                        <span>Neraca</span>
+                    </a>
                 </div>
             </nav>
 
             <div class="sidebar-footer">
-                <div class="operator-info">
-                    <span class="operator-title">Operator Kasir</span>
-                    <span class="operator-desc">Terminal Aktif</span>
+                <div class="operator-card">
+                    <div class="operator-avatar">OK</div>
+                    <div class="operator-meta">
+                        <span class="operator-title">Operator Kasir</span>
+                        <span class="operator-desc"><span class="operator-dot"></span> Terminal Aktif</span>
+                    </div>
                 </div>
                 @auth
                 <form method="POST" action="{{ route('logout') }}" style="margin: 0;">
                     @csrf
-                    <button type="submit" class="sidebar-logout-btn">Keluar</button>
+                    <button type="submit" class="sidebar-logout-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        <span>Keluar</span>
+                    </button>
                 </form>
                 @endauth
             </div>
@@ -624,10 +861,23 @@
                             <line x1="3" y1="18" x2="21" y2="18"></line>
                         </svg>
                     </button>
-                    <span class="topbar-title">Dashboard Material &amp; Bangunan</span>
+                    <div class="topbar-search-wrapper">
+                        <svg class="topbar-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" class="topbar-search-input" placeholder="Cari material, SKU, nota, atau armada..." aria-label="Pencarian Cepat">
+                    </div>
                 </div>
                 <div class="topbar-right">
                     <span class="topbar-status"><span class="status-dot"></span> Sistem Siap</span>
+                    <a href="{{ route('pos.index') }}" class="topbar-btn-new">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        <span>Transaksi Baru</span>
+                    </a>
                 </div>
             </header>
 

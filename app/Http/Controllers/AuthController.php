@@ -38,7 +38,7 @@ class AuthController extends Controller
         :root {
             --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            --canvas: #f8faf8;
+            --canvas: #f3f6f4;
             --surface: #ffffff;
             --primary: #2d6a4f;
             --primary-hover: #1b4332;
@@ -49,7 +49,7 @@ class AuthController extends Controller
             --text-muted: #495057;
             --text-caption: #6c757d;
             --border: #d8f3dc;
-            --border-card: #cbe3d3;
+            --border-card: #e7eee9;
             --focus-ring: #2d6a4f;
             --danger: #b02a37;
             --danger-bg: #f8d7da;
@@ -82,9 +82,9 @@ class AuthController extends Controller
             max-width: 420px;
             background-color: var(--surface);
             border: 1px solid var(--border-card);
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(45, 106, 79, 0.08);
-            padding: 36px 32px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px -5px rgba(27, 67, 50, 0.08), 0 8px 10px -6px rgba(27, 67, 50, 0.04);
+            padding: 38px 34px;
         }
 
         .form-header {
@@ -101,8 +101,8 @@ class AuthController extends Controller
             color: var(--primary);
             background-color: var(--mint-surface);
             border: 1px solid var(--border);
-            padding: 4px 10px;
-            border-radius: 4px;
+            padding: 5px 12px;
+            border-radius: 9999px;
             margin-bottom: 12px;
         }
 
@@ -155,7 +155,7 @@ class AuthController extends Controller
             border: 1px solid #ced4da;
             background-color: #ffffff;
             color: var(--text-main);
-            border-radius: 6px;
+            border-radius: 12px;
             transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
 
@@ -171,7 +171,7 @@ class AuthController extends Controller
 
         .btn-submit {
             width: 100%;
-            min-height: 44px;
+            min-height: 46px;
             background-color: var(--primary);
             color: #ffffff;
             border: 1px solid var(--primary);
@@ -180,15 +180,17 @@ class AuthController extends Controller
             font-weight: 600;
             letter-spacing: 0.01em;
             cursor: pointer;
-            border-radius: 6px;
-            padding: 10px 20px;
-            transition: background-color 0.15s ease, border-color 0.15s ease;
+            border-radius: 9999px;
+            padding: 11px 20px;
+            transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
             margin-top: 4px;
+            box-shadow: 0 2px 8px rgba(45, 106, 79, 0.2);
         }
 
         .btn-submit:hover {
             background-color: var(--primary-hover);
             border-color: var(--primary-hover);
+            transform: translateY(-1px);
         }
 
         .btn-submit:focus {
@@ -233,7 +235,7 @@ class AuthController extends Controller
             font-weight: 600;
             letter-spacing: 0.01em;
             cursor: pointer;
-            border-radius: 6px;
+            border-radius: 9999px;
             padding: 10px 20px;
             transition: background-color 0.15s ease, border-color 0.15s ease;
         }
