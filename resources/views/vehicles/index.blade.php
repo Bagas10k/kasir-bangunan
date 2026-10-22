@@ -75,7 +75,7 @@
                 @csrf
                 <div class="form-group">
                     <label for="license_plate">Nomor Plat Polisi</label>
-                    <input type="text" id="license_plate" name="license_plate" value="{{ old('license_plate') }}" required placeholder="Contoh: B 9123 PBJ" autocomplete="off" class="form-control">
+                    <input type="text" id="license_plate" name="license_plate" value="{{ old('license_plate') }}" required placeholder="Contoh: B 9123 XYZ" autocomplete="off" class="form-control">
                 </div>
                 <div class="form-group">
                     <label for="vehicle_type">Tipe Kendaraan</label>
