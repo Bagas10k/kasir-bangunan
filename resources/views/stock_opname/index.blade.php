@@ -9,61 +9,25 @@
             scroll-behavior: auto !important;
         }
     }
-    input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
-        outline: 2px solid #111;
-        outline-offset: 2px;
-    }
-    .alert-error {
-        background: #fff;
-        border: 1px solid #111;
-        color: #111;
-        padding: 10px 14px;
-        margin-bottom: 16px;
-        font-size: 13px;
-    }
-    .alert-success {
-        background: #f5f5f5;
-        border: 1px solid #333;
-        color: #111;
-        padding: 10px 14px;
-        margin-bottom: 16px;
-        font-size: 13px;
-    }
     .form-group {
-        margin-bottom: 12px;
-    }
-    .form-group label {
-        display: block;
-        margin-bottom: 4px;
-        font-weight: bold;
-        font-size: 12px;
-        text-transform: uppercase;
-        color: #222;
+        margin-bottom: 14px;
     }
     .form-control {
         width: 100%;
         box-sizing: border-box;
     }
-    .btn-secondary {
-        background: #eee;
-        color: #111;
-        border: 1px solid #ccc;
-    }
-    .btn-secondary:hover {
-        background: #ddd;
-    }
 </style>
 
 @if(session('success'))
-    <div class="alert-success" role="status">{{ session('success') }}</div>
+    <div class="alert alert-success" role="status">{{ session('success') }}</div>
 @endif
 
 @if(session('error'))
-    <div class="alert-error" role="alert">{{ session('error') }}</div>
+    <div class="alert alert-error" role="alert">{{ session('error') }}</div>
 @endif
 
 @if($errors->any())
-    <div class="alert-error" role="alert">
+    <div class="alert alert-error" role="alert">
         <strong>Terjadi kesalahan input:</strong>
         <ul style="margin: 6px 0 0 18px; padding: 0;">
             @foreach($errors->all() as $err)
@@ -100,15 +64,15 @@
                                     </select>
                                 </td>
                                 <td>
-                                    <input type="number" step="0.0001" min="0" name="items[0][physical_qty]" class="form-control" placeholder="0.00" required>
+                                    <input type="number" step="0.0001" min="0" name="items[0][physical_qty]" class="form-control tabular-nums" placeholder="0.00" required>
                                 </td>
                                 <td style="text-align: center; vertical-align: middle;">
-                                    <button type="button" class="btn btn-secondary" style="padding: 2px 6px;" onclick="removeOpnameRow(this)">x</button>
+                                    <button type="button" class="btn btn-secondary" style="min-height: 28px; padding: 2px 8px; font-size: 11px;" onclick="removeOpnameRow(this)">x</button>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
-                    <div style="margin-top: 8px;">
+                    <div style="margin-top: 10px;">
                         <button type="button" class="btn btn-secondary" onclick="addOpnameRow()">+ Tambah Baris</button>
                     </div>
                 </div>
@@ -118,8 +82,8 @@
                     <input type="text" name="notes" id="notes" class="form-control" maxlength="255" placeholder="Contoh: Audit stok berkala fisik gudang" value="{{ old('notes') }}">
                 </div>
 
-                <div style="margin-top: 16px;">
-                    <button type="submit" class="btn" style="width: 100%; padding: 10px; font-weight: bold;">Simpan Penyesuaian Stok</button>
+                <div style="margin-top: 18px;">
+                    <button type="submit" class="btn" style="width: 100%; border-radius: 9999px; min-height: 46px; font-weight: 700;">Simpan Penyesuaian Stok</button>
                 </div>
             </form>
         </div>
@@ -140,13 +104,13 @@
                 <tbody>
                     @forelse($recentOpnames as $op)
                     <tr>
-                        <td><strong>{{ $op->opname_number }}</strong></td>
-                        <td>{{ $op->opname_date }}</td>
-                        <td>{{ strtoupper($op->status) }}</td>
+                        <td><strong class="sku-code">{{ $op->opname_number }}</strong></td>
+                        <td style="color: var(--text-caption); font-size: 12px;">{{ $op->opname_date }}</td>
+                        <td><span class="badge">{{ strtoupper($op->status) }}</span></td>
                         <td>{{ $op->notes ?? '-' }}</td>
                     </tr>
                     @empty
-                    <tr><td colspan="4">Belum ada riwayat stock opname.</td></tr>
+                    <tr><td colspan="4" style="text-align: center; color: var(--text-caption); padding: 20px;">Belum ada riwayat stock opname.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -154,7 +118,7 @@
 
         <div class="card">
             <h2>Referensi Stok Sistem Saat Ini</h2>
-            <div style="max-height: 240px; overflow-y: auto;">
+            <div style="max-height: 260px; overflow-y: auto;">
                 <table>
                     <thead>
                         <tr>
@@ -167,13 +131,15 @@
                     <tbody>
                         @forelse($products as $p)
                         <tr>
-                            <td>{{ $p->sku }}</td>
-                            <td>{{ $p->name }}</td>
-                            <td>{{ $p->unit }}</td>
-                            <td style="text-align: right; font-weight: bold;">{{ $p->stock_quantity }}</td>
+                            <td><span class="sku-code badge">{{ $p->sku }}</span></td>
+                            <td style="font-weight: 600;">{{ $p->name }}</td>
+                            <td><span style="color: var(--text-muted);">{{ $p->unit }}</span></td>
+                            <td style="text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--primary-hover);">
+                                {{ number_format((float)$p->stock_quantity, 2, ',', '.') }}
+                            </td>
                         </tr>
                         @empty
-                        <tr><td colspan="4">Belum ada data produk material.</td></tr>
+                        <tr><td colspan="4" style="text-align: center; color: var(--text-caption); padding: 20px;">Belum ada produk terdaftar.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -184,11 +150,12 @@
 
 <script>
 let opnameIndex = 1;
+
 function addOpnameRow() {
     const tbody = document.getElementById('opname-tbody');
     const firstSelect = tbody.querySelector('.opname-product');
     const optionsHtml = firstSelect ? firstSelect.innerHTML : '';
-    
+
     const tr = document.createElement('tr');
     tr.className = 'opname-row';
     tr.innerHTML = `
@@ -198,10 +165,10 @@ function addOpnameRow() {
             </select>
         </td>
         <td>
-            <input type="number" step="0.0001" min="0" name="items[${opnameIndex}][physical_qty]" class="form-control" placeholder="0.00" required>
+            <input type="number" step="0.0001" min="0" name="items[${opnameIndex}][physical_qty]" class="form-control tabular-nums" placeholder="0.00" required>
         </td>
         <td style="text-align: center; vertical-align: middle;">
-            <button type="button" class="btn btn-secondary" style="padding: 2px 6px;" onclick="removeOpnameRow(this)">x</button>
+            <button type="button" class="btn btn-secondary" style="min-height: 28px; padding: 2px 8px; font-size: 11px;" onclick="removeOpnameRow(this)">x</button>
         </td>
     `;
     tbody.appendChild(tr);

@@ -9,32 +9,33 @@
             scroll-behavior: auto !important;
         }
     }
-    input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
-        outline: 2px solid #111;
-        outline-offset: 2px;
+    .filter-card {
+        background-color: #ffffff;
+        border: 1px solid var(--border-card);
+        border-radius: 18px;
+        padding: 16px 20px;
+        margin-bottom: 22px;
+        box-shadow: 0 4px 16px rgba(45, 106, 79, 0.04);
     }
-    .form-group {
-        margin-bottom: 12px;
-    }
-    .form-group label {
-        display: block;
-        margin-bottom: 4px;
-        font-weight: bold;
-        font-size: 12px;
-        text-transform: uppercase;
-        color: #222;
-    }
-    .btn-secondary {
-        background: #eee;
-        color: #111;
-        border: 1px solid #ccc;
-    }
-    .btn-secondary:hover {
-        background: #ddd;
+    .balance-status-box {
+        margin-top: 18px;
+        padding: 14px 18px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border: 1px solid var(--mint-border);
+        background-color: var(--mint-surface);
     }
     @media print {
-        header, nav, .filter-box {
+        header, nav, .sidebar-wrapper, .topbar, .filter-card, .no-print {
             display: none !important;
+        }
+        .app-layout {
+            display: block !important;
+        }
+        .main-wrapper {
+            margin: 0 !important;
         }
         main {
             padding: 0 !important;
@@ -42,30 +43,37 @@
         }
         .card {
             border: none !important;
+            box-shadow: none !important;
             padding: 0 !important;
         }
     }
 </style>
 
 <div class="card">
-    <h2>Laporan Neraca Keuangan (Balance Sheet)</h2>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
+        <h2 style="margin: 0; border: none; padding: 0;">Laporan Neraca Keuangan (Balance Sheet)</h2>
+        <span class="badge" style="font-size: 11px;">Buku Besar Akuntansi</span>
+    </div>
 
-    <div class="filter-box" style="margin-bottom: 20px; background: #f9f9f9; border: 1px solid #ddd; padding: 12px;">
+    <div class="filter-card no-print">
         <form method="GET" action="{{ route('reports.balance_sheet') }}" style="display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;">
             <div class="form-group" style="margin-bottom: 0;">
                 <label for="as_of_date">Per Tanggal (As of Date)</label>
-                <input type="date" name="as_of_date" id="as_of_date" value="{{ $asOfDate ?? date('Y-m-d') }}" style="padding: 6px;">
+                <input type="date" name="as_of_date" id="as_of_date" value="{{ $asOfDate ?? date('Y-m-d') }}" class="form-control" style="border-radius: 9999px; padding: 8px 14px;">
             </div>
-            <div>
-                <button type="submit" class="btn" style="padding: 7px 16px;">Tampilkan</button>
-                <button type="button" class="btn btn-secondary" onclick="window.print()" style="padding: 7px 14px;">Cetak</button>
+            <div style="display: flex; gap: 8px;">
+                <button type="submit" class="btn" style="border-radius: 9999px; padding: 8px 20px;">Tampilkan</button>
+                <button type="button" class="btn btn-secondary" onclick="window.print()" style="border-radius: 9999px; padding: 8px 16px;">Cetak</button>
             </div>
         </form>
     </div>
 
     <div class="grid-2">
         <div>
-            <h3>Aktiva (Aset)</h3>
+            <h3 style="color: var(--primary-hover); font-size: 15px; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                <span style="width: 4px; height: 14px; background-color: var(--accent); border-radius: 2px; display: inline-block;"></span>
+                Aktiva (Aset)
+            </h3>
             <table>
                 <thead>
                     <tr>
@@ -76,24 +84,29 @@
                 <tbody>
                     @forelse($report['assets'] as $a)
                     <tr>
-                        <td>{{ $a['code'] }} - {{ $a['name'] }}</td>
-                        <td style="text-align: right;">Rp {{ $a['amount'] }}</td>
+                        <td>
+                            <span class="sku-code" style="color: var(--primary);">{{ $a['code'] }}</span> &bull; {{ $a['name'] }}
+                        </td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $a['amount'] }}</td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="2" style="color: #777;">(Tidak ada saldo aset tercatat)</td>
+                        <td colspan="2" style="color: var(--text-caption); padding: 14px;">(Tidak ada saldo aset tercatat)</td>
                     </tr>
                     @endforelse
-                    <tr style="font-weight: bold; border-top: 2px solid #111; font-size: 14px;">
-                        <td>TOTAL ASET</td>
-                        <td style="text-align: right;">Rp {{ $report['total_assets'] }}</td>
+                    <tr style="font-weight: 800; border-top: 2px solid var(--primary); font-size: 14px; background-color: var(--mint-surface);">
+                        <td style="color: var(--primary-hover);">TOTAL ASET</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums; color: var(--primary-hover);">Rp {{ $report['total_assets'] }}</td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
         <div>
-            <h3>Pasiva (Kewajiban & Ekuitas)</h3>
+            <h3 style="color: var(--primary-hover); font-size: 15px; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                <span style="width: 4px; height: 14px; background-color: var(--accent); border-radius: 2px; display: inline-block;"></span>
+                Pasiva (Kewajiban &amp; Ekuitas)
+            </h3>
             <table>
                 <thead>
                     <tr>
@@ -102,55 +115,62 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr style="background: #f5f5f5;">
-                        <th colspan="2" style="padding: 6px 8px;">Kewajiban (Liabilitas)</th>
+                    <tr>
+                        <th colspan="2" style="background-color: var(--mint-surface); color: var(--primary-hover); font-size: 11px; padding: 6px 10px; text-transform: uppercase;">Kewajiban (Liabilitas)</th>
                     </tr>
                     @forelse($report['liabilities'] as $l)
                     <tr>
-                        <td style="padding-left: 18px;">{{ $l['code'] }} - {{ $l['name'] }}</td>
-                        <td style="text-align: right;">Rp {{ $l['amount'] }}</td>
+                        <td style="padding-left: 20px;">
+                            <span class="sku-code" style="color: var(--primary);">{{ $l['code'] }}</span> &bull; {{ $l['name'] }}
+                        </td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $l['amount'] }}</td>
                     </tr>
                     @empty
                     <tr>
-                        <td style="padding-left: 18px; color: #777;">(Tidak ada hutang / kewajiban)</td>
-                        <td style="text-align: right;">Rp 0.00</td>
+                        <td style="padding-left: 20px; color: var(--text-caption);">(Tidak ada hutang / kewajiban)</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp 0.00</td>
                     </tr>
                     @endforelse
-                    <tr style="font-weight: bold; border-top: 1px solid #ccc;">
+                    <tr style="font-weight: 700; border-top: 1px solid var(--border-subtle);">
                         <td>Total Kewajiban</td>
-                        <td style="text-align: right;">Rp {{ $report['total_liabilities'] }}</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $report['total_liabilities'] }}</td>
                     </tr>
 
-                    <tr style="background: #f5f5f5;">
-                        <th colspan="2" style="padding: 6px 8px;">Ekuitas Modal</th>
+                    <tr>
+                        <th colspan="2" style="background-color: var(--mint-surface); color: var(--primary-hover); font-size: 11px; padding: 6px 10px; text-transform: uppercase;">Ekuitas Modal</th>
                     </tr>
                     @forelse($report['equity'] as $eq)
                     <tr>
-                        <td style="padding-left: 18px;">{{ $eq['code'] }} - {{ $eq['name'] }}</td>
-                        <td style="text-align: right;">Rp {{ $eq['amount'] }}</td>
+                        <td style="padding-left: 20px;">
+                            <span class="sku-code" style="color: var(--primary);">{{ $eq['code'] }}</span> &bull; {{ $eq['name'] }}
+                        </td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $eq['amount'] }}</td>
                     </tr>
                     @empty
                     @endforelse
                     <tr>
-                        <td style="padding-left: 18px;">Laba Tahun Berjalan (Net Profit)</td>
-                        <td style="text-align: right;">Rp {{ $report['retained_earnings'] }}</td>
+                        <td style="padding-left: 20px;">Laba Tahun Berjalan (Net Profit)</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $report['retained_earnings'] }}</td>
                     </tr>
-                    <tr style="font-weight: bold; border-top: 1px solid #ccc;">
+                    <tr style="font-weight: 700; border-top: 1px solid var(--border-subtle);">
                         <td>Total Ekuitas</td>
-                        <td style="text-align: right;">Rp {{ $report['total_equity'] }}</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $report['total_equity'] }}</td>
                     </tr>
 
-                    <tr style="font-weight: bold; border-top: 2px solid #111; font-size: 14px;">
-                        <td>TOTAL PASIVA</td>
-                        <td style="text-align: right;">Rp {{ $report['total_liabilities_and_equity'] }}</td>
+                    <tr style="font-weight: 800; border-top: 2px solid var(--primary); font-size: 14px; background-color: var(--mint-surface);">
+                        <td style="color: var(--primary-hover);">TOTAL PASIVA</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums; color: var(--primary-hover);">Rp {{ $report['total_liabilities_and_equity'] }}</td>
                     </tr>
                 </tbody>
             </table>
 
-            <div style="margin-top: 16px; padding: 10px; border: 1px solid #111; background: {{ $report['is_balanced'] ? '#f5f5f5' : '#fff' }};">
-                <strong>Status Keseimbangan Neraca:</strong>
-                <span style="display: inline-block; padding: 2px 8px; font-weight: bold;">
-                    {{ $report['is_balanced'] ? 'SEIMBANG (BALANCED)' : 'TIDAK SEIMBANG (UNBALANCED)' }}
+            <div class="balance-status-box" style="{{ $report['is_balanced'] ? '' : 'background-color: #fde8e8; border-color: #f5c2c7;' }}">
+                <div>
+                    <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-caption);">Kondisi Neraca</div>
+                    <strong style="color: {{ $report['is_balanced'] ? 'var(--primary-hover)' : 'var(--danger)' }}; font-size: 13.5px;">Status Keseimbangan:</strong>
+                </div>
+                <span class="badge" style="background-color: {{ $report['is_balanced'] ? '#ffffff' : '#ffffff' }}; color: {{ $report['is_balanced'] ? 'var(--primary-hover)' : 'var(--danger)' }}; border-color: {{ $report['is_balanced'] ? 'var(--mint-border)' : '#f5c2c7' }}; font-weight: 800;">
+                    {{ $report['is_balanced'] ? '● SEIMBANG (BALANCED)' : '● TIDAK SEIMBANG' }}
                 </span>
             </div>
         </div>
