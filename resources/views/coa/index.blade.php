@@ -120,7 +120,7 @@
     </div>
 @endif
 
-<!-- Hero Header -->
+<!-- Hero Header Banner -->
 <div class="card" style="margin-bottom: 22px; padding: 22px 26px; border-left: 4px solid var(--primary);">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
         <div>
@@ -130,8 +130,8 @@
                 Daftar akun standar pembukuan kasir material. Seluruh transaksi kasir, inventori, ritase, dan beban operasional otomatis bermuara ke akun-akun ini.
             </p>
         </div>
-        <div style="display: flex; gap: 10px;">
-            <button type="button" class="btn" onclick="openNewModal()" style="border-radius: 9999px; padding: 9px 20px; font-size: 13px; font-weight: 700;">+ Tambah Akun Baru</button>
+        <div>
+            <button type="button" class="btn" onclick="openNewModal()" style="border-radius: 9999px; padding: 10px 22px; font-size: 13.5px; font-weight: 700; box-shadow: 0 4px 14px rgba(45, 106, 79, 0.25);">+ Tambah Akun Baru</button>
         </div>
     </div>
 </div>
@@ -158,143 +158,152 @@
     </a>
 </div>
 
-<!-- Grid 2 Layout: Left Form & Right Table -->
-<div class="grid-2">
-    <!-- Form Tambah / Edit Akun -->
-    <div class="card" id="form-card">
-        <h2 id="form-title">Tambah Akun Baru</h2>
-        <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px;">
-            Pastikan kode akun mengikuti struktur hierarki (1=Aset, 2=Kewajiban, 3=Ekuitas, 4=Pendapatan, 5=HPP, 6=Beban Operasional).
-        </p>
-        <form id="coa-form" method="POST" action="{{ route('coa.store') }}">
-            @csrf
-            <input type="hidden" name="_method" id="form-method" value="POST">
-
-            <div class="form-group">
-                <label for="account_code">Kode Akun</label>
-                <input type="text" id="account_code" name="account_code" value="{{ old('account_code') }}" required placeholder="Contoh: 1104" autocomplete="off" class="form-control tabular-nums" style="font-family: var(--font-mono);">
-            </div>
-
-            <div class="form-group">
-                <label for="account_name">Nama Akun</label>
-                <input type="text" id="account_name" name="account_name" value="{{ old('account_name') }}" required placeholder="Contoh: Kas Kecil Operasional" autocomplete="off" class="form-control">
-            </div>
-
-            <div class="form-group">
-                <label for="account_type">Tipe Klasifikasi Akun</label>
-                <select id="account_type" name="account_type" required class="form-control" onchange="autoSuggestBalance()">
-                    <option value="">-- Pilih Klasifikasi --</option>
-                    <option value="asset" {{ old('account_type') === 'asset' ? 'selected' : '' }}>Aset / Harta (1xxx)</option>
-                    <option value="liability" {{ old('account_type') === 'liability' ? 'selected' : '' }}>Kewajiban / Utang (2xxx)</option>
-                    <option value="equity" {{ old('account_type') === 'equity' ? 'selected' : '' }}>Ekuitas / Modal (3xxx)</option>
-                    <option value="revenue" {{ old('account_type') === 'revenue' ? 'selected' : '' }}>Pendapatan Operasional / Lainnya (4/7xxx)</option>
-                    <option value="expense" {{ old('account_type') === 'expense' ? 'selected' : '' }}>Beban HPP / Operasional (5/6/8xxx)</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="normal_balance">Saldo Normal</label>
-                <select id="normal_balance" name="normal_balance" required class="form-control">
-                    <option value="debit" {{ old('normal_balance') === 'debit' ? 'selected' : '' }}>Debet (Bertambah di Debet)</option>
-                    <option value="credit" {{ old('normal_balance') === 'credit' ? 'selected' : '' }}>Kredit (Bertambah di Kredit)</option>
-                </select>
-            </div>
-
-            <div style="display: flex; gap: 8px; margin-top: 20px;">
-                <button type="submit" id="btn-submit-coa" class="btn" style="flex: 1; border-radius: 9999px; min-height: 44px; font-weight: 700;">Simpan Akun</button>
-                <button type="button" id="btn-cancel-coa" class="btn btn-secondary" style="border-radius: 9999px; min-height: 44px; padding: 0 18px; display: none;" onclick="resetForm()">Batal</button>
-            </div>
-        </form>
+<!-- Full-Width Data Table Card -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 style="margin: 0; border: none; padding: 0;">Daftar Akun Terdaftar ({{ count($accounts) }})</h2>
+        <span class="badge">Tersinkronisasi Buku Besar</span>
     </div>
 
-    <!-- Data Table -->
-    <div class="card">
-        <h2>Daftar Akun Terdaftar ({{ count($accounts) }})</h2>
-        <div style="overflow-x: auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 80px;">Kode</th>
-                        <th>Nama Akun</th>
-                        <th style="width: 100px;">Klasifikasi</th>
-                        <th style="width: 90px; text-align: center;">Saldo Normal</th>
-                        <th style="width: 70px; text-align: center;">Transaksi</th>
-                        <th style="width: 110px; text-align: center;">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($accounts as $acc)
-                    <tr>
-                        <td><span class="sku-code badge">{{ $acc->account_code }}</span></td>
-                        <td>
-                            <div style="font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
-                                <span>{{ $acc->account_name }}</span>
-                                @if($acc->is_system)
-                                    <span class="badge" style="background: var(--mint-surface); color: var(--primary); border-color: var(--mint-border); font-size: 10px; padding: 1px 7px;">Inti Sistem</span>
-                                @endif
-                            </div>
-                        </td>
-                        <td>
-                            @if($acc->account_type === 'asset')
-                                <span class="badge badge-type-asset">Aset</span>
-                            @elseif($acc->account_type === 'liability')
-                                <span class="badge badge-type-liability">Kewajiban</span>
-                            @elseif($acc->account_type === 'equity')
-                                <span class="badge badge-type-equity">Ekuitas</span>
-                            @elseif($acc->account_type === 'revenue')
-                                <span class="badge badge-type-revenue">Pendapatan</span>
-                            @else
-                                <span class="badge badge-type-expense">Beban</span>
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 100px;">Kode Akun</th>
+                    <th>Nama Akun</th>
+                    <th style="width: 110px;">Klasifikasi</th>
+                    <th style="width: 100px; text-align: center;">Saldo Normal</th>
+                    <th style="width: 90px; text-align: center;">Transaksi</th>
+                    <th style="width: 120px; text-align: center;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($accounts as $acc)
+                <tr>
+                    <td><span class="sku-code badge">{{ $acc->account_code }}</span></td>
+                    <td>
+                        <div style="font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                            <span>{{ $acc->account_name }}</span>
+                            @if($acc->is_system)
+                                <span class="badge" style="background: var(--mint-surface); color: var(--primary); border-color: var(--mint-border); font-size: 10px; padding: 1px 7px;">Inti Sistem</span>
                             @endif
-                        </td>
-                        <td style="text-align: center;">
-                            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-caption);">
-                                {{ $acc->normal_balance }}
+                        </div>
+                    </td>
+                    <td>
+                        @if($acc->account_type === 'asset')
+                            <span class="badge badge-type-asset">Aset</span>
+                        @elseif($acc->account_type === 'liability')
+                            <span class="badge badge-type-liability">Kewajiban</span>
+                        @elseif($acc->account_type === 'equity')
+                            <span class="badge badge-type-equity">Ekuitas</span>
+                        @elseif($acc->account_type === 'revenue')
+                            <span class="badge badge-type-revenue">Pendapatan</span>
+                        @else
+                            <span class="badge badge-type-expense">Beban</span>
+                        @endif
+                    </td>
+                    <td style="text-align: center;">
+                        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-caption);">
+                            {{ $acc->normal_balance }}
+                        </span>
+                    </td>
+                    <td style="text-align: center;">
+                        @if($acc->transaction_count > 0)
+                            <span class="badge" style="background: var(--mint-surface); color: var(--primary-hover); font-variant-numeric: tabular-nums;">
+                                {{ $acc->transaction_count }} jrn
                             </span>
-                        </td>
-                        <td style="text-align: center;">
-                            @if($acc->transaction_count > 0)
-                                <span class="badge" style="background: var(--mint-surface); color: var(--primary-hover); font-variant-numeric: tabular-nums;">
-                                    {{ $acc->transaction_count }} jrn
-                                </span>
-                            @else
-                                <span style="font-size: 11.5px; color: var(--text-caption);">&bull; 0</span>
-                            @endif
-                        </td>
-                        <td style="text-align: center;">
-                            <div style="display: inline-flex; gap: 6px; align-items: center;">
-                                <button type="button" class="btn-action-edit"
-                                    data-id="{{ $acc->id }}"
-                                    data-code="{{ $acc->account_code }}"
-                                    data-name="{{ $acc->account_name }}"
-                                    data-type="{{ $acc->account_type }}"
-                                    data-balance="{{ $acc->normal_balance }}"
-                                    data-system="{{ $acc->is_system ? '1' : '0' }}"
-                                    onclick="editAccountBtn(this)">Ubah</button>
+                        @else
+                            <span style="font-size: 11.5px; color: var(--text-caption);">&bull; 0</span>
+                        @endif
+                    </td>
+                    <td style="text-align: center;">
+                        <div style="display: inline-flex; gap: 6px; align-items: center;">
+                            <button type="button" class="btn-action-edit"
+                                data-id="{{ $acc->id }}"
+                                data-code="{{ $acc->account_code }}"
+                                data-name="{{ $acc->account_name }}"
+                                data-type="{{ $acc->account_type }}"
+                                data-balance="{{ $acc->normal_balance }}"
+                                data-system="{{ $acc->is_system ? '1' : '0' }}"
+                                onclick="editAccountBtn(this)">Ubah</button>
 
-                                @if($acc->is_system)
-                                    <span class="btn-action-disabled" title="Akun inti sistem terlindungi dan tidak dapat dihapus">Terkunci</span>
-                                @elseif($acc->transaction_count > 0)
-                                    <span class="btn-action-disabled" title="Akun sudah memiliki riwayat transaksi di jurnal umum dan terkunci">Hapus</span>
-                                @else
-                                    <form method="POST" action="{{ route('coa.destroy', $acc->id) }}" style="margin: 0;" onsubmit="return confirm('Hapus akun {{ $acc->account_code }} ({{ $acc->account_name }}) dari Bagan Akun?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn-action-delete">Hapus</button>
-                                    </form>
-                                @endif
-                            </div>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="6" style="text-align: center; color: var(--text-caption); padding: 28px;">
-                            Belum ada akun pada klasifikasi ini.
-                        </td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
+                            @if($acc->is_system)
+                                <span class="btn-action-disabled" title="Akun inti sistem terlindungi dan tidak dapat dihapus">Terkunci</span>
+                            @elseif($acc->transaction_count > 0)
+                                <span class="btn-action-disabled" title="Akun sudah memiliki riwayat transaksi di jurnal umum dan terkunci">Hapus</span>
+                            @else
+                                <form method="POST" action="{{ route('coa.destroy', $acc->id) }}" style="margin: 0;" onsubmit="return confirm('Hapus akun {{ $acc->account_code }} ({{ $acc->account_name }}) dari Bagan Akun?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn-action-delete">Hapus</button>
+                                </form>
+                            @endif
+                        </div>
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--text-caption); padding: 32px;">
+                        Belum ada akun pada klasifikasi ini.
+                    </td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- POP-UP MODAL: Form Tambah / Ubah Akun -->
+<div id="modal-coa" class="modal-overlay {{ $errors->any() ? 'open' : '' }}" role="dialog" aria-modal="true" aria-labelledby="form-title">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h2 id="form-title" class="modal-title">Tambah Akun Baru</h2>
+            <button type="button" class="modal-close-btn" onclick="closeModal('modal-coa')" aria-label="Tutup Dialog">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size: 12.5px; color: var(--text-muted); margin: 0 0 16px 0; line-height: 1.5;">
+                Hierarki akun standar: <strong>1</strong>=Aset, <strong>2</strong>=Kewajiban, <strong>3</strong>=Ekuitas, <strong>4</strong>=Pendapatan, <strong>5</strong>=HPP, <strong>6</strong>=Beban Operasional.
+            </p>
+
+            <form id="coa-form" method="POST" action="{{ route('coa.store') }}">
+                @csrf
+                <input type="hidden" name="_method" id="form-method" value="POST">
+
+                <div class="form-group">
+                    <label for="account_code">Kode Akun</label>
+                    <input type="text" id="account_code" name="account_code" value="{{ old('account_code') }}" required placeholder="Contoh: 1104" autocomplete="off" class="form-control tabular-nums" style="font-family: var(--font-mono);">
+                </div>
+
+                <div class="form-group">
+                    <label for="account_name">Nama Akun</label>
+                    <input type="text" id="account_name" name="account_name" value="{{ old('account_name') }}" required placeholder="Contoh: Kas Kecil Operasional" autocomplete="off" class="form-control">
+                </div>
+
+                <div class="form-group">
+                    <label for="account_type">Tipe Klasifikasi Akun</label>
+                    <select id="account_type" name="account_type" required class="form-control" onchange="autoSuggestBalance()">
+                        <option value="">-- Pilih Klasifikasi --</option>
+                        <option value="asset" {{ old('account_type') === 'asset' ? 'selected' : '' }}>Aset / Harta (1xxx)</option>
+                        <option value="liability" {{ old('account_type') === 'liability' ? 'selected' : '' }}>Kewajiban / Utang (2xxx)</option>
+                        <option value="equity" {{ old('account_type') === 'equity' ? 'selected' : '' }}>Ekuitas / Modal (3xxx)</option>
+                        <option value="revenue" {{ old('account_type') === 'revenue' ? 'selected' : '' }}>Pendapatan Operasional / Lainnya (4/7xxx)</option>
+                        <option value="expense" {{ old('account_type') === 'expense' ? 'selected' : '' }}>Beban HPP / Operasional (5/6/8xxx)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="normal_balance">Saldo Normal</label>
+                    <select id="normal_balance" name="normal_balance" required class="form-control">
+                        <option value="debit" {{ old('normal_balance') === 'debit' ? 'selected' : '' }}>Debet (Bertambah di Debet)</option>
+                        <option value="credit" {{ old('normal_balance') === 'credit' ? 'selected' : '' }}>Kredit (Bertambah di Kredit)</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 24px;">
+                    <button type="submit" id="btn-submit-coa" class="btn" style="flex: 1; border-radius: 9999px; min-height: 46px; font-weight: 700;">Simpan Akun</button>
+                    <button type="button" class="btn btn-secondary" style="border-radius: 9999px; min-height: 46px; padding: 0 20px;" onclick="closeModal('modal-coa')">Batal</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -339,12 +348,11 @@ function editAccountBtn(btn) {
     document.getElementById('normal_balance').value = balance;
 
     document.getElementById('btn-submit-coa').textContent = 'Perbarui Akun';
-    document.getElementById('btn-cancel-coa').style.display = 'inline-block';
 
-    document.getElementById('form-card').scrollIntoView({ behavior: 'smooth' });
+    openModal('modal-coa');
 }
 
-function resetForm() {
+function openNewModal() {
     const codeInput = document.getElementById('account_code');
     document.getElementById('form-title').textContent = 'Tambah Akun Baru';
     document.getElementById('coa-form').action = "{{ route('coa.store') }}";
@@ -360,13 +368,8 @@ function resetForm() {
     document.getElementById('normal_balance').value = 'debit';
 
     document.getElementById('btn-submit-coa').textContent = 'Simpan Akun';
-    document.getElementById('btn-cancel-coa').style.display = 'none';
-}
 
-function openNewModal() {
-    resetForm();
-    document.getElementById('form-card').scrollIntoView({ behavior: 'smooth' });
-    document.getElementById('account_code').focus();
+    openModal('modal-coa');
 }
 </script>
 @endsection

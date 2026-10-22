@@ -1,46 +1,66 @@
 @extends('layouts.app')
 @section('content')
-<style>
-    @media (prefers-reduced-motion: reduce) {
-        *, ::before, ::after {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-            scroll-behavior: auto !important;
-        }
-    }
-    .form-group {
-        margin-bottom: 14px;
-    }
-    .form-control {
-        width: 100%;
-        box-sizing: border-box;
-    }
-</style>
-
-@if(session('success'))
-    <div class="alert alert-success" role="status">{{ session('success') }}</div>
-@endif
-
-@if(session('error'))
-    <div class="alert alert-error" role="alert">{{ session('error') }}</div>
-@endif
-
-@if($errors->any())
-    <div class="alert alert-error" role="alert">
-        <strong>Terjadi kesalahan input:</strong>
-        <ul style="margin: 6px 0 0 18px; padding: 0;">
-            @foreach($errors->all() as $err)
-                <li>{{ $err }}</li>
-            @endforeach
-        </ul>
+<!-- Header Summary Card -->
+<div class="card" style="margin-bottom: 22px; padding: 22px 26px; border-left: 4px solid var(--primary);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+        <div>
+            <span class="badge" style="margin-bottom: 6px;">Biaya &amp; Pengeluaran Toko</span>
+            <h1 style="font-size: 20px; font-weight: 800; color: var(--primary-hover); margin: 0 0 4px 0; letter-spacing: -0.01em;">Pengeluaran Operasional</h1>
+            <p style="font-size: 13px; color: var(--text-muted); margin: 0; line-height: 1.5;">
+                Pencatatan kas keluar untuk operasional toko material. Terhubung langsung dengan akun beban di Bagan Akun (COA).
+            </p>
+        </div>
+        <div>
+            <button type="button" class="btn" onclick="openModal('modal-expense')" style="border-radius: 9999px; padding: 10px 22px; font-size: 13.5px; font-weight: 700; box-shadow: 0 4px 14px rgba(45, 106, 79, 0.25);">+ Catat Pengeluaran Baru</button>
+        </div>
     </div>
-@endif
+</div>
 
-<div class="grid-2">
-    <div>
-        <div class="card">
-            <h2>Catat Pengeluaran Operasional</h2>
+<!-- Full-Width Data Table Card -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 style="margin: 0; border: none; padding: 0;">Daftar Pengeluaran Terakhir</h2>
+        <span class="badge">Audit Beban Kasir</span>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 130px;">Nomor Voucher</th>
+                    <th style="width: 100px;">Tanggal</th>
+                    <th>Akun Beban / Kategori</th>
+                    <th>Keterangan</th>
+                    <th style="text-align: right; width: 150px;">Jumlah Nominal</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($expenses as $ex)
+                <tr>
+                    <td><strong class="sku-code">{{ $ex->expense_number }}</strong></td>
+                    <td style="color: var(--text-caption); font-size: 12px;">{{ $ex->expense_date }}</td>
+                    <td><span class="badge" style="font-size: 11px;">{{ $ex->category }}</span></td>
+                    <td style="color: var(--text-main);">{{ $ex->description ?? '-' }}</td>
+                    <td style="text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--primary-hover);">Rp {{ number_format((float)$ex->amount, 2, ',', '.') }}</td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-caption); padding: 32px;">Belum ada catatan pengeluaran operasional.</td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- POP-UP MODAL: Form Catat Pengeluaran Operasional -->
+<div id="modal-expense" class="modal-overlay {{ $errors->any() ? 'open' : '' }}" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h2 id="expense-modal-title" class="modal-title">Catat Pengeluaran Operasional</h2>
+            <button type="button" class="modal-close-btn" onclick="closeModal('modal-expense')" aria-label="Tutup Dialog">&times;</button>
+        </div>
+        <div class="modal-body">
             <form action="{{ route('expenses.store') }}" method="POST">
                 @csrf
                 <div class="form-group">
@@ -82,42 +102,11 @@
                     <input type="text" name="description" id="description" class="form-control" maxlength="255" placeholder="Contoh: Pembelian token listrik toko" value="{{ old('description') }}">
                 </div>
 
-                <div style="margin-top: 18px;">
-                    <button type="submit" class="btn" style="width: 100%; border-radius: 9999px; min-height: 46px; font-weight: 700;">Simpan Pengeluaran</button>
+                <div style="display: flex; gap: 10px; margin-top: 24px;">
+                    <button type="submit" class="btn" style="flex: 1; border-radius: 9999px; min-height: 46px; font-weight: 700;">Simpan Pengeluaran</button>
+                    <button type="button" class="btn btn-secondary" style="border-radius: 9999px; min-height: 46px; padding: 0 20px;" onclick="closeModal('modal-expense')">Batal</button>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <div>
-        <div class="card">
-            <h2>Daftar Pengeluaran Terakhir</h2>
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Nomor</th>
-                            <th>Tanggal</th>
-                            <th>Kategori</th>
-                            <th>Keterangan</th>
-                            <th style="text-align: right;">Jumlah</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($expenses as $ex)
-                        <tr>
-                            <td><strong class="sku-code">{{ $ex->expense_number }}</strong></td>
-                            <td style="color: var(--text-caption); font-size: 12px;">{{ $ex->expense_date }}</td>
-                            <td><span class="badge" style="font-size: 10.5px;">{{ $ex->category }}</span></td>
-                            <td>{{ $ex->description ?? '-' }}</td>
-                            <td style="text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--primary-hover);">Rp {{ number_format((float)$ex->amount, 2, ',', '.') }}</td>
-                        </tr>
-                        @empty
-                        <tr><td colspan="5" style="text-align: center; color: var(--text-caption); padding: 24px;">Belum ada catatan pengeluaran operasional.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
         </div>
     </div>
 </div>

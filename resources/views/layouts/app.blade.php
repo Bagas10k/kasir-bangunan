@@ -640,6 +640,106 @@
             color: var(--primary);
         }
 
+        /* ─── MODAL POPUP DIALOGS ─────────────────────────────────────────── */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-dialog {
+            background-color: var(--surface);
+            border: 1px solid var(--border-card);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px -10px rgba(27, 67, 50, 0.18), 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 520px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            transform: scale(0.96) translateY(10px);
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .modal-overlay.open .modal-dialog {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal-header {
+            padding: 20px 26px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            background-color: var(--surface);
+            z-index: 2;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+        }
+
+        .modal-title {
+            font-size: 16.5px;
+            font-weight: 800;
+            color: var(--primary-hover);
+            letter-spacing: -0.01em;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .modal-title::before {
+            content: "";
+            width: 4px;
+            height: 16px;
+            background-color: var(--accent);
+            border-radius: 2px;
+            display: inline-block;
+        }
+
+        .modal-close-btn {
+            background: none;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-caption);
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .modal-close-btn:hover {
+            background-color: var(--mint-surface);
+            color: var(--primary);
+        }
+
+        .modal-body {
+            padding: 24px 26px;
+        }
+
         /* ─── RESPONSIVE MOBILE ─────────────────────────────────────────── */
         @media (max-width: 900px) {
             .grid-2 {
@@ -927,7 +1027,44 @@
             if (toggle) toggle.addEventListener('click', openSidebar);
             if (backdrop) backdrop.addEventListener('click', closeSidebar);
             if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+
+            // Close modal on Escape key
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') {
+                    document.querySelectorAll('.modal-overlay.open').forEach(function (m) {
+                        m.classList.remove('open');
+                        document.body.style.overflow = '';
+                    });
+                }
+            });
+
+            // Close modal on backdrop click
+            document.addEventListener('click', function (e) {
+                if (e.target.classList.contains('modal-overlay')) {
+                    e.target.classList.remove('open');
+                    document.body.style.overflow = '';
+                }
+            });
         });
+
+        // Global Modal Controls
+        function openModal(id) {
+            var modal = document.getElementById(id);
+            if (!modal) return;
+            modal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            var firstInput = modal.querySelector('input:not([type=hidden]):not([readonly]), select, textarea');
+            if (firstInput) {
+                setTimeout(function () { firstInput.focus(); }, 60);
+            }
+        }
+
+        function closeModal(id) {
+            var modal = document.getElementById(id);
+            if (!modal) return;
+            modal.classList.remove('open');
+            document.body.style.overflow = '';
+        }
     </script>
 </body>
 </html>
