@@ -611,9 +611,7 @@
             border-radius: 14px;
             font-size: 13.5px;
             line-height: 1.5;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            display: block;
         }
 
         .alert-success {
@@ -630,11 +628,12 @@
 
         .badge {
             display: inline-block;
-            padding: 4px 10px;
+            padding: 3px 10px;
             font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            white-space: nowrap;
             border-radius: 9999px;
             border: 1px solid var(--mint-border);
             background-color: var(--mint-surface);

@@ -4,7 +4,7 @@
 <div class="grid-2">
     <div class="card">
         <h2>Pendaftaran Produk Baru</h2>
-        <div class="alert alert-info" style="font-size: 12.5px; margin-bottom: 18px;">
+        <div class="alert alert-info" style="font-size: 12.5px; margin-bottom: 18px; background-color: var(--mint-surface); border: 1px solid var(--mint-border); color: var(--primary-hover);">
             Sesuai prinsip integritas akuntansi, produk baru otomatis didaftarkan dengan <strong>stok awal 0.00</strong>. Penambahan stok fisik wajib melalui form <em>Penerimaan Barang</em> agar jurnal neraca tetap seimbang.
         </div>
         <form method="POST" action="{{ route('products.store') }}">
@@ -39,12 +39,12 @@
             <table>
                 <thead>
                     <tr>
-                        <th>SKU</th>
+                        <th style="width: 140px;">SKU</th>
                         <th>Nama Produk</th>
-                        <th>Satuan</th>
-                        <th style="text-align: right;">HPP</th>
-                        <th style="text-align: right;">Harga Jual</th>
-                        <th style="text-align: right;">Stok</th>
+                        <th style="width: 70px;">Satuan</th>
+                        <th style="text-align: right; width: 110px;">HPP</th>
+                        <th style="text-align: right; width: 120px;">Harga Jual</th>
+                        <th style="text-align: right; width: 80px;">Stok</th>
                     </tr>
                 </thead>
                 <tbody>
