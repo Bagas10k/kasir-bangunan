@@ -11,7 +11,18 @@ class ExpenseController extends Controller
     public function index()
     {
         $expenses = DB::table('expenses')->latest()->limit(10)->get();
-        return view('expenses.index', compact('expenses'));
+
+        if (DB::table('chart_of_accounts')->count() === 0) {
+            (new \Database\Seeders\ChartOfAccountsSeeder())->run();
+        }
+
+        $expenseAccounts = DB::table('chart_of_accounts')
+            ->where('account_type', 'expense')
+            ->whereNotIn('account_code', ['5101', '5201', '6201'])
+            ->orderBy('account_code')
+            ->get();
+
+        return view('expenses.index', compact('expenses', 'expenseAccounts'));
     }
 
     public function store(Request $request, ExpenseService $service)

@@ -227,7 +227,12 @@
                     <tr>
                         <td><span class="sku-code badge">{{ $acc->account_code }}</span></td>
                         <td>
-                            <div style="font-weight: 600; color: var(--text-main);">{{ $acc->account_name }}</div>
+                            <div style="font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                                <span>{{ $acc->account_name }}</span>
+                                @if($acc->is_system)
+                                    <span class="badge" style="background: var(--mint-surface); color: var(--primary); border-color: var(--mint-border); font-size: 10px; padding: 1px 7px;">Inti Sistem</span>
+                                @endif
+                            </div>
                         </td>
                         <td>
                             @if($acc->account_type === 'asset')
@@ -264,9 +269,12 @@
                                     data-name="{{ $acc->account_name }}"
                                     data-type="{{ $acc->account_type }}"
                                     data-balance="{{ $acc->normal_balance }}"
+                                    data-system="{{ $acc->is_system ? '1' : '0' }}"
                                     onclick="editAccountBtn(this)">Ubah</button>
 
-                                @if($acc->transaction_count > 0)
+                                @if($acc->is_system)
+                                    <span class="btn-action-disabled" title="Akun inti sistem terlindungi dan tidak dapat dihapus">Terkunci</span>
+                                @elseif($acc->transaction_count > 0)
                                     <span class="btn-action-disabled" title="Akun sudah memiliki riwayat transaksi di jurnal umum dan terkunci">Hapus</span>
                                 @else
                                     <form method="POST" action="{{ route('coa.destroy', $acc->id) }}" style="margin: 0;" onsubmit="return confirm('Hapus akun {{ $acc->account_code }} ({{ $acc->account_name }}) dari Bagan Akun?');">
@@ -308,12 +316,24 @@ function editAccountBtn(btn) {
     const name = btn.getAttribute('data-name');
     const type = btn.getAttribute('data-type');
     const balance = btn.getAttribute('data-balance');
+    const isSystem = btn.getAttribute('data-system') === '1';
 
-    document.getElementById('form-title').textContent = 'Ubah Akun ' + code;
+    const codeInput = document.getElementById('account_code');
+    document.getElementById('form-title').textContent = 'Ubah Akun ' + code + (isSystem ? ' (Inti Sistem)' : '');
     document.getElementById('coa-form').action = "{{ url('/coa') }}/" + id;
     document.getElementById('form-method').value = 'PUT';
 
-    document.getElementById('account_code').value = code;
+    codeInput.value = code;
+    if (isSystem) {
+        codeInput.readOnly = true;
+        codeInput.style.backgroundColor = '#f3f4f6';
+        codeInput.title = 'Nomor kode akun inti sistem terkunci agar transaksi otomatis tetap sinkron.';
+    } else {
+        codeInput.readOnly = false;
+        codeInput.style.backgroundColor = '#ffffff';
+        codeInput.title = '';
+    }
+
     document.getElementById('account_name').value = name;
     document.getElementById('account_type').value = type;
     document.getElementById('normal_balance').value = balance;
@@ -325,11 +345,16 @@ function editAccountBtn(btn) {
 }
 
 function resetForm() {
+    const codeInput = document.getElementById('account_code');
     document.getElementById('form-title').textContent = 'Tambah Akun Baru';
     document.getElementById('coa-form').action = "{{ route('coa.store') }}";
     document.getElementById('form-method').value = 'POST';
 
-    document.getElementById('account_code').value = '';
+    codeInput.value = '';
+    codeInput.readOnly = false;
+    codeInput.style.backgroundColor = '#ffffff';
+    codeInput.title = '';
+
     document.getElementById('account_name').value = '';
     document.getElementById('account_type').value = '';
     document.getElementById('normal_balance').value = 'debit';

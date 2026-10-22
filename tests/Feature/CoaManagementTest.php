@@ -180,4 +180,77 @@ class CoaManagementTest extends TestCase
         // Ensure account is deleted
         $this->assertDatabaseMissing('chart_of_accounts', ['id' => $accId]);
     }
+
+    public function test_system_account_code_cannot_be_modified(): void
+    {
+        $acc = DB::table('chart_of_accounts')->where('account_code', '1101')->first();
+        if (!$acc) {
+            $this->actingAs($this->user)->get(route('coa.index'));
+            $acc = DB::table('chart_of_accounts')->where('account_code', '1101')->first();
+        }
+
+        // Attempt to change code of core account 1101 to 9991
+        $response = $this->actingAs($this->user)->put(route('coa.update', $acc->id), [
+            'account_code' => '9991',
+            'account_name' => 'Kas Toko Berubah',
+            'account_type' => 'asset',
+            'normal_balance' => 'debit',
+        ]);
+
+        $response->assertRedirect(route('coa.index'));
+        $response->assertSessionHas('error');
+
+        // Code must stay 1101
+        $fresh = DB::table('chart_of_accounts')->where('id', $acc->id)->first();
+        $this->assertEquals('1101', $fresh->account_code);
+    }
+
+    public function test_system_account_cannot_be_deleted(): void
+    {
+        $acc = DB::table('chart_of_accounts')->where('account_code', '1101')->first();
+        if (!$acc) {
+            $this->actingAs($this->user)->get(route('coa.index'));
+            $acc = DB::table('chart_of_accounts')->where('account_code', '1101')->first();
+        }
+
+        $response = $this->actingAs($this->user)->delete(route('coa.destroy', $acc->id));
+        $response->assertRedirect(route('coa.index'));
+        $response->assertSessionHas('error');
+
+        $this->assertDatabaseHas('chart_of_accounts', ['account_code' => '1101']);
+    }
+
+    public function test_dynamic_expense_booking_uses_selected_coa_account(): void
+    {
+        // 1. Create a custom COA expense account
+        $this->actingAs($this->user)->post(route('coa.store'), [
+            'account_code' => '6106',
+            'account_name' => 'Beban Konsumsi & Lembur Kasir',
+            'account_type' => 'expense',
+            'normal_balance' => 'debit',
+        ])->assertSessionHas('success');
+
+        // 2. Submit expense using that COA account code
+        $expenseResponse = $this->actingAs($this->user)->post(route('expenses.store'), [
+            'category' => '6106',
+            'amount' => '75000.00',
+            'description' => 'Makan siang shift lembur',
+            'payment_method' => 'cash',
+        ]);
+        $expenseResponse->assertRedirect(route('expenses.index'));
+        $expenseResponse->assertSessionHas('success');
+
+        // 3. Verify journal entry line uses exact 6106 code and name
+        $expense = DB::table('expenses')->where('category', '6106')->first();
+        $this->assertNotNull($expense);
+
+        $line = DB::table('journal_entry_lines')
+            ->where('journal_entry_id', $expense->journal_entry_id)
+            ->where('debit', '75000.00')
+            ->first();
+
+        $this->assertNotNull($line);
+        $this->assertEquals('6106', $line->account_code);
+        $this->assertEquals('Beban Konsumsi & Lembur Kasir', $line->account_name);
+    }
 }

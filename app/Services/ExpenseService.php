@@ -76,11 +76,39 @@ class ExpenseService
 
             DB::table('expenses')->where('id', $expenseId)->update(['journal_entry_id' => $journalId]);
 
-            // Debit: Beban Operasional (6101)
+            // Resolve debit account from COA or fallback map
+            $coa = DB::table('chart_of_accounts')
+                ->where('account_code', $category)
+                ->orWhere('account_name', $category)
+                ->first();
+
+            if ($coa) {
+                $debitCode = $coa->account_code;
+                $debitName = $coa->account_name;
+            } else {
+                $categoryMap = [
+                    'Operasional Toko' => ['6101', 'Beban Operasional Toko'],
+                    'Listrik & Air' => ['6102', 'Beban Listrik & Air'],
+                    'Pemeliharaan & Perbaikan' => ['6103', 'Beban Pemeliharaan & Perbaikan'],
+                    'Perlengkapan & ATK' => ['6104', 'Beban Perlengkapan & ATK'],
+                    'Gaji & Upah Tenaga' => ['6105', 'Beban Gaji & Upah Tenaga'],
+                    'Lain-lain' => ['6199', 'Beban Lain-lain'],
+                ];
+
+                if (isset($categoryMap[$category])) {
+                    $debitCode = $categoryMap[$category][0];
+                    $debitName = $categoryMap[$category][1];
+                } else {
+                    $debitCode = '6101';
+                    $debitName = 'Beban Operasional';
+                }
+            }
+
+            // Debit: Selected Expense Account
             DB::table('journal_entry_lines')->insert([
                 'journal_entry_id' => $journalId,
-                'account_code' => '6101',
-                'account_name' => 'Beban Operasional',
+                'account_code' => $debitCode,
+                'account_name' => $debitName,
                 'debit' => $amountStr,
                 'credit' => '0.00',
                 'created_at' => date('Y-m-d H:i:s'),

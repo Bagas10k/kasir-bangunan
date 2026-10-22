@@ -10,6 +10,23 @@ use Illuminate\Validation\Rule;
 class ChartOfAccountController extends Controller
 {
     /**
+     * Core system reserved accounts that transact automatically in POS, receipts, opname, and ritase.
+     * Their account codes are locked to prevent breaking operational workflows.
+     */
+    public const SYSTEM_ACCOUNTS = [
+        '1101', // Kas Toko (Tunai)
+        '1102', // Rekening Bank
+        '1103', // Piutang Usaha
+        '1301', // Persediaan Material Bangunan
+        '2101', // Utang Usaha (Supplier)
+        '3101', // Modal Pemilik / Modal Awal
+        '4101', // Pendapatan Penjualan Material
+        '5101', // Beban Pokok Penjualan (HPP)
+        '5201', // Beban Selisih Opname (Susut/Rusak)
+        '6201', // Beban Transportasi & Ritase Armada
+    ];
+
+    /**
      * Display listing of Chart of Accounts with transaction usage metrics.
      */
     public function index(Request $request)
@@ -50,6 +67,11 @@ class ChartOfAccountController extends Controller
             ->orderBy('chart_of_accounts.account_code', 'asc')
             ->get();
 
+        // Attach system flag to each account
+        foreach ($accounts as $acc) {
+            $acc->is_system = in_array($acc->account_code, self::SYSTEM_ACCOUNTS, true);
+        }
+
         // Count per type for summary badges
         $typeCounts = DB::table('chart_of_accounts')
             ->select('account_type', DB::raw('count(*) as count'))
@@ -88,7 +110,7 @@ class ChartOfAccountController extends Controller
     }
 
     /**
-     * Update an existing account.
+     * Update an existing account with system account code protection.
      */
     public function update(Request $request, $id)
     {
@@ -106,6 +128,11 @@ class ChartOfAccountController extends Controller
 
         $newCode = trim($validated['account_code']);
         $oldCode = $account->account_code;
+
+        // System Reserved Account Guard: Cannot change account code
+        if (in_array($oldCode, self::SYSTEM_ACCOUNTS, true) && $newCode !== $oldCode) {
+            return redirect()->route('coa.index')->with('error', 'Kode akun inti sistem (' . $oldCode . ') tidak boleh diubah nomornya karena terhubung langsung dengan alur transaksi otomatis kasir/operasional.');
+        }
 
         // Check if code changed and if it is used in journal entries
         if ($newCode !== $oldCode) {
@@ -131,13 +158,18 @@ class ChartOfAccountController extends Controller
     }
 
     /**
-     * Remove the specified account with strict integrity check.
+     * Remove the specified account with strict integrity and system reserved check.
      */
     public function destroy($id)
     {
         $account = DB::table('chart_of_accounts')->where('id', $id)->first();
         if (!$account) {
             return redirect()->route('coa.index')->with('error', 'Akun tidak ditemukan.');
+        }
+
+        // System Reserved Account Guard: Cannot delete system accounts
+        if (in_array($account->account_code, self::SYSTEM_ACCOUNTS, true)) {
+            return redirect()->route('coa.index')->with('error', 'Akun ' . $account->account_code . ' (' . $account->account_name . ') adalah akun inti sistem dan tidak boleh dihapus.');
         }
 
         // Strict integrity guard: cannot delete if referenced in general ledger

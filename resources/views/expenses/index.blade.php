@@ -44,15 +44,23 @@
             <form action="{{ route('expenses.store') }}" method="POST">
                 @csrf
                 <div class="form-group">
-                    <label for="category">Kategori Biaya</label>
+                    <label for="category">Akun Biaya / Kategori</label>
                     <select name="category" id="category" class="form-control" required>
-                        <option value="">-- Pilih Kategori --</option>
-                        <option value="Operasional Toko" {{ old('category') === 'Operasional Toko' ? 'selected' : '' }}>Operasional Toko</option>
-                        <option value="Listrik & Air" {{ old('category') === 'Listrik & Air' ? 'selected' : '' }}>Listrik &amp; Air</option>
-                        <option value="Pemeliharaan & Perbaikan" {{ old('category') === 'Pemeliharaan & Perbaikan' ? 'selected' : '' }}>Pemeliharaan &amp; Perbaikan</option>
-                        <option value="Perlengkapan & ATK" {{ old('category') === 'Perlengkapan & ATK' ? 'selected' : '' }}>Perlengkapan &amp; ATK</option>
-                        <option value="Gaji & Upah Tenaga" {{ old('category') === 'Gaji & Upah Tenaga' ? 'selected' : '' }}>Gaji &amp; Upah Tenaga</option>
-                        <option value="Lain-lain" {{ old('category') === 'Lain-lain' ? 'selected' : '' }}>Lain-lain</option>
+                        <option value="">-- Pilih Akun Biaya Operasional --</option>
+                        @if(isset($expenseAccounts) && count($expenseAccounts) > 0)
+                            @foreach($expenseAccounts as $acc)
+                                <option value="{{ $acc->account_code }}" {{ old('category') == $acc->account_code ? 'selected' : '' }}>
+                                    {{ $acc->account_code }} - {{ $acc->account_name }}
+                                </option>
+                            @endforeach
+                        @else
+                            <option value="Operasional Toko" {{ old('category') === 'Operasional Toko' ? 'selected' : '' }}>6101 - Operasional Toko</option>
+                            <option value="Listrik & Air" {{ old('category') === 'Listrik & Air' ? 'selected' : '' }}>6102 - Listrik &amp; Air</option>
+                            <option value="Pemeliharaan & Perbaikan" {{ old('category') === 'Pemeliharaan & Perbaikan' ? 'selected' : '' }}>6103 - Pemeliharaan &amp; Perbaikan</option>
+                            <option value="Perlengkapan & ATK" {{ old('category') === 'Perlengkapan & ATK' ? 'selected' : '' }}>6104 - Perlengkapan &amp; ATK</option>
+                            <option value="Gaji & Upah Tenaga" {{ old('category') === 'Gaji & Upah Tenaga' ? 'selected' : '' }}>6105 - Gaji &amp; Upah Tenaga</option>
+                            <option value="Lain-lain" {{ old('category') === 'Lain-lain' ? 'selected' : '' }}>6199 - Lain-lain</option>
+                        @endif
                     </select>
                 </div>
 
