@@ -31,8 +31,13 @@ class AuthController extends Controller
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login Kasir - Sistem Bahan Bangunan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
+            --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
             --canvas: #f8faf8;
             --surface: #ffffff;
             --primary: #2d6a4f;
@@ -58,7 +63,7 @@ class AuthController extends Controller
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: var(--font-sans);
             background-color: var(--canvas);
             color: var(--text-main);
             line-height: 1.5;
@@ -67,7 +72,9 @@ class AuthController extends Controller
             align-items: center;
             justify-content: center;
             padding: 24px 16px;
+            font-feature-settings: "cv02", "cv03", "cv04", "cv11";
             -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .auth-card {
@@ -89,7 +96,7 @@ class AuthController extends Controller
             display: inline-block;
             font-size: 11px;
             font-weight: 700;
-            letter-spacing: 0.06em;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
             color: var(--primary);
             background-color: var(--mint-surface);
@@ -100,17 +107,18 @@ class AuthController extends Controller
         }
 
         h1 {
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--primary-hover);
+            font-size: 24px;
+            font-weight: 800;
+            color: #1b4332;
             margin-bottom: 6px;
-            letter-spacing: -0.01em;
+            letter-spacing: -0.02em;
+            text-wrap: balance;
         }
 
         .form-subtitle {
-            font-size: 13px;
-            color: var(--text-muted);
-            line-height: 1.4;
+            font-size: 13.5px;
+            line-height: 1.5;
+            color: #495057;
         }
 
         .alert-box {
@@ -133,8 +141,9 @@ class AuthController extends Controller
             display: block;
             font-size: 13px;
             font-weight: 600;
+            letter-spacing: -0.005em;
             margin-bottom: 6px;
-            color: var(--text-main);
+            color: #1c2826;
         }
 
         input {
@@ -169,6 +178,7 @@ class AuthController extends Controller
             font-family: inherit;
             font-size: 14px;
             font-weight: 600;
+            letter-spacing: 0.01em;
             cursor: pointer;
             border-radius: 6px;
             padding: 10px 20px;
@@ -193,8 +203,9 @@ class AuthController extends Controller
             margin: 16px 0 12px;
             color: var(--text-caption);
             font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
         }
 
         .login-divider::before, .login-divider::after {
@@ -220,6 +231,7 @@ class AuthController extends Controller
             font-family: inherit;
             font-size: 14px;
             font-weight: 600;
+            letter-spacing: 0.01em;
             cursor: pointer;
             border-radius: 6px;
             padding: 10px 20px;

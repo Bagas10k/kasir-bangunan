@@ -37,8 +37,9 @@
     .form-group label {
         display: block;
         margin-bottom: 4px;
-        font-weight: bold;
-        font-size: 12px;
+        font-weight: 700;
+        font-size: 11.5px;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
         color: #2d6a4f;
     }
@@ -81,11 +82,40 @@
     }
     .summary-total {
         font-size: 16px;
-        font-weight: bold;
+        font-weight: 700;
         color: #1b4332;
         border-top: 2px solid #2d6a4f;
         padding-top: 8px;
         margin-top: 8px;
+    }
+    #display-total {
+        font-size: 22px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        color: #1b4332;
+    }
+    #display-change {
+        font-size: 16px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+    #cart-table th, #products-table th, .card table th {
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+    #cart-table td, #products-table td, .card table td {
+        font-size: 13.5px;
+    }
+    .item-price, .item-subtotal, td.item-price, td.item-subtotal {
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+    }
+    .sku-code {
+        font-family: var(--font-mono, 'JetBrains Mono', monospace);
+        font-size: 12px;
+        font-weight: 600;
     }
 </style>
 
@@ -139,8 +169,8 @@
                             <tr>
                                 <th>Produk</th>
                                 <th style="width: 80px;">Qty</th>
-                                <th style="width: 100px;">Harga</th>
-                                <th style="width: 110px;">Subtotal</th>
+                                <th style="width: 100px; text-align: right;">Harga</th>
+                                <th style="width: 110px; text-align: right;">Subtotal</th>
                                 <th style="width: 40px;"></th>
                             </tr>
                         </thead>
@@ -207,17 +237,17 @@
                             <th>SKU</th>
                             <th>Nama</th>
                             <th>Stok</th>
-                            <th>Harga</th>
+                            <th style="text-align: right;">Harga</th>
                             <th style="width: 50px;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($products as $p)
                         <tr class="product-item-row">
-                            <td>{{ $p->sku }}</td>
+                            <td class="sku-code">{{ $p->sku }}</td>
                             <td>{{ $p->name }}</td>
                             <td>{{ $p->stock_quantity }} {{ $p->unit }}</td>
-                            <td>Rp {{ number_format($p->selling_price, 2) }}</td>
+                            <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ number_format($p->selling_price, 2) }}</td>
                             <td>
                                 <button type="button" class="btn btn-secondary" style="padding: 2px 6px; font-size: 11px;" onclick="addToCart({{ $p->id }})">Pilih</button>
                             </td>
@@ -237,16 +267,16 @@
                     <tr>
                         <th>Invoice</th>
                         <th>Metode</th>
-                        <th>Total</th>
+                        <th style="text-align: right;">Total</th>
                         <th>Struk</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($recentSales as $s)
                     <tr>
-                        <td><strong>{{ $s->invoice_number }}</strong></td>
+                        <td><strong class="sku-code">{{ $s->invoice_number }}</strong></td>
                         <td>{{ strtoupper($s->payment_method) }} ({{ strtoupper($s->customer_type) }})</td>
-                        <td>Rp {{ number_format($s->total_amount, 2) }}</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ number_format($s->total_amount, 2) }}</td>
                         <td>
                             <a href="{{ route('pos.receipt', $s->id) }}" class="btn btn-secondary" style="padding: 2px 8px; text-decoration: none; display: inline-block;">Lihat Struk</a>
                         </td>

@@ -4,8 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kasir Material & Bangunan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            --text-xs: 11px;
+            --text-sm: 12.5px;
+            --text-base: 14px;
+            --text-md: 15px;
+            --text-lg: 16.5px;
+            --text-xl: 20px;
+            --text-2xl: 24px;
+            --leading-tight: 1.25;
+            --leading-normal: 1.5;
+            --leading-relaxed: 1.6;
+            --tracking-tight: -0.015em;
+            --tracking-wide: 0.04em;
+            --tracking-wider: 0.08em;
+
             --primary: #2d6a4f;
             --primary-hover: #1b4332;
             --accent: #52b788;
@@ -40,12 +59,14 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: var(--font-sans);
             background-color: var(--canvas);
             color: var(--text-main);
-            font-size: 14px;
-            line-height: 1.5;
+            font-size: var(--text-base);
+            line-height: var(--leading-normal);
+            font-feature-settings: "cv02", "cv03", "cv04", "cv11";
             -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         /* Layout Structure */
@@ -89,9 +110,9 @@
 
         .sidebar-title {
             font-size: 16px;
-            font-weight: 700;
+            font-weight: 800;
             margin: 0;
-            letter-spacing: 0.5px;
+            letter-spacing: -0.01em;
             color: #ffffff;
             line-height: 1.2;
         }
@@ -139,7 +160,7 @@
             font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.08em;
             color: var(--sidebar-accent);
             padding: 0 10px 6px;
         }
@@ -147,7 +168,7 @@
         .sidebar-nav a {
             color: var(--sidebar-text);
             text-decoration: none;
-            font-size: 13px;
+            font-size: 13.5px;
             font-weight: 500;
             min-height: 40px;
             display: flex;
@@ -326,21 +347,26 @@
             margin-bottom: 24px;
         }
 
+        h1, h2 {
+            font-weight: 700;
+            letter-spacing: -0.015em;
+            text-wrap: balance;
+        }
+
         h2 {
             font-size: 16px;
-            font-weight: 700;
             color: var(--primary-hover);
             margin-top: 0;
             border-bottom: 2px solid var(--mint-surface);
             padding-bottom: 10px;
-            letter-spacing: 0.3px;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 13px;
+            font-size: 13.5px;
             margin-top: 10px;
+            font-variant-numeric: tabular-nums;
         }
 
         th, td {
@@ -348,6 +374,17 @@
             padding: 10px 12px;
             border-bottom: 1px solid var(--border-subtle);
             vertical-align: middle;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .sku-code, .sku-cell, code, .font-mono {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
         }
 
         th {
