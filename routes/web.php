@@ -11,6 +11,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\InventoryReceiptController;
+use App\Http\Controllers\ChartOfAccountController;
 
 // Guest authentication & demo setup routes
 Route::middleware('guest')->group(function () {
@@ -58,4 +59,10 @@ Route::middleware('auth')->group(function () {
     // Reports
     Route::get('/reports/profit-loss', [ReportController::class, 'profitLoss'])->name('reports.profit_loss');
     Route::get('/reports/balance-sheet', [ReportController::class, 'balanceSheet'])->name('reports.balance_sheet');
+
+    // Chart of Accounts (COA)
+    Route::get('/coa', [ChartOfAccountController::class, 'index'])->name('coa.index');
+    Route::post('/coa', [ChartOfAccountController::class, 'store'])->name('coa.store');
+    Route::put('/coa/{id}', [ChartOfAccountController::class, 'update'])->name('coa.update');
+    Route::delete('/coa/{id}', [ChartOfAccountController::class, 'destroy'])->name('coa.destroy');
 });
