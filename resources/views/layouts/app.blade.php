@@ -429,12 +429,52 @@
             box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
         }
 
+        /* ─── CROSS-DOCUMENT VIEW TRANSITIONS & PAGE MORPHING ─────────── */
+        @view-transition {
+            navigation: auto;
+        }
+
+        ::view-transition-old(root) {
+            animation: 90ms cubic-bezier(0.4, 0, 1, 1) both fadeOut;
+        }
+
+        ::view-transition-new(root) {
+            animation: 220ms cubic-bezier(0, 0, 0.2, 1) both fadeIn,
+                       240ms cubic-bezier(0.16, 1, 0.3, 1) both slideUp;
+        }
+
+        @keyframes fadeOut {
+            to { opacity: 0; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(12px) scale(0.995); }
+            to { transform: translateY(0) scale(1); }
+        }
+
+        @keyframes pageMorphIn {
+            0% {
+                opacity: 0;
+                transform: translateY(14px) scale(0.992);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
         .main-content {
             padding: 28px;
             flex: 1;
             max-width: 1360px;
             width: 100%;
             margin: 0 auto;
+            animation: pageMorphIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+            will-change: transform, opacity;
         }
 
         /* ─── ELEVATED CARDS & COMPONENTS ───────────────────────────────── */
@@ -445,6 +485,13 @@
             box-shadow: 0 4px 20px -2px rgba(27, 67, 50, 0.05);
             padding: 24px;
             margin-bottom: 24px;
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                        box-shadow 0.25s ease,
+                        border-color 0.25s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 10px 28px -4px rgba(27, 67, 50, 0.08);
         }
 
         h2 {
@@ -640,46 +687,90 @@
             color: var(--primary);
         }
 
-        /* ─── MODAL POPUP DIALOGS ─────────────────────────────────────────── */
+        /* ─── MODAL POPUP DIALOGS (Fluid Spring Morphing) ───────────────── */
         .modal-overlay {
-            display: none;
+            display: flex;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             background-color: rgba(15, 23, 42, 0.45);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
             z-index: 1000;
             align-items: center;
             justify-content: center;
             padding: 20px;
             opacity: 0;
-            transition: opacity 0.2s ease;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                        visibility 0.25s,
+                        backdrop-filter 0.25s ease;
+            will-change: opacity, backdrop-filter;
         }
 
         .modal-overlay.open {
-            display: flex;
             opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
         }
 
         .modal-dialog {
             background-color: var(--surface);
             border: 1px solid var(--border-card);
-            border-radius: 20px;
-            box-shadow: 0 20px 40px -10px rgba(27, 67, 50, 0.18), 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+            border-radius: 36px;
+            box-shadow: 0 25px 50px -12px rgba(27, 67, 50, 0.22), 0 12px 24px -6px rgba(0, 0, 0, 0.08);
             width: 100%;
             max-width: 520px;
             max-height: 90vh;
             overflow-y: auto;
             position: relative;
-            transform: scale(0.96) translateY(10px);
-            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: scale(0.88) translateY(24px);
+            opacity: 0;
+            transition: transform 0.34s cubic-bezier(0.34, 1.45, 0.7, 1),
+                        border-radius 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+                        opacity 0.22s ease;
+            will-change: transform, opacity, border-radius;
         }
 
         .modal-overlay.open .modal-dialog {
             transform: scale(1) translateY(0);
+            border-radius: 20px;
+            opacity: 1;
+        }
+
+        /* ─── MORPHING BUTTONS & PILL CONTROLS ──────────────────────────── */
+        .btn, .topbar-btn-new, .btn-pill-submit, .btn-action-edit, .btn-action-delete, .filter-tab, .category-chip-card {
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+                        box-shadow 0.2s ease,
+                        background-color 0.15s ease,
+                        border-color 0.15s ease,
+                        border-radius 0.25s ease;
+            will-change: transform;
+        }
+
+        .btn:hover, .topbar-btn-new:hover, .btn-pill-submit:hover {
+            transform: translateY(-2px) scale(1.02);
+        }
+
+        .btn:active, .topbar-btn-new:active, .btn-pill-submit:active {
+            transform: translateY(0) scale(0.97);
+        }
+
+        .btn-action-edit:hover, .btn-action-delete:hover, .filter-tab:hover {
+            transform: translateY(-1.5px) scale(1.03);
+        }
+
+        .sidebar-nav a {
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                        background-color 0.15s ease,
+                        color 0.15s ease;
+        }
+
+        .sidebar-nav a:hover {
+            transform: translateX(4px);
         }
 
         .modal-header {
