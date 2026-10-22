@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -184,6 +186,56 @@ class AuthController extends Controller
             box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.3);
         }
 
+        .login-divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 16px 0 12px;
+            color: var(--text-caption);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .login-divider::before, .login-divider::after {
+            content: "";
+            flex: 1;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .login-divider:not(:empty)::before {
+            margin-right: 10px;
+        }
+
+        .login-divider:not(:empty)::after {
+            margin-left: 10px;
+        }
+
+        .btn-demo {
+            width: 100%;
+            min-height: 44px;
+            background-color: var(--mint-surface);
+            color: var(--primary-hover);
+            border: 1px solid var(--border-card);
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            padding: 10px 20px;
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .btn-demo:hover {
+            background-color: var(--primary-light);
+            border-color: var(--accent);
+        }
+
+        .btn-demo:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.2);
+        }
+
         .form-footer-note {
             margin-top: 20px;
             font-size: 12px;
@@ -221,6 +273,11 @@ class AuthController extends Controller
                 <input type="password" id="password" name="password" autocomplete="current-password" required>
             </div>
             <button type="submit" class="btn-submit">Masuk ke Kasir</button>
+        </form>
+        <div class="login-divider">atau pengujian langsung</div>
+        <form method="POST" action="' . htmlspecialchars(route('login.demo'), ENT_QUOTES, 'UTF-8') . '">
+            <input type="hidden" name="_token" value="' . $escapedCsrf . '">
+            <button type="submit" class="btn-demo">Masuk Uji Coba (1-Klik)</button>
         </form>
         <div class="form-footer-note">Prototipe pengujian kasir material. Akses internal.</div>
     </main>
@@ -269,6 +326,23 @@ class AuthController extends Controller
         return redirect()->route('login')->withErrors([
             'email' => 'Kredensial tidak valid.',
         ])->withInput($request->except('password'));
+    }
+
+    public function demoLogin(Request $request)
+    {
+        $user = User::first();
+        if (! $user) {
+            $user = User::create([
+                'name' => 'Operator Kasir Toko',
+                'email' => 'kasir@jajandigital.web.id',
+                'password' => Hash::make(Str::random(32)),
+            ]);
+        }
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        return redirect()->intended(route('pos.index'));
     }
 
     public function logout(Request $request)

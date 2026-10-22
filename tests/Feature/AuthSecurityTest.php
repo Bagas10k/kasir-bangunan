@@ -122,4 +122,11 @@ class AuthSecurityTest extends TestCase
         $response->assertRedirect('/login');
         $this->assertGuest();
     }
+
+    public function test_demo_login_authenticates_and_redirects_to_pos(): void
+    {
+        $response = $this->post('/login/demo');
+        $response->assertRedirect(route('pos.index'));
+        $this->assertAuthenticated();
+    }
 }
