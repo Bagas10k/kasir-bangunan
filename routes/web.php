@@ -17,7 +17,6 @@ use App\Http\Controllers\ChartOfAccountController;
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
-    Route::post('/login/demo', [AuthController::class, 'demoLogin'])->name('login.demo');
 
     Route::get('/demo-setup', [DemoSetupController::class, 'create'])->name('demo.setup');
     Route::post('/demo-setup', [DemoSetupController::class, 'store'])->name('demo.setup.store');
