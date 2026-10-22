@@ -101,8 +101,8 @@ class AuthController extends Controller
             color: var(--primary);
             background-color: var(--mint-surface);
             border: 1px solid var(--border);
-            padding: 5px 12px;
-            border-radius: 9999px;
+            padding: 4px 10px;
+            border-radius: 6px;
             margin-bottom: 12px;
         }
 
@@ -148,14 +148,14 @@ class AuthController extends Controller
 
         input {
             width: 100%;
-            min-height: 44px;
+            min-height: 42px;
             padding: 10px 14px;
             font-family: inherit;
             font-size: 14px;
             border: 1px solid #ced4da;
             background-color: #ffffff;
             color: var(--text-main);
-            border-radius: 12px;
+            border-radius: 9px;
             transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
 
@@ -171,7 +171,7 @@ class AuthController extends Controller
 
         .btn-submit {
             width: 100%;
-            min-height: 46px;
+            min-height: 44px;
             background-color: var(--primary);
             color: #ffffff;
             border: 1px solid var(--primary);
@@ -180,10 +180,10 @@ class AuthController extends Controller
             font-weight: 600;
             letter-spacing: 0.01em;
             cursor: pointer;
-            border-radius: 9999px;
-            padding: 11px 20px;
+            border-radius: 9px;
+            padding: 10px 20px;
             transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-            margin-top: 4px;
+            margin-top: 6px;
             box-shadow: 0 2px 8px rgba(45, 106, 79, 0.2);
         }
 

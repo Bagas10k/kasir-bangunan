@@ -11,7 +11,7 @@
             </p>
         </div>
         <div>
-            <button type="button" class="btn" onclick="openModal('modal-expense')" style="border-radius: 9999px; padding: 10px 22px; font-size: 13.5px; font-weight: 700; box-shadow: 0 4px 14px rgba(45, 106, 79, 0.25);">+ Catat Pengeluaran Baru</button>
+            <button type="button" class="btn" onclick="openModal('modal-expense')" style="padding: 9px 18px; font-size: 13.5px; font-weight: 600; box-shadow: 0 4px 14px rgba(45, 106, 79, 0.25);">+ Catat Pengeluaran Baru</button>
         </div>
     </div>
 </div>
@@ -103,8 +103,8 @@
                 </div>
 
                 <div style="display: flex; gap: 10px; margin-top: 24px;">
-                    <button type="submit" class="btn" style="flex: 1; border-radius: 9999px; min-height: 46px; font-weight: 700;">Simpan Pengeluaran</button>
-                    <button type="button" class="btn btn-secondary" style="border-radius: 9999px; min-height: 46px; padding: 0 20px;" onclick="closeModal('modal-expense')">Batal</button>
+                    <button type="submit" class="btn" style="flex: 1; min-height: 44px; font-weight: 600;">Simpan Pengeluaran</button>
+                    <button type="button" class="btn btn-secondary" style="min-height: 44px; padding: 0 20px;" onclick="closeModal('modal-expense')">Batal</button>
                 </div>
             </form>
         </div>

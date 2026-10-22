@@ -12,7 +12,7 @@
             </p>
         </div>
         <div>
-            <button type="button" class="btn" onclick="openModal('modal-product')" style="border-radius: 9999px; padding: 10px 22px; font-size: 13.5px; font-weight: 700; box-shadow: 0 4px 14px rgba(45, 106, 79, 0.25);">+ Tambah Produk Baru</button>
+            <button type="button" class="btn" onclick="openModal('modal-product')" style="padding: 9px 18px; font-size: 13.5px; font-weight: 600; box-shadow: 0 4px 14px rgba(45, 106, 79, 0.25);">+ Tambah Produk Baru</button>
         </div>
     </div>
 </div>
@@ -90,8 +90,8 @@
                     <input type="number" step="0.01" min="0" id="selling_price" name="selling_price" value="{{ old('selling_price', '0.00') }}" required class="form-control tabular-nums">
                 </div>
                 <div style="display: flex; gap: 10px; margin-top: 24px;">
-                    <button type="submit" class="btn" style="flex: 1; border-radius: 9999px; min-height: 46px; font-weight: 700;">Simpan Produk (Stok Awal 0)</button>
-                    <button type="button" class="btn btn-secondary" style="border-radius: 9999px; min-height: 46px; padding: 0 20px;" onclick="closeModal('modal-product')">Batal</button>
+                    <button type="submit" class="btn" style="flex: 1; min-height: 44px; font-weight: 600;">Simpan Produk (Stok Awal 0)</button>
+                    <button type="button" class="btn btn-secondary" style="min-height: 44px; padding: 0 20px;" onclick="closeModal('modal-product')">Batal</button>
                 </div>
             </form>
         </div>

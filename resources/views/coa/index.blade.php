@@ -17,8 +17,8 @@
         margin-bottom: 20px;
     }
     .filter-tab {
-        padding: 6px 16px;
-        border-radius: 9999px;
+        padding: 6px 14px;
+        border-radius: 8px;
         font-size: 12.5px;
         font-weight: 600;
         text-decoration: none;
@@ -65,8 +65,8 @@
         background-color: var(--mint-surface);
         color: var(--primary-hover);
         border: 1px solid var(--mint-border);
-        border-radius: 9999px;
-        padding: 3px 12px;
+        border-radius: 6px;
+        padding: 3px 10px;
         font-size: 11.5px;
         font-weight: 600;
         cursor: pointer;
@@ -80,7 +80,7 @@
         background-color: #fde8e8;
         color: var(--danger-text);
         border: 1px solid var(--danger-border);
-        border-radius: 9999px;
+        border-radius: 6px;
         padding: 3px 10px;
         font-size: 11.5px;
         font-weight: 600;
@@ -94,7 +94,7 @@
         background-color: #f3f4f6;
         color: #9ca3af;
         border: 1px solid #e5e7eb;
-        border-radius: 9999px;
+        border-radius: 6px;
         padding: 3px 10px;
         font-size: 11.5px;
         cursor: not-allowed;
@@ -131,7 +131,7 @@
             </p>
         </div>
         <div>
-            <button type="button" class="btn" onclick="openNewModal()" style="border-radius: 9999px; padding: 10px 22px; font-size: 13.5px; font-weight: 700; box-shadow: 0 4px 14px rgba(45, 106, 79, 0.25);">+ Tambah Akun Baru</button>
+            <button type="button" class="btn" onclick="openNewModal()" style="padding: 9px 18px; font-size: 13.5px; font-weight: 600; box-shadow: 0 4px 14px rgba(45, 106, 79, 0.25);">+ Tambah Akun Baru</button>
         </div>
     </div>
 </div>
@@ -300,8 +300,8 @@
                 </div>
 
                 <div style="display: flex; gap: 10px; margin-top: 24px;">
-                    <button type="submit" id="btn-submit-coa" class="btn" style="flex: 1; border-radius: 9999px; min-height: 46px; font-weight: 700;">Simpan Akun</button>
-                    <button type="button" class="btn btn-secondary" style="border-radius: 9999px; min-height: 46px; padding: 0 20px;" onclick="closeModal('modal-coa')">Batal</button>
+                    <button type="submit" id="btn-submit-coa" class="btn" style="flex: 1; min-height: 44px; font-weight: 600;">Simpan Akun</button>
+                    <button type="button" class="btn btn-secondary" style="min-height: 44px; padding: 0 20px;" onclick="closeModal('modal-coa')">Batal</button>
                 </div>
             </form>
         </div>

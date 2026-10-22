@@ -42,6 +42,14 @@
             --sidebar-active-text: #1b4332;
             --sidebar-hover-bg: #f4f8f5;
             --sidebar-label: #8a9990;
+
+            /* Mathematical Concentric Radius Hierarchy (Linear/Fulcrum Style) */
+            --radius-window: 24px;
+            --radius-modal: 20px;
+            --radius-card: 16px;
+            --radius-inner: 10px;
+            --radius-control: 9px;
+            --radius-badge: 6px;
         }
 
         *, *::before, *::after {
@@ -395,7 +403,7 @@
             font-size: 13px;
             font-weight: 600;
             padding: 9px 18px;
-            border-radius: 9999px;
+            border-radius: var(--radius-control);
             display: inline-flex;
             align-items: center;
             gap: 6px;
@@ -418,7 +426,7 @@
             background-color: var(--mint-surface);
             border: 1px solid var(--mint-border);
             padding: 7px 14px;
-            border-radius: 9999px;
+            border-radius: var(--radius-control);
         }
 
         .status-dot {
@@ -481,7 +489,7 @@
         .card {
             background-color: var(--surface);
             border: 1px solid var(--border-card);
-            border-radius: 20px;
+            border-radius: var(--radius-card);
             box-shadow: 0 4px 20px -2px rgba(27, 67, 50, 0.05);
             padding: 24px;
             margin-bottom: 24px;
@@ -556,13 +564,13 @@
             background-color: var(--primary);
             color: #ffffff;
             border: 1px solid var(--primary);
-            min-height: 44px;
-            padding: 10px 22px;
+            min-height: 42px;
+            padding: 9px 20px;
             font-family: inherit;
             font-size: 13.5px;
             font-weight: 600;
             cursor: pointer;
-            border-radius: 9999px;
+            border-radius: var(--radius-control);
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -588,12 +596,12 @@
             color: var(--primary-hover);
             border: 1px solid var(--mint-border);
             min-height: 38px;
-            padding: 8px 18px;
+            padding: 8px 16px;
             font-family: inherit;
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            border-radius: 9999px;
+            border-radius: var(--radius-control);
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -609,14 +617,14 @@
 
         /* Form Controls */
         input, select, textarea {
-            min-height: 44px;
+            min-height: 42px;
             padding: 10px 14px;
             font-family: inherit;
             font-size: 13.5px;
             color: var(--text-main);
             background-color: #ffffff;
             border: 1px solid var(--border-control);
-            border-radius: 12px;
+            border-radius: var(--radius-control);
             width: 100%;
             transition: all 0.15s ease;
         }
@@ -637,12 +645,12 @@
 
         .form-group label {
             display: block;
-            font-size: 11.5px;
+            margin-bottom: 6px;
+            font-size: 12px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-bottom: 6px;
-            color: var(--primary);
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
         }
 
         .grid-2 {
@@ -655,7 +663,7 @@
         .alert {
             padding: 14px 18px;
             margin-bottom: 20px;
-            border-radius: 14px;
+            border-radius: var(--radius-inner);
             font-size: 13.5px;
             line-height: 1.5;
             display: block;
@@ -675,13 +683,13 @@
 
         .badge {
             display: inline-block;
-            padding: 3px 10px;
+            padding: 3px 8px;
             font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
             white-space: nowrap;
-            border-radius: 9999px;
+            border-radius: var(--radius-badge);
             border: 1px solid var(--mint-border);
             background-color: var(--mint-surface);
             color: var(--primary);
@@ -719,25 +727,25 @@
 
         .modal-dialog {
             background-color: var(--surface);
-            border: 1px solid var(--border-card);
-            border-radius: 36px;
-            box-shadow: 0 25px 50px -12px rgba(27, 67, 50, 0.22), 0 12px 24px -6px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(45, 106, 79, 0.12);
+            border-radius: 28px;
+            box-shadow: 0 24px 48px -12px rgba(27, 67, 50, 0.22), 0 8px 16px -4px rgba(0, 0, 0, 0.05), inset 0 1px 1px rgba(255, 255, 255, 0.9);
             width: 100%;
             max-width: 520px;
             max-height: 90vh;
             overflow-y: auto;
             position: relative;
-            transform: scale(0.88) translateY(24px);
+            transform: scale(0.92) translateY(20px);
             opacity: 0;
-            transition: transform 0.34s cubic-bezier(0.34, 1.45, 0.7, 1),
-                        border-radius 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+            transition: transform 0.32s cubic-bezier(0.34, 1.45, 0.7, 1),
+                        border-radius 0.32s cubic-bezier(0.16, 1, 0.3, 1),
                         opacity 0.22s ease;
             will-change: transform, opacity, border-radius;
         }
 
         .modal-overlay.open .modal-dialog {
             transform: scale(1) translateY(0);
-            border-radius: 20px;
+            border-radius: var(--radius-modal);
             opacity: 1;
         }
 
@@ -774,7 +782,7 @@
         }
 
         .modal-header {
-            padding: 20px 26px;
+            padding: 20px 24px;
             border-bottom: 1px solid var(--border-subtle);
             display: flex;
             align-items: center;
@@ -783,8 +791,8 @@
             top: 0;
             background-color: var(--surface);
             z-index: 2;
-            border-top-left-radius: 20px;
-            border-top-right-radius: 20px;
+            border-top-left-radius: var(--radius-modal);
+            border-top-right-radius: var(--radius-modal);
         }
 
         .modal-title {
@@ -809,10 +817,10 @@
 
         .modal-close-btn {
             background: none;
-            border: none;
+            border: 1px solid transparent;
             width: 32px;
             height: 32px;
-            border-radius: 50%;
+            border-radius: var(--radius-badge);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -824,6 +832,7 @@
 
         .modal-close-btn:hover {
             background-color: var(--mint-surface);
+            border-color: var(--mint-border);
             color: var(--primary);
         }
 
