@@ -52,17 +52,31 @@
         </table>
     </div>
 </div>
+@endsection
 
+@section('modals')
 <!-- POP-UP MODAL: Form Catat Pengeluaran Operasional -->
 <div id="modal-expense" class="modal-overlay {{ $errors->any() ? 'open' : '' }}" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
     <div class="modal-dialog">
         <div class="modal-header">
-            <h2 id="expense-modal-title" class="modal-title">Catat Pengeluaran Operasional</h2>
+            <div class="modal-title-wrapper">
+                <div class="modal-icon-badge">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h2 id="expense-modal-title" class="modal-title">Catat Pengeluaran Operasional</h2>
+                    <div style="font-size: 12px; color: var(--text-caption); margin-top: 2px;">Beban Kasir &amp; Operasional Toko</div>
+                </div>
+            </div>
             <button type="button" class="modal-close-btn" onclick="closeModal('modal-expense')" aria-label="Tutup Dialog">&times;</button>
         </div>
-        <div class="modal-body">
-            <form action="{{ route('expenses.store') }}" method="POST">
-                @csrf
+
+        <form action="{{ route('expenses.store') }}" method="POST" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
+            @csrf
+            <div class="modal-body">
                 <div class="form-group">
                     <label for="category">Akun Biaya / Kategori</label>
                     <select name="category" id="category" class="form-control" required>
@@ -97,17 +111,17 @@
                     </select>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom: 0;">
                     <label for="description">Keterangan / Deskripsi</label>
                     <input type="text" name="description" id="description" class="form-control" maxlength="255" placeholder="Contoh: Pembelian token listrik toko" value="{{ old('description') }}">
                 </div>
+            </div>
 
-                <div style="display: flex; gap: 10px; margin-top: 24px;">
-                    <button type="submit" class="btn" style="flex: 1; min-height: 44px; font-weight: 600;">Simpan Pengeluaran</button>
-                    <button type="button" class="btn btn-secondary" style="min-height: 44px; padding: 0 20px;" onclick="closeModal('modal-expense')">Batal</button>
-                </div>
-            </form>
-        </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-expense')">Batal</button>
+                <button type="submit" class="btn">Simpan Pengeluaran</button>
+            </div>
+        </form>
     </div>
 </div>
 @endsection

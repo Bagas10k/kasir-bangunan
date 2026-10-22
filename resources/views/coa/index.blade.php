@@ -180,7 +180,7 @@
             <tbody>
                 @forelse($accounts as $acc)
                 <tr>
-                    <td><span class="sku-code badge">{{ $acc->account_code }}</span></td>
+                    <td><span class="sku-code">{{ $acc->account_code }}</span></td>
                     <td>
                         <div style="font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
                             <span>{{ $acc->account_name }}</span>
@@ -252,22 +252,38 @@
         </table>
     </div>
 </div>
+@endsection
 
-<!-- POP-UP MODAL: Form Tambah / Ubah Akun -->
+@section('modals')
+<!-- POP-UP MODAL: Form Tambah / Ubah Akun (Centered Viewport) -->
 <div id="modal-coa" class="modal-overlay {{ $errors->any() ? 'open' : '' }}" role="dialog" aria-modal="true" aria-labelledby="form-title">
     <div class="modal-dialog">
         <div class="modal-header">
-            <h2 id="form-title" class="modal-title">Tambah Akun Baru</h2>
+            <div class="modal-title-wrapper">
+                <div class="modal-icon-badge">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"></path>
+                        <path d="M6 6h10"></path>
+                        <path d="M6 10h10"></path>
+                        <path d="M6 14h10"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h2 id="form-title" class="modal-title">Tambah Akun Baru</h2>
+                    <div id="form-subtitle" style="font-size: 12px; color: var(--text-caption); margin-top: 2px;">Bagan Akun Pembukuan Material</div>
+                </div>
+            </div>
             <button type="button" class="modal-close-btn" onclick="closeModal('modal-coa')" aria-label="Tutup Dialog">&times;</button>
         </div>
-        <div class="modal-body">
-            <p style="font-size: 12.5px; color: var(--text-muted); margin: 0 0 16px 0; line-height: 1.5;">
-                Hierarki akun standar: <strong>1</strong>=Aset, <strong>2</strong>=Kewajiban, <strong>3</strong>=Ekuitas, <strong>4</strong>=Pendapatan, <strong>5</strong>=HPP, <strong>6</strong>=Beban Operasional.
-            </p>
 
-            <form id="coa-form" method="POST" action="{{ route('coa.store') }}">
-                @csrf
-                <input type="hidden" name="_method" id="form-method" value="POST">
+        <form id="coa-form" method="POST" action="{{ route('coa.store') }}" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
+            @csrf
+            <input type="hidden" name="_method" id="form-method" value="POST">
+
+            <div class="modal-body">
+                <div style="background-color: var(--mint-surface); border: 1px solid var(--mint-border); border-radius: var(--radius-inner); padding: 10px 14px; margin-bottom: 16px; font-size: 12px; line-height: 1.5; color: var(--primary-hover);">
+                    <strong>Panduan Kode:</strong> 1=Aset, 2=Kewajiban, 3=Ekuitas, 4=Pendapatan, 5=HPP, 6=Beban Operasional.
+                </div>
 
                 <div class="form-group">
                     <label for="account_code">Kode Akun</label>
@@ -291,20 +307,20 @@
                     </select>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom: 0;">
                     <label for="normal_balance">Saldo Normal</label>
                     <select id="normal_balance" name="normal_balance" required class="form-control">
                         <option value="debit" {{ old('normal_balance') === 'debit' ? 'selected' : '' }}>Debet (Bertambah di Debet)</option>
                         <option value="credit" {{ old('normal_balance') === 'credit' ? 'selected' : '' }}>Kredit (Bertambah di Kredit)</option>
                     </select>
                 </div>
+            </div>
 
-                <div style="display: flex; gap: 10px; margin-top: 24px;">
-                    <button type="submit" id="btn-submit-coa" class="btn" style="flex: 1; min-height: 44px; font-weight: 600;">Simpan Akun</button>
-                    <button type="button" class="btn btn-secondary" style="min-height: 44px; padding: 0 20px;" onclick="closeModal('modal-coa')">Batal</button>
-                </div>
-            </form>
-        </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-coa')">Batal</button>
+                <button type="submit" id="btn-submit-coa" class="btn">Simpan Akun</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -329,6 +345,7 @@ function editAccountBtn(btn) {
 
     const codeInput = document.getElementById('account_code');
     document.getElementById('form-title').textContent = 'Ubah Akun ' + code + (isSystem ? ' (Inti Sistem)' : '');
+    document.getElementById('form-subtitle').textContent = isSystem ? 'Akun inti sistem terlindungi' : 'Perbarui data akun buku besar';
     document.getElementById('coa-form').action = "{{ url('/coa') }}/" + id;
     document.getElementById('form-method').value = 'PUT';
 
@@ -355,6 +372,7 @@ function editAccountBtn(btn) {
 function openNewModal() {
     const codeInput = document.getElementById('account_code');
     document.getElementById('form-title').textContent = 'Tambah Akun Baru';
+    document.getElementById('form-subtitle').textContent = 'Bagan Akun Pembukuan Material';
     document.getElementById('coa-form').action = "{{ route('coa.store') }}";
     document.getElementById('form-method').value = 'POST';
 

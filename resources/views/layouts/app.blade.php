@@ -181,43 +181,42 @@
         }
 
         .sidebar-nav a {
-            color: var(--sidebar-text);
+            color: #64748b;
             text-decoration: none;
             font-size: 13.5px;
             font-weight: 500;
-            min-height: 42px;
+            min-height: 38px;
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 9px 14px;
-            border-radius: 12px;
-            transition: all 0.15s ease;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: var(--radius-control);
+            transition: background-color 0.15s ease, color 0.15s ease;
         }
 
         .sidebar-nav a svg {
-            color: var(--sidebar-label);
+            color: #94a3b8;
             transition: color 0.15s ease;
             flex-shrink: 0;
         }
 
-        .sidebar-nav a:hover {
-            background-color: var(--sidebar-hover-bg);
-            color: var(--primary-hover);
+        .sidebar-nav a:hover:not(.active) {
+            background-color: rgba(20, 50, 35, 0.04);
+            color: #1c2826;
         }
 
-        .sidebar-nav a:hover svg {
-            color: var(--primary);
+        .sidebar-nav a:hover:not(.active) svg {
+            color: #475569;
         }
 
         .sidebar-nav a.active {
-            background-color: var(--sidebar-active-bg);
-            color: var(--sidebar-active-text);
-            font-weight: 700;
-            box-shadow: inset 3.5px 0 0 var(--primary);
+            background-color: rgba(45, 106, 79, 0.08);
+            color: #1b4332;
+            font-weight: 600;
         }
 
         .sidebar-nav a.active svg {
-            color: var(--primary);
+            color: #1b4332;
         }
 
         .sidebar-footer {
@@ -695,27 +694,29 @@
             color: var(--primary);
         }
 
-        /* ─── MODAL POPUP DIALOGS (Fluid Spring Morphing) ───────────────── */
+        /* ─── MODAL POPUP DIALOGS (Centered, Viewport Clamped, Teleported) ───────────────── */
         .modal-overlay {
             display: flex;
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(15, 23, 42, 0.45);
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
-            z-index: 1000;
+            right: 0;
+            bottom: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(15, 23, 42, 0.48);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 99999;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 24px;
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
-            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-                        visibility 0.25s,
-                        backdrop-filter 0.25s ease;
+            transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+                        visibility 0.22s,
+                        backdrop-filter 0.22s ease;
             will-change: opacity, backdrop-filter;
         }
 
@@ -727,58 +728,26 @@
 
         .modal-dialog {
             background-color: var(--surface);
-            border: 1px solid rgba(45, 106, 79, 0.12);
-            border-radius: 28px;
-            box-shadow: 0 24px 48px -12px rgba(27, 67, 50, 0.22), 0 8px 16px -4px rgba(0, 0, 0, 0.05), inset 0 1px 1px rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(45, 106, 79, 0.14);
+            border-radius: var(--radius-modal);
+            box-shadow: 0 24px 48px -12px rgba(27, 67, 50, 0.22), 0 8px 16px -4px rgba(0, 0, 0, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.9);
             width: 100%;
-            max-width: 520px;
-            max-height: 90vh;
-            overflow-y: auto;
+            max-width: 500px;
+            max-height: calc(100vh - 60px);
+            display: flex;
+            flex-direction: column;
             position: relative;
-            transform: scale(0.92) translateY(20px);
+            transform: scale(0.92) translateY(16px);
             opacity: 0;
-            transition: transform 0.32s cubic-bezier(0.34, 1.45, 0.7, 1),
-                        border-radius 0.32s cubic-bezier(0.16, 1, 0.3, 1),
-                        opacity 0.22s ease;
-            will-change: transform, opacity, border-radius;
+            transition: transform 0.28s cubic-bezier(0.34, 1.45, 0.7, 1),
+                        opacity 0.2s ease;
+            will-change: transform, opacity;
+            overflow: hidden;
         }
 
         .modal-overlay.open .modal-dialog {
             transform: scale(1) translateY(0);
-            border-radius: var(--radius-modal);
             opacity: 1;
-        }
-
-        /* ─── MORPHING BUTTONS & PILL CONTROLS ──────────────────────────── */
-        .btn, .topbar-btn-new, .btn-pill-submit, .btn-action-edit, .btn-action-delete, .filter-tab, .category-chip-card {
-            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
-                        box-shadow 0.2s ease,
-                        background-color 0.15s ease,
-                        border-color 0.15s ease,
-                        border-radius 0.25s ease;
-            will-change: transform;
-        }
-
-        .btn:hover, .topbar-btn-new:hover, .btn-pill-submit:hover {
-            transform: translateY(-2px) scale(1.02);
-        }
-
-        .btn:active, .topbar-btn-new:active, .btn-pill-submit:active {
-            transform: translateY(0) scale(0.97);
-        }
-
-        .btn-action-edit:hover, .btn-action-delete:hover, .filter-tab:hover {
-            transform: translateY(-1.5px) scale(1.03);
-        }
-
-        .sidebar-nav a {
-            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-                        background-color 0.15s ease,
-                        color 0.15s ease;
-        }
-
-        .sidebar-nav a:hover {
-            transform: translateX(4px);
         }
 
         .modal-header {
@@ -787,32 +756,35 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            position: sticky;
-            top: 0;
             background-color: var(--surface);
-            z-index: 2;
-            border-top-left-radius: var(--radius-modal);
-            border-top-right-radius: var(--radius-modal);
+            flex-shrink: 0;
+        }
+
+        .modal-title-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .modal-icon-badge {
+            width: 38px;
+            height: 38px;
+            border-radius: var(--radius-control);
+            background-color: var(--mint-surface);
+            border: 1px solid var(--mint-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            flex-shrink: 0;
         }
 
         .modal-title {
-            font-size: 16.5px;
-            font-weight: 800;
-            color: var(--primary-hover);
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
             letter-spacing: -0.01em;
             margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .modal-title::before {
-            content: "";
-            width: 4px;
-            height: 16px;
-            background-color: var(--accent);
-            border-radius: 2px;
-            display: inline-block;
         }
 
         .modal-close-btn {
@@ -825,7 +797,7 @@
             align-items: center;
             justify-content: center;
             color: var(--text-caption);
-            font-size: 18px;
+            font-size: 20px;
             cursor: pointer;
             transition: all 0.15s ease;
         }
@@ -837,7 +809,19 @@
         }
 
         .modal-body {
-            padding: 24px 26px;
+            padding: 20px 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-subtle);
+            background-color: var(--surface);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-shrink: 0;
         }
 
         /* ─── RESPONSIVE MOBILE ─────────────────────────────────────────── */
@@ -1107,8 +1091,18 @@
         </div>
     </div>
 
+    <!-- Modals Portal Area (at root of <body>, completely outside transformed containers) -->
+    @yield('modals')
+
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // Automatically teleport all .modal-overlay directly under <body> so position:fixed is never trapped by transformed parents
+            document.querySelectorAll('.modal-overlay').forEach(function (m) {
+                if (m.parentElement !== document.body) {
+                    document.body.appendChild(m);
+                }
+            });
+
             var toggle = document.getElementById('sidebar-toggle');
             var sidebar = document.getElementById('app-sidebar');
             var backdrop = document.getElementById('sidebar-backdrop');
@@ -1151,11 +1145,14 @@
         function openModal(id) {
             var modal = document.getElementById(id);
             if (!modal) return;
+            if (modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
             modal.classList.add('open');
             document.body.style.overflow = 'hidden';
             var firstInput = modal.querySelector('input:not([type=hidden]):not([readonly]), select, textarea');
             if (firstInput) {
-                setTimeout(function () { firstInput.focus(); }, 60);
+                setTimeout(function () { firstInput.focus(); }, 80);
             }
         }
 

@@ -55,20 +55,36 @@
         </table>
     </div>
 </div>
+@endsection
 
+@section('modals')
 <!-- POP-UP MODAL: Form Pendaftaran Produk Baru -->
 <div id="modal-product" class="modal-overlay {{ $errors->any() ? 'open' : '' }}" role="dialog" aria-modal="true" aria-labelledby="product-modal-title">
     <div class="modal-dialog">
         <div class="modal-header">
-            <h2 id="product-modal-title" class="modal-title">Pendaftaran Produk Baru</h2>
+            <div class="modal-title-wrapper">
+                <div class="modal-icon-badge">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+                        <path d="m3.3 7 8.7 5 8.7-5"></path>
+                        <path d="M12 22V12"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h2 id="product-modal-title" class="modal-title">Pendaftaran Produk Baru</h2>
+                    <div style="font-size: 12px; color: var(--text-caption); margin-top: 2px;">Katalog Master Material Toko</div>
+                </div>
+            </div>
             <button type="button" class="modal-close-btn" onclick="closeModal('modal-product')" aria-label="Tutup Dialog">&times;</button>
         </div>
-        <div class="modal-body">
-            <div class="alert alert-info" style="font-size: 12.5px; margin-bottom: 18px; background-color: var(--mint-surface); border: 1px solid var(--mint-border); color: var(--primary-hover);">
-                Sesuai prinsip integritas akuntansi, produk baru otomatis didaftarkan dengan <strong>stok awal 0.00</strong>. Penambahan stok fisik wajib melalui form <em>Penerimaan Barang</em> agar jurnal neraca tetap seimbang.
-            </div>
-            <form method="POST" action="{{ route('products.store') }}">
-                @csrf
+
+        <form method="POST" action="{{ route('products.store') }}" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
+            @csrf
+            <div class="modal-body">
+                <div class="alert alert-info" style="font-size: 12.5px; margin-bottom: 16px; background-color: var(--mint-surface); border: 1px solid var(--mint-border); color: var(--primary-hover);">
+                    Sesuai prinsip integritas akuntansi, produk baru otomatis didaftarkan dengan <strong>stok awal 0.00</strong>. Penambahan stok fisik wajib melalui form <em>Penerimaan Barang</em> agar jurnal neraca tetap seimbang.
+                </div>
+
                 <div class="form-group">
                     <label for="sku">Kode SKU / Barcode</label>
                     <input type="text" id="sku" name="sku" value="{{ old('sku') }}" required placeholder="Contoh: SEM-001" autocomplete="off" class="form-control">
@@ -85,16 +101,17 @@
                     <label for="cost_price">Harga Pokok Pembelian (HPP)</label>
                     <input type="number" step="0.0001" min="0" id="cost_price" name="cost_price" value="{{ old('cost_price', '0.0000') }}" required class="form-control tabular-nums">
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom: 0;">
                     <label for="selling_price">Harga Jual Satuan</label>
                     <input type="number" step="0.01" min="0" id="selling_price" name="selling_price" value="{{ old('selling_price', '0.00') }}" required class="form-control tabular-nums">
                 </div>
-                <div style="display: flex; gap: 10px; margin-top: 24px;">
-                    <button type="submit" class="btn" style="flex: 1; min-height: 44px; font-weight: 600;">Simpan Produk (Stok Awal 0)</button>
-                    <button type="button" class="btn btn-secondary" style="min-height: 44px; padding: 0 20px;" onclick="closeModal('modal-product')">Batal</button>
-                </div>
-            </form>
-        </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-product')">Batal</button>
+                <button type="submit" class="btn">Simpan Produk (Stok Awal 0)</button>
+            </div>
+        </form>
     </div>
 </div>
 @endsection

@@ -59,20 +59,37 @@
         </table>
     </div>
 </div>
+@endsection
 
+@section('modals')
 <!-- POP-UP MODAL: Form Pendaftaran Armada Kendaraan -->
 <div id="modal-vehicle" class="modal-overlay {{ $errors->any() ? 'open' : '' }}" role="dialog" aria-modal="true" aria-labelledby="vehicle-modal-title">
     <div class="modal-dialog">
         <div class="modal-header">
-            <h2 id="vehicle-modal-title" class="modal-title">Pendaftaran Armada Kendaraan</h2>
+            <div class="modal-title-wrapper">
+                <div class="modal-icon-badge">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="1" y="3" width="15" height="13"></rect>
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                    </svg>
+                </div>
+                <div>
+                    <h2 id="vehicle-modal-title" class="modal-title">Pendaftaran Armada Kendaraan</h2>
+                    <div style="font-size: 12px; color: var(--text-caption); margin-top: 2px;">Logistik &amp; Armada Pengiriman</div>
+                </div>
+            </div>
             <button type="button" class="modal-close-btn" onclick="closeModal('modal-vehicle')" aria-label="Tutup Dialog">&times;</button>
         </div>
-        <div class="modal-body">
-            <p style="font-size: 12.5px; color: var(--text-muted); margin: 0 0 16px 0; line-height: 1.5;">
-                Daftarkan armada angkutan material untuk pelacakan ritase dan operasional pengiriman.
-            </p>
-            <form method="POST" action="{{ route('vehicles.store') }}">
-                @csrf
+
+        <form method="POST" action="{{ route('vehicles.store') }}" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
+            @csrf
+            <div class="modal-body">
+                <p style="font-size: 12.5px; color: var(--text-muted); margin: 0 0 16px 0; line-height: 1.5;">
+                    Daftarkan armada angkutan material untuk pelacakan ritase dan operasional pengiriman.
+                </p>
+
                 <div class="form-group">
                     <label for="license_plate">Nomor Plat Polisi</label>
                     <input type="text" id="license_plate" name="license_plate" value="{{ old('license_plate') }}" required placeholder="Contoh: B 9123 XYZ" autocomplete="off" class="form-control">
@@ -85,7 +102,7 @@
                         <option value="lainnya" {{ old('vehicle_type') === 'lainnya' ? 'selected' : '' }}>Lainnya</option>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom: 0;">
                     <label for="status">Status Operasional</label>
                     <select id="status" name="status" class="form-control">
                         <option value="active" {{ old('status') === 'active' ? 'selected' : '' }}>Aktif (Siap Jalan)</option>
@@ -93,12 +110,13 @@
                         <option value="inactive" {{ old('status') === 'inactive' ? 'selected' : '' }}>Nonaktif</option>
                     </select>
                 </div>
-                <div style="display: flex; gap: 10px; margin-top: 24px;">
-                    <button type="submit" class="btn" style="flex: 1; min-height: 44px; font-weight: 600;">Daftarkan Kendaraan</button>
-                    <button type="button" class="btn btn-secondary" style="min-height: 44px; padding: 0 20px;" onclick="closeModal('modal-vehicle')">Batal</button>
-                </div>
-            </form>
-        </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-vehicle')">Batal</button>
+                <button type="submit" class="btn">Daftarkan Kendaraan</button>
+            </div>
+        </form>
     </div>
 </div>
 @endsection
