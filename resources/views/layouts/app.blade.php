@@ -573,7 +573,7 @@
             gap: 8px 10px;
             flex-wrap: wrap;
             margin-bottom: 12px;
-            padding: 8px 12px;
+            padding: 10px 12px;
             background: #fbfdfc;
             border: 1px solid var(--border-control, #d9e2dc);
             border-radius: 10px;
@@ -653,6 +653,12 @@
         .table-filters .table-reset:hover {
             background: var(--primary-light, #d8f3dc);
             border-color: var(--accent, #52b788);
+        }
+        @media (max-width: 600px) {
+            .table-filters { gap: 8px; padding: 10px; }
+            .table-search { flex-basis: 100%; max-width: none; }
+            .table-perpage { flex: 1 1 auto; }
+            .table-filters .table-reset { min-height: 40px; height: 40px; }
         }
         th a.th-sort {
             color: inherit;

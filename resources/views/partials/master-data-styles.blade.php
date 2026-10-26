@@ -138,7 +138,7 @@
     .master-toolbar {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px 10px;
+        gap: 8px 12px;
         align-items: center;
         padding: 10px 14px;
         border-bottom: 1px solid var(--border-control);
@@ -156,36 +156,43 @@
     .master-control {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
         min-width: 0;
+        flex: 0 0 auto;
     }
     .master-control label {
         color: var(--text-caption, #526359);
-        font-size: 11px;
+        font-size: 11.5px;
         font-weight: 700;
         letter-spacing: .02em;
         text-transform: none;
         white-space: nowrap;
         margin: 0;
+        line-height: 1.2;
+        flex-shrink: 0;
     }
     .master-control-search {
-        flex: 1 1 200px;
-        min-width: 160px;
+        flex: 1 1 220px;
+        min-width: 180px;
     }
     .master-control-search input {
         width: 100%;
+        flex: 1 1 auto;
     }
     .master-control input, .master-control select {
+        box-sizing: border-box;
         min-width: 0;
-        min-height: 32px;
-        height: 32px;
-        padding: 4px 10px;
+        min-height: 34px;
+        height: 34px;
+        padding: 5px 10px;
         font-size: 12px;
+        line-height: 1.4;
         border-radius: 8px;
         border: 1px solid var(--border-control, #d9e2dc);
         background: #ffffff;
         color: var(--text-main, #1c2826);
         box-shadow: none;
+        vertical-align: middle;
         transition: border-color .15s ease, box-shadow .15s ease;
     }
     .master-control input:focus, .master-control select:focus {
@@ -196,14 +203,17 @@
 
     .master-toolbar-actions {
         display: inline-flex;
-        gap: 6px;
+        gap: 8px;
         align-items: center;
         margin-left: auto;
+        flex-shrink: 0;
     }
-    .master-toolbar .btn, .master-toolbar .btn-secondary {
-        min-height: 32px;
-        height: 32px;
-        padding: 4px 14px;
+    .master-toolbar .btn, .master-toolbar .btn-secondary,
+    .master-toolbar-actions .btn, .master-toolbar-actions .btn-secondary {
+        box-sizing: border-box;
+        min-height: 34px;
+        height: 34px;
+        padding: 5px 14px;
         font-size: 12px;
         font-weight: 600;
         border-radius: 9999px;
@@ -214,6 +224,7 @@
         align-items: center;
         justify-content: center;
         line-height: 1;
+        text-decoration: none;
     }
     .master-toolbar .btn {
         background: var(--primary, #2d6a4f);
@@ -474,7 +485,21 @@
         .master-toolbar, .master-toolbar.product-toolbar, .master-toolbar.coa-toolbar, .master-toolbar.vehicle-toolbar {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 10px 8px;
+            align-items: center;
+        }
+        .master-control-search {
+            flex: 1 1 200px;
+        }
+        .master-toolbar-actions {
+            margin-left: auto;
+        }
+    }
+
+    @media (max-width: 860px) {
+        .master-control-search {
+            flex: 1 1 100%;
+            min-width: 100%;
         }
         .master-toolbar-actions {
             margin-left: auto;
@@ -521,14 +546,18 @@
             flex-direction: column;
             align-items: stretch;
             padding: 10px 12px;
-            gap: 8px;
+            gap: 10px;
         }
         .master-control {
             display: flex;
             flex-direction: column;
             align-items: stretch;
-            gap: 3px;
+            gap: 4px;
             width: 100%;
+            flex: 1 1 100%;
+        }
+        .master-control label {
+            white-space: normal;
         }
         .master-control-search {
             flex: none;
@@ -536,9 +565,10 @@
         }
         .master-control:first-child { grid-column: auto; }
         .master-control input, .master-control select {
+            box-sizing: border-box;
             min-height: 40px;
             height: 40px;
-            padding: 8px 10px;
+            padding: 8px 12px;
             font-size: 13px;
             width: 100%;
         }
@@ -549,12 +579,16 @@
             margin-left: 0;
             gap: 8px;
         }
+        .master-toolbar .btn, .master-toolbar .btn-secondary,
+        .master-toolbar-actions .btn, .master-toolbar-actions .btn-secondary,
         .master-toolbar-actions > * {
             flex: 1;
             min-height: 40px;
             height: 40px;
+            min-width: 40px;
             padding: 8px 14px;
             font-size: 13px;
+            box-sizing: border-box;
         }
 
         .master-table-head {

@@ -498,10 +498,18 @@
     .pos-history-full { order: 2; margin-top: 18px; }
     .pos-catalog-pane, .pos-cart-pane, .pos-primary-pane, .pos-side-pane, .pos-catalog-pane > .card, .pos-cart-pane > .card, .pos-primary-pane > .card, .pos-side-pane > .card { min-width: 0; }
     .pos-cart-pane .search-kbd-hint, .pos-primary-pane .search-kbd-hint { display: none; }
-    .sales-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: end; margin-bottom: 12px; }
-    .sales-filter-grid label { display: block; margin-bottom: 4px; font-size: 10.5px; font-weight: 700; color: var(--text-muted); }
-    .sales-filter-grid .form-control { min-height: 38px; padding: 7px 10px; }
-    .sales-filter-actions { display: flex; gap: 6px; align-items: center; min-height: 38px; }
+    .sales-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end; margin-bottom: 12px; }
+    .sales-filter-grid > div { min-width: 0; }
+    .sales-filter-grid label { display: block; margin-bottom: 5px; font-size: 11px; font-weight: 700; color: var(--text-caption, #526359); }
+    .sales-filter-grid .form-control { box-sizing: border-box; width: 100%; min-height: 40px; padding: 7px 10px; }
+    .sales-filter-actions { display: grid; grid-template-columns: minmax(64px, .7fr) minmax(72px, auto); gap: 8px; align-items: center; min-height: 40px; }
+    .sales-filter-actions .btn-table-action { min-height: 40px; white-space: nowrap; }
+    .catalog-filter-row { display: grid; grid-template-columns: minmax(150px, 1.3fr) minmax(130px, 1fr) auto; align-items: end; gap: 10px; margin-bottom: 12px; }
+    .catalog-filter-field { display: grid; gap: 5px; min-width: 0; }
+    .catalog-filter-field label { color: var(--text-caption, #6b7280); font-size: 11px; font-weight: 700; }
+    .catalog-filter-row .form-control { width: 100%; min-height: 40px; box-sizing: border-box; }
+    .catalog-filter-actions { display: flex; gap: 8px; align-items: center; }
+    .catalog-filter-actions .btn-table-action { min-height: 40px; white-space: nowrap; }
 
     @media (min-width: 1100px) and (min-height: 720px) {
         .pos-cart-pane > .card { margin-bottom: 0; padding: 18px; display: flex; flex-direction: column; }
@@ -719,24 +727,31 @@
                 </div>
                 <div id="product-search-status" aria-live="polite" style="font-size:11.5px; color:var(--text-caption,#6b7280); margin-top:5px;">Ketik 2 huruf atau lebih untuk mencari produk.</div>
             </div>
-            <form method="GET" action="{{ route('pos.index') }}" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px;">
-                <label for="product-category-filter" style="font-size:11.5px;font-weight:700;color:var(--text-caption,#6b7280);">Kelompok</label>
-                <select id="product-category-filter" name="product_category" class="form-control" style="width:auto;min-width:150px;" onchange="this.form.requestSubmit()">
-                    <option value="">Semua kelompok</option>
-                    @foreach($categories as $category)
-                        <option value="{{ $category }}" {{ $productCategory === $category ? 'selected' : '' }}>{{ $category }}</option>
-                    @endforeach
-                </select>
-                <select name="product_stock" class="form-control" style="width: auto; min-width: 130px;">
-                    <option value="all" {{ $productStock === 'all' ? 'selected' : '' }}>Semua Stok</option>
-                    <option value="available" {{ $productStock === 'available' ? 'selected' : '' }}>Tersedia</option>
-                    <option value="low" {{ $productStock === 'low' ? 'selected' : '' }}>Menipis</option>
-                    <option value="out" {{ $productStock === 'out' ? 'selected' : '' }}>Habis</option>
-                </select>
-                <button type="submit" class="btn-table-action">Terapkan</button>
-                @if($productQ !== '' || $productCategory !== '' || $productStock !== 'all')
-                    <a href="{{ route('pos.index') }}" class="btn-table-action" style="text-decoration: none;">Reset</a>
-                @endif
+            <form method="GET" action="{{ route('pos.index') }}" class="catalog-filter-row">
+                <div class="catalog-filter-field">
+                    <label for="product-category-filter">Kelompok</label>
+                    <select id="product-category-filter" name="product_category" class="form-control" onchange="this.form.requestSubmit()">
+                        <option value="">Semua kelompok</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category }}" {{ $productCategory === $category ? 'selected' : '' }}>{{ $category }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="catalog-filter-field">
+                    <label for="product-stock-filter">Kondisi stok</label>
+                    <select id="product-stock-filter" name="product_stock" class="form-control">
+                        <option value="all" {{ $productStock === 'all' ? 'selected' : '' }}>Semua Stok</option>
+                        <option value="available" {{ $productStock === 'available' ? 'selected' : '' }}>Tersedia</option>
+                        <option value="low" {{ $productStock === 'low' ? 'selected' : '' }}>Menipis</option>
+                        <option value="out" {{ $productStock === 'out' ? 'selected' : '' }}>Habis</option>
+                    </select>
+                </div>
+                <div class="catalog-filter-actions">
+                    <button type="submit" class="btn-table-action">Terapkan</button>
+                    @if($productQ !== '' || $productCategory !== '' || $productStock !== 'all')
+                        <a href="{{ route('pos.index') }}" class="btn-table-action" style="text-decoration: none;">Reset</a>
+                    @endif
+                </div>
             </form>
             <div class="catalog-table-scroll" style="max-height: 320px; overflow-y: auto;">
                 <table id="products-table">

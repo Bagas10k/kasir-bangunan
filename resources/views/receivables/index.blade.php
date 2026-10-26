@@ -19,11 +19,64 @@
     .receivable-summary-card span { display:block; margin-bottom:7px; color:var(--text-caption); font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
     .receivable-summary-card strong { display:block; color:var(--text-main); font:700 clamp(16px,1.6vw,21px) var(--font-mono); font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
     .receivable-summary-card.is-primary strong { color:var(--primary-hover); }
-    .receivables-filter { display:flex; align-items:end; flex-wrap:wrap; gap:10px; margin:0 0 16px; }
-    .receivables-filter .form-group { flex:1 1 150px; min-width:140px; margin:0; }
-    .receivables-filter .form-group label { display:block; margin-bottom:4px; color:var(--text-caption); font-size:11px; font-weight:700; }
-    .receivables-filter .form-control { min-height:38px; }
-    .receivables-filter .btn, .receivables-filter .btn-secondary { min-height:38px; }
+    .receivables-filter {
+        display: grid;
+        grid-template-columns: minmax(180px, 1.6fr) minmax(140px, 1.2fr) repeat(2, minmax(130px, 1fr)) minmax(90px, .6fr) auto;
+        grid-template-areas: "search customer start end size actions";
+        align-items: end;
+        gap: 12px;
+        margin: 0 0 16px;
+        padding: 14px;
+        border: 1px solid var(--border-card, #e5e7eb);
+        border-radius: 12px;
+        background: var(--surface, #fff);
+    }
+    .receivables-filter .form-group {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 5px;
+        min-width: 0;
+        margin: 0;
+    }
+    .receivables-filter .form-group label {
+        display: block;
+        margin: 0;
+        color: var(--text-caption);
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .receivables-filter .form-control {
+        min-height: 38px;
+        height: 38px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .receivables-filter-search { grid-area: search; }
+    .receivables-filter-customer { grid-area: customer; }
+    .receivables-filter-start { grid-area: start; }
+    .receivables-filter-end { grid-area: end; }
+    .receivables-filter-size { grid-area: size; }
+    .receivables-filter-actions {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+    }
+    .receivables-filter-actions > * { white-space: nowrap; }
+    .receivables-filter .btn,
+    .receivables-filter .btn-secondary {
+        min-height: 38px;
+        height: 38px;
+        padding: 6px 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        box-sizing: border-box;
+    }
     .receivables-table-wrap { width:100%; overflow-x:auto; }
     .receivables-table { min-width:780px; }
     .receivables-table .money { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
@@ -33,15 +86,40 @@
     @media (max-width:900px) {
         .receivables-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
     }
+    @media (max-width:1024px) {
+        .receivables-filter {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-areas:
+                "search search customer customer"
+                "start start end end"
+                "size size actions actions";
+        }
+    }
     @media (max-width:720px) {
         .receivables-head { flex-direction:column; }
         .receivables-summary { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
         .receivable-summary-card { padding:12px; }
         .receivable-summary-card span { font-size:9px; }
         .receivable-summary-card strong { font-size:14px; }
-        .receivables-filter { display:grid; grid-template-columns:1fr; }
+        .receivables-filter {
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-areas: "search" "customer" "start" "end" "size" "actions";
+            gap: 10px;
+            padding: 12px;
+        }
         .receivables-filter .form-group { min-width:0; }
-        .receivables-filter .btn, .receivables-filter .btn-secondary { width:100%; }
+        .receivables-filter-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+        .receivables-filter .btn,
+        .receivables-filter .btn-secondary {
+            width: 100%;
+            min-height: 40px;
+            height: 40px;
+        }
         .receivables-table-wrap { overflow:visible; }
         .receivables-table { min-width:0; }
         .receivables-table thead { display:none; }
@@ -87,11 +165,11 @@
 
     <section class="card" aria-label="Daftar piutang">
         <form method="GET" action="{{ route('receivables.index') }}" class="receivables-filter">
-            <div class="form-group">
+            <div class="form-group receivables-filter-search">
                 <label for="receivables-search">No. invoice</label>
                 <input id="receivables-search" class="form-control" type="search" name="search" value="{{ $filters['search'] }}" maxlength="50" placeholder="Cari invoice">
             </div>
-            <div class="form-group">
+            <div class="form-group receivables-filter-customer">
                 <label for="receivables-customer">Jenis pelanggan</label>
                 <select id="receivables-customer" class="form-control" name="customer_type">
                     <option value="">Semua jenis</option>
@@ -100,15 +178,15 @@
                     @endforeach
                 </select>
             </div>
-            <div class="form-group">
+            <div class="form-group receivables-filter-start">
                 <label for="receivables-start">Dari tanggal</label>
                 <input id="receivables-start" class="form-control" type="date" name="start_date" value="{{ $filters['start_date'] }}">
             </div>
-            <div class="form-group">
+            <div class="form-group receivables-filter-end">
                 <label for="receivables-end">Sampai tanggal</label>
                 <input id="receivables-end" class="form-control" type="date" name="end_date" value="{{ $filters['end_date'] }}">
             </div>
-            <div class="form-group">
+            <div class="form-group receivables-filter-size">
                 <label for="receivables-per-page">Baris</label>
                 <select id="receivables-per-page" class="form-control" name="per_page">
                     @foreach([10, 15, 25, 50, 100] as $size)
@@ -116,8 +194,10 @@
                     @endforeach
                 </select>
             </div>
-            <button type="submit" class="btn">Terapkan</button>
-            <a class="btn-secondary" href="{{ route('receivables.index') }}">Reset</a>
+            <div class="receivables-filter-actions">
+                <button type="submit" class="btn">Terapkan</button>
+                <a class="btn-secondary" href="{{ route('receivables.index') }}">Reset</a>
+            </div>
         </form>
 
         @if($receivables->isEmpty())

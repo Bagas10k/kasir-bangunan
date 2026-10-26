@@ -56,7 +56,7 @@
     }
     .ritase-history-toolbar {
         display: grid;
-        grid-template-columns: minmax(210px, 2fr) minmax(160px, 1.3fr) repeat(3, minmax(135px, 1fr)) minmax(105px, .7fr) auto;
+        grid-template-columns: minmax(180px, 1.5fr) minmax(130px, 1fr) repeat(3, minmax(110px, .8fr)) minmax(80px, .6fr) auto;
         grid-template-areas: "search vehicle start end status size actions";
         align-items: end;
         gap: 12px;
@@ -93,7 +93,7 @@
         margin: 0;
     }
     .ritase-history-toolbar .master-toolbar-actions > * { white-space: nowrap; }
-    @media (max-width: 1100px) {
+    @media (max-width: 1320px) {
         .ritase-history-toolbar {
             grid-template-columns: repeat(4, minmax(0, 1fr));
             grid-template-areas:

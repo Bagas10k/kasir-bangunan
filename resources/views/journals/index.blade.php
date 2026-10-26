@@ -45,21 +45,24 @@
     .opening-row span { color:var(--text-muted); }
     .opening-row strong { color:var(--text-main); font-family:var(--font-mono); font-variant-numeric:tabular-nums; text-align:right; }
     .ledger-filter {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px 10px;
-        align-items: center;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(130px, 1fr)) minmax(160px, 1.2fr) minmax(140px, 1fr) auto;
+        grid-template-areas: "start end source account actions";
+        align-items: end;
+        gap: 12px;
         margin-bottom: 16px;
-        padding: 10px 14px;
+        padding: 14px;
         background: #fbfdfc;
         border: 1px solid var(--border-card, #e5e7eb);
         border-radius: 12px;
     }
     .ledger-filter .form-group {
         margin: 0;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 5px;
+        min-width: 0;
     }
     .ledger-filter .form-group label {
         color: var(--text-caption, #526359);
@@ -70,31 +73,39 @@
         margin: 0;
     }
     .ledger-filter .form-control {
-        min-height: 32px;
-        height: 32px;
-        padding: 4px 10px;
+        min-height: 38px;
+        height: 38px;
+        padding: 6px 10px;
         font-size: 12px;
         border-radius: 8px;
         border: 1px solid var(--border-control, #d9e2dc);
         background: #ffffff;
         color: var(--text-main, #1c2826);
+        width: 100%;
+        box-sizing: border-box;
     }
     .ledger-filter .form-control:focus {
         border-color: var(--primary, #2d6a4f);
         outline: none;
         box-shadow: 0 0 0 2px rgba(45, 106, 79, .12);
     }
+    .ledger-filter-start { grid-area: start; }
+    .ledger-filter-end { grid-area: end; }
+    .ledger-filter-source { grid-area: source; }
+    .ledger-filter-account { grid-area: account; }
     .ledger-filter-actions {
-        display: inline-flex;
-        gap: 6px;
+        grid-area: actions;
+        display: flex;
+        gap: 8px;
         align-items: center;
-        margin-left: auto;
+        margin: 0;
     }
+    .ledger-filter-actions > * { white-space: nowrap; }
     .ledger-filter .btn,
     .ledger-filter .btn-secondary {
-        min-height: 32px;
-        height: 32px;
-        padding: 4px 14px;
+        min-height: 38px;
+        height: 38px;
+        padding: 6px 16px;
         font-size: 12px;
         font-weight: 600;
         border-radius: 9999px;
@@ -103,6 +114,8 @@
         justify-content: center;
         line-height: 1;
         white-space: nowrap;
+        text-decoration: none;
+        box-sizing: border-box;
     }
     .ledger-filter .btn {
         background: var(--primary, #2d6a4f);
@@ -132,12 +145,35 @@
     @media(max-width:900px) {
         .opening-panel { grid-template-columns:1fr; }
         .opening-form { grid-template-columns:1fr; }
-        .ledger-filter { grid-template-columns:1fr 1fr; }
+        .ledger-filter {
+            grid-template-columns: 1fr 1fr;
+            grid-template-areas:
+                "start end"
+                "source account"
+                "actions actions";
+        }
         .balance-strip { grid-template-columns:1fr; }
     }
     @media(max-width:640px) {
         .ledger-heading { flex-direction:column; }
-        .ledger-filter { grid-template-columns:1fr; }
+        .ledger-filter {
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-areas: "start" "end" "source" "account" "actions";
+            gap: 10px;
+            padding: 12px;
+        }
+        .ledger-filter-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+        .ledger-filter .btn,
+        .ledger-filter .btn-secondary {
+            min-height: 40px;
+            height: 40px;
+            width: 100%;
+        }
         .journal-head { grid-template-columns:1fr; gap:7px; }
         .journal-table th:nth-child(2), .journal-table td:nth-child(2) { display:none; }
     }
@@ -234,15 +270,15 @@
     </div>
 
     <form method="GET" action="{{ route('journals.index') }}" class="ledger-filter">
-        <div class="form-group">
+        <div class="form-group ledger-filter-start">
             <label for="start_date">Dari Tanggal</label>
             <input class="form-control" id="start_date" name="start_date" type="date" value="{{ $filters['start_date'] ?? '' }}">
         </div>
-        <div class="form-group">
+        <div class="form-group ledger-filter-end">
             <label for="end_date">Sampai Tanggal</label>
             <input class="form-control" id="end_date" name="end_date" type="date" value="{{ $filters['end_date'] ?? '' }}">
         </div>
-        <div class="form-group">
+        <div class="form-group ledger-filter-source">
             <label for="source">Sumber Aktivitas</label>
             <select class="form-control" id="source" name="source">
                 <option value="">Semua sumber</option>
@@ -251,7 +287,7 @@
                 @endforeach
             </select>
         </div>
-        <div class="form-group">
+        <div class="form-group ledger-filter-account">
             <label for="account">Kode Akun</label>
             <input class="form-control" id="account" name="account" value="{{ $filters['account'] ?? '' }}" placeholder="Semua akun">
         </div>
