@@ -54,6 +54,64 @@
         width: 100%;
         box-sizing: border-box;
     }
+    .ritase-history-toolbar {
+        display: grid;
+        grid-template-columns: minmax(210px, 2fr) minmax(160px, 1.3fr) repeat(3, minmax(135px, 1fr)) minmax(105px, .7fr) auto;
+        grid-template-areas: "search vehicle start end status size actions";
+        align-items: end;
+        gap: 12px;
+        padding: 14px;
+        margin-bottom: 18px;
+        border: 1px solid var(--border-card, #e5e7eb);
+        border-radius: 12px;
+        background: var(--surface, #fff);
+    }
+    .ritase-history-toolbar .master-control {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 5px;
+        min-width: 0;
+    }
+    .ritase-history-toolbar .master-control label {
+        color: var(--text-caption, #526359);
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .ritase-history-toolbar .master-control-search { grid-area: search; }
+    .ritase-history-toolbar .ritase-filter-vehicle { grid-area: vehicle; }
+    .ritase-history-toolbar .ritase-filter-start { grid-area: start; }
+    .ritase-history-toolbar .ritase-filter-end { grid-area: end; }
+    .ritase-history-toolbar .ritase-filter-status { grid-area: status; }
+    .ritase-history-toolbar .ritase-filter-size { grid-area: size; }
+    .ritase-history-toolbar .master-toolbar-actions {
+        grid-area: actions;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+    }
+    .ritase-history-toolbar .master-toolbar-actions > * { white-space: nowrap; }
+    @media (max-width: 1100px) {
+        .ritase-history-toolbar {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-areas:
+                "search search vehicle vehicle"
+                "start start end end"
+                "status status size actions";
+        }
+    }
+    @media (max-width: 720px) {
+        .ritase-history-toolbar {
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-areas: "search" "vehicle" "start" "end" "status" "size" "actions";
+            gap: 10px;
+            padding: 12px;
+        }
+        .ritase-history-toolbar .master-toolbar-actions { display: grid; grid-template-columns: 1fr 1fr; }
+        .ritase-history-toolbar .master-toolbar-actions > * { min-height: 40px; }
+    }
 </style>
 
 <div class="card">
@@ -70,12 +128,12 @@
         </div>
     </div>
 
-    <form method="GET" action="{{ route('ritase.index') }}" class="master-toolbar" style="margin-bottom: 18px; border-radius: 12px; border: 1px solid var(--border-card, #e5e7eb);">
+    <form method="GET" action="{{ route('ritase.index') }}" class="ritase-history-toolbar">
         <div class="master-control master-control-search">
             <label for="history-search">Cari riwayat</label>
             <input class="form-control" id="history-search" name="search" value="{{ $search }}" placeholder="Nomor, plat, nota, tujuan">
         </div>
-        <div class="master-control">
+        <div class="master-control ritase-filter-vehicle">
             <label for="history-vehicle">Armada</label>
             <select class="form-control" id="history-vehicle" name="vehicle_id">
                 <option value="">Semua armada</option>
@@ -84,15 +142,15 @@
                 @endforeach
             </select>
         </div>
-        <div class="master-control">
+        <div class="master-control ritase-filter-start">
             <label for="history-start">Dari</label>
             <input class="form-control" type="date" id="history-start" name="start_date" value="{{ $filters['start_date'] ?? '' }}">
         </div>
-        <div class="master-control">
+        <div class="master-control ritase-filter-end">
             <label for="history-end">Sampai</label>
             <input class="form-control" type="date" id="history-end" name="end_date" value="{{ $filters['end_date'] ?? '' }}">
         </div>
-        <div class="master-control">
+        <div class="master-control ritase-filter-status">
             <label for="history-status">Status</label>
             <select class="form-control" id="history-status" name="status">
                 <option value="">Semua status</option>
@@ -100,7 +158,7 @@
                 <option value="pending_details" @selected(($filters['status'] ?? '') === 'pending_details')>Perlu detail</option>
             </select>
         </div>
-        <div class="master-control">
+        <div class="master-control ritase-filter-size">
             <label for="history-page-size">Baris</label>
             <select class="form-control" id="history-page-size" name="per_page">
                 @foreach([10, 15, 25, 50] as $size)
