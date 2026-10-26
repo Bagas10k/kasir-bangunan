@@ -1,0 +1,50 @@
+{
+  "task": "Audit dan koreksi subsistem keuangan bersama profil kunagent (Si Kun)",
+  "phase": "completed_with_prototype_limitations",
+  "started_wib": "2026-10-24 17:03 WIB",
+  "finished_wib": "2026-10-24 17:49 WIB",
+  "database_policy": "Tes mutatif memakai SQLite :memory: atau MariaDB disposable; migrasi publik hanya setelah backup tervalidasi dan perbandingan invariant sebelum/sesudah",
+  "acceptance": {
+    "journal_balanced_per_entry": true,
+    "exact_decimal_money": true,
+    "cash_bank_guard_atomic": true,
+    "coa_classification_valid": true,
+    "posted_history_immutable_in_code_and_database": true,
+    "finance_ui_understandable": true,
+    "isolated_finance_tests_pass": true,
+    "kunagent_review_settled": true,
+    "independent_qc_pass": true,
+    "production_migration_verified": true,
+    "audit_pdf_generated": true
+  },
+  "evidence": {
+    "laravel_full_suite": "239 passed, 8 skipped, 1370 assertions; exit 0",
+    "mariadb_rehearsal": "MariaDB 11.4 disposable PASS; debit=credit; P&L exact; balance sheet balanced; direct journal UPDATE/DELETE rejected",
+    "browser": "Expenses, Journals, Profit/Loss, Balance Sheet at 390px and 1440px: no horizontal overflow; zero emoji; expenses table becomes labelled cards at 390px with locked badge and amount visible inside the viewport",
+    "kunagent": "settled; verdict SESUAI; accounting 9.6/10; understandability 9.2/10",
+    "independent_qc": "completed; GO for prototype",
+    "workspace_verify": "hermes verify --json ok=true; npm audit 0 vulnerabilities; Vite build exit 0",
+    "public_health": "after migration, root redirects once to login HTTP 200; login HTTP 200",
+    "production_migration": "2026_10_24_000002_make_posted_journals_immutable ran in batch 4; four triggers present; row counts and journal hash unchanged; rollback-safe production probe rejected UPDATE/DELETE",
+    "backup": "/home/ubuntu/backups/kasir-bangunan/kasir_bangunan_prod_before_finance_immutability_20261024_174659.sql.gz",
+    "audit_pdf": "/home/ubuntu/kasir-bangunan-app/audit-keuangan-prototipe-2026-10-24.pdf"
+  },
+  "production_readback": {
+    "products": 7,
+    "chart_of_accounts": 17,
+    "users": 1,
+    "sales": 0,
+    "journal_entries": 4,
+    "journal_entry_lines": 9,
+    "ritases": 1,
+    "inventory_receipts": 1,
+    "expenses": 1,
+    "journal_hash_before_and_after": "42ac574a048878f81ff91c7c521c20b97d2affd249bc8f0e6d4009966f010397"
+  },
+  "limitations": [
+    "Authenticated public browser finance flow tidak diuji karena browser vault tidak memiliki login",
+    "Tutup buku/periode akuntansi tahunan belum tersedia pada prototipe",
+    "Backup lolos integritas gzip tetapi restore drill belum dilakukan"
+  ],
+  "status": "Selesai: Si Kun SESUAI, Si Pengawas GO, migrasi imutabilitas terpasang setelah backup dan invariant comparison; batas prototipe terdokumentasi"
+}

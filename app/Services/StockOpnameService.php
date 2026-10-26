@@ -95,6 +95,9 @@ class StockOpnameService
                 if (!$product) {
                     throw new RuntimeException("Product ID {$productId} not found");
                 }
+                if (!(bool) $product->is_active) {
+                    throw new InvalidArgumentException("Product ID {$productId} is inactive");
+                }
 
                 $systemQty = BigDecimal::of((string) $product->stock_quantity)->toScale(4, RoundingMode::HalfUp);
                 $diffQty = $physicalQty->minus($systemQty);

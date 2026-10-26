@@ -18,6 +18,8 @@ class KasirBangunanFeatureTest extends TestCase
 
     public function test_complete_kasir_bangunan_verified_workflow(): void
     {
+        $this->startBooks();
+
         // 1. Seed neutral synthetic items (no fake personal identities)
         $productId = DB::table('products')->insertGetId([
             'sku' => 'ITM-NEUTRAL-01',

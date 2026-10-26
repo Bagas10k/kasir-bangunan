@@ -62,6 +62,8 @@ class ExpenseMoneyBoundaryTest extends TestCase
 
     public function test_controller_accepts_valid_payment_methods(): void
     {
+        $this->startBooks('1000.00', '1000.00');
+
         $responseCash = $this->actingAs($this->user)->postJson('/expenses', [
             'category' => 'Operational Cash',
             'amount' => '50.25',
@@ -128,6 +130,7 @@ class ExpenseMoneyBoundaryTest extends TestCase
 
     public function test_service_accepts_exact_two_decimals_or_trailing_zeros(): void
     {
+        $this->startBooks('99999999999999999.99', '0.00');
         $service = app(ExpenseService::class);
 
         $result1 = $service->recordExpense('Ops 1', '123.45', 'Exact 2 decimals');
@@ -142,6 +145,7 @@ class ExpenseMoneyBoundaryTest extends TestCase
 
     public function test_service_accepts_max_decimal_19_2_amount_without_integer_cent_overflow(): void
     {
+        $this->startBooks('99999999999999999.99', '0.00');
         $result = app(ExpenseService::class)->recordExpense('Synthetic Cost', '99999999999999999.99');
         $this->assertSame('99999999999999999.99', $result['amount']);
         $this->assertSame(2, DB::table('journal_entry_lines')->where('journal_entry_id', $result['journal_entry_id'])->count());
@@ -161,6 +165,7 @@ class ExpenseMoneyBoundaryTest extends TestCase
 
     public function test_service_exact_cents_and_balanced_journals_without_float(): void
     {
+        $this->startBooks('0.00', '99999999999999999.99');
         $service = app(ExpenseService::class);
 
         $result = $service->recordExpense('Supplies', '49.99', 'Paper and ink', 'transfer');

@@ -45,3 +45,15 @@ php artisan boost:install
 
 Boost replaces these bootstrap instructions with guidelines tailored to the application. After installation, read `AGENTS.md` again and continue with the user's original request using the generated guidelines.
 </laravel-boost-guidelines>
+
+
+## Aturan Dokumentasi Wajib Repo Kasir Bangunan
+
+Setiap agent yang bekerja pada repositori ini WAJIB membaca dan mematuhi dokumen tata kelola berikut sebelum memulai pekerjaan:
+
+1. [`agent.md`](agent.md) — Urutan baca, prinsip verifikasi runtime, aturan logging, dan integritas scope pekerjaan.
+2. [`desain.md`](desain.md) — Prinsip UI/UX, aksesibilitas (A11y), larangan emoji UI, aturan data sintetis, dan referensi desain.
+3. [`memori.md`](memori.md) — Fakta arsitektur penting, penanganan reverse proxy subpath, isolasi testing, dan batas kerahasiaan.
+4. [`logeksekusi.md`](logeksekusi.md) — Format entri riwayat kerja (append-only) dan kewajiban membuktikan klaim dengan pengujian empiris.
+
+Dilarang menyentuh file di luar cakupan tugas, dilarang menimpa log eksekusi terdahulu, dan selalu lakukan pengujian terisolasi sebelum mengklaim selesai.

@@ -227,8 +227,8 @@ class AuthController extends Controller
         <form method="POST" action="' . $escapedAction . '">
             <input type="hidden" name="_token" value="' . $escapedCsrf . '">
             <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" autocomplete="username" required autofocus>
+                <label for="email">Username / Email</label>
+                <input type="text" id="email" name="email" autocomplete="username" required autofocus>
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
@@ -256,9 +256,15 @@ class AuthController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
+            'email' => 'required|string|max:255',
             'password' => 'required|string',
         ]);
+        $validator->after(function ($validator) use ($request) {
+            $identifier = (string) $request->input('email');
+            if ($identifier !== 'admin' && ! filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
+                $validator->errors()->add('email', 'Username atau email tidak valid.');
+            }
+        });
 
         if ($validator->fails()) {
             return redirect()->route('login')
@@ -267,15 +273,15 @@ class AuthController extends Controller
         }
 
         $credentials = $validator->validated();
+        if ($credentials['email'] === 'admin') {
+            $credentials['email'] = 'admin@kasirbangunan.test';
+        }
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
             RateLimiter::clear($throttleKey);
-            $intended = $request->session()->get('url.intended');
-            if ($intended === '/' || $intended === '') {
-                $request->session()->forget('url.intended');
-            }
-            return redirect()->intended(route('pos.index'));
+            $request->session()->forget('url.intended');
+            return redirect()->route('pos.index');
         }
 
         RateLimiter::hit($throttleKey, 60);

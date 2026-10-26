@@ -18,6 +18,7 @@ class RitaseLinkTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->startBooks();
 
         $this->vehicleId = DB::table('vehicles')->insertGetId([
             'license_plate' => 'B 9001 TEST',

@@ -248,11 +248,11 @@
             <span class="tabular-nums" style="font-weight: 700;">Rp {{ number_format((float)$sale->total_amount, 2, ',', '.') }}</span>
         </div>
         <div class="summary-line">
-            <span style="color: var(--text-caption);">Nominal Bayar:</span>
+            <span style="color: var(--text-caption);">Uang Tunai:</span>
             <span class="tabular-nums">Rp {{ number_format((float)$sale->paid_amount, 2, ',', '.') }}</span>
         </div>
         <div class="summary-line grand-total">
-            <span>Kembalian:</span>
+            <span>Uang Kembalian:</span>
             <span class="tabular-nums">Rp {{ number_format((float)$sale->change_amount, 2, ',', '.') }}</span>
         </div>
     </div>

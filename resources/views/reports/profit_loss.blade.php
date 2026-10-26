@@ -1,180 +1,226 @@
 @extends('layouts.app')
 @section('content')
-<style>
-    @media (prefers-reduced-motion: reduce) {
-        *, ::before, ::after {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-            scroll-behavior: auto !important;
-        }
-    }
-    .filter-card {
-        background-color: #ffffff;
-        border: 1px solid var(--border-card);
-        border-radius: 18px;
-        padding: 16px 20px;
-        margin-bottom: 22px;
-        box-shadow: 0 4px 16px rgba(45, 106, 79, 0.04);
-    }
-    .report-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    .report-table th.section-title {
-        background-color: var(--mint-surface);
-        color: var(--primary-hover);
-        font-size: 11.5px;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        padding: 10px 14px;
-        border-radius: 8px;
-    }
-    .report-table td {
-        padding: 9px 14px;
-        border-bottom: 1px solid #f0f4f1;
-        font-size: 13.5px;
-    }
-    .highlight-card {
-        background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%);
-        color: #ffffff;
-        border-radius: 16px;
-        padding: 16px 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-top: 18px;
-        box-shadow: 0 6px 18px rgba(27, 67, 50, 0.2);
-    }
-    @media print {
-        header, nav, .sidebar-wrapper, .topbar, .filter-card, .no-print {
-            display: none !important;
-        }
-        .app-layout {
-            display: block !important;
-        }
-        .main-wrapper {
-            margin: 0 !important;
-        }
-        main {
-            padding: 0 !important;
-            max-width: 100% !important;
-        }
-        .card {
-            border: none !important;
-            box-shadow: none !important;
-            padding: 0 !important;
-        }
-    }
-</style>
+@include('reports._styles')
 
-<div class="card">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
-        <h2 style="margin: 0; border: none; padding: 0;">Laporan Laba Rugi (Profit &amp; Loss)</h2>
-        <span class="badge" style="font-size: 11px;">Buku Besar Akuntansi</span>
-    </div>
-    
-    <div class="filter-card no-print">
-        <form method="GET" action="{{ route('reports.profit_loss') }}" style="display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;">
-            <div class="form-group" style="margin-bottom: 0;">
-                <label for="start_date">Dari Tanggal</label>
-                <input type="date" name="start_date" id="start_date" value="{{ $startDate ?? '' }}" class="form-control" style="border-radius: 9999px; padding: 8px 14px;">
+@php
+    $formatMoney = function ($value, bool $withSymbol = false, bool $accountingSign = false) {
+        $decimal = \Brick\Math\BigDecimal::of((string) $value)->toScale(2, \Brick\Math\RoundingMode::HalfUp);
+        $negative = $decimal->isNegative();
+        [$whole, $fraction] = explode('.', ltrim((string) $decimal, '-'));
+        $formatted = preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', $whole) . ',' . $fraction;
+        $formatted = ($withSymbol ? 'Rp ' : '') . $formatted;
+
+        return $negative ? ($accountingSign ? '(' . $formatted . ')' : '-' . $formatted) : $formatted;
+    };
+    $num = fn ($n) => $formatMoney($n);
+    $rp = fn ($n) => $formatMoney($n, true);
+    $rpSigned = fn ($n) => $formatMoney($n, true, true);
+
+    $totalPendapatan = \Brick\Math\BigDecimal::of((string) $report['total_revenue'])
+        ->plus((string) $report['total_other_income'])->toScale(2, \Brick\Math\RoundingMode::HalfUp);
+    $totalBeban = \Brick\Math\BigDecimal::of((string) $report['total_cogs'])
+        ->plus((string) $report['total_expense'])->plus((string) $report['total_other_expense'])
+        ->toScale(2, \Brick\Math\RoundingMode::HalfUp);
+    $net = \Brick\Math\BigDecimal::of((string) $report['net_profit'])->toScale(2, \Brick\Math\RoundingMode::HalfUp);
+    $isProfit = !$net->isNegative();
+    $periodLabel = ($startDate || $endDate)
+        ? 'Periode ' . ($startDate ? \Carbon\Carbon::parse($startDate)->locale('id')->translatedFormat('d M Y') : 'awal pembukuan')
+            . ' s.d. ' . ($endDate ? \Carbon\Carbon::parse($endDate)->locale('id')->translatedFormat('d M Y') : 'sekarang')
+        : 'Seluruh periode pembukuan';
+    $accountCount = count($report['revenues']) + count($report['cogs']) + count($report['expenses'])
+        + count($report['other_income']) + count($report['other_expenses']);
+
+    $now = now();
+    $presets = [
+        'Bulan Ini' => [$now->copy()->startOfMonth()->toDateString(), $now->toDateString()],
+        'Bulan Lalu' => [$now->copy()->subMonthNoOverflow()->startOfMonth()->toDateString(), $now->copy()->subMonthNoOverflow()->endOfMonth()->toDateString()],
+        'Tahun Ini' => [$now->copy()->startOfYear()->toDateString(), $now->toDateString()],
+    ];
+    $isPresetActive = fn ($s, $e) => (($startDate ?? '') === $s && ($endDate ?? '') === $e);
+@endphp
+
+<div class="card report-shell">
+    <header class="statement-header">
+        <div class="statement-title">
+            <nav class="breadcrumb no-print" aria-label="Breadcrumb">Laporan Keuangan<span class="sep" aria-hidden="true">›</span>Laba Rugi (Income Statement)</nav>
+            <h2>Laporan Laba Rugi</h2>
+            <p class="report-period">{{ $periodLabel }}</p>
+        </div>
+        <div class="statement-actions no-print">
+            <a href="{{ route('reports.profit_loss.csv', array_filter(['start_date' => $startDate ?? null, 'end_date' => $endDate ?? null])) }}" class="btn btn-secondary report-action">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Unduh CSV
+            </a>
+            <button type="button" class="btn report-action" onclick="window.print()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                Cetak / PDF
+            </button>
+        </div>
+    </header>
+
+    <section class="statement-summary" aria-label="Ringkasan Laba Rugi">
+        <div class="summary-item">
+            <span class="summary-label">Pendapatan Keseluruhan</span>
+            <strong class="summary-value">{{ $rp($totalPendapatan) }}</strong>
+        </div>
+        <div class="summary-item">
+            <span class="summary-label">Total Beban</span>
+            <strong class="summary-value">{{ $rp($totalBeban) }}</strong>
+        </div>
+        <div class="summary-item {{ $isProfit ? 'is-result' : 'is-alert' }}">
+            <span class="summary-label">{{ $isProfit ? 'Laba Bersih (Net Profit)' : 'Rugi Bersih (Net Loss)' }}</span>
+            <strong class="summary-value">{{ $rpSigned($net) }}</strong>
+        </div>
+    </section>
+
+    <div class="report-toolbar no-print">
+        <div class="report-filter-form">
+            <div class="filter-cluster">
+                <div class="preset-cluster">
+                    <span class="filter-caption">Periode cepat</span>
+                    <div class="period-presets">
+                        @foreach($presets as $label => $range)
+                            <a class="preset-btn {{ $isPresetActive($range[0], $range[1]) ? 'active' : '' }}"
+                               href="{{ route('reports.profit_loss', ['start_date' => $range[0], 'end_date' => $range[1]]) }}">{{ $label }}</a>
+                        @endforeach
+                        <a class="preset-btn" href="{{ route('reports.profit_loss') }}">Semua</a>
+                    </div>
+                </div>
+                <details class="custom-period">
+                    <summary>Rentang khusus</summary>
+                    <form method="GET" action="{{ route('reports.profit_loss') }}" class="date-cluster">
+                        <div class="field">
+                            <label for="start_date">Dari</label>
+                            <input type="date" name="start_date" id="start_date" value="{{ $startDate ?? '' }}">
+                        </div>
+                        <span class="range-sep">s.d.</span>
+                        <div class="field">
+                            <label for="end_date">Sampai</label>
+                            <input type="date" name="end_date" id="end_date" value="{{ $endDate ?? '' }}">
+                        </div>
+                        <button type="submit" class="btn report-apply">Tampilkan</button>
+                        <a href="{{ route('reports.profit_loss') }}" class="report-reset">Reset</a>
+                    </form>
+                </details>
             </div>
-            <div class="form-group" style="margin-bottom: 0;">
-                <label for="end_date">Sampai Tanggal</label>
-                <input type="date" name="end_date" id="end_date" value="{{ $endDate ?? '' }}" class="form-control" style="border-radius: 9999px; padding: 8px 14px;">
-            </div>
-            <div style="display: flex; gap: 8px;">
-                <button type="submit" class="btn" style="border-radius: 9999px; padding: 8px 20px;">Tampilkan</button>
-                <a href="{{ route('reports.profit_loss') }}" class="btn btn-secondary" style="border-radius: 9999px; padding: 8px 16px; text-decoration: none; display: inline-block;">Reset</a>
-                <button type="button" class="btn btn-secondary" onclick="window.print()" style="border-radius: 9999px; padding: 8px 16px;">Cetak</button>
-            </div>
-        </form>
+        </div>
     </div>
 
-    <div style="max-width: 680px;">
-        <table class="report-table">
-            <tbody>
+    <div class="ledger-caption">
+        <strong>Rincian akun · {{ $accountCount }} akun</strong>
+        <span>Mata uang Rupiah · angka dalam nilai penuh</span>
+    </div>
+    <div class="report-ledger">
+        <table class="report-table" aria-label="Rincian Laporan Laba Rugi">
+            <thead>
                 <tr>
-                    <th colspan="2" class="section-title">1. Pendapatan Operasional</th>
+                    <th scope="col" style="width: 90px;">Kode</th>
+                    <th scope="col">Nama Akun</th>
+                    <th scope="col" class="num">Jumlah (Rp)</th>
                 </tr>
+            </thead>
+            <tbody>
+                <tr><th scope="row" colspan="3" class="section-title">1. Pendapatan Operasional</th></tr>
                 @forelse($report['revenues'] as $rev)
                 <tr>
-                    <td style="padding-left: 20px;">
-                        <span class="sku-code" style="color: var(--primary);">{{ $rev['code'] }}</span> &bull; {{ $rev['name'] }}
-                    </td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $rev['amount'] }}</td>
+                    <td class="code"><span class="sku-code">{{ $rev['code'] }}</span></td>
+                    <td>{{ $rev['name'] }}</td>
+                    <td class="amount">{{ $num($rev['amount']) }}</td>
                 </tr>
                 @empty
                 <tr>
-                    <td style="padding-left: 20px; color: var(--text-caption);">(Belum ada pendapatan pada periode ini)</td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp 0.00</td>
+                    <td colspan="2" style="color: var(--text-caption);">(Belum ada pendapatan pada periode ini)</td>
+                    <td class="amount">0,00</td>
                 </tr>
                 @endforelse
-                <tr style="font-weight: 700; border-top: 1px solid var(--border-subtle);">
+                <tr class="total">
+                    <td></td>
                     <td>Total Pendapatan</td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums; color: var(--primary-hover);">Rp {{ $report['total_revenue'] }}</td>
+                    <td class="amount">{{ $num($report['total_revenue']) }}</td>
                 </tr>
 
-                <tr>
-                    <th colspan="2" class="section-title" style="margin-top: 14px;">2. Beban Pokok Penjualan (HPP)</th>
-                </tr>
+                <tr><th scope="row" colspan="3" class="section-title">2. Beban Pokok Penjualan (HPP)</th></tr>
                 @forelse($report['cogs'] as $c)
                 <tr>
-                    <td style="padding-left: 20px;">
-                        <span class="sku-code" style="color: var(--primary);">{{ $c['code'] }}</span> &bull; {{ $c['name'] }}
-                    </td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums;">(Rp {{ $c['amount'] }})</td>
+                    <td class="code"><span class="sku-code">{{ $c['code'] }}</span></td>
+                    <td>{{ $c['name'] }}</td>
+                    <td class="amount neg">({{ $num($c['amount']) }})</td>
                 </tr>
                 @empty
                 <tr>
-                    <td style="padding-left: 20px; color: var(--text-caption);">(Tidak ada HPP tercatat)</td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp 0.00</td>
+                    <td colspan="2" style="color: var(--text-caption);">(Tidak ada HPP tercatat)</td>
+                    <td class="amount">0,00</td>
                 </tr>
                 @endforelse
-                <tr style="font-weight: 700; border-top: 1px solid var(--border-subtle);">
+                <tr class="total">
+                    <td></td>
                     <td>Total HPP</td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums; color: var(--danger);">(Rp {{ $report['total_cogs'] }})</td>
+                    <td class="amount neg">({{ $num($report['total_cogs']) }})</td>
+                </tr>
+                <tr class="grand">
+                    <td></td>
+                    <td>LABA KOTOR (GROSS PROFIT)</td>
+                    <td class="amount">{{ $num($report['gross_profit']) }}</td>
                 </tr>
 
-                <tr style="background-color: var(--mint-surface); font-weight: 800; border-radius: 8px;">
-                    <td style="color: var(--primary-hover);">LABA KOTOR (GROSS PROFIT)</td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums; color: var(--primary-hover); font-size: 15px;">Rp {{ $report['gross_profit'] }}</td>
-                </tr>
-
-                <tr>
-                    <th colspan="2" class="section-title">3. Beban Operasional</th>
-                </tr>
+                <tr><th scope="row" colspan="3" class="section-title">3. Beban Operasional</th></tr>
                 @forelse($report['expenses'] as $exp)
                 <tr>
-                    <td style="padding-left: 20px;">
-                        <span class="sku-code" style="color: var(--primary);">{{ $exp['code'] }}</span> &bull; {{ $exp['name'] }}
-                    </td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums;">(Rp {{ $exp['amount'] }})</td>
+                    <td class="code"><span class="sku-code">{{ $exp['code'] }}</span></td>
+                    <td>{{ $exp['name'] }}</td>
+                    <td class="amount neg">({{ $num($exp['amount']) }})</td>
                 </tr>
                 @empty
                 <tr>
-                    <td style="padding-left: 20px; color: var(--text-caption);">(Tidak ada beban operasional tercatat)</td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp 0.00</td>
+                    <td colspan="2" style="color: var(--text-caption);">(Tidak ada beban operasional tercatat)</td>
+                    <td class="amount">0,00</td>
                 </tr>
                 @endforelse
-                <tr style="font-weight: 700; border-top: 1px solid var(--border-subtle);">
+                <tr class="total">
+                    <td></td>
                     <td>Total Beban Operasional</td>
-                    <td style="text-align: right; font-variant-numeric: tabular-nums; color: var(--danger);">(Rp {{ $report['total_expense'] }})</td>
+                    <td class="amount neg">({{ $num($report['total_expense']) }})</td>
+                </tr>
+
+                @if(count($report['other_income']) > 0)
+                <tr><th scope="row" colspan="3" class="section-title">4. Pendapatan Lain-lain</th></tr>
+                @foreach($report['other_income'] as $oi)
+                <tr>
+                    <td class="code"><span class="sku-code">{{ $oi['code'] }}</span></td>
+                    <td>{{ $oi['name'] }}</td>
+                    <td class="amount">{{ $num($oi['amount']) }}</td>
+                </tr>
+                @endforeach
+                <tr class="total">
+                    <td></td>
+                    <td>Total Pendapatan Lain-lain</td>
+                    <td class="amount">{{ $num($report['total_other_income']) }}</td>
+                </tr>
+                @endif
+
+                @if(count($report['other_expenses']) > 0)
+                <tr><th scope="row" colspan="3" class="section-title">5. Beban Lain-lain</th></tr>
+                @foreach($report['other_expenses'] as $oe)
+                <tr>
+                    <td class="code"><span class="sku-code">{{ $oe['code'] }}</span></td>
+                    <td>{{ $oe['name'] }}</td>
+                    <td class="amount neg">({{ $num($oe['amount']) }})</td>
+                </tr>
+                @endforeach
+                <tr class="total">
+                    <td></td>
+                    <td>Total Beban Lain-lain</td>
+                    <td class="amount neg">({{ $num($report['total_other_expense']) }})</td>
+                </tr>
+                @endif
+
+                <tr class="grand">
+                    <td></td>
+                    <td>LABA BERSIH (NET PROFIT)</td>
+                    <td class="amount">{{ $num($report['net_profit']) }}</td>
                 </tr>
             </tbody>
         </table>
-
-        <div class="highlight-card">
-            <div>
-                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85;">Hasil Bersih Periode</div>
-                <div style="font-size: 16px; font-weight: 800;">LABA BERSIH (NET PROFIT)</div>
-            </div>
-            <div class="tabular-nums" style="font-size: 22px; font-weight: 800;">
-                Rp {{ $report['net_profit'] }}
-            </div>
-        </div>
     </div>
 </div>
 @endsection

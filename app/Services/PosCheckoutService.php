@@ -88,6 +88,9 @@ class PosCheckoutService
                 if (!$product) {
                     throw new RuntimeException("Product ID {$productId} not found");
                 }
+                if (!(bool) $product->is_active) {
+                    throw new InvalidArgumentException("Product ID {$productId} is inactive");
+                }
                 $currentStockBd = BigDecimal::of((string) $product->stock_quantity);
                 if ($currentStockBd->isLessThan($itemData['quantity'])) {
                     throw new RuntimeException(

@@ -1,0 +1,43 @@
+{
+  "target": "Subsistem keuangan prototipe Kasir Bangunan",
+  "surface": "https://www.jajandigital.web.id/kasir-bangunan/",
+  "source_kind": "local-file",
+  "source_url": "",
+  "done_when": [
+    {"id": "finance-tests", "test": "Full Laravel regression passes on isolated SQLite"},
+    {"id": "mariadb-ledger", "test": "Disposable MariaDB financial rehearsal passes"},
+    {"id": "browser-layout", "test": "Four finance pages render without horizontal overflow on mobile and desktop"},
+    {"id": "workspace-build", "test": "Detected workspace verification passes"},
+    {"id": "public-health", "test": "Public login route remains HTTP 200"},
+    {"id": "kun-review", "test": "Si Kun review settles with a substantive verdict"},
+    {"id": "independent-qc", "test": "Independent supervisor returns completed GO verdict"},
+    {"id": "production-immutability", "test": "Journal immutability migration is backed up, applied, and verified without ledger drift"},
+    {"id": "audit-report", "test": "A final PDF audit report with screenshots is generated"}
+  ],
+  "constraints": [
+    "Mutating tests use SQLite memory or disposable MariaDB",
+    "Public schema migration runs only after a verified backup and before/after invariant comparison",
+    "Do not claim authenticated public finance flow without browser-vault evidence"
+  ],
+  "checks": [
+    {"id": "finance-tests", "result": "pass", "evidence": "artisan test exit 0: 239 passed, 8 skipped, 1370 assertions"},
+    {"id": "mariadb-ledger", "result": "pass", "evidence": "MariaDB 11.4 disposable exit 0; debit=credit, exact reports, direct posted-journal UPDATE/DELETE rejected"},
+    {"id": "browser-layout", "result": "pass", "evidence": "CDP screenshots at 390px and 1440px for Expenses, Journals, P&L, Balance Sheet; scrollWidth equals clientWidth"},
+    {"id": "workspace-build", "result": "pass", "evidence": "hermes verify --json ok=true; npm audit zero vulnerabilities; Vite build exit 0"},
+    {"id": "public-health", "result": "pass", "evidence": "After migration, curl root followed one redirect to login HTTP 200; login HTTP 200"},
+    {"id": "kun-review", "result": "pass", "evidence": "kunagent delivery settled; verdict SESUAI, accounting 9.6/10, understandability 9.2/10"},
+    {"id": "independent-qc", "result": "pass", "evidence": "Si Pengawas completed with GO for prototype after code and visual audit"},
+    {"id": "production-immutability", "result": "pass", "evidence": "Backup gzip valid; migration batch 4 ran; four triggers present; row counts and journal hash unchanged; production rollback-safe probe rejected line UPDATE and header DELETE"},
+    {"id": "audit-report", "result": "pass", "evidence": "Chromium produced audit-keuangan-prototipe-2026-10-24.pdf regenerated with post-fix mobile card screenshot; file identifies PDF 1.4, 5 pages, 670797 bytes, SHA256 da648995685db09b1277ecc1c325715f4f273515da7b8c2b001a157fc3bf9b8d"}
+  ],
+  "claims": [
+    {"text": "The corrected finance code passes the isolated Laravel regression suite", "check_id": "finance-tests"},
+    {"text": "The disposable MariaDB ledger balances and rejects direct mutation of posted journals", "check_id": "mariadb-ledger"},
+    {"text": "The four finance pages fit mobile and desktop widths in a real browser", "check_id": "browser-layout"},
+    {"text": "The public login surface remains reachable after the schema migration", "check_id": "public-health"},
+    {"text": "Si Kun completed an independent finance and usability review", "check_id": "kun-review"},
+    {"text": "Si Pengawas completed the independent release gate with GO", "check_id": "independent-qc"},
+    {"text": "The public prototype database now enforces posted-journal immutability without changing existing ledger data", "check_id": "production-immutability"},
+    {"text": "A five-page PDF audit report with finance screenshots was generated", "check_id": "audit-report"}
+  ]
+}

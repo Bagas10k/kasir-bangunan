@@ -1,0 +1,24 @@
+{
+  "task": "Optional fleet/ritase at POS checkout and inventory receipt",
+  "phase": "targeted MySQL migration applied; synthetic master vehicle/product added; public authenticated fleet workflow not exercised",
+  "decisions": {
+    "ritase": "shop operational expense: debit 6201, credit Kas Toko 1101; separate from sale and inventory HPP",
+    "driver_destination": "nullable while pending_details; fill later once, no second journal",
+    "without_fleet": "existing sale/receipt behavior unchanged"
+  },
+  "verified": [
+    "Full isolated suite: 193 passed, 8 skipped, 1012 assertions after migration; FleetFlowTest 11 passed (46 assertions)",
+    "Active MySQL synthetic master vehicle SYN-UNIT-01 (active) and product SYN-MATERIAL-01 (stock zero) read back; no sale/receipt/ritase/stock movement added, users=1, journal entries unchanged=2",
+    "Fresh disposable SQLite migration succeeds and column exists",
+    "Targeted MySQL migration 2026_10_23_000002 applied (batch 2); inventory_receipt_id, driver_name, destination nullable; FK read back",
+    "Pre-migration private gzip dump validated against 24 live table markers: /home/ubuntu/kasir-bangunan-backups/pre-ritase-migration-20261023-184822.sql.gz",
+    "Real browser DOM and screenshots of POS and receiving modal show controls without overlap",
+    "Browser test normalized IDR 125,50 to server string 125.50 before form.submit()",
+    "Active DB readback after migration users=1, products=0, sales=0, receipts=0, ritases=0; new column present; public login HTTP 200 and unauthenticated POS HTTP 302 to login"
+  ],
+  "blocked": [
+    "Independent QC subagents stalled without verdict",
+    "No real public authenticated UI mutation exercised; browser vault has no saved login"
+  ],
+  "safety": "Do not claim public authenticated transaction success; do not run migrate:fresh, reset user, or seed active DB. Code is bind-mounted into public container; schema gate now enables fleet controls after migration. Backup gzip integrity passed, restore drill not run."
+}

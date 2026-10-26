@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Laporan Audit Subsistem Keuangan — Prototipe Kasir Bangunan</title>
+<style>
+@page { size: A4; margin: 16mm 15mm 17mm; }
+:root { --ink:#142018; --muted:#506158; --line:#cbd6ce; --paper:#fbfaf5; --green:#146b3a; --pale:#e8f2ea; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:var(--paper); font-family:Arial,Helvetica,sans-serif; font-size:10.5pt; line-height:1.48; }
+.page { break-after:page; min-height:255mm; position:relative; }
+.page:last-child { break-after:auto; }
+.kicker { color:var(--green); font-size:9pt; font-weight:700; letter-spacing:.14em; text-transform:uppercase; }
+h1 { font-size:28pt; line-height:1.05; margin:8mm 0 4mm; letter-spacing:-.04em; }
+h2 { font-size:17pt; margin:8mm 0 3mm; letter-spacing:-.025em; }
+p { margin:0 0 4mm; }
+.lead { color:var(--muted); font-size:12pt; max-width:155mm; }
+.verdict { margin:8mm 0; padding:5mm; border:1.5px solid var(--green); background:var(--pale); }
+.verdict strong { display:block; color:var(--green); font-size:15pt; margin-bottom:2mm; }
+table { width:100%; border-collapse:collapse; margin:5mm 0 7mm; }
+th,td { padding:3mm; border-bottom:1px solid var(--line); vertical-align:top; text-align:left; }
+th { color:var(--green); font-size:9pt; text-transform:uppercase; letter-spacing:.06em; }
+.note { padding:4mm 5mm; border-left:3px solid var(--green); background:#f1f4ef; color:#33463a; }
+ul { margin:2mm 0 5mm 5mm; padding-left:5mm; }
+li { margin:0 0 2mm; }
+.figure-head { display:flex; justify-content:space-between; align-items:end; border-bottom:1px solid var(--line); padding-bottom:3mm; margin-bottom:6mm; }
+.figure-head h2 { margin:0; }
+.figure { display:block; max-width:86mm; max-height:205mm; margin:0 auto; border:1px solid var(--line); box-shadow:0 2mm 8mm rgba(20,32,24,.08); }
+.caption { color:var(--muted); font-size:9pt; margin-top:5mm; }
+.footer { position:absolute; bottom:0; left:0; right:0; padding-top:3mm; border-top:1px solid var(--line); color:var(--muted); font-size:8pt; display:flex; justify-content:space-between; }
+code { font-family:Consolas,monospace; font-size:8.5pt; word-break:break-all; }
+</style>
+</head>
+<body>
+<section class="page">
+  <div class="kicker">Audit teknis & keterpahaman pengguna</div>
+  <h1>Subsistem Keuangan<br>Prototipe Kasir Bangunan</h1>
+  <p class="lead">Pemeriksaan menyeluruh terhadap jurnal, presisi nominal, perlindungan Kas/Bank, klasifikasi akun, Laba Rugi, Neraca, dan keterpahaman layar bagi pemilik usaha non-akuntan.</p>
+  <div class="verdict"><strong>GO bersyarat untuk prototipe</strong>Logika inti akuntansi dan antarmuka telah lulus gate. Sistem belum disebut ERP produksi penuh karena tutup buku/periode akuntansi belum tersedia dan alur publik terautentikasi belum diuji melalui browser vault.</div>
+  <h2>Bukti kelulusan</h2>
+  <table>
+    <tr><th>Gate</th><th>Bukti empiris</th></tr>
+    <tr><td>Laravel</td><td>239 lulus, 8 dilewati, 1.370 asersi; exit 0</td></tr>
+    <tr><td>MariaDB 11.4 disposable</td><td>Debit = kredit Rp 850.004.787.507,01; Neraca seimbang</td></tr>
+    <tr><td>Imutabilitas jurnal</td><td>UPDATE baris dan DELETE header jurnal ditolak trigger</td></tr>
+    <tr><td>Si Kun</td><td>SESUAI — akuntansi 9,6/10; keterpahaman 9,2/10</td></tr>
+    <tr><td>Si Pengawas</td><td>GO — audit independen selesai</td></tr>
+    <tr><td>Browser nyata</td><td>Empat halaman pada 390px dan 1440px tanpa overflow horizontal</td></tr>
+    <tr><td>Situs publik</td><td>Root dialihkan sekali ke login; hasil akhir HTTP 200</td></tr>
+  </table>
+  <div class="footer"><span>24 Oktober 2026 · 17:49 WIB</span><span>1 / 5</span></div>
+</section>
+
+<section class="page">
+  <div class="kicker">Koreksi yang diterapkan</div>
+  <h2>Integritas uang dan jejak audit</h2>
+  <ul>
+    <li>Pengeluaran terposting tidak dapat diedit atau dihapus langsung.</li>
+    <li>Jurnal terposting dilindungi empat trigger UPDATE/DELETE pada basis data.</li>
+    <li>Ritase, saldo Kas/Bank, restock, penerimaan barang, dan laporan memakai string desimal serta BigDecimal, bukan keputusan berbasis float.</li>
+    <li>Neraca tidak lagi menghitung laba berjalan dua kali.</li>
+    <li>Saldo normal COA wajib konsisten: aset/beban = debit; kewajiban/modal/pendapatan = kredit.</li>
+    <li>Respons penerimaan barang mempertahankan presisi kuantitas empat desimal dan uang dua desimal.</li>
+  </ul>
+  <h2>Penerapan aman di database publik</h2>
+  <p>Sebelum migrasi dibuat backup terkompresi dan tervalidasi. Setelah migrasi, jumlah data pada tabel penting serta hash jurnal sama persis. Empat trigger terbaca dan probe rollback-safe membuktikan mutasi langsung ditolak.</p>
+  <div class="note"><strong>Backup terverifikasi</strong><br><code>/home/ubuntu/backups/kasir-bangunan/kasir_bangunan_prod_before_finance_immutability_20261024_174659.sql.gz</code><br>24 tabel · SHA256 <code>cd77a7c472f7b448549c762393088f9ce5be41400d2e4835c5d404029dc42d59</code></div>
+  <h2>Batas prototipe</h2>
+  <ul>
+    <li>Tutup buku/periode akuntansi tahunan belum tersedia.</li>
+    <li>Alur finance publik terautentikasi belum diuji karena browser vault tidak memiliki login.</li>
+    <li>Backup telah diuji integritas berkas, tetapi restore drill belum dilakukan.</li>
+  </ul>
+  <div class="footer"><span>Audit keuangan prototipe</span><span>2 / 5</span></div>
+</section>
+
+<section class="page">
+  <div class="figure-head"><div><div class="kicker">Bukti antarmuka mobile</div><h2>Pengeluaran Operasional</h2></div><span>390 × 844</span></div>
+  <img class="figure" src="file:///home/ubuntu/.hermes/cache/scratch/finance-audit-preview/expenses-390-card.png" alt="Halaman Pengeluaran Operasional">
+  <p class="caption">Tabel berubah menjadi kartu berlabel pada 390px: setiap field punya label, nominal dan status jurnal “Terkunci” langsung terlihat tanpa geser horizontal. Browser mengukur <code>scrollWidth = clientWidth = 390</code> dan semua sel berhenti di x=334.</p>
+  <div class="footer"><span>Audit keuangan prototipe</span><span>3 / 5</span></div>
+</section>
+
+<section class="page">
+  <div class="figure-head"><div><div class="kicker">Bukti antarmuka mobile</div><h2>Jurnal Umum & Laba Rugi</h2></div><span>390 × 844</span></div>
+  <table><tr><td><img class="figure" style="max-width:75mm;max-height:175mm" src="file:///home/ubuntu/.hermes/cache/scratch/finance-audit-preview/journals-390.png" alt="Halaman Jurnal Umum"></td><td><img class="figure" style="max-width:75mm;max-height:175mm" src="file:///home/ubuntu/.hermes/cache/scratch/finance-audit-preview/profit-loss-390.png" alt="Halaman Laba Rugi"></td></tr></table>
+  <p class="caption">Jurnal memperlihatkan saldo pembukaan, saldo akhir, filter, status “Seimbang”, serta pasangan debit-kredit. Laba Rugi menonjolkan periode, pendapatan, beban, laba kotor, dan laba bersih yang dapat ditelusuri per akun.</p>
+  <div class="footer"><span>Audit keuangan prototipe</span><span>4 / 5</span></div>
+</section>
+
+<section class="page">
+  <div class="figure-head"><div><div class="kicker">Bukti antarmuka mobile</div><h2>Neraca</h2></div><span>390 × 844</span></div>
+  <img class="figure" src="file:///home/ubuntu/.hermes/cache/scratch/finance-audit-preview/balance-sheet-390.png" alt="Halaman Neraca">
+  <p class="caption">Total Aset dan Total Pasiva dibandingkan langsung. Modal tercatat dan laba tahun berjalan dipisahkan sehingga sumber ekuitas mudah dipahami; status “Seimbang” ditampilkan eksplisit.</p>
+  <div class="note"><strong>Kesimpulan</strong><br>Bagian keuangan kini sesuai untuk ruang lingkup prototipe dan cukup mudah dipahami pemilik usaha non-akuntan. Kekurangan yang tersisa dinyatakan terbuka, bukan disembunyikan sebagai fitur selesai.</div>
+  <div class="footer"><span>Audit keuangan prototipe</span><span>5 / 5</span></div>
+</section>
+</body>
+</html>

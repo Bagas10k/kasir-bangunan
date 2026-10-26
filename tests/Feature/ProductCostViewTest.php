@@ -18,7 +18,7 @@ class ProductCostViewTest extends TestCase
         }
     }
 
-    public function test_products_index_renders_four_decimal_cost_and_step(): void
+    public function test_products_index_renders_four_decimal_cost_and_currency_input(): void
     {
         $user = User::create([
             'name' => 'View Tester',
@@ -46,9 +46,11 @@ class ProductCostViewTest extends TestCase
         $response->assertSee('VIEW-4DP-01');
         $this->assertSame('54321.1234', (string) $response->viewData('products')->first()->cost_price);
         $this->assertSame('54321.1234', (string) \Brick\Math\BigDecimal::of((string) $response->viewData('products')->first()->cost_price)->toScale(4));
-        $response->assertSee('step="0.0001"', false);
-        preg_match('/<td style="text-align:right;">Rp ([^<]+)<\/td>/', $response->getContent(), $costCell);
-        $this->assertSame('54321.1234', $costCell[1] ?? null);
+        $response->assertSee('name="cost_price"', false);
+        $response->assertSee('data-currency-input', false);
+        $response->assertSee('data-currency-scale="4"', false);
+        // HPP renders formatted from the exact decimal string; the assertion is independent of responsive cell attributes.
+        $response->assertSee('Rp 54.321,1234');
         $response->assertSee('Rp 65.000,00');
     }
 }

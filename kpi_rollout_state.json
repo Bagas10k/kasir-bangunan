@@ -1,0 +1,44 @@
+{
+  "task": "Add contextual current-month summary cards to operational/data menus missing them",
+  "status": "completed_verified_not_deployed",
+  "started_wib": "2026-10-25 16:55",
+  "scope": {
+    "already_had_summaries": ["Kasir/POS", "Piutang", "Produk", "Armada", "Ritase", "COA", "Jurnal", "Laba Rugi", "Neraca"],
+    "implemented": ["Pengeluaran", "Penerimaan Barang", "Stock Opname"],
+    "excluded": ["Pengaturan/non-data pages", "business logic changes", "database migrations", "production DB writes", "deployment"]
+  },
+  "acceptance": {
+    "current_month_window_explicit": "PASS; explicit month boundary filters and labels",
+    "money_aggregations_exact_decimal_strings": "PASS; BigDecimal string calculations",
+    "summary_period_and_scope_are_explicit": "PASS; month labels present",
+    "targeted_tests": "PASS: 3 tests, 31 assertions, exit 0, isolated SQLite :memory:; parent rerun after QC hash comparison also passed",
+    "full_isolated_regression": "PASS after final implementation and temporary-preview cleanup: 247 passed, 8 skipped, 1426 assertions, exit 0",
+    "php_lint_and_diff_check": "PASS: three touched controllers syntax clean via test container; git diff --check exit 0",
+    "desktop_tablet_mobile_preview": "PASS for all 3 pages at 390px, 768px, and 1440px; actual Laravel controller/view rendered with synthetic-only fixtures, no page-level horizontal overflow and zero UI emoji. Parent inspected screenshots; independent visual QC GO for expenses/receipts/opname on desktop and mobile. Receipt KPI layout also checked by DOM at 768px: all 4 cards visible, 2 columns.",
+    "independent_qc_final_hashes": "GO, no blockers; all 8 hashes matched parent-computed hashes; independent targeted tests 3 passed, 31 assertions, exit 0",
+    "independent_visual_qc": "GO all 3 pages desktop/mobile. Observations: mobile card stacks require vertical scrolling to reach tables; month caption on Stock Opname renders English October 2026. These are preview observations, not blockers for card calculations."
+  },
+  "changed_files": ["app/Http/Controllers/ExpenseController.php", "resources/views/expenses/index.blade.php", "tests/Feature/ExpensesSummaryCardsTest.php", "app/Http/Controllers/InventoryReceiptController.php", "resources/views/inventory/receipts.blade.php", "app/Http/Controllers/StockOpnameController.php", "resources/views/stock_opname/index.blade.php", "tests/Feature/InventorySummaryCardsTest.php"],
+  "evidence": {
+    "targeted_test": "3 passed (31 assertions), exit 0",
+    "full_suite": "247 passed, 8 skipped (1426 assertions), exit 0; final post-cleanup run",
+    "php_lint": "3 controllers clean",
+    "diff_check": "exit 0",
+    "synthetic_render_test": "1 passed (6 assertions), exit 0; temporary test removed afterward",
+    "vite_build": "npm run build exit 0 (optional fontaine package warning)",
+    "visual_screenshots": ["/home/ubuntu/.hermes/cache/scratch/expenses-kpi-mobile.png", "/home/ubuntu/.hermes/cache/scratch/expenses-kpi-tablet.png", "/home/ubuntu/.hermes/cache/scratch/expenses-kpi-desktop.png", "/home/ubuntu/.hermes/cache/scratch/receipts-kpi-mobile.png", "/home/ubuntu/.hermes/cache/scratch/receipts-kpi-tablet.png", "/home/ubuntu/.hermes/cache/scratch/receipts-kpi-desktop.png", "/home/ubuntu/.hermes/cache/scratch/opname-kpi-mobile.png", "/home/ubuntu/.hermes/cache/scratch/opname-kpi-tablet.png", "/home/ubuntu/.hermes/cache/scratch/opname-kpi-desktop.png"],
+    "preview_server": "stopped"
+  },
+  "qc_hashes": {
+    "app/Http/Controllers/ExpenseController.php": "9ba2ebc5bcdb1fa9d1b0c1da52a07e6794fb2218dadfbf63f998262eccdddf2f",
+    "resources/views/expenses/index.blade.php": "e76d3ac003d0d725f2fd216cd17653d2e86023e12b053975e820bbdc2de4ce1c",
+    "tests/Feature/ExpensesSummaryCardsTest.php": "b718cb3c848027f17ab4a8357f3d648c7d62b058162ddb26e0d62e80969d681c",
+    "app/Http/Controllers/InventoryReceiptController.php": "19a5311a53c7221864bc3fb61fd6886171b6f064900bf673b3a19c66ece9108c",
+    "resources/views/inventory/receipts.blade.php": "a0797b8a9160f261a7deddd227e32b866b04540fceff87708b20287eb61c4505",
+    "app/Http/Controllers/StockOpnameController.php": "1e0ca8a0a3778828e585b0fcae3239e766f0264d3494bb74dc7c3b2cfbfc8d5a",
+    "resources/views/stock_opname/index.blade.php": "190bfb88fdb40c361f9a61fd509d5d91912143bc9e32c05ecf9c6f640a6991ac",
+    "tests/Feature/InventorySummaryCardsTest.php": "6d6230a6ede2cb29c3820dbba15389309b817ea24b50a29860a314df76e88503"
+  },
+  "limitations": ["No production deployment requested/performed. Authenticated production pages not inspected. Existing worktree contains unrelated uncommitted changes; do not revert them. On mobile/tablet, receipt/opname history tables are separate horizontal-scroll regions; new KPI cards do not overflow."],
+  "next": "None for this scoped rollout; deployment requires separate authorization and post-deploy verification."
+}

@@ -185,6 +185,41 @@ class AccountingReportService
     }
 
     /**
+     * Validate each posted entry, not only aggregate balance sheet totals.
+     * Streaming rows preserves exact DECIMAL values and avoids loading the ledger at once.
+     */
+    private function journalsAreBalanced(?string $asOfDate): bool
+    {
+        $rows = DB::table('journal_entries')
+            ->leftJoin('journal_entry_lines', 'journal_entries.id', '=', 'journal_entry_lines.journal_entry_id')
+            ->when($asOfDate, fn ($q) => $q->where('journal_entries.transaction_date', '<=', $asOfDate))
+            ->orderBy('journal_entries.id')
+            ->orderBy('journal_entry_lines.id')
+            ->select('journal_entries.id as entry_id', 'journal_entry_lines.id as line_id',
+                'journal_entry_lines.debit', 'journal_entry_lines.credit')
+            ->cursor();
+        $entryId = null;
+        $debit = BigDecimal::zero();
+        $credit = BigDecimal::zero();
+        foreach ($rows as $row) {
+            if ($entryId !== $row->entry_id) {
+                if ($entryId !== null && !$debit->isEqualTo($credit)) {
+                    return false;
+                }
+                $entryId = $row->entry_id;
+                $debit = BigDecimal::zero();
+                $credit = BigDecimal::zero();
+            }
+            if ($row->line_id === null) {
+                return false;
+            }
+            $debit = $debit->plus((string) $row->debit);
+            $credit = $credit->plus((string) $row->credit);
+        }
+        return $debit->isEqualTo($credit);
+    }
+
+    /**
      * Calculates Balance Sheet (Neraca) from journal entries:
      * Assets (1xxx) = Liabilities (2xxx) + Equity (3xxx) + Net Profit
      */
@@ -254,7 +289,7 @@ class AccountingReportService
             'retained_earnings' => (string)$netProfit->toScale(2),
             'total_equity' => (string)$totalEquityWithRetained->toScale(2),
             'total_liabilities_and_equity' => (string)$totalLiabilitiesAndEquity->toScale(2),
-            'is_balanced' => $totalAsset->isEqualTo($totalLiabilitiesAndEquity),
+            'is_balanced' => $totalAsset->isEqualTo($totalLiabilitiesAndEquity) && $this->journalsAreBalanced($asOfDate),
         ];
     }
 }

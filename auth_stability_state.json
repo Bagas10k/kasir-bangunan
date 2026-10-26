@@ -1,0 +1,23 @@
+{
+  "task": "Prototipe kasir: autentikasi tetap aktif, login admin stabil saat dashboard berubah",
+  "phase": "implemented_directly; public authenticated login not verified",
+  "scope": [
+    "Username admin sebagai alias akun email internal yang sama tanpa skema baru",
+    "Form login menerima username atau email",
+    "Akun pada database aktif dibuat sekali dan dibaca ulang",
+    "Fixture lama yang memakai migrate:fresh dijaga agar menolak selain SQLite :memory:"
+  ],
+  "evidence": {
+    "isolated_tests": "182 passed, 8 skipped, 966 assertions; SQLite :memory:",
+    "active_db_readback": "kasir_bangunan_prod; users=1 setelah tes; alias account ditemukan",
+    "public_login_page": "HTTP 200; browser menunjukkan Username / Email dan action /kasir-bangunan/login",
+    "fixture_guard": "exit 1 pada kontainer produksi sebelum migrate:fresh; akun tetap users=1",
+    "independent_qc": false
+  },
+  "safety_note": "Skrip fixture sebelumnya menjalankan migrate:fresh dari kontainer produksi. Probe membuktikan putenv sqlite di dalam skrip tetap menggunakan DB mysql aktif; perubahan data historis mungkin terjadi dan belum direkonsiliasi dengan backup. Jangan pakai fixture ini pada kontainer produksi. Jangan ubah/reset akun saat tugas dashboard lain.",
+  "unverified": [
+    "Login sukses melalui browser publik tidak diuji karena tidak ada kredensial tersimpan di browser vault",
+    "Cakupan kehilangan data historis dan backup sebelum fixture tidak diaudit",
+    "QC independen macet dan tidak memberi putusan"
+  ]
+}

@@ -224,6 +224,26 @@ class AccountingReportIntegrityTest extends TestCase
         $this->assertEquals('530000.00', $bs['total_liabilities_and_equity']);
     }
 
+    public function test_opposing_unbalanced_journals_do_not_show_false_seimbang(): void
+    {
+        foreach ([['id' => 901, 'code' => '1101', 'debit' => '10.00', 'credit' => '0.00'], ['id' => 902, 'code' => '3101', 'debit' => '0.00', 'credit' => '10.00']] as $row) {
+            $id = DB::table('journal_entries')->insertGetId([
+                'reference_type' => 'integrity_test', 'reference_id' => $row['id'],
+                'description' => 'Synthetic imbalance', 'transaction_date' => '2026-10-21',
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            DB::table('journal_entry_lines')->insert([
+                'journal_entry_id' => $id, 'account_code' => $row['code'],
+                'account_name' => 'Synthetic account', 'debit' => $row['debit'],
+                'credit' => $row['credit'], 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        $balance = $this->reportService->generateBalanceSheet('2026-10-21');
+        $this->assertSame('10.00', $balance['total_assets']);
+        $this->assertSame($balance['total_assets'], $balance['total_liabilities_and_equity']);
+        $this->assertFalse($balance['is_balanced'], 'Balanced totals must not mask unbalanced individual journals.');
+    }
+
     public function test_invalid_start_date_throws_invalid_argument_exception(): void
     {
         $this->expectException(\InvalidArgumentException::class);

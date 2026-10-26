@@ -95,6 +95,42 @@ class AuthSecurityTest extends TestCase
         $this->assertAuthenticatedAs($user);
     }
 
+    public function test_admin_identifier_logs_in_to_the_same_persistent_account(): void
+    {
+        $user = User::factory()->create([
+            'name' => 'Operator Demo',
+            'email' => 'admin@kasirbangunan.test',
+            'password' => Hash::make('SyntheticPassword123!'),
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => 'admin',
+            'password' => 'SyntheticPassword123!',
+        ]);
+
+        $response->assertRedirect('/');
+        $this->assertAuthenticatedAs($user);
+        $this->assertSame(1, User::count());
+    }
+
+    public function test_admin_identifier_rejects_wrong_password_without_creating_an_account(): void
+    {
+        User::factory()->create([
+            'email' => 'admin@kasirbangunan.test',
+            'password' => Hash::make('SyntheticPassword123!'),
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => 'admin',
+            'password' => 'WrongPassword123!',
+        ]);
+
+        $response->assertRedirect('/login');
+        $response->assertSessionHasErrors('email');
+        $this->assertGuest();
+        $this->assertSame(1, User::count());
+    }
+
     public function test_login_rate_limiting_triggers_after_repeated_failures(): void
     {
         RateLimiter::clear('kasir.fail@example.local|127.0.0.1');

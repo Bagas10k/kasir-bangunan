@@ -1,0 +1,29 @@
+{
+  "task": "Reconcile financial flows and reports for kasir prototype",
+  "phase": "implementation verified in isolated suite; public authenticated reports pending",
+  "scope": "No synthetic transactions or ledger writes on active MySQL; all mutation tests isolated SQLite :memory:",
+  "gates": [
+    "Audit report service, opening balances, sales/receipt/ritase and active ledger",
+    "Reproduce defects with isolated regression test",
+    "Minimal corrective implementation",
+    "Run full isolated suite, read-only live report reconciliation, verify rendered report"
+  ],
+  "status": "partial: master COA and report safeguards verified; public authenticated report and real workflow not exercised",
+  "verified": [
+    "17 canonical COA accounts inserted into active MySQL when empty; journal rows hash unchanged",
+    "Live journal totals balanced: debit/credit 15750000.00; no unmapped journal codes",
+    "Live P/L net -750000.00 and balance sheet 14250000.00 = 14250000.00, is_balanced true",
+    "COA historical code/type change and conflicting code/category rejected by regression",
+    "Two opposing unbalanced journals no longer yield false SEIMBANG",
+    "Expense debit COA guard rejects asset category 1101 on create/update at HTTP and service layers; no expense/journal row added in isolated tests",
+    "Full isolated suite 206 passed, 8 skipped, 1122 assertions; Blade cache and git diff check exit 0",
+    "Read-only active MySQL: expenses=1, journals=2, lines=5; no expense with existing non-expense COA code"
+  ],
+  "pending": [
+    "Independent QC veto identified non-expense debit risk; targeted regression is green, but no independent post-fix verdict yet",
+    "No vault login for authenticated public browser report verification",
+    "No financial transactions written to active ledger just to populate demo reports",
+    "DB-level per-journal commit-time balanced constraint and fiscal close not built in this sprint"
+  ],
+  "independent_qc": "veto before fix; post-fix verdict pending"
+}

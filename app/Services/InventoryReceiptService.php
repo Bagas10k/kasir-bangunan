@@ -149,6 +149,9 @@ class InventoryReceiptService
                 if (!$product) {
                     throw new RuntimeException("Product ID {$pid} not found");
                 }
+                if (!(bool) $product->is_active) {
+                    throw new InvalidArgumentException("Product ID {$pid} is inactive");
+                }
                 $lockedProducts[$pid] = $product;
             }
 
@@ -263,15 +266,19 @@ class InventoryReceiptService
 
                 $processedItems[] = [
                     'product_id' => $productId,
-                    'quantity' => (float) (string) $quantity,
-                    'unit_cost' => (float) (string) $unitCost,
-                    'subtotal' => (float) (string) $subtotalMoney,
-                    'new_stock' => (float) (string) $newBalance,
-                    'new_cost_price' => (float) (string) $newCostPrice,
+                    'quantity' => (string) $quantity->toScale(4, RoundingMode::HalfUp),
+                    'unit_cost' => (string) $unitCost->toScale(4, RoundingMode::HalfUp),
+                    'subtotal' => (string) $subtotalMoney->toScale(2, RoundingMode::HalfUp),
+                    'new_stock' => (string) $newBalance->toScale(4, RoundingMode::HalfUp),
+                    'new_cost_price' => (string) $newCostPrice->toScale(4, RoundingMode::HalfUp),
                 ];
             }
 
             $totalAmountStr = (string) $totalJournalMoney->toScale(2, RoundingMode::HalfUp);
+
+            if (in_array($creditAccount, ['1101', '1102'], true)) {
+                (new AccountBalanceService())->assertSufficient($creditAccount, $totalAmountStr);
+            }
 
             // Update receipt total amount
             DB::table('inventory_receipts')->where('id', $receiptId)->update([
@@ -326,7 +333,7 @@ class InventoryReceiptService
                 'receipt_number' => $receiptNumber,
                 'receipt_type' => $receiptType,
                 'credit_account' => $creditAccount,
-                'total_amount' => (float) $totalAmountStr,
+                'total_amount' => $totalAmountStr,
                 'journal_entry_id' => $journalId,
                 'items' => $processedItems,
             ];

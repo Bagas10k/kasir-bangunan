@@ -209,7 +209,7 @@ def build_director_pdf(output_filename: str):
             Paragraph("<b>Kerangka Kerja:</b> Laravel 12 • PHP 8.5 • MariaDB 11.4", style_table_cell)
         ],
         [
-            Paragraph("<b>Penanggung Jawab:</b> Bagas Saputra (Pemilik Sistem)", style_table_cell),
+            Paragraph("<b>Penanggung Jawab:</b> Penanggung Jawab (Pemilik Sistem)", style_table_cell),
             Paragraph("<b>Branch / Commit:</b> <code>main</code> (Commit <code>c938d56</code>)", style_table_cell)
         ],
         [
@@ -544,7 +544,7 @@ def build_director_pdf(output_filename: str):
     sign_rows = [
         [
             Paragraph("<b>Diuji & Diverifikasi Secara Empiris Oleh:</b><br/><br/><br/><b>Mandor Utama Sistem AI</b><br/><i>Kabinet: Si Pintar, Si Eksekutor, Si Pengawas</i>", style_table_cell),
-            Paragraph("<b>Diterima & Disetujui Oleh:</b><br/><br/><br/><b>Bagas Saputra</b><br/><i>Pemilik & Penanggung Jawab Sistem (LangitDev)</i>", style_table_cell)
+            Paragraph("<b>Diterima & Disetujui Oleh:</b><br/><br/><br/><b>Penanggung Jawab</b><br/><i>Pemilik & Penanggung Jawab Sistem (LangitDev)</i>", style_table_cell)
         ]
     ]
     t_sign = Table(sign_rows, colWidths=[260, 260])

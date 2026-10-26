@@ -151,6 +151,31 @@ class SubpathRoutingTest extends TestCase
         $this->assertAuthenticatedAs($user);
     }
 
+    public function test_successful_login_ignores_intended_url_outside_application_prefix(): void
+    {
+        $password = 'SyntheticPassword123!';
+        $user = User::factory()->create([
+            'email' => 'synthetic.external-intended@example.test',
+            'password' => Hash::make($password),
+        ]);
+
+        $response = $this->withSession([
+                '_token' => $this->csrfToken,
+                'url.intended' => 'https://example.test/',
+            ])
+            ->withServerVariables([
+                'SCRIPT_NAME' => '/kasir-bangunan/index.php',
+                'SCRIPT_FILENAME' => base_path('public/index.php'),
+            ])->post(route('login'), [
+                '_token' => $this->csrfToken,
+                'email' => $user->email,
+                'password' => $password,
+            ]);
+
+        $response->assertRedirect(route('pos.index'));
+        $this->assertAuthenticatedAs($user);
+    }
+
     public function test_invalid_credentials_redirects_to_subpath_login_route_without_escaping(): void
     {
         $response = $this->withSession(['_token' => $this->csrfToken])

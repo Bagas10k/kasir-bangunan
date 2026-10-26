@@ -1,0 +1,21 @@
+{
+  "task": "Per-vehicle ritase summary and filterable history",
+  "status": "functional wireframe and identified QC blockers fixed in isolated runtime; authenticated public browser untested",
+  "changed": [
+    "app/Http/Controllers/RitaseController.php: validated vehicle/date/status filters, history search, exact BigDecimal totals from ritases, pagination",
+    "resources/views/ritase/index.blade.php: vehicle/period/status/search controls, per-vehicle count and expense, history link, pending-detail status",
+    "app/Services/RitaseService.php: active-vehicle guard inside standalone ritase transaction",
+    "tests/Feature/RitaseHistoryFilterTest.php: isolated filter, decimal display, pagination, inactive vehicle write rejection, pending-detail and invalid GET checks"
+  ],
+  "verified": [
+    "Full SQLite :memory: suite 205 passed, 8 skipped, 1114 assertions; large DECIMAL cents exact, inactive vehicle write rejected, 15-row default matches UI and search totals filtered",
+    "Blade view:cache succeeded; git diff --check and PHP syntax checks exit 0",
+    "Real browser rendered disposable synthetic preview on desktop and 390px mobile; mobile document has no horizontal overflow",
+    "Active MySQL read-only: kasir_bangunan_prod ritases=0 vehicles=3; no example ritase written"
+  ],
+  "pending": [
+    "Independent QC identified three issues (float display, inactive vehicle writes, 15-row mismatch); fixes have passing isolated tests, but no second independent post-fix verdict",
+    "Authenticated public browser interactions; browser vault has no login",
+    "Visual direction confirmation before style phase"
+  ]
+}

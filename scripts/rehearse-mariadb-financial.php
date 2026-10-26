@@ -9,6 +9,7 @@ $kernel->bootstrap();
 use App\Services\AccountingReportService;
 use App\Services\ExpenseService;
 use App\Services\InventoryReceiptService;
+use App\Services\OpeningBalanceService;
 use App\Services\PosCheckoutService;
 use App\Services\RitaseService;
 use Brick\Math\BigDecimal;
@@ -41,7 +42,10 @@ try {
         ['account_code' => '6201', 'account_name' => 'Beban Transportasi & Ritase', 'account_type' => 'expense', 'normal_balance' => 'debit', 'created_at' => now(), 'updated_at' => now()],
     ]);
 
-    echo "[PHP 2/6] Inserting neutral synthetic product & inventory receipt (4dp precision)...\n";
+    echo "[PHP 2/6] Posting neutral synthetic opening balance, then inserting product & receipt...\n";
+    $openingService = new OpeningBalanceService();
+    $openingService->saveDraft('2026-10-01', '2000000.00', '1000000.00');
+    $openingService->post();
     $productId = DB::table('products')->insertGetId([
         'sku' => 'SYN-FIN-001',
         'name' => 'Synthetic Portland Cement 50kg',
@@ -243,10 +247,11 @@ try {
 
     // Independent fixture totals, not merely the report's own balance equation.
     $expectedAssets = BigDecimal::of('850000000000.50')
+        ->plus('3000000.00')
         ->plus('412500.00')->minus('25000.00')->minus('50000.00')
         ->plus('1025005.13')->minus('275001.38');
     $expectedLiabilities = BigDecimal::of('1025005.13');
-    $expectedPaidInCapital = BigDecimal::of('850000000000.50');
+    $expectedPaidInCapital = BigDecimal::of('850000000000.50')->plus('3000000.00');
     $expectedEquity = $expectedPaidInCapital->plus($expectedNetProfit);
     if ($bs['total_assets'] !== (string) $expectedAssets->toScale(2)
         || $bs['total_liabilities'] !== (string) $expectedLiabilities->toScale(2)
@@ -271,6 +276,23 @@ try {
     if (!$totAssetsBd->isEqualTo($totLiabAndEquityBd)) {
         fwrite(STDERR, "ERROR: Total assets != Total liabilities & equity!\n");
         exit(1);
+    }
+
+    echo "Verifying MariaDB posted-journal immutability triggers...\n";
+    $lineId = (int) DB::table('journal_entry_lines')->where('journal_entry_id', $expenseResult['journal_entry_id'])->value('id');
+    try {
+        DB::table('journal_entry_lines')->where('id', $lineId)->update(['debit' => '1.00']);
+        fwrite(STDERR, "ERROR: Direct posted-journal line update unexpectedly succeeded.\n");
+        exit(1);
+    } catch (\Illuminate\Database\QueryException $e) {
+        echo "  Direct journal-line update rejected.\n";
+    }
+    try {
+        DB::table('journal_entries')->where('id', $expenseResult['journal_entry_id'])->delete();
+        fwrite(STDERR, "ERROR: Direct posted-journal deletion unexpectedly succeeded.\n");
+        exit(1);
+    } catch (\Illuminate\Database\QueryException $e) {
+        echo "  Direct journal-header deletion rejected.\n";
     }
 
     echo "SUB-SUITE SUCCESS: All MariaDB 11.4 financial integration calculations verified.\n";

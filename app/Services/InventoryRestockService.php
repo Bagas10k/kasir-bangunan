@@ -29,10 +29,10 @@ class InventoryRestockService
         if ($productId <= 0) {
             throw new InvalidArgumentException("Invalid product ID: {$productId}");
         }
-        if (!is_numeric($quantity) || (float) $quantity <= 0) {
+        if (!is_numeric($quantity) || BigDecimal::of((string) $quantity)->isLessThanOrEqualTo(0)) {
             throw new InvalidArgumentException("Restock quantity must be greater than zero");
         }
-        if (!is_numeric($unitCost) || (float) $unitCost <= 0) {
+        if (!is_numeric($unitCost) || BigDecimal::of((string) $unitCost)->isLessThanOrEqualTo(0)) {
             throw new InvalidArgumentException("Unit cost must be greater than zero");
         }
 
@@ -73,9 +73,9 @@ class InventoryRestockService
             'movement_id' => $movement ? $movement->id : null,
             'journal_entry_id' => $receiptResult['journal_entry_id'],
             'product_id' => $productId,
-            'quantity' => (float) $firstItem['quantity'],
-            'total_cost' => number_format($receiptResult['total_amount'], 2, '.', ''),
-            'balance_after' => number_format((float) $firstItem['new_stock'], 4, '.', ''),
+            'quantity' => (string) $firstItem['quantity'],
+            'total_cost' => (string) $receiptResult['total_amount'],
+            'balance_after' => (string) $firstItem['new_stock'],
         ];
     }
 }

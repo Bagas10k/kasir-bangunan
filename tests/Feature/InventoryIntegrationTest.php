@@ -160,6 +160,7 @@ class InventoryIntegrationTest extends TestCase
 
     public function test_fractional_qty_4dp_and_money_2dp_precision_with_roundoff_reconciliation(): void
     {
+        $this->startBooks();
         $productId = $this->createSyntheticProduct('SYN-PREC-01', 'Product Fractional Precision', 0.0, 20000.0, 0.0);
 
         // Receive with 4dp fractional quantity: 12.3456 @ 4567.89

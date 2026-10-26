@@ -453,7 +453,7 @@ def build_pdf_report(output_filename: str):
     sign_data = [
         [
             Paragraph("<b>Diverifikasi Oleh:</b><br/>Mandor Utama Sistem AI<br/><i>(Trio Pintar, Eksekutor, Pengawas)</i>", style_meta),
-            Paragraph("<b>Disetujui Oleh:</b><br/>Bagas Saputra<br/><i>Pemilik & Penanggung Jawab Sistem</i>", style_meta)
+            Paragraph("<b>Disetujui Oleh:</b><br/>Penanggung Jawab<br/><i>Pemilik & Penanggung Jawab Sistem</i>", style_meta)
         ]
     ]
     sign_table = Table(sign_data, colWidths=[260, 260])

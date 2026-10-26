@@ -1,179 +1,185 @@
 @extends('layouts.app')
 @section('content')
-<style>
-    @media (prefers-reduced-motion: reduce) {
-        *, ::before, ::after {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-            scroll-behavior: auto !important;
-        }
-    }
-    .filter-card {
-        background-color: #ffffff;
-        border: 1px solid var(--border-card);
-        border-radius: 18px;
-        padding: 16px 20px;
-        margin-bottom: 22px;
-        box-shadow: 0 4px 16px rgba(45, 106, 79, 0.04);
-    }
-    .balance-status-box {
-        margin-top: 18px;
-        padding: 14px 18px;
-        border-radius: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        border: 1px solid var(--mint-border);
-        background-color: var(--mint-surface);
-    }
-    @media print {
-        header, nav, .sidebar-wrapper, .topbar, .filter-card, .no-print {
-            display: none !important;
-        }
-        .app-layout {
-            display: block !important;
-        }
-        .main-wrapper {
-            margin: 0 !important;
-        }
-        main {
-            padding: 0 !important;
-            max-width: 100% !important;
-        }
-        .card {
-            border: none !important;
-            box-shadow: none !important;
-            padding: 0 !important;
-        }
-    }
-</style>
+@include('reports._styles')
 
-<div class="card">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
-        <h2 style="margin: 0; border: none; padding: 0;">Laporan Neraca Keuangan (Balance Sheet)</h2>
-        <span class="badge" style="font-size: 11px;">Buku Besar Akuntansi</span>
-    </div>
+@php
+    $formatMoney = function ($value, bool $withSymbol = false, bool $accountingSign = false) {
+        $decimal = \Brick\Math\BigDecimal::of((string) $value)->toScale(2, \Brick\Math\RoundingMode::HalfUp);
+        $negative = $decimal->isNegative();
+        [$whole, $fraction] = explode('.', ltrim((string) $decimal, '-'));
+        $formatted = preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', $whole) . ',' . $fraction;
+        $formatted = ($withSymbol ? 'Rp ' : '') . $formatted;
 
-    <div class="filter-card no-print">
-        <form method="GET" action="{{ route('reports.balance_sheet') }}" style="display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;">
-            <div class="form-group" style="margin-bottom: 0;">
-                <label for="as_of_date">Per Tanggal (As of Date)</label>
-                <input type="date" name="as_of_date" id="as_of_date" value="{{ $asOfDate ?? date('Y-m-d') }}" class="form-control" style="border-radius: 9999px; padding: 8px 14px;">
-            </div>
-            <div style="display: flex; gap: 8px;">
-                <button type="submit" class="btn" style="border-radius: 9999px; padding: 8px 20px;">Tampilkan</button>
-                <button type="button" class="btn btn-secondary" onclick="window.print()" style="border-radius: 9999px; padding: 8px 16px;">Cetak</button>
-            </div>
-        </form>
-    </div>
+        return $negative ? ($accountingSign ? '(' . $formatted . ')' : '-' . $formatted) : $formatted;
+    };
+    $num = fn ($n) => $formatMoney($n);
+    $rp = fn ($n) => $formatMoney($n, true);
+    $rpSigned = fn ($n) => $formatMoney($n, true, true);
 
-    <div class="grid-2">
-        <div>
-            <h3 style="color: var(--primary-hover); font-size: 15px; margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                <span style="width: 4px; height: 14px; background-color: var(--accent); border-radius: 2px; display: inline-block;"></span>
-                Aktiva (Aset)
-            </h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Akun Aset</th>
-                        <th style="text-align: right;">Jumlah</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($report['assets'] as $a)
-                    <tr>
-                        <td>
-                            <span class="sku-code" style="color: var(--primary);">{{ $a['code'] }}</span> &bull; {{ $a['name'] }}
-                        </td>
-                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $a['amount'] }}</td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="2" style="color: var(--text-caption); padding: 14px;">(Tidak ada saldo aset tercatat)</td>
-                    </tr>
-                    @endforelse
-                    <tr style="font-weight: 800; border-top: 2px solid var(--primary); font-size: 14px; background-color: var(--mint-surface);">
-                        <td style="color: var(--primary-hover);">TOTAL ASET</td>
-                        <td style="text-align: right; font-variant-numeric: tabular-nums; color: var(--primary-hover);">Rp {{ $report['total_assets'] }}</td>
-                    </tr>
-                </tbody>
-            </table>
+    $balanced = (bool) $report['is_balanced'];
+    $difference = \Brick\Math\BigDecimal::of((string) $report['total_assets'])
+        ->minus((string) $report['total_liabilities_and_equity'])
+        ->toScale(2, \Brick\Math\RoundingMode::HalfUp);
+    $totalEquityIncludingProfit = \Brick\Math\BigDecimal::of((string) $report['total_equity'])
+        ->toScale(2, \Brick\Math\RoundingMode::HalfUp);
+    $recordedEquity = $totalEquityIncludingProfit
+        ->minus((string) $report['retained_earnings'])->toScale(2, \Brick\Math\RoundingMode::HalfUp);
+    $accountCount = count($report['assets']) + count($report['liabilities']) + count($report['equity']);
+
+    $now = now();
+    $presets = [
+        'Hari Ini' => $now->toDateString(),
+        'Akhir Bulan Lalu' => $now->copy()->subMonthNoOverflow()->endOfMonth()->toDateString(),
+    ];
+    $isPresetActive = fn ($d) => (($asOfDate ?? '') === $d);
+    $asOfLabel = \Carbon\Carbon::parse($asOfDate ?? date('Y-m-d'))->locale('id')->translatedFormat('d M Y');
+@endphp
+
+<div class="card report-shell">
+    <header class="statement-header">
+        <div class="statement-title">
+            <nav class="breadcrumb no-print" aria-label="Breadcrumb">Laporan Keuangan<span class="sep" aria-hidden="true">›</span>Neraca (Balance Sheet)</nav>
+            <h2>Laporan Neraca Keuangan</h2>
+            <p class="report-period">Posisi keuangan per {{ $asOfLabel }}</p>
         </div>
+        <div class="statement-actions no-print">
+            <a href="{{ route('reports.balance_sheet.csv', ['as_of_date' => $asOfDate ?? null]) }}" class="btn btn-secondary report-action">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Unduh CSV
+            </a>
+            <button type="button" class="btn report-action" onclick="window.print()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                Cetak / PDF
+            </button>
+        </div>
+    </header>
 
-        <div>
-            <h3 style="color: var(--primary-hover); font-size: 15px; margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                <span style="width: 4px; height: 14px; background-color: var(--accent); border-radius: 2px; display: inline-block;"></span>
-                Pasiva (Kewajiban &amp; Ekuitas)
-            </h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Akun Pasiva</th>
-                        <th style="text-align: right;">Jumlah</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <th colspan="2" style="background-color: var(--mint-surface); color: var(--primary-hover); font-size: 11px; padding: 6px 10px; text-transform: uppercase;">Kewajiban (Liabilitas)</th>
-                    </tr>
-                    @forelse($report['liabilities'] as $l)
-                    <tr>
-                        <td style="padding-left: 20px;">
-                            <span class="sku-code" style="color: var(--primary);">{{ $l['code'] }}</span> &bull; {{ $l['name'] }}
-                        </td>
-                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $l['amount'] }}</td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td style="padding-left: 20px; color: var(--text-caption);">(Tidak ada hutang / kewajiban)</td>
-                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp 0.00</td>
-                    </tr>
-                    @endforelse
-                    <tr style="font-weight: 700; border-top: 1px solid var(--border-subtle);">
-                        <td>Total Kewajiban</td>
-                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $report['total_liabilities'] }}</td>
-                    </tr>
+    <section class="statement-summary" aria-label="Ringkasan Neraca">
+        <div class="summary-item">
+            <span class="summary-label">Total Aset (Aktiva)</span>
+            <strong class="summary-value">{{ $rp($report['total_assets']) }}</strong>
+        </div>
+        <div class="summary-item">
+            <span class="summary-label">Total Pasiva (Kewajiban + Ekuitas)</span>
+            <strong class="summary-value">{{ $rp($report['total_liabilities_and_equity']) }}</strong>
+        </div>
+        <div class="summary-item {{ $balanced ? 'is-result' : 'is-alert' }}">
+            <span class="summary-label">{{ $balanced ? 'Status Neraca' : 'Selisih Aset − Pasiva' }}</span>
+            <strong class="summary-value">{{ $balanced ? 'SEIMBANG' : $rpSigned($difference) }}</strong>
+        </div>
+    </section>
 
-                    <tr>
-                        <th colspan="2" style="background-color: var(--mint-surface); color: var(--primary-hover); font-size: 11px; padding: 6px 10px; text-transform: uppercase;">Ekuitas Modal</th>
-                    </tr>
-                    @forelse($report['equity'] as $eq)
-                    <tr>
-                        <td style="padding-left: 20px;">
-                            <span class="sku-code" style="color: var(--primary);">{{ $eq['code'] }}</span> &bull; {{ $eq['name'] }}
-                        </td>
-                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $eq['amount'] }}</td>
-                    </tr>
-                    @empty
-                    @endforelse
-                    <tr>
-                        <td style="padding-left: 20px;">Laba Tahun Berjalan (Net Profit)</td>
-                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $report['retained_earnings'] }}</td>
-                    </tr>
-                    <tr style="font-weight: 700; border-top: 1px solid var(--border-subtle);">
-                        <td>Total Ekuitas</td>
-                        <td style="text-align: right; font-variant-numeric: tabular-nums;">Rp {{ $report['total_equity'] }}</td>
-                    </tr>
-
-                    <tr style="font-weight: 800; border-top: 2px solid var(--primary); font-size: 14px; background-color: var(--mint-surface);">
-                        <td style="color: var(--primary-hover);">TOTAL PASIVA</td>
-                        <td style="text-align: right; font-variant-numeric: tabular-nums; color: var(--primary-hover);">Rp {{ $report['total_liabilities_and_equity'] }}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div class="balance-status-box" style="{{ $report['is_balanced'] ? '' : 'background-color: #fde8e8; border-color: #f5c2c7;' }}">
-                <div>
-                    <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-caption);">Kondisi Neraca</div>
-                    <strong style="color: {{ $report['is_balanced'] ? 'var(--primary-hover)' : 'var(--danger)' }}; font-size: 13.5px;">Status Keseimbangan:</strong>
+    <div class="report-toolbar no-print">
+        <div class="report-filter-form">
+            <div class="filter-cluster">
+                <div class="preset-cluster">
+                    <span class="filter-caption">Tanggal cepat</span>
+                    <div class="period-presets">
+                        @foreach($presets as $label => $d)
+                            <a class="preset-btn {{ $isPresetActive($d) ? 'active' : '' }}"
+                               href="{{ route('reports.balance_sheet', ['as_of_date' => $d]) }}">{{ $label }}</a>
+                        @endforeach
+                    </div>
                 </div>
-                <span class="badge" style="background-color: {{ $report['is_balanced'] ? '#ffffff' : '#ffffff' }}; color: {{ $report['is_balanced'] ? 'var(--primary-hover)' : 'var(--danger)' }}; border-color: {{ $report['is_balanced'] ? 'var(--mint-border)' : '#f5c2c7' }}; font-weight: 800;">
-                    {{ $report['is_balanced'] ? '● SEIMBANG (BALANCED)' : '● TIDAK SEIMBANG' }}
-                </span>
+                <details class="custom-period">
+                    <summary>Tanggal khusus</summary>
+                    <form method="GET" action="{{ route('reports.balance_sheet') }}" class="date-cluster">
+                        <div class="field">
+                            <label for="as_of_date">Per Tanggal</label>
+                            <input type="date" name="as_of_date" id="as_of_date" value="{{ $asOfDate ?? date('Y-m-d') }}">
+                        </div>
+                        <button type="submit" class="btn report-apply">Tampilkan</button>
+                        <a href="{{ route('reports.balance_sheet') }}" class="report-reset">Reset</a>
+                    </form>
+                </details>
             </div>
         </div>
+    </div>
+
+    <div class="ledger-caption">
+        <strong>Posisi akun · {{ $accountCount }} akun</strong>
+        <span>Mata uang Rupiah · angka dalam nilai penuh</span>
+    </div>
+    <div class="report-ledger">
+        <table class="report-table" aria-label="Rincian Laporan Neraca Keuangan">
+            <thead>
+                <tr>
+                    <th scope="col" style="width: 90px;">Kode</th>
+                    <th scope="col">Nama Akun</th>
+                    <th scope="col" class="num">Jumlah (Rp)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><th scope="row" colspan="3" class="section-title">Aktiva (Aset)</th></tr>
+                @forelse($report['assets'] as $a)
+                <tr>
+                    <td class="code"><span class="sku-code">{{ $a['code'] }}</span></td>
+                    <td>{{ $a['name'] }}</td>
+                    <td class="amount">{{ $num($a['amount']) }}</td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="2" style="color: var(--text-caption);">(Tidak ada saldo aset tercatat)</td>
+                    <td class="amount">0,00</td>
+                </tr>
+                @endforelse
+                <tr class="grand">
+                    <td></td>
+                    <td>TOTAL ASET (AKTIVA)</td>
+                    <td class="amount">{{ $num($report['total_assets']) }}</td>
+                </tr>
+
+                <tr><th scope="row" colspan="3" class="section-title">Kewajiban (Liabilitas)</th></tr>
+                @forelse($report['liabilities'] as $l)
+                <tr>
+                    <td class="code"><span class="sku-code">{{ $l['code'] }}</span></td>
+                    <td>{{ $l['name'] }}</td>
+                    <td class="amount">{{ $num($l['amount']) }}</td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="2" style="color: var(--text-caption);">(Tidak ada kewajiban tercatat)</td>
+                    <td class="amount">0,00</td>
+                </tr>
+                @endforelse
+                <tr class="total">
+                    <td></td>
+                    <td>Total Kewajiban</td>
+                    <td class="amount">{{ $num($report['total_liabilities']) }}</td>
+                </tr>
+
+                <tr><th scope="row" colspan="3" class="section-title">Ekuitas (Modal)</th></tr>
+                @forelse($report['equity'] as $eq)
+                <tr>
+                    <td class="code"><span class="sku-code">{{ $eq['code'] }}</span></td>
+                    <td>{{ $eq['name'] }}</td>
+                    <td class="amount">{{ $num($eq['amount']) }}</td>
+                </tr>
+                @empty
+                @endforelse
+                <tr class="total">
+                    <td></td>
+                    <td>Subtotal Modal Tercatat</td>
+                    <td class="amount">{{ $num($recordedEquity) }}</td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td>Laba Tahun Berjalan (Net Profit)</td>
+                    <td class="amount">{{ $num($report['retained_earnings']) }}</td>
+                </tr>
+                <tr class="total">
+                    <td></td>
+                    <td>Total Ekuitas Termasuk Laba Berjalan</td>
+                    <td class="amount">{{ $num($totalEquityIncludingProfit) }}</td>
+                </tr>
+
+                <tr class="grand">
+                    <td></td>
+                    <td>TOTAL PASIVA (KEWAJIBAN + EKUITAS)</td>
+                    <td class="amount">{{ $num($report['total_liabilities_and_equity']) }}</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>
 @endsection
