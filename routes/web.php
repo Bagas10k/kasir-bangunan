@@ -12,6 +12,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\InventoryReceiptController;
 use App\Http\Controllers\ChartOfAccountController;
+use App\Http\Controllers\JournalController;
 
 // Guest authentication & demo setup routes
 Route::middleware('guest')->group(function () {
@@ -57,6 +58,12 @@ Route::middleware('auth')->group(function () {
 
     // Reports
     Route::get('/reports/profit-loss', [ReportController::class, 'profitLoss'])->name('reports.profit_loss');
+    // General Journal & Opening Balances
+    Route::get('/journals', [JournalController::class, 'index'])->name('journals.index');
+    Route::get('/journals/feed', [JournalController::class, 'feed'])->name('journals.feed');
+    Route::post('/journals/opening-balance', [JournalController::class, 'saveOpening'])->name('journals.opening.save');
+    Route::post('/journals/opening-balance/post', [JournalController::class, 'postOpening'])->name('journals.opening.post');
+
     Route::get('/reports/balance-sheet', [ReportController::class, 'balanceSheet'])->name('reports.balance_sheet');
 
     // Chart of Accounts (COA)

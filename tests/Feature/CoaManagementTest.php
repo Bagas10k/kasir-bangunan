@@ -68,6 +68,26 @@ class CoaManagementTest extends TestCase
         $this->assertEquals('debit', $account->normal_balance);
     }
 
+    public function test_coa_store_rejects_normal_balance_that_conflicts_with_account_type(): void
+    {
+        foreach ([
+            ['1109', 'asset', 'credit'],
+            ['2109', 'liability', 'debit'],
+            ['3109', 'equity', 'debit'],
+            ['4109', 'revenue', 'debit'],
+            ['6109', 'expense', 'credit'],
+        ] as [$code, $type, $normal]) {
+            $this->actingAs($this->user)->post(route('coa.store'), [
+                'account_code' => $code,
+                'account_name' => 'Akun Sintetis',
+                'account_type' => $type,
+                'normal_balance' => $normal,
+            ])->assertSessionHasErrors('normal_balance');
+
+            $this->assertDatabaseMissing('chart_of_accounts', ['account_code' => $code]);
+        }
+    }
+
     public function test_coa_store_validation_rejects_duplicate_code_and_invalid_types(): void
     {
         DB::table('chart_of_accounts')->insert([
@@ -98,6 +118,17 @@ class CoaManagementTest extends TestCase
         $invalidType->assertSessionHasErrors(['account_type']);
     }
 
+    public function test_coa_rejects_account_code_with_conflicting_financial_category(): void
+    {
+        foreach ([['7198', 'expense', 'debit'], ['1198', 'expense', 'debit'], ['6198', 'revenue', 'credit']] as [$code, $type, $normal]) {
+            $this->actingAs($this->user)->post(route('coa.store'), [
+                'account_code' => $code, 'account_name' => 'Akun Sintetis',
+                'account_type' => $type, 'normal_balance' => $normal,
+            ])->assertSessionHasErrors('account_code');
+            $this->assertDatabaseMissing('chart_of_accounts', ['account_code' => $code]);
+        }
+    }
+
     public function test_authenticated_user_can_update_coa_account(): void
     {
         $id = DB::table('chart_of_accounts')->insertGetId([
@@ -121,6 +152,33 @@ class CoaManagementTest extends TestCase
 
         $updated = DB::table('chart_of_accounts')->where('id', $id)->first();
         $this->assertEquals('Beban Baru Diperbarui', $updated->account_name);
+    }
+
+    public function test_used_account_cannot_change_code_or_type_and_historical_journal_stays_immutable(): void
+    {
+        $this->startBooks();
+        $id = DB::table('chart_of_accounts')->insertGetId([
+            'account_code' => '6198', 'account_name' => 'Beban Sintetis',
+            'account_type' => 'expense', 'normal_balance' => 'debit',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $journalId = DB::table('journal_entries')->insertGetId([
+            'reference_type' => 'synthetic', 'reference_id' => 1,
+            'description' => 'Transaksi sintetis terisolasi', 'transaction_date' => now()->toDateString(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('journal_entry_lines')->insert([
+            ['journal_entry_id' => $journalId, 'account_code' => '6198', 'account_name' => 'Beban Sintetis', 'debit' => '10.00', 'credit' => '0.00', 'created_at' => now(), 'updated_at' => now()],
+            ['journal_entry_id' => $journalId, 'account_code' => '1101', 'account_name' => 'Kas Toko', 'debit' => '0.00', 'credit' => '10.00', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        foreach ([['7198', 'revenue', 'credit'], ['6197', 'expense', 'debit']] as [$code, $type, $normal]) {
+            $this->actingAs($this->user)->put(route('coa.update', $id), [
+                'account_code' => $code, 'account_name' => 'Beban Sintetis',
+                'account_type' => $type, 'normal_balance' => $normal,
+            ])->assertRedirect(route('coa.index'))->assertSessionHas('error');
+            $this->assertDatabaseHas('chart_of_accounts', ['id' => $id, 'account_code' => '6198', 'account_type' => 'expense']);
+            $this->assertDatabaseHas('journal_entry_lines', ['journal_entry_id' => $journalId, 'account_code' => '6198', 'debit' => '10.00']);
+        }
     }
 
     public function test_coa_destroy_rejects_when_account_has_journal_transactions(): void
@@ -222,6 +280,8 @@ class CoaManagementTest extends TestCase
 
     public function test_dynamic_expense_booking_uses_selected_coa_account(): void
     {
+        $this->startBooks();
+
         // 1. Create a custom COA expense account
         $this->actingAs($this->user)->post(route('coa.store'), [
             'account_code' => '6106',
@@ -252,5 +312,19 @@ class CoaManagementTest extends TestCase
         $this->assertNotNull($line);
         $this->assertEquals('6106', $line->account_code);
         $this->assertEquals('Beban Konsumsi & Lembur Kasir', $line->account_name);
+    }
+
+    public function test_coa_pagination_preserves_reverse_proxy_subpath(): void
+    {
+        config(['app.url' => 'https://example.test/kasir-bangunan']);
+        \Illuminate\Support\Facades\URL::forceRootUrl('https://example.test/kasir-bangunan');
+
+        $response = $this->actingAs($this->user)->get('https://example.test/coa');
+
+        $response->assertStatus(200);
+        $nextPageUrl = $response->viewData('accounts')->nextPageUrl();
+        $this->assertNotNull($nextPageUrl);
+        $this->assertStringStartsWith('https://example.test/kasir-bangunan/coa?page=2', $nextPageUrl);
+        $response->assertSee('https://example.test/kasir-bangunan/coa?page=2', false);
     }
 }
