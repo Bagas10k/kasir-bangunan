@@ -77,6 +77,21 @@
             width: 100%;
         }
 
+        @media (min-width: 901px) {
+            .app-layout { position: relative; }
+            .app-sidebar {
+                position: absolute;
+                inset: 0 auto 0 0;
+                height: 100%;
+                overflow-y: auto;
+            }
+            .app-main {
+                flex: none;
+                width: calc(100% - 260px);
+                margin-left: 260px;
+            }
+        }
+
         /* ─── SIDEBAR (Clean White SaaS Rail like Hireism) ──────────────── */
         .app-sidebar {
             width: 260px;
