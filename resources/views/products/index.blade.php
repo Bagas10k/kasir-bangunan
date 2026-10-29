@@ -532,6 +532,23 @@
 @endsection
 
 @section('modals')
+<style>
+    #modal-product .modal-header { padding:16px 20px; }
+    #modal-product .modal-title { border:0; padding:0; margin:0; font-size:17px; }
+    #modal-product .modal-close-btn { min-width:44px; min-height:44px; }
+    #modal-product .master-modal-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 16px; }
+    #modal-product .form-group { min-width:0; }
+    #modal-product .master-help { background:transparent; border:0; padding:0 0 12px; border-bottom:1px solid var(--border-card); border-radius:0; font-size:12px; line-height:1.5; color:var(--text-muted); }
+    #modal-product #min_stock, #modal-product #cost_price, #modal-product #selling_price { text-align:right; font-variant-numeric:tabular-nums; }
+    #modal-product .product-active-label { display:flex; align-items:center; justify-content:flex-start; gap:10px; min-height:44px; margin:0; cursor:pointer; text-transform:none; letter-spacing:0; }
+    #modal-product .product-active-label input[type="checkbox"] { appearance:auto; display:block; width:17px; height:17px; min-width:17px; min-height:17px; max-width:17px; flex:0 0 17px; padding:0; margin:0; accent-color:var(--primary); box-shadow:none; }
+    #modal-product .product-active-label input:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
+    #modal-product .product-active-label strong { display:block; font-size:12px; color:var(--text-main); }
+    #modal-product .product-active-label small { display:block; font-size:11.5px; font-weight:400; color:var(--text-muted); margin-top:2px; }
+    #modal-product .modal-footer { padding:12px 20px; gap:8px; }
+    #modal-product .modal-footer .btn { min-height:44px; }
+    @media(max-width:480px) { #modal-product .master-modal-grid { grid-template-columns:minmax(0,1fr); } #modal-product .master-modal-grid .span-2 { grid-column:auto; } }
+</style>
 <div id="modal-product" class="modal-overlay {{ $errors->any() ? 'open' : '' }}" role="dialog" aria-modal="true" aria-labelledby="product-modal-title">
     <div class="modal-dialog">
         <div class="modal-header">
@@ -545,18 +562,18 @@
             @csrf
             <input type="hidden" name="_method" id="product-method" value="POST">
             <div class="modal-body">
-                <div id="product-modal-info" class="master-help" style="margin-bottom:14px;">Produk baru dimulai dari stok awal 0.00. Perubahan stok tetap melalui penerimaan atau stock opname agar jejak audit terjaga.</div>
+                <div id="product-modal-info" class="master-help" style="margin-bottom:14px;">Stok awal 0. Tambahkan stok melalui Penerimaan Barang atau Stok Opname.</div>
                 <div class="master-modal-grid">
                     <div class="form-group"><label for="sku">SKU / Barcode</label><input class="form-control" id="sku" name="sku" value="{{ old('sku') }}" required autocomplete="off"></div>
-                    <div class="form-group"><label for="unit">Satuan</label><input class="form-control" id="unit" name="unit" value="{{ old('unit', 'sak') }}" required autocomplete="off"></div>
+                    @include('partials.product-option-picker', ['optionType' => 'unit', 'optionLabel' => 'Satuan', 'optionValue' => old('unit', 'sak')])
                     <div class="form-group span-2"><label for="name">Nama Material</label><input class="form-control" id="name" name="name" value="{{ old('name') }}" required autocomplete="off"></div>
-                    <div class="form-group"><label for="category">Kelompok Produk</label><input class="form-control" id="category" name="category" value="{{ old('category', 'Umum') }}" list="product-category-options" required maxlength="50" autocomplete="off" placeholder="Misal: Semen, Besi, Cat"><datalist id="product-category-options">@foreach($categories as $category)<option value="{{ $category }}">@endforeach</datalist><small style="display:block;margin-top:4px;color:var(--text-caption);">Pilih saran atau ketik nama kelompok baru.</small></div>
+                    @include('partials.product-option-picker', ['optionType' => 'category', 'optionLabel' => 'Kelompok Produk', 'optionValue' => old('category', 'Umum')])
                     <div class="form-group"><label for="min_stock">Minimum Stok</label><input class="form-control tabular-nums" type="text" inputmode="decimal" id="min_stock" name="min_stock" value="{{ old('min_stock', '0') }}" required></div>
                     <div class="form-group"><label for="cost_price">HPP</label><input class="form-control tabular-nums" type="text" inputmode="decimal" id="cost_price" name="cost_price" value="{{ old('cost_price') }}" required data-currency-input data-currency-scale="4"></div>
                     <div class="form-group"><label for="selling_price">Harga Jual</label><input class="form-control tabular-nums" type="text" inputmode="decimal" id="selling_price" name="selling_price" value="{{ old('selling_price') }}" required data-currency-input data-currency-scale="2"></div>
                     <div class="form-group span-2">
                         <input type="hidden" name="is_active" value="0">
-                        <label style="display:flex;align-items:center;gap:8px;min-height:38px;"><input type="checkbox" id="product-active" name="is_active" value="1" @checked(old('is_active', '1') === '1')> Aktif dan dapat dipakai pada transaksi baru</label>
+                        <label class="product-active-label" for="product-active"><input type="checkbox" id="product-active" name="is_active" value="1" @checked(old('is_active', '1') === '1')><span><strong>Produk aktif</strong><small>Tersedia untuk transaksi baru.</small></span></label>
                     </div>
                 </div>
             </div>
@@ -572,6 +589,7 @@ function productModalReset() {
     document.getElementById('name').value = '';
     document.getElementById('unit').value = 'sak';
     document.getElementById('category').value = 'Umum';
+    window.refreshProductOptionPickers?.();
     document.getElementById('min_stock').value = '0';
     document.getElementById('product-active').checked = true;
     setCurrencyInput(document.getElementById('cost_price'), '');
@@ -589,6 +607,7 @@ function editProductBtn(btn) {
     document.getElementById('name').value = btn.dataset.name;
     document.getElementById('unit').value = btn.dataset.unit;
     document.getElementById('category').value = btn.dataset.category;
+    window.refreshProductOptionPickers?.();
     document.getElementById('min_stock').value = btn.dataset.minStock;
     document.getElementById('product-active').checked = btn.dataset.active === '1';
     setCurrencyInput(document.getElementById('cost_price'), btn.dataset.cost);
@@ -600,4 +619,5 @@ function editProductBtn(btn) {
     openModal('modal-product');
 }
 </script>
+@include('partials.product-option-picker-script')
 @endsection

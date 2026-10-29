@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AccountAdjustmentService;
 use App\Services\AccountBalanceService;
 use App\Services\OpeningBalanceService;
 use Brick\Math\BigDecimal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -24,9 +26,10 @@ class JournalController extends Controller
         $cashBalance = (string) $balances->balance('1101');
         $bankBalance = (string) $balances->balance('1102');
         $sources = DB::table('journal_entries')->distinct()->orderBy('reference_type')->pluck('reference_type');
+        $adjustmentAccounts = DB::table('chart_of_accounts')->where('is_active', true)->orderBy('account_code')->get();
 
         return view('journals.index', compact(
-            'entries', 'opening', 'cashOpening', 'bankOpening', 'cashBalance', 'bankBalance', 'sources', 'filters'
+            'entries', 'opening', 'cashOpening', 'bankOpening', 'cashBalance', 'bankBalance', 'sources', 'filters', 'adjustmentAccounts'
         ));
     }
 
@@ -40,6 +43,26 @@ class JournalController extends Controller
             'entries' => $entries,
             'latest_id' => (int) ($entries->max('id') ?? ($validated['after_id'] ?? 0)),
         ], 200, ['Cache-Control' => 'no-store, private']);
+    }
+
+    public function adjust(Request $request, AccountAdjustmentService $service): RedirectResponse
+    {
+        $validated = $request->validate([
+            'transaction_date' => ['required', 'date_format:Y-m-d'],
+            'account_code' => ['required', 'string', 'max:20'],
+            'counter_account_code' => ['required', 'string', 'max:20', 'different:account_code'],
+            'target_balance' => ['required', 'numeric', 'decimal:0,2', 'between:-99999999999999999.99,99999999999999999.99'],
+            'description' => ['required', 'string', 'max:200'],
+            'password' => ['required', 'current_password'],
+        ], ['password.current_password' => 'Password konfirmasi tidak sesuai.']);
+
+        try {
+            $service->post($validated, (int) $request->user()->id);
+        } catch (\InvalidArgumentException $e) {
+            return back()->withInput($request->except('password'))->withErrors(['adjustment' => $e->getMessage()]);
+        }
+
+        return redirect()->route('journals.index')->with('success', 'Saldo berhasil disesuaikan. Jurnal seimbang tersimpan dan pembukuan siap digunakan.');
     }
 
     public function saveOpening(Request $request, OpeningBalanceService $service): RedirectResponse
@@ -84,19 +107,19 @@ class JournalController extends Controller
         ]);
     }
 
-    private function entries(array $filters, int $limit = 25, bool $ascending = false): \Illuminate\Support\Collection
+    private function entries(array $filters, int $limit = 25, bool $ascending = false): Collection
     {
         $query = DB::table('journal_entries')
-            ->when(!empty($filters['start_date']), fn ($q) => $q->whereDate('transaction_date', '>=', $filters['start_date']))
-            ->when(!empty($filters['end_date']), fn ($q) => $q->whereDate('transaction_date', '<=', $filters['end_date']))
-            ->when(!empty($filters['source']), fn ($q) => $q->where('reference_type', $filters['source']))
-            ->when(!empty($filters['account']), fn ($q) => $q->whereExists(function ($lines) use ($filters) {
+            ->when(! empty($filters['start_date']), fn ($q) => $q->whereDate('transaction_date', '>=', $filters['start_date']))
+            ->when(! empty($filters['end_date']), fn ($q) => $q->whereDate('transaction_date', '<=', $filters['end_date']))
+            ->when(! empty($filters['source']), fn ($q) => $q->where('reference_type', $filters['source']))
+            ->when(! empty($filters['account']), fn ($q) => $q->whereExists(function ($lines) use ($filters) {
                 $lines->selectRaw('1')
                     ->from('journal_entry_lines')
                     ->whereColumn('journal_entry_lines.journal_entry_id', 'journal_entries.id')
                     ->where('journal_entry_lines.account_code', $filters['account']);
             }))
-            ->when(!empty($filters['after_id']), fn ($q) => $q->where('id', '>', (int) $filters['after_id']));
+            ->when(! empty($filters['after_id']), fn ($q) => $q->where('id', '>', (int) $filters['after_id']));
 
         $headers = $query
             ->orderBy('id', $ascending ? 'asc' : 'desc')

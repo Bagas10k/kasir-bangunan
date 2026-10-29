@@ -8,12 +8,33 @@ use Brick\Math\BigDecimal;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class ExpenseController extends Controller
 {
-    public function index(AccountBalanceService $balances)
+    public function index(Request $request, AccountBalanceService $balances): View
     {
-        $expenses = DB::table('expenses')->latest()->limit(10)->get();
+        $filters = $request->validate([
+            'start_date' => 'nullable|date_format:Y-m-d',
+            'end_date' => ['nullable', 'date_format:Y-m-d', ...($request->filled('start_date') ? ['after_or_equal:start_date'] : [])],
+            'category' => 'nullable|string|max:100',
+            'payment_method' => 'nullable|in:cash,transfer',
+        ]);
+        $expenseQuery = DB::table('expenses');
+        if (! empty($filters['start_date'])) {
+            $expenseQuery->where('expense_date', '>=', $filters['start_date']);
+        }
+        if (! empty($filters['end_date'])) {
+            $expenseQuery->where('expense_date', '<=', $filters['end_date']);
+        }
+        if (! empty($filters['category'])) {
+            $expenseQuery->where('category', $filters['category']);
+        }
+        if (! empty($filters['payment_method'])) {
+            $expenseQuery->where('payment_method', $filters['payment_method']);
+        }
+        $expenses = $expenseQuery->latest()->limit(10)->get();
+        $expenseCategories = DB::table('expenses')->distinct()->orderBy('category')->pluck('category');
 
         $expenseAccounts = DB::table('chart_of_accounts')
             ->where('account_type', 'expense')
@@ -55,7 +76,7 @@ class ExpenseController extends Controller
             'period_label' => $now->translatedFormat('F Y'),
         ];
 
-        return view('expenses.index', compact('expenses', 'expenseAccounts', 'cashBalance', 'bankBalance', 'expenseSummary'));
+        return view('expenses.index', compact('expenses', 'expenseAccounts', 'expenseCategories', 'cashBalance', 'bankBalance', 'expenseSummary'));
     }
 
     public function store(Request $request, ExpenseService $service)
@@ -78,6 +99,7 @@ class ExpenseController extends Controller
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], 422);
             }
+
             return redirect()->back()->withInput()->withErrors(['error' => $e->getMessage()]);
         }
 
@@ -109,6 +131,7 @@ class ExpenseController extends Controller
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], 422);
             }
+
             return redirect()->back()->withInput()->withErrors(['error' => $e->getMessage()]);
         }
 
@@ -129,6 +152,7 @@ class ExpenseController extends Controller
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], 422);
             }
+
             return redirect()->back()->withErrors(['error' => $e->getMessage()]);
         }
 

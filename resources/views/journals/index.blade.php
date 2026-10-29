@@ -2,6 +2,7 @@
 
 @section('content')
 @php
+    $adjustmentAccounts = $adjustmentAccounts ?? collect();
     $sourceLabels = [
         'opening_balance' => 'Saldo Pembukaan',
         'sale' => 'Penjualan',
@@ -183,7 +184,7 @@
 <header class="ledger-heading">
     <div>
         <h1>Jurnal Umum</h1>
-        <p>Catatan kronologis seluruh perpindahan nilai antar-akun. Bagan Akun tetap menjadi master akun; aktivitas debit dan kredit berada di halaman ini.</p>
+        <p>Pantau saldo dan riwayat jurnal pembukuan.</p>
     </div>
     <div class="ledger-status" id="feed-status">PEMBARUAN OTOMATIS · 10 DETIK</div>
 </header>
@@ -210,6 +211,63 @@
     </article>
 </section>
 
+<details class="card adjustment-panel" id="adjustment-panel" @if($errors->any() && !$errors->has('opening_balance')) open @endif>
+    <summary class="adjustment-summary">
+        <span><strong id="adjustment-title">Sesuaikan saldo</strong><small>Saldo awal go-live atau koreksi akun.</small></span>
+        <span class="adjustment-toggle" aria-hidden="true">+</span>
+    </summary>
+    <div class="adjustment-content">
+    <h2 class="section-title">Jurnal Penyesuaian Saldo</h2>
+    <p class="section-copy">Isi saldo tujuan. Selisihnya otomatis masuk ke akun lawan.</p>
+    <form method="POST" action="{{ route('journals.adjustments.store') }}">
+        @csrf
+        <div class="adjustment-grid">
+            <div class="form-group"><label for="adjustment-account">Akun yang disesuaikan</label><select class="form-control" id="adjustment-account" name="account_code" data-native-select required><option value="">Pilih akun</option>@foreach($adjustmentAccounts as $account)<option value="{{ $account->account_code }}" @selected(old('account_code') === $account->account_code)>{{ $account->account_code }} — {{ $account->account_name }} ({{ $account->normal_balance === 'credit' ? 'Kredit' : 'Debet' }})</option>@endforeach</select></div>
+            <div class="form-group"><label for="adjustment-target">Saldo tujuan (Rp)</label><input class="form-control" id="adjustment-target" name="target_balance" type="number" step="0.01" placeholder="0,00" value="{{ old('target_balance') }}" required aria-describedby="adjustment-help"></div>
+            <div class="form-group"><label for="adjustment-counter">Akun lawan</label><select class="form-control" id="adjustment-counter" name="counter_account_code" data-native-select required><option value="">Pilih akun lawan</option>@foreach($adjustmentAccounts as $account)<option value="{{ $account->account_code }}" @selected(old('counter_account_code') === $account->account_code)>{{ $account->account_code }} — {{ $account->account_name }}</option>@endforeach</select></div>
+            <div class="form-group"><label for="adjustment-date">Tanggal</label><input class="form-control" id="adjustment-date" type="date" name="transaction_date" value="{{ old('transaction_date', now()->toDateString()) }}" required></div>
+            <div class="form-group adjustment-wide"><label for="adjustment-description">Keterangan</label><input class="form-control" id="adjustment-description" name="description" maxlength="200" value="{{ old('description') }}" placeholder="Mis. saldo awal go-live" required></div>
+        </div>
+        <p class="adjustment-hint" id="adjustment-help">Saldo tujuan mengikuti sisi normal akun. Jurnal lama tetap tersimpan.</p>
+        @if($openingStatus !== 'posted')<p class="adjustment-hint">Posting pertama memulai pembukuan dan menggantikan draf saldo awal.</p>@endif
+        @if($adjustmentAccounts->isEmpty())<p class="section-copy">Belum ada akun aktif. Siapkan dahulu melalui <a href="{{ route('coa.index') }}">Bagan Akun</a>.</p>@endif
+        <div class="adjustment-confirm">
+            <div class="form-group"><label for="adjustment-password">Password login untuk konfirmasi</label><input class="form-control" id="adjustment-password" name="password" type="password" autocomplete="current-password" placeholder="Masukkan password Anda" required></div>
+            <div class="adjustment-actions"><button class="btn btn-secondary" type="button" onclick="document.getElementById('adjustment-panel').open = false; document.getElementById('adjustment-password').value = ''; document.querySelector('#adjustment-panel > summary').focus();">Batal</button><button class="btn" type="submit" @disabled($adjustmentAccounts->isEmpty())>Simpan penyesuaian</button></div>
+        </div>
+    </form>
+    </div>
+</details>
+<style>
+    .adjustment-panel { margin-bottom:16px; padding:0; overflow:hidden; }
+    .adjustment-summary { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 20px; min-height:44px; cursor:pointer; list-style:none; }
+    .adjustment-summary::-webkit-details-marker { display:none; }
+    .adjustment-summary strong { display:block; font-size:15px; color:var(--text-main); }
+    .adjustment-summary small { display:block; margin-top:4px; font-size:12px; color:var(--text-muted); }
+    .adjustment-toggle { display:grid; place-items:center; width:32px; height:32px; border-radius:50%; background:var(--mint-surface); color:var(--primary); font-size:22px; flex-shrink:0; }
+    .adjustment-panel[open] .adjustment-toggle { transform:rotate(45deg); }
+    .adjustment-summary:focus-visible, .opening-disclosure > summary:focus-visible { outline:2px solid var(--primary); outline-offset:-4px; }
+    .adjustment-content { border-top:1px solid var(--border-card); padding:20px; }
+    .adjustment-content > h2 { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+    .adjustment-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; max-width:800px; }
+    .adjustment-wide { grid-column:1 / -1; }
+    .adjustment-grid .form-group { margin:0; min-width:0; }
+    .adjustment-grid .form-control { width:100%; min-height:44px; box-sizing:border-box; }
+    .adjustment-panel .btn { min-height:44px; }
+    .adjustment-panel .form-group label { text-transform:none; letter-spacing:0; font-size:12px; }
+    .adjustment-hint { font-size:12px; line-height:1.6; color:var(--text-muted); margin:10px 0 0; }
+    .adjustment-confirm { display:flex; align-items:end; justify-content:space-between; flex-wrap:wrap; gap:18px; margin-top:20px; padding-top:18px; border-top:1px solid var(--border-card); }
+    .adjustment-confirm .form-group { margin:0; flex:1 1 240px; max-width:360px; }
+    .adjustment-actions { display:flex; gap:8px; }
+    .opening-disclosure { margin-bottom:18px; }
+    .opening-disclosure > summary { cursor:pointer; min-height:44px; display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; color:var(--text-muted); }
+    .opening-disclosure > summary::before { content:'›'; font-size:18px; }
+    .opening-disclosure[open] > summary::before { transform:rotate(90deg); }
+    #adjustment-target { text-align:right; font-variant-numeric:tabular-nums; }
+    @media(max-width:720px) { .adjustment-grid { grid-template-columns:minmax(0,1fr); } .adjustment-content { padding:16px; } .adjustment-confirm .form-group { max-width:none; } .adjustment-actions { width:100%; } .adjustment-panel .btn { flex:1; white-space:normal; } }
+</style>
+<details class="opening-disclosure" @if($errors->has('opening_balance')) open @endif>
+<summary>Saldo pembukaan &amp; rincian awal</summary>
 <section class="opening-panel">
     <div class="card">
         <h2 class="section-title">Saldo Pembukaan</h2>
@@ -261,6 +319,7 @@
     </aside>
 </section>
 
+ </details>
 <section class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
         <div>

@@ -1,19 +1,19 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\DemoSetupController;
-use App\Http\Controllers\PosController;
-use App\Http\Controllers\ReceivablesController;
-use App\Http\Controllers\StockOpnameController;
-use App\Http\Controllers\ExpenseController;
-use App\Http\Controllers\RitaseController;
-use App\Http\Controllers\ReportController;
-use App\Http\Controllers\ProductController;
-use App\Http\Controllers\VehicleController;
-use App\Http\Controllers\InventoryReceiptController;
 use App\Http\Controllers\ChartOfAccountController;
+use App\Http\Controllers\DemoSetupController;
+use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\InventoryReceiptController;
 use App\Http\Controllers\JournalController;
+use App\Http\Controllers\PosController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ReceivablesController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RitaseController;
+use App\Http\Controllers\StockOpnameController;
+use App\Http\Controllers\VehicleController;
+use Illuminate\Support\Facades\Route;
 
 // Guest authentication & demo setup routes
 Route::middleware('guest')->group(function () {
@@ -40,6 +40,8 @@ Route::middleware('auth')->group(function () {
     // Products
     Route::get('/products', [ProductController::class, 'index'])->name('products.index');
     Route::post('/products', [ProductController::class, 'store'])->name('products.store');
+    Route::post('/product-options', [ProductController::class, 'storeOption'])->name('products.options.store');
+    Route::delete('/product-options/{id}', [ProductController::class, 'destroyOption'])->whereNumber('id')->name('products.options.destroy');
     Route::put('/products/{id}', [ProductController::class, 'update'])->name('products.update');
     Route::delete('/products/{id}', [ProductController::class, 'destroy'])->name('products.destroy');
 
@@ -76,6 +78,7 @@ Route::middleware('auth')->group(function () {
 
     // General Journal & Opening Balances
     Route::get('/journals', [JournalController::class, 'index'])->name('journals.index');
+    Route::post('/journals/adjustments', [JournalController::class, 'adjust'])->middleware('throttle:5,1')->name('journals.adjustments.store');
     Route::get('/journals/feed', [JournalController::class, 'feed'])->name('journals.feed');
     Route::post('/journals/opening-balance', [JournalController::class, 'saveOpening'])->name('journals.opening.save');
     Route::post('/journals/opening-balance/post', [JournalController::class, 'postOpening'])->name('journals.opening.post');

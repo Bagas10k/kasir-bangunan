@@ -351,7 +351,7 @@
             box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.12);
         }
 
-        .topbar-location { font-size: 13px; font-weight: 600; color: var(--primary-hover); }
+        .topbar-location { font-size: clamp(18px, 1.5vw, 22px); font-weight: 700; line-height: 1.3; letter-spacing: -.02em; color: var(--primary-hover); }
 
         /* A single semantic select remains the submitted form control. */
         .select-shell { position: relative; width: 100%; }
@@ -1486,10 +1486,6 @@
                     </button>
                 </form>
                 @endauth
-                <button type="button" id="sidebar-pin" class="sidebar-pin-btn" aria-pressed="false" aria-label="Kunci menu tetap terbuka">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"></polyline><polyline points="18 17 13 12 18 7"></polyline></svg>
-                    <span>Ciutkan Menu</span>
-                </button>
             </div>
         </aside>
 
@@ -1504,7 +1500,24 @@
                             <line x1="3" y1="18" x2="21" y2="18"></line>
                         </svg>
                     </button>
-                    <span class="topbar-location">{{ request()->routeIs('pos.*') ? 'Kasir' : (request()->routeIs('ritase.*') ? 'Ritase' : (request()->routeIs('opname.*') ? 'Stok Opname' : (request()->routeIs('inventory.receipts*') ? 'Penerimaan Barang' : 'Kasir Bangunan'))) }}</span>
+                    @php
+                        $headerTitle = match (true) {
+                            request()->routeIs('pos.*') => 'Kasir',
+                            request()->routeIs('receivables.*') => 'Piutang Usaha',
+                            request()->routeIs('products.*') => 'Produk',
+                            request()->routeIs('inventory.*') => 'Penerimaan Barang',
+                            request()->routeIs('opname.*') => 'Stok Opname',
+                            request()->routeIs('vehicles.*') => 'Kendaraan',
+                            request()->routeIs('ritase.*') => 'Ritase',
+                            request()->routeIs('expenses.*') => 'Pengeluaran',
+                            request()->routeIs('reports.profit_loss') => 'Laba Rugi',
+                            request()->routeIs('reports.balance_sheet') => 'Neraca',
+                            request()->routeIs('journals.*') => 'Jurnal Umum',
+                            request()->routeIs('coa.*') => 'Bagan Akun',
+                            default => 'Kasir Bangunan',
+                        };
+                    @endphp
+                    <span class="topbar-location">{{ $headerTitle }}</span>
                 </div>
             </header>
 
@@ -1516,6 +1529,10 @@
 
     <!-- Modals Portal Area (at root of <body>, completely outside transformed containers) -->
     @yield('modals')
+    @include('partials.compact-form-styles')
+    @include('partials.filter-disclosure-script')
+    @include('partials.themed-date-picker')
+    @include('partials.notice-dialog')
 
     <!-- Toast notification container (Sonner-style stacking) -->
     <div id="toast-container" aria-live="polite" aria-atomic="false"><div class="toast-list"></div></div>

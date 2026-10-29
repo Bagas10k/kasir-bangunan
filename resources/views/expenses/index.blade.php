@@ -63,6 +63,38 @@
         <span class="badge">Audit Beban Kasir</span>
     </div>
 
+    <form method="GET" action="{{ route('expenses.index') }}" class="master-toolbar">
+        <div class="master-control">
+            <label for="expense-filter-start">Tanggal awal</label>
+            <input type="date" id="expense-filter-start" name="start_date" class="form-control" value="{{ request('start_date') }}">
+        </div>
+        <div class="master-control">
+            <label for="expense-filter-end">Tanggal akhir</label>
+            <input type="date" id="expense-filter-end" name="end_date" class="form-control" value="{{ request('end_date') }}">
+        </div>
+        <div class="master-control">
+            <label for="expense-filter-category">Kategori</label>
+            <select id="expense-filter-category" name="category" class="form-control">
+                <option value="">Semua kategori</option>
+                @foreach($expenseCategories ?? [] as $expenseCategory)
+                    <option value="{{ $expenseCategory }}" @selected(request('category') === $expenseCategory)>{{ $expenseCategory }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="master-control">
+            <label for="expense-filter-method">Metode pembayaran</label>
+            <select id="expense-filter-method" name="payment_method" class="form-control">
+                <option value="">Semua metode</option>
+                <option value="cash" @selected(request('payment_method') === 'cash')>Kas tunai</option>
+                <option value="transfer" @selected(request('payment_method') === 'transfer')>Transfer bank</option>
+            </select>
+        </div>
+        <div class="master-toolbar-actions">
+            <a href="{{ route('expenses.index') }}" class="btn btn-secondary">Reset</a>
+            <button type="submit" class="btn">Terapkan</button>
+        </div>
+    </form>
+
     <div>
         <table class="master-table">
             <thead>

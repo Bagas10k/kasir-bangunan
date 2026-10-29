@@ -271,12 +271,30 @@
 #modal-coa .modal-body { padding: 18px 20px; }
 #modal-coa .form-control { border-radius: 10px; border: 1px solid var(--border-control, #d9e2dc); }
 #modal-coa .form-control:focus { border-color: var(--primary, #2d6a4f); box-shadow: 0 0 0 3px rgba(45, 106, 79, .15); }
+#modal-coa .master-modal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 16px; }
+#modal-coa .form-group { min-width: 0; }
+#modal-coa .form-control { width: 100%; box-sizing: border-box; min-height: 44px; font-size: 14px; }
+#modal-coa .form-control[readonly] { background: #f5f8f6; color: var(--text-muted); }
+#modal-coa .coa-status-label {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+    margin: 0; min-height: 44px; border: 1px solid var(--border-control, #d9e2dc);
+    border-radius: 10px; background: #f8fbf9; cursor: pointer;
+    text-transform: none; letter-spacing: normal;
+}
+#modal-coa .coa-status-label input[type="checkbox"] {
+    appearance: auto; width: 18px; height: 18px; min-width: 18px; min-height: 18px;
+    flex: 0 0 18px; margin: 0; padding: 0; accent-color: var(--primary, #2d6a4f);
+}
+#modal-coa .coa-status-label input:focus-visible { outline: 2px solid var(--primary, #2d6a4f); outline-offset: 4px; }
+#modal-coa .coa-status-label strong { display: block; font-size: 13px; color: var(--text-main, #1c2826); }
+#modal-coa .coa-status-label small { display: block; margin-top: 3px; font-size: 12px; font-weight: 400; line-height: 1.5; }
+#modal-coa .modal-close-btn { min-width: 44px; min-height: 44px; }
 #modal-coa .modal-footer { border-top: 1px solid var(--border-card, #e5e7eb); padding: 14px 20px; }
-#modal-coa .modal-footer .btn { border-radius: 9999px; padding: 8px 18px; min-height: 38px; }
+#modal-coa .modal-footer .btn { border-radius: 9999px; padding: 8px 18px; min-height: 44px; }
 #modal-coa .modal-footer .btn-secondary {
     border-radius: 9999px;
     padding: 8px 18px;
-    min-height: 38px;
+    min-height: 44px;
     background: var(--mint-surface, #e8f5e9);
     color: var(--primary-hover, #1b4332);
     border: 1px solid var(--mint-border, #a3b18a);
@@ -304,6 +322,8 @@
         justify-content: center;
     }
     #modal-coa .modal-footer .btn { min-height: 44px; }
+    #modal-coa .master-modal-grid { grid-template-columns: minmax(0, 1fr); }
+    #modal-coa .modal-footer { flex-wrap: wrap; }
 }
 </style>
 <div class="master-page coa-pos-theme">
@@ -452,11 +472,14 @@
                 <div class="master-modal-grid">
                     <div class="form-group"><label for="account_code">Kode Akun</label><input class="form-control tabular-nums" id="account_code" name="account_code" value="{{ old('account_code') }}" required autocomplete="off"></div>
                     <div class="form-group"><label for="account_name">Nama Akun</label><input class="form-control" id="account_name" name="account_name" value="{{ old('account_name') }}" required autocomplete="off"></div>
-                    <div class="form-group"><label for="account_type">Klasifikasi</label><select class="form-control" id="account_type" name="account_type" required onchange="autoSuggestBalance()"><option value="">Pilih klasifikasi</option>@foreach($typeLabels as $value => $label)<option value="{{ $value }}">{{ $label }}</option>@endforeach</select></div>
-                    <div class="form-group"><label for="normal_balance">Saldo Normal</label><select class="form-control" id="normal_balance" name="normal_balance" required><option value="debit">Debet</option><option value="credit">Kredit</option></select></div>
+                    <div class="form-group"><label for="account_type">Klasifikasi</label><select class="form-control" id="account_type" name="account_type" data-native-select required onchange="autoSuggestBalance()"><option value="">Pilih klasifikasi</option>@foreach($typeLabels as $value => $label)<option value="{{ $value }}" @selected(old('account_type') === $value)>{{ $label }}</option>@endforeach</select></div>
+                    <div class="form-group"><label for="normal_balance">Saldo Normal</label><select class="form-control" id="normal_balance" name="normal_balance" data-native-select required><option value="debit" @selected(old('normal_balance', 'debit') === 'debit')>Debet</option><option value="credit" @selected(old('normal_balance') === 'credit')>Kredit</option></select></div>
                     <div class="form-group span-2">
                         <input type="hidden" name="is_active" value="0">
-                        <label style="display:flex;align-items:center;gap:8px;min-height:38px;"><input type="checkbox" id="account-active" name="is_active" value="1" checked> Aktif dan dapat dipilih pada transaksi baru</label>
+                        <label class="coa-status-label" for="account-active">
+                            <input type="checkbox" id="account-active" name="is_active" value="1" @checked(old('is_active', '1') === '1') aria-describedby="account-active-help">
+                            <span><strong>Akun aktif</strong><small id="account-active-help">Dapat dipilih pada transaksi baru.</small></span>
+                        </label>
                     </div>
                 </div>
             </div>

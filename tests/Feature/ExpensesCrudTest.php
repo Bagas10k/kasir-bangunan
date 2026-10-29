@@ -23,7 +23,7 @@ class ExpensesCrudTest extends TestCase
     {
         return User::create([
             'name' => 'Expense Tester',
-            'email' => 'expense_' . uniqid() . '@example.com',
+            'email' => 'expense_'.uniqid().'@example.com',
             'password' => bcrypt('password'),
         ]);
     }
@@ -31,7 +31,58 @@ class ExpensesCrudTest extends TestCase
     private function record(string $category = 'Operasional Toko', string $amount = '50000.00', string $method = 'cash'): int
     {
         $this->startBooks();
+
         return app(ExpenseService::class)->recordExpense($category, $amount, 'Test', $method)['expense_id'];
+    }
+
+    public function test_expense_filters_apply_individually_and_together(): void
+    {
+        foreach ([
+            ['EXP-FILTER-A', '2026-10-10', '6101', 'cash'],
+            ['EXP-FILTER-B', '2026-10-11', '6102', 'transfer'],
+            ['EXP-FILTER-C', '2026-09-01', '6101', 'transfer'],
+        ] as [$number, $date, $category, $method]) {
+            DB::table('expenses')->insert([
+                'expense_number' => $number,
+                'expense_date' => $date,
+                'category' => $category,
+                'payment_method' => $method,
+                'amount' => '100.00',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $this->actingAs($this->user());
+        foreach ([
+            [[], ['EXP-FILTER-A', 'EXP-FILTER-B', 'EXP-FILTER-C']],
+            [['start_date' => '2026-10-10'], ['EXP-FILTER-A', 'EXP-FILTER-B']],
+            [['end_date' => '2026-10-10'], ['EXP-FILTER-A', 'EXP-FILTER-C']],
+            [['category' => '6101'], ['EXP-FILTER-A', 'EXP-FILTER-C']],
+            [['payment_method' => 'transfer'], ['EXP-FILTER-B', 'EXP-FILTER-C']],
+            [['start_date' => '2026-10-10', 'end_date' => '2026-10-11', 'category' => '6102', 'payment_method' => 'transfer'], ['EXP-FILTER-B']],
+            [['category' => 'Tidak ada'], []],
+        ] as [$filters, $expected]) {
+            $response = $this->get(route('expenses.index', $filters))->assertOk();
+            $actual = $response->viewData('expenses')->pluck('expense_number')->all();
+            $this->assertEqualsCanonicalizing($expected, $actual);
+        }
+    }
+
+    public function test_expense_filters_reject_invalid_dates_ranges_and_payment_methods(): void
+    {
+        $this->actingAs($this->user());
+        foreach ([
+            [['start_date' => 'not-a-date'], 'start_date'],
+            [['end_date' => '2026-02-30'], 'end_date'],
+            [['start_date' => '2026-10-11', 'end_date' => '2026-10-10'], 'end_date'],
+            [['payment_method' => 'invalid'], 'payment_method'],
+            [['category' => str_repeat('a', 101)], 'category'],
+        ] as [$filters, $error]) {
+            $this->getJson(route('expenses.index', $filters))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors($error);
+        }
     }
 
     public function test_guest_is_blocked_from_update_and_delete(): void

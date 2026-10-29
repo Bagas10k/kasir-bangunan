@@ -1551,8 +1551,7 @@ function syncArmadaFields() {
 
 function openPaymentModal() {
     if (document.querySelectorAll('#cart-tbody .cart-row').length === 0) {
-        alert('Keranjang masih kosong. Pilih produk dari katalog terlebih dahulu.');
-        document.getElementById('pos-product-search').focus();
+        showNotice('Keranjang masih kosong', 'Pilih produk dari katalog sebelum melanjutkan pembayaran.', document.getElementById('pos-product-search'), 'Pilih produk');
         return;
     }
     document.getElementById('payment-modal-overlay').classList.add('open');
@@ -1620,8 +1619,7 @@ function validateCheckout(e) {
     e.preventDefault();
     const rows = document.querySelectorAll('#cart-tbody .cart-row');
     if (rows.length === 0) {
-        alert('Keranjang belanja masih kosong! Silakan cari dan pilih minimal 1 item material sebelum proses checkout.');
-        document.getElementById('pos-product-search').focus();
+        showNotice('Keranjang masih kosong', 'Pilih produk dari katalog sebelum melanjutkan pembayaran.', document.getElementById('pos-product-search'), 'Pilih produk');
         return false;
     }
     const paidInput = document.getElementById('paid_amount');

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -31,8 +32,8 @@ class ProductController extends Controller
                         ->orWhere(DB::raw('LOWER(name)'), 'like', "%{$needle}%");
                 });
             })
-            ->when(!empty($filters['category']), fn ($query) => $query->where('category', $filters['category']))
-            ->when(!empty($filters['unit']), fn ($query) => $query->where('unit', $filters['unit']))
+            ->when(! empty($filters['category']), fn ($query) => $query->where('category', $filters['category']))
+            ->when(! empty($filters['unit']), fn ($query) => $query->where('unit', $filters['unit']))
             ->when(($filters['status'] ?? null) === 'active', fn ($query) => $query->where('is_active', true))
             ->when(($filters['status'] ?? null) === 'inactive', fn ($query) => $query->where('is_active', false))
             ->when(($filters['stock'] ?? null) === 'low', fn ($query) => $query->where('stock_quantity', '>', 0)->whereColumn('stock_quantity', '<=', 'min_stock'))
@@ -64,9 +65,19 @@ class ProductController extends Controller
         ];
         $categories = DB::table('products')->distinct()->orderBy('category')->pluck('category');
         $units = DB::table('products')->distinct()->orderBy('unit')->pluck('unit');
+        $productOptions = [];
+        foreach (['unit' => $units, 'category' => $categories] as $type => $usedNames) {
+            $savedOptions = DB::table('product_options')->where('type', $type)->get();
+            $productOptions[$type] = $savedOptions->pluck('name')->merge($usedNames)->unique()->sort()->values()
+                ->map(fn (string $name): array => [
+                    'name' => $name,
+                    'id' => $savedOptions->firstWhere('name', $name)?->id,
+                    'used' => $usedNames->contains($name),
+                ])->all();
+        }
 
         if (view()->exists('products.index')) {
-            return view('products.index', compact('products', 'filters', 'search', 'perPage', 'summary', 'categories', 'units'));
+            return view('products.index', compact('products', 'filters', 'search', 'perPage', 'summary', 'categories', 'units', 'productOptions'));
         }
 
         return response()->json($products);
@@ -107,15 +118,46 @@ class ProductController extends Controller
         return redirect()->route('products.index')->with('success', 'Produk berhasil didaftarkan dengan stok awal 0.');
     }
 
+    public function storeOption(Request $request): JsonResponse
+    {
+        $type = $request->validate(['type' => ['required', Rule::in(['unit', 'category'])]])['type'];
+        $request->merge(['name' => is_string($request->input('name')) ? trim($request->input('name')) : $request->input('name')]);
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:'.($type === 'unit' ? 20 : 50), Rule::unique('product_options', 'name')->where('type', $type)],
+        ]);
+        $id = DB::table('product_options')->insertGetId([
+            'type' => $type,
+            'name' => $validated['name'],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json(['id' => $id, 'name' => $validated['name'], 'used' => DB::table('products')->where($type, $validated['name'])->exists()], 201);
+    }
+
+    public function destroyOption(int $id): JsonResponse
+    {
+        return DB::transaction(function () use ($id): JsonResponse {
+            $option = DB::table('product_options')->where('id', $id)->lockForUpdate()->first();
+            abort_if($option === null, 404);
+            if (DB::table('products')->where($option->type, $option->name)->exists()) {
+                return response()->json(['message' => 'Pilihan masih digunakan oleh produk dan tidak dapat dihapus.'], 422);
+            }
+            DB::table('product_options')->where('id', $id)->delete();
+
+            return response()->json(['success' => true]);
+        });
+    }
+
     public function update(Request $request, $id)
     {
         $product = DB::table('products')->where('id', $id)->first();
-        if (!$product) {
+        if (! $product) {
             abort(404);
         }
 
         $validated = $request->validate([
-            'sku' => 'required|string|max:50|unique:products,sku,' . $id,
+            'sku' => 'required|string|max:50|unique:products,sku,'.$id,
             'name' => 'required|string|max:255',
             'unit' => 'required|string|max:20',
             'category' => 'nullable|string|max:50',
@@ -147,7 +189,7 @@ class ProductController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        if (!DB::table('products')->where('id', $id)->exists()) {
+        if (! DB::table('products')->where('id', $id)->exists()) {
             abort(404);
         }
 
@@ -161,6 +203,7 @@ class ProductController extends Controller
             if ($request->wantsJson()) {
                 return response()->json(['error' => $message], 422);
             }
+
             return redirect()->route('products.index')->with('error', $message);
         }
 
