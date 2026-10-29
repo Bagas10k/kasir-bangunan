@@ -334,6 +334,28 @@
     box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.15);
 }
 
+#modal-product .product-active-label {
+    margin: 0;
+    color: var(--text-main, #1c2826);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: normal;
+    text-transform: none;
+    cursor: pointer;
+    user-select: none;
+}
+
+#modal-product #product-active {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    margin: 0;
+    padding: 0;
+    flex-shrink: 0;
+    accent-color: var(--primary, #2d6a4f);
+    cursor: pointer;
+}
+
 #modal-product .modal-footer {
     border-top: 1px solid var(--border-card, #e5e7eb);
     padding: 14px 20px;
@@ -556,7 +578,7 @@
                     <div class="form-group"><label for="selling_price">Harga Jual</label><input class="form-control tabular-nums" type="text" inputmode="decimal" id="selling_price" name="selling_price" value="{{ old('selling_price') }}" required data-currency-input data-currency-scale="2"></div>
                     <div class="form-group span-2">
                         <input type="hidden" name="is_active" value="0">
-                        <label style="display:flex;align-items:center;gap:8px;min-height:38px;"><input type="checkbox" id="product-active" name="is_active" value="1" @checked(old('is_active', '1') === '1')> Aktif dan dapat dipakai pada transaksi baru</label>
+                        <label class="product-active-label" style="display:flex;align-items:center;gap:8px;min-height:38px;"><input type="checkbox" id="product-active" name="is_active" value="1" @checked(old('is_active', '1') === '1')> Aktif dan dapat dipakai pada transaksi baru</label>
                     </div>
                 </div>
             </div>
