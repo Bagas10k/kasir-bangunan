@@ -277,11 +277,13 @@ class AuthController extends Controller
             $credentials['email'] = 'admin@kasirbangunan.test';
         }
 
+        $credentials['is_active'] = true;
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
+            $request->session()->put('v2_auth_stamp', [(int) Auth::id(), (int) Auth::user()->auth_version]);
             RateLimiter::clear($throttleKey);
             $request->session()->forget('url.intended');
-            return redirect()->route('pos.index');
+            return redirect()->route(config('v2.enabled') ? 'v2.index' : 'pos.index');
         }
 
         RateLimiter::hit($throttleKey, 60);
