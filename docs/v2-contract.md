@@ -1,0 +1,31 @@
+# Kontrak implementasi V2 — slice pertama
+
+Status: kontrak baru; belum runtime. Framework, autentikasi, products, vehicles, stock_movements dan journal_entries/journal_entry_lines legacy tetap menjadi adapter kompatibilitas data. Controller, layanan dan layar operasional V2 ditulis fresh. Tidak menyalin view lama. Menghindari sumber kebenaran stok/jurnal kedua lebih penting daripada mengulang tabel yang sama. Tidak menghapus legacy atau reset users.
+
+## Tabel baru dan kolom minimum
+Semua id unsigned bigint, created_at/updated_at. money DECIMAL(19,2); qty/cost 4 decimals. FK restrict untuk dokumen keuangan. actor = users.id. Nullable fields eksplisit.
+
+- v2_user_roles: id,user_id unique FK,role [admin,cashier]. Tidak otomatis grant ke semua user lama.
+- v2_parties: id,kind [customer,supplier,employee],code unique,name,is_active default true,notes nullable.
+- v2_shifts: id,user_id FK,open_user_id nullable unique FK (user id selama open; null setelah closed),source [admin,carry,both],opening_cash,expected_cash nullable,counted_cash nullable,difference nullable,status [open,closed,review],opened_at,closed_at nullable,notes nullable. Opening float adalah kustodian uang, bukan jurnal revenue. Carry harus berasal shift closed pemilik yg sama yang belum dibawa (carried_from_id nullable unique self FK). Maksimal carry sesuai counted cash nonnegatif.
+- v2_sales: id,number unique,user_id FK,shift_id FK,customer_id nullable FK v2_parties,subtotal,line_discount,invoice_discount,delivery_fee,total,cogs,payment_method [cash,transfer,credit],status [unpaid,partial,paid],fulfillment [pickup,delivery],idempotency_key unique. snapshot_name via items. Sales total immutable after posted.
+- v2_sale_items: id,sale_id FK,product_id FK products,name,quantity,unit_price,cost_price,discount,subtotal.
+- v2_invoices: id,direction [receivable,payable],party_id nullable FK v2_parties,sale_id nullable unique FK v2_sales,receipt_id nullable unique FK inventory_receipts,number unique,amount,paid default0,due_date nullable,status [open,paid]. Balance=amount-paid computed BigDecimal, paid guarded by payment lock. Credit requires party.
+- v2_payments: id,invoice_id FK,shift_id nullable FK,amount,method [cash,transfer],status [proposed,pending,posted,rejected],requested_by FK users,approved_by nullable FK,reference nullable,idempotency_key unique,journal_entry_id nullable FK journal_entries. Inward cash cashier posted; inward transfer pending admin; outward proposed then admin actual payment posts. No self-approval for outward request.
+- v2_shift_movements: id,shift_id FK,direction [in,out],kind [sale,collection,supplier,transfer_in,transfer_out,adjustment],amount,reference_type,reference_id nullable unique composite(reference_type,reference_id),note nullable. Posted cash only; bank not drawer. No generic adjustment without explicit admin control.
+- v2_deliveries: id,sale_id unique FK v2_sales,number unique,vehicle_id nullable FK vehicles,driver_name nullable,destination,status [prepared,sent,received]. No stock/journal second posting.
+- v2_trips: id,delivery_id nullable FK v2_deliveries,vehicle_id FK vehicles,driver_name,date,destination,fuel_cost,allowance,total_cost,status [draft,posted],requested_by FK users,journal_entry_id nullable FK. Fresh creation; separate customer delivery fee from expense. Driver advance settlement if not implemented MUST NOT be called done.
+
+## API service convention
+Namespace App\\Services\\V2; services use query builder. Money::value(string $value,int $scale=2):BigDecimal, Money::discount(string $base,array $discount):string. Discount object type=amount|percent,value decimal string; empty=0; reject bounds. Output strings. Ledger::post(string $referenceType,int $referenceId,string $description,array $lines):int; line {account_code,debit,credit}; derive account_name from chart_of_accounts; exact totals, create lines atomic. Ledger cash account 1101, bank1102, AR1103, inventory1301, AP2101, goods revenue4101, delivery revenue4102 (if missing fail with user-readable error, never invent classification), COGS5101, trip expense6101 (validate existing COA). Account-specific locks in service; financial posted journals immutable existing guards.
+
+Operations API implemented by App\\Services\\V2\\Operations:
+- role(int $actor):string fail closed; requireRole(int $actor,array $roles):void.
+- openShift(int $actor,string $cash,string $source,?int $carryFrom=null):int.
+- closeShift(int $actor,int $shiftId,string $counted):array returns expected/count/difference/status; review only if difference.
+- checkout(int $actor,array $data):array; data items [{product_id,quantity,discount?}],discount?,delivery_fee,customer_id?,payment_method,paid_amount,idempotency_key,fulfillment,destination?. Requires open shift. All inventory locks sorted, money string, idempotency checked inside transaction. Cash sufficient gives change but invoice receives min(total,tendered). transfer payment request pending exact total if stated and customer required because unpaid permitted; credit deposit optional. Create receivable invoice for every sale for consistent collection tracking, cash posts payment once. Sale journals DR AR total CR goods revenue(goods after discount) CR delivery fee; DR COGS CR inventory. Payment posted separate DR cash/bank CR AR.
+- collect(int $actor,int $invoiceId,string $amount,string $method,string $key,?string $reference=null):int (cash incoming posted, transfer pending; supplier outgoing proposed). Cash collector open shift required. Lock invoice; pending amounts don't consume amount permanently; verify again at approval.
+- approvePayment(int $actor,int $paymentId):void admin, lock invoice/payment, reject duplicate posting/outward self approval; bank verify only here; cash supplier movement on request's open shift ONLY, require open before payout; outflow guard balance nonnegative after exact sum journal on locked chart_of_accounts row.
+
+## Ownership
+Schema+Money+Ledger child A; Operations child B; routes/controller/views/tests parent. Children edit only named 3 files. Tests isolated :memory:, no prod operations. Exception invalid data ->422; auth/role denied->403. Runtime runner must avoid optimized Composer absolute class maps; use disposable vendor copy + composer dump-autoload --no-scripts and mount at /app.

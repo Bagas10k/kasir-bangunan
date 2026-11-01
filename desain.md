@@ -42,6 +42,8 @@ Dokumen ini menetapkan standar visual, tata letak antarmuka pengguna (UI), dan p
 Antarmuka aplikasi memiliki beberapa domain operasional dengan karakteristik kebutuhan visual yang berbeda. Jangan memaksakan satu tema kaku ke seluruh halaman:
 - **Workspace Kasir / POS (Kanonik)**:
   - Karakter: Bersih, ramah mata kasir, kanvas lembut (`#f3f6f4`), kartu putih dengan bayangan halus (*subtle green shadow*), kontrol tombol kapsul penuh (`border-radius: 9999px`), dan layout kartu terstruktur pada keranjang belanja (menghindari tabel sempit yang terpotong).
+  - Kontrak alur yang disetujui: katalog kiri dan keranjang kanan pada desktop; barang/jumlah `−/+`, total dan checkout langsung tersedia. Pada ponsel susun katalog lalu keranjang. Popup hanya pembayaran dan tinjau transaksi; membatalkan menjaga keranjang, konfirmasi akhir mengirim satu transaksi. Jangan mengganti POS dengan halaman daftar-nota dahulu atau popup penjualan panjang.
+  - Penambahan role, shift, piutang, dan operasional lain mengikuti alur kasir ini. Pertahankan fitur lama yang sudah bekerja; perubahan susunan utama memerlukan persetujuan pemilik, bukan asumsi agen. Sidebar tetap kiri, menjadi drawer kiri di ponsel.
 - **Halaman Master Data (Produk, Kendaraan, Akun COA)**:
   - Mengikuti keselarasan visual kanonik Kasir/POS: kanvas rapi, kartu putih teratur, bilah filter fleksibel (*flex-wrap toolbar*), dan status kapsul netral/operasional yang tidak saling bertabrakan.
 - **Buku Besar, Jurnal, dan Laporan Keuangan (Ledger Industrial)**:

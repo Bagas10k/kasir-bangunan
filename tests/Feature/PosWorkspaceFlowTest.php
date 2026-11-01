@@ -26,18 +26,18 @@ class PosWorkspaceFlowTest extends TestCase
         $this->assertStringContainsString('class="pos-workspace"', $html);
         $this->assertStringContainsString('class="pos-catalog-pane', $html);
         $this->assertStringContainsString('class="pos-cart-pane', $html);
-        $this->assertStringContainsString('grid-template-columns: minmax(0, 1fr) minmax(360px, 400px)', $html);
+        $this->assertStringContainsString('.pos-workspace { order: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));', $html);
         $this->assertStringContainsString('class="card pos-recent-card pos-history-full"', $html);
         $this->assertStringContainsString('class="monitor-grid"', $html);
         // Catalog pane (left) comes before cart pane (right) in HTML order
         $this->assertLessThan(strpos($html, 'class="pos-cart-pane'), strpos($html, 'class="pos-catalog-pane'));
-        // Dashboard appears inside catalog pane
-        $this->assertLessThan(strpos($html, '<section class="dash-card sales-dashboard-card"'), strpos($html, 'class="pos-catalog-pane'));
+        // Monitoring precedes the separate catalog/cart workspace.
+        $this->assertLessThan(strpos($html, 'class="pos-catalog-pane'), strpos($html, '<section class="dash-card sales-dashboard-card"'));
         $this->assertLessThan(strpos($html, '<div class="dash-label">Produk Unggulan</div>'), strpos($html, '<section class="dash-card sales-dashboard-card"'));
         $this->assertLessThan(strpos($html, '<div class="dash-label">Ringkasan Produk</div>'), strpos($html, '<div class="dash-label">Produk Unggulan</div>'));
         $this->assertLessThan(strpos($html, '<div class="card pos-catalog-card">'), strpos($html, '<div class="dash-label">Ringkasan Produk</div>'));
         $this->assertLessThan(strpos($html, 'class="card pos-recent-card pos-history-full"'), strpos($html, '<div class="card pos-catalog-card">'));
-        $this->assertStringContainsString('Tinjau &amp; Konfirmasi', $html);
+        $this->assertStringContainsString('Tinjau Pembayaran', $html);
         $this->assertStringContainsString('Konfirmasi &amp; Simpan Transaksi', $html);
         $this->assertStringContainsString('Cetak Struk', $html);
         $this->assertStringNotContainsString('Konfirmasi &amp; Cetak Struk', $html);

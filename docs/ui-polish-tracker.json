@@ -1,0 +1,63 @@
+{
+  "task": "Pematangan UI/UX operasional V2",
+  "status": "split_master_pages_in_progress",
+  "source": "/home/ubuntu/kasir-bangunan-rebuild",
+  "theme": "existing green-white operational refinement, no rebrand",
+  "scope": [
+    "reuse incumbent themed dates",
+    "reuse incumbent custom selects in dialog top layer",
+    "history search/method/date/page filters",
+    "preserve cashier and financial domain"
+  ],
+  "locked": [
+    "domain services",
+    "database",
+    "financial calculations",
+    "routes and permissions",
+    "production"
+  ],
+  "acceptance": [
+    "Date ISO/event contract preserved including inside input dialog",
+    "Dropdown semantic select source of truth, keyboard and Escape restoration",
+    "History filters query whole actor-scoped source before pagination",
+    "No write requests on filter/calendar/dropdown actions",
+    "Final isolated regressions and real browser screenshot"
+  ],
+  "references": [
+    "desain.md incumbent green-white",
+    "https://www.w3.org/WAI/ARIA/apg/patterns/tabs/",
+    "https://developer.mozilla.org/en-US/docs/Web/API/Document/startViewTransition",
+    "impeccable Operate/polish craft floor"
+  ],
+  "motion_contract": {
+    "initial": "Penjualan selected, source controls visible before enhancement",
+    "intermediate": "Click or arrow selects task; preserve DOM node identity and values",
+    "review": "Selected panel shown, active navigation announced; no submission",
+    "final": "Panel settled within 180ms; reduced motion skips animation"
+  },
+  "production_changed": false,
+  "tests": {
+    "v2_phpunit": "68 tests, 563 assertions, exit 0",
+    "preview_decimal": "9 assertions, exit 0",
+    "keyboard": "Chromium actual CDP keys at 1440 and 390: Enter, Tab/Shift+Tab, Space cancel, Escape and focus restoration passed; zero writes",
+    "checkout": "One POST despite double confirm; HTTP 200; sale 2 total 200.00 / paid 200.00 / change 50.00; saved document read back LUNAS remaining 0",
+    "legacy_pos": "byte-identical SHA256 8c8b0dfbd60599c8d97a9377460073031a97ed2c6e2cd8e540088d2f57186b5b",
+    "qc": "completed additive independent child; final source manifest 10/10 matches"
+  },
+  "user_correction": "Approved incumbent cashier is canonical. Preserve visible catalogue left/cart right/quantity steppers. Only payment+review popup; never replace cashier with list-first or a long sale popup.",
+  "completed_at": "2026-10-30 16:07:54 WIB",
+  "evidence_root": "/home/ubuntu/.hermes/work/kasir-rebuild-20261029/ui-polish/shared-controls",
+  "latest_screenshots": [
+    "cashier-1440-verified.png",
+    "payment-390-verified.png"
+  ],
+  "not_run": [
+    "Axe automated accessibility audit",
+    "physical mobile keyboard and device performance",
+    "production browser checkout",
+    "repackaged release archive after UI changes"
+  ],
+  "owner_review": "User requests closer matching to the actual old cashier, including shell, font, monitoring and proportions.",
+  "sprint_started_at": "2026-10-30 18:56:36 WIB",
+  "current_sprint": "Split master into dedicated sidebar pages (Produk, Pelanggan, Supplier, Karyawan, Kendaraan)"
+}

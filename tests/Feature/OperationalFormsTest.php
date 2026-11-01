@@ -42,7 +42,7 @@ class OperationalFormsTest extends TestCase
         $response = $this->actingAs($this->user)->get('/products');
         $response->assertStatus(200);
         $response->assertSee('Pendaftaran Produk Baru');
-        $response->assertSee('stok awal 0.00');
+        $response->assertSee('Stok awal 0. Tambahkan stok melalui Penerimaan Barang atau Stok Opname.');
 
         $storeResponse = $this->actingAs($this->user)->post('/products', [
             'sku' => 'MAT-TEST-001',

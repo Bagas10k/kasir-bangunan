@@ -15,6 +15,8 @@ use App\Http\Controllers\StockOpnameController;
 use App\Http\Controllers\VehicleController;
 use Illuminate\Support\Facades\Route;
 
+require __DIR__.'/v2.php';
+
 // Guest authentication & demo setup routes
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
