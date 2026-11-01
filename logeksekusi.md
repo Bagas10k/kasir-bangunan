@@ -482,3 +482,19 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
   - `Invoke-WebRequest http://127.0.0.1:8080/login` (status 200 — server dev menyajikan manifest baru tanpa restart).
 - **Bukti & Hasil Pengujian Empiris**: Manifest Vite baru memuat resources/css/app.css dan resources/js/app.js dengan aset ter-hash; halaman login merespons 200 setelah build. Tidak ada migrasi schema baru yang perlu diterapkan pada database MySQL kasir_bangunan.
 - **Status & Catatan Akhir**: SELESAI. Runtime lengkap: PHP 8.4.27 + MySQL kasir_bangunan + aset frontend hasil build segar + kode main hasil merge rolev2 (364 tes, 0 gagal). Aplikasi siap dipakai di http://127.0.0.1:8080.
+
+
+## [2026-11-01 11:25 WIB] - Aktivasi Default Operasional V2 (V2_ENABLED=true)
+- **Pelaksana**: OpenCode / GLM 5.3
+- **Target Tugas**: Mengaktifkan alur Operasional V2 sebagai default runtime aplikasi di lingkungan web, serta mengunci isolasi testing V1 legacy pada phpunit.xml.
+- **Berkas yang Diubah**:
+  - `.env`: Menambahkan `V2_ENABLED=true` agar runtime server web (login, redirect, cutover) langsung mengarah ke workspace V2 secara permanen tanpa perlu menyertakan `/v2` manual di URL.
+  - `phpunit.xml`: Menambahkan `<env name="V2_ENABLED" value="false"/>` agar 269 test legacy tetap terisolasi dalam mode pengujian backward-compatibility, sementara 87 test V2 secara independen memvalidasi behavior cutover (`V2CutoverTest`).
+  - Database MySQL `kasir_bangunan`: Mendaftarkan role `admin` untuk user id 1 di tabel `v2_user_roles` agar akun admin memiliki hak akses penuh ke seluruh menu manajemen V2.
+  - `logeksekusi.md`: Entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan test --compact` (Exit code: 0; **364 tes, 356 lulus, 8 skipped, 0 gagal, 2304 assertion**).
+  - `php artisan config:clear` (Exit code: 0).
+  - MySQL query `SELECT * FROM v2_user_roles` (Exit code: 0; User ID 1 terdaftar role `admin`).
+- **Bukti & Hasil Pengujian Empiris**: Aplikasi web saat login sekarang langsung mengalihkan user ke alur V2 (`/v2`), rute root `/` mem-forward ke `v2.index`, dan suite pengujian otomatis tetap 100% lulus.
+- **Status & Catatan Akhir**: SELESAI. Runtime operasional V2 telah aktif penuh secara default.
