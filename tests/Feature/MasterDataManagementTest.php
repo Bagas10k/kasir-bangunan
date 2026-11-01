@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -64,7 +65,7 @@ class MasterDataManagementTest extends TestCase
 
         $response->assertOk()->assertSee('Material Sintetis Alpha')->assertDontSee('Material Sintetis Beta');
         $products = $response->viewData('products');
-        $this->assertInstanceOf(\Illuminate\Pagination\LengthAwarePaginator::class, $products);
+        $this->assertInstanceOf(LengthAwarePaginator::class, $products);
         $this->assertSame(1, $products->total());
         $this->assertSame(2, $response->viewData('summary')['total']);
         $this->assertSame(1, $response->viewData('summary')['inactive']);
@@ -116,7 +117,8 @@ class MasterDataManagementTest extends TestCase
 
     public function test_coa_supports_search_status_usage_pagination_and_exact_balance_strings(): void
     {
-        $this->actingAs($this->user())->get(route('coa.index'))->assertOk();
+        $user = $this->user();
+        $this->actingAs($user)->get(route('coa.index'))->assertOk();
         $customId = DB::table('chart_of_accounts')->insertGetId([
             'account_code' => '6198',
             'account_name' => 'Beban Sintetis Arsip',
@@ -127,7 +129,7 @@ class MasterDataManagementTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $response = $this->actingAs($this->user())->get(route('coa.index', [
+        $response = $this->actingAs($user)->get(route('coa.index', [
             'search' => 'Sintetis Arsip',
             'type' => 'expense',
             'status' => 'inactive',
@@ -137,7 +139,7 @@ class MasterDataManagementTest extends TestCase
 
         $response->assertOk()->assertSee('Beban Sintetis Arsip');
         $accounts = $response->viewData('accounts');
-        $this->assertInstanceOf(\Illuminate\Pagination\LengthAwarePaginator::class, $accounts);
+        $this->assertInstanceOf(LengthAwarePaginator::class, $accounts);
         $this->assertSame(1, $accounts->total());
         $this->assertSame('0.00', $accounts->items()[0]->balance);
         $this->assertSame($customId, (int) $accounts->items()[0]->id);
@@ -194,7 +196,8 @@ class MasterDataManagementTest extends TestCase
 
     public function test_journal_can_be_filtered_from_account_drilldown(): void
     {
-        $this->actingAs($this->user())->get(route('coa.index'))->assertOk();
+        $user = $this->user();
+        $this->actingAs($user)->get(route('coa.index'))->assertOk();
         $journalId = DB::table('journal_entries')->insertGetId([
             'reference_type' => 'synthetic',
             'reference_id' => 1,
@@ -221,7 +224,7 @@ class MasterDataManagementTest extends TestCase
             ['journal_entry_id' => $unrelatedId, 'account_code' => '3101', 'account_name' => 'Modal', 'debit' => '0.00', 'credit' => '5.00', 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        $this->actingAs($this->user())->get(route('journals.index', ['account' => '6101']))
+        $this->actingAs($user)->get(route('journals.index', ['account' => '6101']))
             ->assertOk()
             ->assertSee('name="account"', false)
             ->assertSee('value="6101"', false)

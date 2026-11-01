@@ -332,3 +332,97 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
 - **Implementasi**: Area input tambah sekarang tersembunyi secara default. Tombol plus hijau berukuran 44px menampilkan atau menyembunyikan input, memindahkan fokus ke input saat dibuka, dan menutup kembali setelah berhasil menambah pilihan. Label aria, title, keyboard Enter, dan alur validasi tetap dipertahankan.
 - **Perintah Verifikasi & Exit Code**: JavaScript partial via `node --check` dengan fixture netral (Exit code: 0); `artisan view:cache` dalam APP_ENV=testing (Exit code: 0); `git diff --check` (Exit code: 0).
 - **Status & Catatan Akhir**: SELESAI. Visual browser belum diverifikasi langsung.
+
+
+## [2026-11-01 10:20 WIB] - Instalasi PHP 8.4.27 sebagai Runtime Default (Laragon Windows)
+- **Pelaksana**: OpenCode / GLM 5.3
+- **Target Tugas**: Verifikasi rekomendasi upgrade PHP dan pemasangan PHP 8.4.27 NTS x64 sebagai default CLI menggantikan PHP 8.3.7, karena vendor dependencies mensyaratkan PHP >= 8.4.1.
+- **Berkas yang Dibuat**:
+  - `C:\laragon\bin\php\php-8.4.27-1-nts-Win32-vs17-x64\`: instalasi PHP 8.4.27 NTS x64 (build vs17) dari windows.php.net, SHA-256 diverifikasi terhadap sha256sum.txt resmi sebelum ekstrak.
+- **Berkas yang Diubah**:
+  - `C:\laragon\bin\php\php-8.4.27-1-nts-Win32-vs17-x64\php.ini`: disalin dari instalasi PHP 8.3.7, `extension_dir` disesuaikan, dua setting deprecated PHP 8.4 (`session.sid_length`, `session.sid_bits_per_character`) dinonaktifkan.
+  - User PATH Windows: entri `C:\laragon\bin\php\php-8.3.7-nts-Win32-vs16-x64` diganti menjadi folder PHP 8.4.27 (folder 8.3.7 dipertahankan untuk rollback).
+  - `logeksekusi.md`: entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - Pra-instalasi `php artisan test --compact` pada PHP 8.3.7 (Exit code: 1; fatal `vendor/composer/platform_check.php`: dependencies require PHP ">= 8.4.1", running 8.3.7).
+  - Pra-instalasi `composer check-platform-reqs` pada PHP 8.3.7 (Exit code: 1; `symfony/clock v8.1.9` dependency laravel/framework v13.38.0 menuntut php >= 8.4.1).
+  - `php -v` pada binary baru (Exit code: 0; PHP 8.4.27 NTS Visual C++ 2022 x64, tanpa deprecation startup).
+  - `composer check-platform-reqs` pada PHP 8.4.27 (Exit code: 0; seluruh ekstensi dan php 8.4.27 status success).
+  - `php artisan test --compact` pada PHP 8.4.27, SQLite in-memory APP_ENV=testing (Exit code: 1; 277 tes, 264 lulus, 5 gagal, 1538 assertion, durasi 41,8 detik).
+- **Bukti & Hasil Pengujian Empiris**:
+  - Fakta pendorong: `symfony/clock v8.1.9` sudah ada di composer.lock pada HEAD ter-commit, artinya repo ini tidak dapat berjalan pada runtime 8.3.7 sejak commit tersebut; PHP 8.4 bukan opsional melainkan syarat runtime.
+  - Aplikasi berhasil boot di PHP 8.4.27; platform check lulus penuh.
+  - Lima kegagalan suite dianalisis dan bersumber dari kode ter-commit, bukan runtime PHP: (1-3) `MasterDataManagementTest` dan `MasterDataViewTest` memanggil `$this->user()` dua kali dalam satu tes sehingga `v2_auth_stamp` session milik user pertama mismatch terhadap user kedua dan middleware `EnsureActiveAccount` me-logout ("Sesi berakhir", 302); (4) `OperationalFormsTest` kegagalan asersi konten HTML; (5) `PosWorkspaceFlowTest` kegagalan ekspektasi CSS layout POS yang sudah terdokumentasi sebagai kegagalan tersisa pada entri 2026-10-29. Tidak ada galat kompatibilitas PHP 8.4 (deprecation/fatal) pada kode aplikasi.
+  - Catatan baseline entri 2026-10-29 (host Linux): 271 tes, 262 lulus, 1 gagal; pertumbuhan jumlah tes dan kegagalan berasal dari commit `88c17d6` (v2 login accounts) dan perubahan view ter-commit setelah entri tersebut.
+- **Status & Catatan Akhir**: TERSISA. Environment PHP 8.4.27 aktif dan terverifikasi; 5 kegagalan test suite adalah bug aplikasi ter-commit (pola `$this->user()` ganda vs `v2_auth_stamp`, dan asersi view) yang berada di luar scope tugas environment ini. Composer lokal versi 2.4.1 (2022) menghasilkan spam deprecation PHP 8.4 dari phar-nya sendiri; disarankan `composer self-update` (belum dieksekusi). PATH baru efektif pada terminal yang dibuka setelah perubahan; server web Laragon (Apache/Nginx) perlu di-switch versi PHP dari menu Laragon jika dipakai.
+
+
+## [2026-11-01 10:35 WIB] - Perbaikan Lima Kegagalan Test Suite pada PHP 8.4.27
+- **Pelaksana**: OpenCode / GLM 5.3
+- **Target Tugas**: Memperbaiki 5 kegagalan test suite yang teridentifikasi setelah aktivasi runtime PHP 8.4.27, tanpa mengubah logika aplikasi.
+- **Berkas yang Dibuat**: Tidak ada.
+- **Berkas yang Diubah**:
+  - `tests/Feature/MasterDataManagementTest.php`: Dua test (`test_coa_supports_search_status_usage_pagination_and_exact_balance_strings`, `test_journal_can_be_filtered_from_account_drilldown`) memegang satu variabel `$user` alih-alih memanggil `$this->user()` dua kali, sehingga `v2_auth_stamp` session tidak lagi mismatch terhadap user kedua dan middleware `EnsureActiveAccount` tidak me-logout (sebelumnya 302 "Sesi berakhir"). Pint: fully_qualified_strict_types, ordered_imports.
+  - `tests/Feature/MasterDataViewTest.php`: Test `test_coa_page_exposes_summary_filters_status_exact_balance_and_journal_drilldown` memakai satu `$user` untuk kedua request (perbaikan "Sesi berakhir" yang sama).
+  - `tests/Feature/OperationalFormsTest.php`: Asersi usang `assertSee('stok awal 0.00')` diperbarui menjadi `assertSee('Stok awal 0.')` sesuai teks view ter-commit (`resources/views/products/index.blade.php` baris 565: "Stok awal 0. Tambahkan stok melalui Penerimaan Barang atau Stok Opname.").
+  - `tests/Feature/PosWorkspaceFlowTest.php`: Tiga asersi kontrak layout POS usang diselaraskan dengan struktur view ter-commit: grid workspace kini `repeat(2, minmax(0, 1fr))` (bukan `minmax(0, 1fr) minmax(360px, 400px)`); dashboard kini full-width di atas workspace sebelum `pos-catalog-pane` (bukan di dalam pane); label alur review kini "Tinjau Pembayaran" dan "Tinjau Sebelum Menyimpan" (bukan "Tinjau & Konfirmasi"). Pint: method_chaining_indentation.
+  - `logeksekusi.md`: entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan test --compact tests/Feature/MasterDataManagementTest.php tests/Feature/MasterDataViewTest.php` (Exit code: 0; 9 tes, 104 assertion).
+  - `php artisan test --compact tests/Feature/PosWorkspaceFlowTest.php` (Exit code: 0; 3 tes, 36 assertion).
+  - `php artisan test --compact tests/Feature/MasterDataManagementTest.php tests/Feature/MasterDataViewTest.php tests/Feature/PosWorkspaceFlowTest.php tests/Feature/OperationalFormsTest.php` setelah Pint (Exit code: 0; 21 tes, 201 assertion).
+  - `php artisan test --compact` suite penuh SQLite in-memory APP_ENV=testing (Exit code: 0; 277 tes, 269 lulus, 8 skipped, 1589 assertion, durasi 16,9 detik; tidak ada kegagalan).
+  - `vendor/bin/pint --dirty --format agent` (Exit code: 0; 2 file diformat).
+  - `git diff --check` (Exit code: 0).
+  - `composer self-update` (2.4.1 -> 2.11.1, rollback tersedia via `composer self-update --rollback`); `composer validate --no-check-publish` (Exit code: 0, composer.json valid, spam deprecation PHP 8.4 hilang).
+- **Bukti & Hasil Pengujian Empiris**: Lima kegagalan sebelumnya (3x redirect 302 "Sesi berakhir" akibat `$this->user()` ganda vs `v2_auth_stamp`, 1x asersi teks produk usang, 1x asersi layout POS usang) seluruhnya lulus. Suite penuh kini hijau di PHP 8.4.27. Tidak ada file aplikasi (controller, middleware, view, migrasi) yang diubah; seluruh perbaikan berada di sisi test. Modifikasi pre-existing (AGENTS.md, CLAUDE.md, composer.json, composer.lock, direktori untracked) tidak disentuh.
+- **Status & Catatan Akhir**: SELESAI. Suite penuh 269 lulus / 8 skipped / 0 gagal pada PHP 8.4.27. Catatan: 8 test di-skip bawaan suite (belum diselidiki, berada di luar scope). Verifikasi visual browser tetap menjadi gerbang yang belum diuji.
+
+
+## [2026-11-01 11:05 WIB] - Migrasi Database Lokal dan Pembuatan Akun Admin
+- **Pelaksana**: OpenCode / GLM 5.3
+- **Target Tugas**: Menyiapkan akun administrator (username `admin`) dengan kata sandi sesuai permintaan pengguna agar aplikasi dapat diakses di http://127.0.0.1:8080.
+- **Berkas yang Dibuat**: Tidak ada.
+- **Berkas yang Diubah**:
+  - `database/database.sqlite`: seluruh migrasi pending dijalankan via `php artisan migrate --force` (database dev lokal kosong, bukan produksi; termasuk migrasi v2 operations/login accounts).
+  - Tabel `users`: satu baris admin (email `admin@kasirbangunan.test`, name "Admin", is_active=1, auth_version=1, password di-hash bcrypt; nilai kata sandi TIDAK didokumentasikan sesuai aturan keamanan repo).
+  - `logeksekusi.md`: entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan migrate --force` (Exit code: 0; 7 migrasi terakhir DONE, termasuk `2026_10_31_000001_v2_login_accounts`).
+  - Pembaruan password via tinker satu-baris: `update(...)` mengembalikan 1 baris (berhasil).
+  - Verifikasi tinker: `password_verify` terhadap hash tersimpan = yes; `Auth::attempt(["email" => "admin@kasirbangunan.test", "password" => ..., "is_active" => true])` = yes (jalur kredensial identik dengan `AuthController@login`, username `admin` dipetakan ke email tersebut).
+- **Bukti & Hasil Pengujian Empiris**: Form login aplikasi menerima identifier `admin` yang dipetakan ke email `admin@kasirbangunan.test`; `Auth::attempt` sukses dengan kredensial yang diminta pengguna. Ditemukan sekali kegagalan pembuatan awal: statement tinker multi-baris yang di-pipe via stdin menghasilkan hash yang salah (verifikasi gagal); diperbaiki dengan statement satu baris dan diverifikasi ulang hingga `attempt=yes`. Percobaan login HTTP end-to-end lewat peramban tidak dijalankan agent (kredensial tidak diketik ke skrip otomasi, sesuai memori.md) — menjadi gerbang yang belum diuji oleh agent; pengguna dapat mencobanya langsung.
+- **Status & Catatan Akhir**: SELESAI. Akun admin aktif dan terverifikasi pada level kredensial. Server dev berjalan di http://127.0.0.1:8080 (PHP 8.4.27). Nilai kata sandi tidak dicatat di dokumen mana pun.
+
+
+## [2026-11-01 10:55 WIB] - Migrasi Database Lokal ke MySQL (Paritas Produksi)
+- **Pelaksana**: OpenCode / GLM 5.3
+- **Target Tugas**: Mengalihkan runtime database lokal tb01 dari SQLite ke MySQL Laragon agar paritas dengan produksi (produksi menggunakan MariaDB/MySQL sesuai memori.md), atas permintaan pengguna.
+- **Berkas yang Dibuat**: Tidak ada berkas repo; database MySQL `kasir_bangunan` (utf8mb4/utf8mb4_unicode_ci) dibuat di server MySQL 8.0.30 Laragon lokal.
+- **Berkas yang Diubah**:
+  - `.env`: baris `DB_CONNECTION=sqlite` diganti blok koneksi MySQL standar Laragon lokal (host/port 3306, database `kasir_bangunan`, user root; nilai kredensial tidak didokumentasikan).
+  - Database `kasir_bangunan`: seluruh 39 tabel dibuat via `php artisan migrate --force`; satu akun admin dibuat ulang (email `admin@kasirbangunan.test`, password bcrypt diverifikasi; nilai tidak didokumentasikan).
+  - `logeksekusi.md`: entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `CREATE DATABASE kasir_bangunan ...` via mysql CLI (Exit code: 0; database muncul di SHOW DATABASES).
+  - `php artisan config:clear` + `php artisan migrate --force` (Exit code: 0; 39 tabel, users kosong).
+  - Tinker satu-baris pembuatan admin + verifikasi (Exit code: 0; count=1, password_verify=yes, `Auth::attempt`=yes, `config("database.default")`=mysql).
+  - `Invoke-WebRequest http://127.0.0.1:8080/login` (status 200) diikuti kueri MySQL: `sessions` berisi 1 baris dan `users` 1 baris — bukti aplikasi web aktif menulis session ke MySQL.
+  - `php artisan test --compact` (Exit code: 0; 277 tes, 269 lulus, 8 skipped, 1589 assertion, 17,9 detik) — test suite tetap terisolasi pada SQLite :memory: via phpunit.xml, tidak menyentuh MySQL.
+- **Bukti & Hasil Pengujian Empiris**: Aplikasi berjalan di PHP 8.4.27 + MySQL 8.0.30: halaman login merespons 200 dan tabel `sessions` di MySQL terisi setelah request web (session driver database). Akun admin terverifikasi pada level kredensial melalui jalur attempt yang identik dengan controller login. Log server sebelumnya juga menunjukkan pengguna telah berhasil login dan mengakses endpoint POS (/pos/dashboard-sales, /pos/sales) pada 10:51 sebelum pergantian database. Berkas `database/database.sqlite` tidak dihapus (rollback cukup dengan mengembalikan DB_CONNECTION=sqlite).
+- **Status & Catatan Akhir**: SELESAI. Runtime lokal kini paritas dengan produksi (MySQL). Test suite tetap SQLite in-memory sesuai aturan isolasi testing. Kredensial database dan kata sandi tidak dicatat di dokumen.
+
+
+## [2026-11-01 11:00 WIB] - Penghapusan Berkas SQLite Lokal
+- **Pelaksana**: OpenCode / GLM 5.3
+- **Target Tugas**: Menghapus berkas database SQLite lama atas permintaan eksplisit pengguna, setelah runtime lokal bermigrasi penuh ke MySQL.
+- **Berkas yang Dibuat**: Tidak ada.
+- **Berkas yang Diubah**:
+  - `database/database.sqlite`: DIHAPUS (548.864 byte; hanya berisi migrasi, akun admin percobaan, dan session dari sesi browsing pengguna — data operasional tidak ada karena aplikasi belum dipakai transaksional).
+  - `logeksekusi.md`: entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `Remove-Item database/database.sqlite -Force` (Exit code: 0).
+  - `Invoke-WebRequest http://127.0.0.1:8080/login` sebelum dan sesudah penghapusan (status 200 keduanya; aplikasi tetap berjalan di MySQL karena `DB_CONNECTION=mysql`).
+  - `Test-Path database/database.sqlite` = False.
+- **Bukti & Hasil Pengujian Empiris**: Aplikasi tetap merespons 200 setelah berkas dihapus, membuktikan runtime tidak lagi bergantung pada SQLite. Rollback ke SQLite kini memerlukan pembuatan ulang berkas via `touch database/database.sqlite && php artisan migrate`. Test suite tidak terdampak karena menggunakan SQLite :memory: (bukan berkas).
+- **Status & Catatan Akhir**: SELESAI. Sumber data tunggal lokal kini MySQL `kasir_bangunan`.

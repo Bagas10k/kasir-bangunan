@@ -108,7 +108,8 @@ class MasterDataViewTest extends TestCase
 
     public function test_coa_page_exposes_summary_filters_status_exact_balance_and_journal_drilldown(): void
     {
-        $this->actingAs($this->user())->get(route('coa.index'))->assertOk();
+        $user = $this->user();
+        $this->actingAs($user)->get(route('coa.index'))->assertOk();
         $journalId = DB::table('journal_entries')->insertGetId([
             'reference_type' => 'synthetic',
             'reference_id' => 1,
@@ -122,7 +123,7 @@ class MasterDataViewTest extends TestCase
             ['journal_entry_id' => $journalId, 'account_code' => '3101', 'account_name' => 'Modal', 'debit' => '0.00', 'credit' => '123456789.99', 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        $response = $this->actingAs($this->user())->get(route('coa.index', ['search' => '1101']));
+        $response = $this->actingAs($user)->get(route('coa.index', ['search' => '1101']));
 
         $response->assertOk()
             ->assertSee('master-summary-strip', false)
