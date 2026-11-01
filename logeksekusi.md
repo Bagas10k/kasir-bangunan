@@ -469,3 +469,16 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
   - `php artisan test --compact` pasca-merge, SQLite :memory: (Exit code: 0; **364 tes, 356 lulus, 8 skipped, 0 gagal, 2304 assertion, 56,5 detik** — naik dari 277 tes karena 13 file test V2 baru).
 - **Bukti & Hasil Pengujian Empiris**: Seluruh test V2 baru dari rolev2 (V2MasterData, V2SupplyTrips, V2DeliveryTrips, V2PaymentShift, V2ReportsDocuments, V2AccountManagement, V2Cutover, dll.) lulus di runtime PHP 8.4.27 lokal dengan database testing SQLite in-memory. Tidak ada regresi pada test lama.
 - **Status & Catatan Akhir**: SELESAI. Kode rolev2 aktif di working tree main. Perubahan pre-existing yang belum ter-commit (AGENTS.md, CLAUDE.md, composer.json, composer.lock, file konfigurasi lokal) tetap dipertahankan tanpa disentuh. Server dev berjalan di http://127.0.0.1:8080 dengan MySQL `kasir_bangunan`.
+
+
+## [2026-11-01 11:15 WIB] - Migrate dan Frontend Build Pasca-Merge rolev2
+- **Pelaksana**: OpenCode / GLM 5.3
+- **Target Tugas**: Menjalankan migrasi database dan build frontend pada kode hasil merge rolev2, atas permintaan pengguna.
+- **Berkas yang Dibuat**: `public/build/manifest.json` dan aset ter-hash hasil `npm run build` (gitignored, artefak build).
+- **Berkas yang Diubah**: `logeksekusi.md` (entri append-only ini).
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan migrate --force` (Exit code: 0; "Nothing to migrate" — tidak ada migrasi baru pada rolev2, 39 tabel MySQL sudah lengkap).
+  - `npm run build` / `vite build` (Exit code: 0; 3 modul, manifest 5 entri, CSS 62,25 kB ter-hash, durasi 1,26 detik).
+  - `Invoke-WebRequest http://127.0.0.1:8080/login` (status 200 — server dev menyajikan manifest baru tanpa restart).
+- **Bukti & Hasil Pengujian Empiris**: Manifest Vite baru memuat resources/css/app.css dan resources/js/app.js dengan aset ter-hash; halaman login merespons 200 setelah build. Tidak ada migrasi schema baru yang perlu diterapkan pada database MySQL kasir_bangunan.
+- **Status & Catatan Akhir**: SELESAI. Runtime lengkap: PHP 8.4.27 + MySQL kasir_bangunan + aset frontend hasil build segar + kode main hasil merge rolev2 (364 tes, 0 gagal). Aplikasi siap dipakai di http://127.0.0.1:8080.
