@@ -6,6 +6,13 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
 {
+    // actingAs is an explicit test login: bind the session to that identity too.
+    public function actingAs(\Illuminate\Contracts\Auth\Authenticatable $user, $guard = null)
+    {
+        $this->withSession(['v2_auth_stamp'=>[(int) $user->getAuthIdentifier(), (int) ($user->auth_version ?? 1)]]);
+        return parent::actingAs($user, $guard);
+    }
+
     protected function startBooks(string $cash = '1000000000.00', string $bank = '1000000000.00'): void
     {
         $service = app(\App\Services\OpeningBalanceService::class);

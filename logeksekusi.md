@@ -333,6 +333,33 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
 - **Perintah Verifikasi & Exit Code**: JavaScript partial via `node --check` dengan fixture netral (Exit code: 0); `artisan view:cache` dalam APP_ENV=testing (Exit code: 0); `git diff --check` (Exit code: 0).
 - **Status & Catatan Akhir**: SELESAI. Visual browser belum diverifikasi langsung.
 
+## [2026-10-30 WIB] — Kandidat operasional V2 dan paket publish terkontrol
+- **Pelaksana**: Hermes Mandor dan pekerja terisolasi; hasil anak diverifikasi induk.
+- **Source**: worktree `kasir-bangunan-rebuild`, branch `rebuild/operasional-v2`; source/database produksi tidak diubah.
+- **Berkas**: namespace service/controller/view V2, enam migrasi additif, middleware cutover, konfigurasi V2/WIB, perintah `v2:prepare`, tes V2, dokumentasi dan runbook.
+- **Verifikasi nyata**: source archive hasil ekstraksi diuji di PHP8.5.11 SQLite `:memory:` network-none — 345 tes/2137 assertion/8skip, exit0. MariaDB disposable — 9tes/22assertion/1skip, exit0; skip khusus engine yang berlawanan. Restore25tabel +6migrasi ->40tabel; checksum jurnal9header/21baris dan produk8 sama. Dua checkout paralel MariaDB -> sale sama, satu pembayaran/mutasi stok.
+- **Browser**: sesi sintetis Laravel; kasir shift/checkout/DP transfer/cicilan, admin verify/supplier, XLSX preview+commit/master edit, pengiriman sent/received, uang muka100->aktual80+refund20, shift selisih-1 direview tanpa mengubah angka. Screenshot390/1440 no overflow; focus-visible3px. Tidak mengklaim login password produksi/FPS.
+- **Kemasan**: source270berkas +manifest; dependency/runtime sensitif dikeluarkan; arsip diekstrak dan diuji, QC270/270hash cocok. PDF5halaman screenshot aktual, text/raster/layout diperiksa. Hash final disimpan pada paket release terpisah, bukan log ini.
+- **Batas**: lihat `docs/publish-v2.md` (payroll deferred, cap workspace, saldo awal rincian JSON, realisasi sopir<=uangmuka, koreksi/retur UI belum ada). Produksi belum dipublish; aktivasi membutuhkan backup cutoff/preflight terbaru, IDrole eksplisit dan health publik. Rollback setelah transaksi V2 memerlukan rekonsiliasi, bukan flag false saja.
+
+## [2026-10-30 16:07:54 WIB] — Pemulihan pola kasir yang disetujui
+- **Pelaksana**: Mandor; pelaksana CSS dan QC aditif memakai Gemini Flash High. Source produksi tidak diubah.
+- **Lingkup**: `resources/views/v2/pos-cashier*.blade.php`, `pos-cart-template.blade.php`, sambungan workspace/UI, proyeksi baca SKU/kelompok di controller, tes render dan `scripts/test-v2-pos-ui.cjs`; dokumentasi/tracker diperbarui. Tidak mengubah layanan uang, schema, route, role, atau file POS legacy.
+- **Hasil**: katalog kiri/keranjang kanan, stepper jumlah, total/checkout langsung; popup hanya pembayaran dan review. Form pendukung tetap popup.
+- **Uji**: Node9assertion; PHPUnit68tes563assertion SQLite-memory terisolasi; keduanya exit0. Browser kandidat: cari/tambah/ubah/hapus, batal0POST, double-confirm1POST200, nota2 LUNAS total200/paid200/change50/remaining0. Keyboard Enter/Tab/Shift+Tab/Space/Escape pada1440/390 lulus dengan0write; fokus kembali dan nominal250 bertahan.
+- **Bukti**: `/home/ubuntu/.hermes/work/kasir-rebuild-20261029/ui-polish/approved-pos`; source manifest10/10cocok. POS legacy SHA256`8c8b0dfbd60599c8d97a9377460073031a97ed2c6e2cd8e540088d2f57186b5b` sama pada kedua worktree.
+- **Batas**: penilaian visual pemilik menunggu; bukan klaim pixel-identik. Axe/perangkat fisik dan checkout produksi belum diuji. Arsip rilis lama belum mencakup revisi UI.
+
+
+## [2026-10-30 21:30:30 WIB] — Aktivasi web V2 dan halaman master terpisah
+- Izin: pemilik meminta penerapan web untuk diperiksa; tidak reset akun/database.
+- Penerapan: 43 berkas runtime V2; enam migrasi bernama 2026_10_30_000001–000006; existing user ID1 admin, dua COA sistem yang hilang ditambah. Password/akun tidak diganti. APP_TIMEZONE Asia/Jakarta, V2_ENABLED true.
+- Backup privat: source+DB; dump direstore ke MariaDB latihan kasir_release_20261030; checksum products/sales/journal_entries/journal_entry_lines/stock_movements sama. Enam migrasi diuji pada clone terbaru sebelum produksi.
+- Uji: scripts/test-v2.sh 74 tests/646 assertions exit0; node scripts/test-v2-pos-ui.cjs 9 assertions exit0; browser kandidat kelima menu membuka panel sendiri, tanpa dropdown master, popup tambah terbuka,0JSerror. Render produksi400563bytes/5masterstrue; manifest43/43matches.
+- Setelah aktivasi hash akun/produk/penjualan/jurnal/barisjurnal/stok unchanged. Baseline8produk/1sales/9journal/21lines/4stockmovements.
+- Nginx penahan akses503 dilepas; curl login/up publik200. Web https://www.jajandigital.web.id/kasir-bangunan/v2#master-product. Restart hanya app dan web kasir.
+- Batas: login browser publik belum diuji (vault kosong); tidak membuat transaksi palsu produksi. Daftar/pencarian master100terbaru perjenis. QC aditif memverifikasi bukti; HTTP200 bukan checkout.
+- Bukti privat: /home/ubuntu/.hermes/work/kasir-rebuild-20261029/ui-polish/master-pages. Rollback setelah transaksiV2 perlu rekonsiliasi; jangan toggle flag/restoreDB sembarang.
 
 ## [2026-11-01 10:20 WIB] - Instalasi PHP 8.4.27 sebagai Runtime Default (Laragon Windows)
 - **Pelaksana**: OpenCode / GLM 5.3
@@ -426,3 +453,19 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
   - `Test-Path database/database.sqlite` = False.
 - **Bukti & Hasil Pengujian Empiris**: Aplikasi tetap merespons 200 setelah berkas dihapus, membuktikan runtime tidak lagi bergantung pada SQLite. Rollback ke SQLite kini memerlukan pembuatan ulang berkas via `touch database/database.sqlite && php artisan migrate`. Test suite tidak terdampak karena menggunakan SQLite :memory: (bukan berkas).
 - **Status & Catatan Akhir**: SELESAI. Sumber data tunggal lokal kini MySQL `kasir_bangunan`.
+
+
+## [2026-11-01 11:10 WIB] - Pull Branch rolev2 ke Main dan Verifikasi Menyeluruh
+- **Pelaksana**: OpenCode / GLM 5.3
+- **Target Tugas**: Menggabungkan kode terbaru dari branch `origin/rolev2` (commit 8f5fea6 "feat(v2): workspace operasional lengkap — kategori master & sistem tambalah") ke main atas permintaan pengguna.
+- **Berkas yang Dibuat** (dari rolev2): 13 file test V2 baru (`tests/Feature/V2*.php`), dokumentasi V2 (`docs/rancangan-operasional-v2.md`, `docs/v2-contract.md`, `docs/release-plan-v2.md`, dll.), skrip `scripts/test-v2.sh`, `scripts/test-v2-pos-ui.cjs`, `scripts/rehearse-v2.sh`, `docs/build_tracker_v2.json`.
+- **Berkas yang Diubah**:
+  - `tests/TestCase.php`: override `actingAs()` yang otomatis men-set session `v2_auth_stamp` (solusi akar masalah "Sesi berakhir" — lebih elegan daripada perbaikan per-test yang dilakukan sesi ini; keduanya kini berdampingan).
+  - `tests/Feature/PosWorkspaceFlowTest.php` dan `tests/Feature/OperationalFormsTest.php`: konflik merge diselesaikan dengan mengambil versi rolev2 (perbaikan ekuivalen dengan versi lokal, string lebih lengkap).
+  - `logeksekusi.md`: konflik merge diselesaikan dengan union kronologis — 3 entri 2026-10-30 milik rolev2 diletakkan sebelum 5 entri 2026-11-01 milik sesi ini (ledger append-only tetap utuh dari kedua sisi).
+  - Commit lokal `a5c1141` (perbaikan 5 kegagalan test) dipertahankan dalam histori sebelum merge.
+- **Perintah Verifikasi & Exit Code**:
+  - `git pull origin rolev2 --no-rebase` (konflik di 3 file, diselesaikan manual).
+  - `php artisan test --compact` pasca-merge, SQLite :memory: (Exit code: 0; **364 tes, 356 lulus, 8 skipped, 0 gagal, 2304 assertion, 56,5 detik** — naik dari 277 tes karena 13 file test V2 baru).
+- **Bukti & Hasil Pengujian Empiris**: Seluruh test V2 baru dari rolev2 (V2MasterData, V2SupplyTrips, V2DeliveryTrips, V2PaymentShift, V2ReportsDocuments, V2AccountManagement, V2Cutover, dll.) lulus di runtime PHP 8.4.27 lokal dengan database testing SQLite in-memory. Tidak ada regresi pada test lama.
+- **Status & Catatan Akhir**: SELESAI. Kode rolev2 aktif di working tree main. Perubahan pre-existing yang belum ter-commit (AGENTS.md, CLAUDE.md, composer.json, composer.lock, file konfigurasi lokal) tetap dipertahankan tanpa disentuh. Server dev berjalan di http://127.0.0.1:8080 dengan MySQL `kasir_bangunan`.

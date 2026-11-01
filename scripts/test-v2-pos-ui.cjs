@@ -1,0 +1,23 @@
+// Test the actual preview arithmetic shipped in the Blade source, not a copy.
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const source = fs.readFileSync(path.join(__dirname, '../resources/views/v2/pos-cashier-script.blade.php'), 'utf8');
+const start = source.indexOf('window.KasirDecimal=');
+const end = source.indexOf('\n(()=>{', start);
+assert.ok(start >= 0 && end > start, 'Preview arithmetic block must exist');
+const context = { window: {} };
+vm.runInNewContext(source.slice(start, end), context);
+const D = context.window.KasirDecimal;
+assert.equal(D.plain(D.line('100', '2')), '200.00');
+assert.equal(D.plain(D.line('100', '2', 'percent', '10')), '180.00');
+const goods = D.line('100', '2', 'percent', '10');
+assert.equal(D.plain(goods - D.discount(goods, 'amount', '5') + D.scaled('15', 2)), '190.00');
+assert.equal(D.plain(D.line('9999999999999999.99', '1')), '9999999999999999.99');
+assert.equal(D.plain(D.line('0.05', '0.1')), '0.01');
+assert.equal(D.plain(D.line('100', '2,5')), '250.00');
+assert.throws(() => D.discount(100n, 'percent', '101'));
+assert.throws(() => D.line('100', '-1'));
+assert.ok(source.includes('form.__finalConfirmed=true;'), 'Confirm must arm the existing V2 submit handler');
+console.log('POS preview: 9 assertions passed');

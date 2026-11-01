@@ -1,0 +1,66 @@
+{
+  "task": "Fresh cashier/admin operational V2",
+  "status": "candidate_ready_for_controlled_publish_not_deployed",
+  "release_plan": "docs/release-plan-v2.md",
+  "branch": "rebuild/operasional-v2",
+  "source": "/home/ubuntu/kasir-bangunan-rebuild",
+  "production_source": "/home/ubuntu/kasir-bangunan-app",
+  "production_changed": false,
+  "approved": {
+    "replace_active_after_backup": true,
+    "release_gate_required": true,
+    "theme": "green-white",
+    "payroll": "deferred",
+    "excel": "master-only",
+    "transfer_sale_dispatch": "unpaid allowed",
+    "delivery_note": "required for delivery"
+  },
+  "gates": {
+    "initial_pdf": true,
+    "contracts": true,
+    "backup": true,
+    "schema_core": true,
+    "domain_core": true,
+    "runtime_tests": "extracted_source_full_sqlite_345_tests_2137_assertions_exit0_8_engine_specific_skips",
+    "browser": "synthetic_authenticated_candidate_flows_verified_desktop_mobile_no_overflow",
+    "imports": true,
+    "ritase": "actual_and_advance_settlement_verified_with_documented_cap",
+    "opening_balances": "service_tests_and_preview_confirm_UI_integrated_new_install_only",
+    "legacy_mapping": "shared_stock_journal_retained_zero_outstanding_snapshot_preflight_passed",
+    "mariadb_rehearsal": true,
+    "qc": "final_source_review_dispositions_applied_and_package_270of270_manifest_hashes_passed",
+    "production_promotion": false
+  },
+  "artifacts": {
+    "plan": "docs/rancangan-operasional-v2.md",
+    "contracts": "docs/v2-contract.md",
+    "pdf": "/home/ubuntu/.hermes/work/kasir-rebuild-20261029/rancangan-operasional-v2.pdf",
+    "qc_disposition": "docs/v2-qc-disposition.md",
+    "release_runbook": "docs/publish-v2.md",
+    "release_plan": "docs/release-plan-v2.md",
+    "source_bundle": "release/kasir-v2-source.tar.gz (delivered outside repo)",
+    "release_pdf": "release/kasir-v2-bukti-rilis.pdf (delivered outside repo)"
+  },
+  "evidence": [
+    "Extracted source archive tested after final middleware patch: 345 tests / 2137 assertions, exit0; 8 MariaDB-only tests skipped in SQLite and covered by separate target-engine run.",
+    "MariaDB 9 tests /22 assertions exit0; one SQLite-specific skip.",
+    "Backup restored 25 tables; 6 additive migrations ->40tables; parent readback journal9/21 and products8 checksum same.",
+    "Two simultaneous same-actor MariaDB checkout requests replay sale1; single sale/payment/stock movement, stock19.0000.",
+    "Browser real candidate synthetic session: shift, discounted credit+DP transfer190/50, admin approval, cash collection140, supplier payout50, delivery sent/received, advance100 settled80 refund20, XLSX preview+commit and master edit, shift discrepancy -1 reviewed preserving counts.",
+    "Fresh 390/1440 screenshots inspected; no horizontal overflow after min-width correction; Tab focus visible3px.",
+    "v2:prepare dry-run and apply on restored DB exit0, role+missingCOA only; journal/products checksum unchanged.",
+    "Production source/database untouched; no public deployment.",
+    "Final package independent QC: 270/270 source hashes match in archive and extraction; no traversal, links, real env, sessions, DB dumps, vendor contents or node_modules.",
+    "Five-page screenshot report generated and text checked; all pages rasterized and layout inspected.",
+    "Readiness scope is documented operational V2 candidate, not a claim of production deployment or all original aspirational features."
+  ],
+  "limitations": [
+    "Payroll deferred per approved scope.",
+    "Driver settlement actual greater than advance rejected; no refund/return/correction workflow in V2 UI.",
+    "Master100/shift30/sales30/invoice100/payment50 workspace caps, not complete archive; summary reports aggregate full scope.",
+    "Opening inventory/AR/AP details use labelled JSON form; only new empty installs; no second legacy opening.",
+    "Bank pending is current status not historical snapshot; sales/cash report business day is shift-open day.",
+    "Timestamp history not rewritten after WIB setting.",
+    "Public credential login and production promotion NOT RUN; new backup/cutoff/preflight required at actual deployment."
+  ]
+}

@@ -26,19 +26,18 @@ class PosWorkspaceFlowTest extends TestCase
         $this->assertStringContainsString('class="pos-workspace"', $html);
         $this->assertStringContainsString('class="pos-catalog-pane', $html);
         $this->assertStringContainsString('class="pos-cart-pane', $html);
-        $this->assertStringContainsString('grid-template-columns: repeat(2, minmax(0, 1fr))', $html);
+        $this->assertStringContainsString('.pos-workspace { order: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));', $html);
         $this->assertStringContainsString('class="card pos-recent-card pos-history-full"', $html);
         $this->assertStringContainsString('class="monitor-grid"', $html);
         // Catalog pane (left) comes before cart pane (right) in HTML order
         $this->assertLessThan(strpos($html, 'class="pos-cart-pane'), strpos($html, 'class="pos-catalog-pane'));
-        // Dashboard appears above the workspace, before the catalog pane
+        // Monitoring precedes the separate catalog/cart workspace.
         $this->assertLessThan(strpos($html, 'class="pos-catalog-pane'), strpos($html, '<section class="dash-card sales-dashboard-card"'));
         $this->assertLessThan(strpos($html, '<div class="dash-label">Produk Unggulan</div>'), strpos($html, '<section class="dash-card sales-dashboard-card"'));
         $this->assertLessThan(strpos($html, '<div class="dash-label">Ringkasan Produk</div>'), strpos($html, '<div class="dash-label">Produk Unggulan</div>'));
         $this->assertLessThan(strpos($html, '<div class="card pos-catalog-card">'), strpos($html, '<div class="dash-label">Ringkasan Produk</div>'));
         $this->assertLessThan(strpos($html, 'class="card pos-recent-card pos-history-full"'), strpos($html, '<div class="card pos-catalog-card">'));
         $this->assertStringContainsString('Tinjau Pembayaran', $html);
-        $this->assertStringContainsString('Tinjau Sebelum Menyimpan', $html);
         $this->assertStringContainsString('Konfirmasi &amp; Simpan Transaksi', $html);
         $this->assertStringContainsString('Cetak Struk', $html);
         $this->assertStringNotContainsString('Konfirmasi &amp; Cetak Struk', $html);
@@ -70,7 +69,7 @@ class PosWorkspaceFlowTest extends TestCase
             'payment_method' => 'transfer', 'customer_type' => 'contractor',
             'start_date' => '2026-10-10', 'end_date' => '2026-10-18',
         ]))->assertOk()->assertJsonPath('pagination.total', 1)
-            ->assertJsonPath('data.0.invoice_number', 'INV-SYN-002');
+          ->assertJsonPath('data.0.invoice_number', 'INV-SYN-002');
     }
 
     public function test_sales_history_rejects_invalid_filter_shapes(): void
