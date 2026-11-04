@@ -77,6 +77,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/reports/profit-loss/csv', [ReportController::class, 'profitLossCsv'])->name('reports.profit_loss.csv');
     Route::get('/reports/balance-sheet', [ReportController::class, 'balanceSheet'])->name('reports.balance_sheet');
     Route::get('/reports/balance-sheet/csv', [ReportController::class, 'balanceSheetCsv'])->name('reports.balance_sheet.csv');
+    Route::get('/reports/cash-flow', [ReportController::class, 'cashFlow'])->name('reports.cash_flow');
+    Route::get('/reports/cash-flow/csv', [ReportController::class, 'cashFlowCsv'])->name('reports.cash_flow.csv');
 
     // General Journal & Opening Balances
     Route::get('/journals', [JournalController::class, 'index'])->name('journals.index');

@@ -1,4 +1,8 @@
 <style>
+.workspace-nav-group{padding:14px 12px 4px;color:var(--text-caption);font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;visibility:hidden}
+.workspace-sidebar.pinned .workspace-nav-group,.workspace-sidebar:hover .workspace-nav-group,.workspace-sidebar:focus-within .workspace-nav-group{visibility:visible}
+.admin-overview-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.admin-overview-metrics div{padding:16px;border:1px solid var(--border-subtle);border-radius:12px}.admin-overview-metrics dt{font-size:12px}.admin-overview-metrics dd{margin:8px 0 0;font-size:22px;font-variant-numeric:tabular-nums;text-align:right}
+@media(max-width:900px){.workspace-nav-group{visibility:visible}.admin-overview-metrics{grid-template-columns:1fr}}
 /* Bind the incumbent shell/classes to the existing V2 controls. */
 html,body{height:auto;min-height:100%;overflow-x:clip}body{padding-left:76px;font-family:var(--font-sans);font-size:14px;line-height:1.5;background:var(--canvas);color:var(--text-main)}
 .workspace-sidebar.app-sidebar{position:fixed;inset:0 auto 0 0;width:76px;min-width:76px;height:100dvh;padding:0;z-index:100;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;background:#fff}

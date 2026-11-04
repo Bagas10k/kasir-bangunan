@@ -10,6 +10,11 @@ const text={kasir:['Kasir','Pilih barang di katalog, lalu lanjutkan pembayaran.'
 const paths={kasir:'M4 4h16v16H4z M8 8h8M8 12h3M8 16h8',tagihan:'M6 3h12v18l-3-2-3 2-3-2-3 2z M9 8h6M9 12h6',pengiriman:'M3 6h11v11H3z M14 10h4l3 4v3h-7 M8 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0 M20 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0','master-product':'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4','master-customer':'M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z','master-supplier':'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10','master-employee':'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75','master-vehicle':'M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1 .4-1 1v7c0 .6.4 1 1 1h1 M5 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0 M15 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0',penerimaan:'M4 8l8-4 8 4v12H4z M4 8l8 4 8-4M12 12v8',shift:'M3 7h18v13H3z M3 11h18M7 16h3M7 3v4',laporan:'M4 3v18h17 M9 17V9M14 17V5M19 17v-5'};
 groups.akun=['#login-accounts'];text.akun=['Akun Login','Kelola akun Admin dan Kasir; terpisah dari master karyawan.'];paths.akun='M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M4 21v-3a6 6 0 0 1 12 0v3 M19 13v8M16 17h6';
 const panels=new Map();
+groups.ringkasan=['#admin-overview'];text.ringkasan=['Ringkasan Admin','Pengawasan operasional seluruh kasir.'];paths.ringkasan=paths.laporan;
+groups.keuangan=['#financial-reports'];text.keuangan=['Keuangan & Pembukuan','Jurnal, neraca, laba rugi, arus kas, dan akun COA.'];paths.keuangan=paths.laporan;
+groups.persetujuan=['#h-verify','#reject-heading'];text.persetujuan=['Persetujuan Pembayaran','Verifikasi transfer dan persetujuan pembayaran supplier.'];paths.persetujuan=paths.tagihan;
+groups.tagihan=['#tagihan','#supplier-pay-heading'];
+const defaultTask=navigation.dataset.defaultTask||'kasir';
 for(const link of links){
  const key=link.dataset.task,panel=document.createElement('div');panel.id='panel-'+key;panel.className='task-panel';panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby','tab-'+key);panel.tabIndex=0;
  for(const selector of groups[key]||[]){const target=document.querySelector(selector);const section=target?.matches('section')?target:target?.closest('section');if(section)panel.append(section);}
@@ -113,11 +118,12 @@ sidebar.querySelector('.sidebar-brand').addEventListener('dblclick',()=>{if(mobi
 menu.addEventListener('click',()=>drawer(true));sidebar.querySelector('.sidebar-close').addEventListener('click',()=>drawer(false));overlay.addEventListener('click',()=>drawer(false));
 window.addEventListener('resize',()=>drawer(false,{restore:false}));
 document.addEventListener('keydown',e=>{if(!document.body.classList.contains('sidebar-open'))return;if(e.key==='Escape'){e.preventDefault();drawer(false);}if(e.key==='Tab'){const nodes=Array.from(sidebar.querySelectorAll('button,a')).filter(el=>el.tabIndex>=0&&el.getBoundingClientRect().height);const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
-function store(value){try{sessionStorage.setItem('v2-workspace-task',value);}catch{}}
-let saved;try{saved=sessionStorage.getItem('v2-workspace-task');}catch{}
+const storageKey='v2-workspace-task:'+navigation.dataset.role;
+function store(value){try{sessionStorage.setItem(storageKey,value);}catch{}}
+let saved;try{saved=sessionStorage.getItem(storageKey);}catch{}
 const requested=()=>({admin:'master-product',master:'master-product'}[location.hash.slice(1)]||location.hash.slice(1));let active=null;
 function select(key,{focus=false,updateURL=true}={}){
- if(!panels.has(key))key='kasir';const changed=active!==key;
+  if(!panels.has(key))key=defaultTask;const changed=active!==key;
  for(const [id,panel]of panels){panel.hidden=id!==key;panel.inert=id!==key;}
  for(const link of links){const selected=link.dataset.task===key;link.setAttribute('aria-selected',String(selected));link.tabIndex=selected?0:-1;}
  active=key;store(key);document.body.dataset.activeTask=key;document.querySelector('#workspace-title').textContent=text[key][0];document.querySelector('#workspace-description').textContent=text[key][1];document.querySelector('.top-context strong').textContent=text[key][0];
@@ -127,7 +133,7 @@ function select(key,{focus=false,updateURL=true}={}){
 for(const link of links){link.addEventListener('click',e=>{e.preventDefault();select(link.dataset.task);if(mobile())drawer(false);});link.addEventListener('keydown',e=>{const i=links.indexOf(link);let n;if(['ArrowDown','ArrowRight'].includes(e.key))n=(i+1)%links.length;if(['ArrowUp','ArrowLeft'].includes(e.key))n=(i-1+links.length)%links.length;if(e.key==='Home')n=0;if(e.key==='End')n=links.length-1;if(n!==undefined){e.preventDefault();select(links[n].dataset.task,{focus:true});}});}
 for(const link of document.querySelectorAll('[data-task-link]'))link.addEventListener('click',e=>{e.preventDefault();select(link.dataset.taskLink);panels.get(active).querySelector('.popup-action,input,button')?.focus({preventScroll:true});});
 window.addEventListener('hashchange',()=>select(requested(),{updateURL:false}));
-select(panels.has(requested())?requested():(panels.has(saved)?saved:'kasir'),{updateURL:false});document.body.classList.add('workspace-enhanced');drawer(false,{restore:false});window.scrollTo({top:0,behavior:'instant'});
+select(panels.has(requested())?requested():(panels.has(saved)?saved:defaultTask),{updateURL:false});document.body.classList.add('workspace-enhanced');drawer(false,{restore:false});window.scrollTo({top:0,behavior:'instant'});
 const busyWatch=new MutationObserver(records=>{for(const record of records){const form=record.target;if(form.matches('form'))form.setAttribute('aria-busy',form.dataset.busy?'true':'false');}});busyWatch.observe(main,{subtree:true,attributes:true,attributeFilter:['data-busy']});
 })();
 </script>

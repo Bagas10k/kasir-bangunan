@@ -1453,6 +1453,13 @@
                         </svg>
                         <span>Neraca</span>
                     </a>
+                    <a href="{{ route('reports.cash_flow') }}" class="{{ request()->routeIs('reports.cash_flow') ? 'active' : '' }}">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="2" x2="12" y2="22"></line>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                        <span>Arus Kas</span>
+                    </a>
                     <a href="{{ route('journals.index') }}" class="{{ request()->routeIs('journals.*') ? 'active' : '' }}">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M4 4h16v16H4z"></path>
@@ -1512,6 +1519,7 @@
                             request()->routeIs('expenses.*') => 'Pengeluaran',
                             request()->routeIs('reports.profit_loss') => 'Laba Rugi',
                             request()->routeIs('reports.balance_sheet') => 'Neraca',
+                            request()->routeIs('reports.cash_flow') => 'Arus Kas',
                             request()->routeIs('journals.*') => 'Jurnal Umum',
                             request()->routeIs('coa.*') => 'Bagan Akun',
                             default => 'Kasir Bangunan',

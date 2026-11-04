@@ -49,21 +49,33 @@
 
 <aside id="workspace-sidebar" class="workspace-sidebar app-sidebar collapsed" aria-label="Navigasi aplikasi">
     <div class="sidebar-brand sidebar-header"><div class="brand-mark" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4zM8 8h8M8 12h3M8 16h8"/></svg></div><div class="sidebar-brand-text"><strong>Kasir Bangunan</strong><small>Terminal Material</small></div><button type="button" class="sidebar-close secondary" aria-label="Tutup menu">×</button></div>
-    <nav class="nav sidebar-nav" aria-label="Ruang kerja">
+    <nav class="nav sidebar-nav" aria-label="Ruang kerja" data-role="{{ $role }}" data-default-task="{{ $isAdmin ? 'ringkasan' : 'kasir' }}">
+        @if($isAdmin)
+        <span class="workspace-nav-group">Pengawasan</span>
+        <a href="#ringkasan" data-task="ringkasan"><span>Ringkasan Admin</span></a>
+        <a href="#persetujuan" data-task="persetujuan"><span>Persetujuan Pembayaran</span></a>
+        @endif
+        <span class="workspace-nav-group">Operasional</span>
         <a href="#kasir" data-task="kasir"><span>Kasir (POS)</span></a>
         <a href="#tagihan" data-task="tagihan"><span>Tagihan</span></a>
         <a href="#pengiriman" data-task="pengiriman"><span>Pengiriman</span></a>
         @if($isAdmin)
+        <a href="#penerimaan" data-task="penerimaan"><span>Penerimaan barang</span></a>
+        <span class="workspace-nav-group">Master Data</span>
         <a href="#master-product" data-task="master-product"><span>Produk</span></a>
         <a href="#master-customer" data-task="master-customer"><span>Pelanggan</span></a>
         <a href="#master-supplier" data-task="master-supplier"><span>Supplier</span></a>
         <a href="#master-employee" data-task="master-employee"><span>Karyawan</span></a>
         <a href="#master-vehicle" data-task="master-vehicle"><span>Mobil</span></a>
-        <a href="#penerimaan" data-task="penerimaan"><span>Penerimaan barang</span></a>
+        <span class="workspace-nav-group">Pengguna & Akses</span>
         <a href="#akun" data-task="akun"><span>Akun Login</span></a>
         @endif
-        <a href="#shift" data-task="shift"><span>Kas & shift</span></a>
-        <a href="#laporan" data-task="laporan"><span>Laporan</span></a>
+        <span class="workspace-nav-group">Kas & Laporan</span>
+        <a href="#shift" data-task="shift"><span>{{ $isAdmin ? 'Pengawasan Shift' : 'Shift Saya' }}</span></a>
+        <a href="#laporan" data-task="laporan"><span>{{ $isAdmin ? 'Laporan Semua Kasir' : 'Laporan Saya' }}</span></a>
+        @if($isAdmin)
+        <a href="#keuangan" data-task="keuangan"><span>Laporan Keuangan</span></a>
+        @endif
     </nav>
     <div class="sidebar-footer"><span class="role-label">{{ $isAdmin ? 'Admin' : 'Kasir' }}</span><form method="post" action="{{ route('logout') }}">@csrf<button class="secondary" title="Keluar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 4H4v16h5M13 7l5 5-5 5M8 12h10"/></svg><span>Keluar</span></button></form></div>
 </aside>
@@ -79,6 +91,30 @@
 
     <div class="work-heading"><div><h2 id="workspace-title">Penjualan</h2><p id="workspace-description">Pilih barang, catat pembayaran, lalu simpan nota.</p></div><div class="work-state"><strong>{{ $ownOpenShift ? 'Shift #'.$ownOpenShift->id.' terbuka' : 'Belum buka shift' }}</strong><a href="#shift" data-task-link="shift">{{ $ownOpenShift ? 'Kelola shift' : 'Buka shift dahulu' }}</a></div></div>
     <div id="task-panels"></div>
+    @if($isAdmin)
+    <section class="card" id="admin-overview" aria-labelledby="admin-overview-title">
+        <h2 id="admin-overview-title">Ringkasan Pengawasan Admin</h2>
+        <p class="note">Anda masuk sebagai Admin. Awasi operasional seluruh kasir di sini. Menu Kasir (POS) tetap tersedia bila Anda perlu melayani transaksi.</p>
+        <dl class="admin-overview-metrics">
+            <div><dt>Penjualan pada tanggal laporan {{ $reportDate }}</dt><dd>{{ $rp($daily['revenue']['total_sales'] ?? '0.00') }}</dd></div>
+            <div><dt>Shift terbuka pada tanggal laporan</dt><dd>{{ $daily['shifts']['open'] ?? 0 }}</dd></div>
+            <div><dt>Shift perlu diperiksa pada tanggal laporan</dt><dd>{{ $daily['shifts']['review'] ?? 0 }}</dd></div>
+        </dl>
+        <p><a href="#persetujuan" data-task-link="persetujuan">Periksa pembayaran</a> · <a href="#shift" data-task-link="shift">Awasi shift</a> · <a href="#laporan" data-task-link="laporan">Laporan seluruh kasir</a></p>
+    </section>
+    <section class="card" id="financial-reports" aria-labelledby="financial-reports-title">
+        <h2 id="financial-reports-title">Keuangan & Pembukuan</h2>
+        <p class="note">Laporan buku besar seluruh usaha, terpisah dari uang laci dan laporan shift. Akun COA adalah akun pembukuan, bukan akun login pengguna.</p>
+        <ul>
+            <li><a href="{{ route('journals.index') }}">Jurnal Umum</a></li>
+            <li><a href="{{ route('reports.balance_sheet') }}">Neraca</a></li>
+            <li><a href="{{ route('reports.profit_loss') }}">Laba Rugi</a></li>
+            <li><a href="{{ route('reports.cash_flow') }}">Arus Kas</a></li>
+            <li><a href="{{ route('coa.index') }}">Bagan Akun (COA)</a></li>
+        </ul>
+        <p class="note">Halaman pembukuan menggunakan tampilan laporan terpisah. Saat mode V2 aktif, perubahan melalui halaman lama tetap dikunci.</p>
+    </section>
+    @endif
     <div class="split">
         <div class="stack">
 
@@ -287,6 +323,10 @@
 
     <section class="card" id="laporan" aria-labelledby="h-laporan">
         <h2 id="h-laporan">Laporan harian per tanggal buka shift</h2>
+        @if($isAdmin)
+            <p class="note">Laporan keuangan dari buku besar tersedia terpisah dari ringkasan shift.</p>
+            <p><a href="{{ route('reports.cash_flow') }}">Buka Laporan Arus Kas</a></p>
+        @endif
         <form method="get" action="{{ route('v2.index') }}" class="row" novalidate>
             <div class="field">
                 <label for="report-date">Tanggal laporan</label>
