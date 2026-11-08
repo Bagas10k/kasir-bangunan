@@ -5,28 +5,186 @@ const navigation=document.querySelector('.nav');
 const links=Array.from(navigation?.querySelectorAll('[data-task]')||[]);
 const host=document.querySelector('#task-panels');
 if(!host||!links.length)return;
-const groups={kasir:['#kasir','#h-sales'],tagihan:['#tagihan','#h-verify','#supplier-pay-heading','#reject-heading'],pengiriman:['#pengiriman','#trip-heading','#uang-muka-sopir','#h-deliveries'],'master-product':['#master-section-product'],'master-customer':['#master-section-customer'],'master-supplier':['#master-section-supplier'],'master-employee':['#master-section-employee'],'master-vehicle':['#master-section-vehicle'],penerimaan:['#receipt-heading'],shift:['#h-shift','#review-heading','#opening-heading'],laporan:['#laporan']};
-const text={kasir:['Kasir','Pilih barang di katalog, lalu lanjutkan pembayaran.'],tagihan:['Tagihan & pembayaran','Piutang pelanggan, utang supplier, dan pemeriksaan pembayaran.'],pengiriman:['Pengiriman & sopir','Surat jalan, status pengiriman, dan biaya perjalanan.'],'master-product':['Master Produk','Katalog produk material, satuan, harga jual, dan stok minimum.'],'master-customer':['Master Pelanggan','Data pelanggan toko, kode langganan, dan catatan piutang.'],'master-supplier':['Master Supplier','Data pemasok barang material dan toko rekanan.'],'master-employee':['Master Karyawan','Data staf operasional dan karyawan toko.'],'master-vehicle':['Master Mobil','Armada kendaraan operasional pengiriman barang.'],penerimaan:['Penerimaan barang','Catat barang masuk dan tagihan supplier melalui formulir penerimaan.'],shift:['Kas & shift','Riwayat kas awal, uang fisik, dan pemeriksaan selisih.'],laporan:['Laporan harian','Tunai, transfer terverifikasi, dan transfer menunggu dipisahkan.']};
-const paths={kasir:'M4 4h16v16H4z M8 8h8M8 12h3M8 16h8',tagihan:'M6 3h12v18l-3-2-3 2-3-2-3 2z M9 8h6M9 12h6',pengiriman:'M3 6h11v11H3z M14 10h4l3 4v3h-7 M8 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0 M20 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0','master-product':'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4','master-customer':'M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z','master-supplier':'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10','master-employee':'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75','master-vehicle':'M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1 .4-1 1v7c0 .6.4 1 1 1h1 M5 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0 M15 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0',penerimaan:'M4 8l8-4 8 4v12H4z M4 8l8 4 8-4M12 12v8',shift:'M3 7h18v13H3z M3 11h18M7 16h3M7 3v4',laporan:'M4 3v18h17 M9 17V9M14 17V5M19 17v-5'};
-groups.akun=['#login-accounts'];text.akun=['Akun Login','Kelola akun Admin dan Kasir; terpisah dari master karyawan.'];paths.akun='M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M4 21v-3a6 6 0 0 1 12 0v3 M19 13v8M16 17h6';
+const groups={kasir:['#kasir','#h-sales'],tagihan:['#tagihan','#h-verify','#supplier-pay-heading','#reject-heading'],pengiriman:['#pengiriman','#trip-heading','#uang-muka-sopir','#h-deliveries'],'master-product':['#master-section-product'],'master-customer':['#master-section-customer'],'master-supplier':['#master-section-supplier'],'master-employee':['#master-section-staff','#master-section-employee','#master-section-driver'],'master-vehicle':['#master-section-vehicle'],penerimaan:['#receipt-heading','#receipt-history'],shift:['#h-shift','#review-heading','#opening-heading'],laporan:['#laporan']};
+const text={kasir:['Kasir','Pilih barang di katalog, lalu lanjutkan pembayaran.'],tagihan:['Tagihan & pembayaran','Piutang pelanggan, utang supplier, dan pemeriksaan pembayaran.'],pengiriman:['Pengiriman & sopir','Surat jalan, status pengiriman, dan biaya perjalanan.'],'master-product':['Produk','Katalog barang: satuan, kategori, harga jual, stok minimum, dan supplier.'],'master-customer':['Pelanggan','Opsional saat penjualan; kasir boleh mengetik nama pembeli langsung.'],'master-supplier':['Supplier','Pemasok barang. Tekan nama supplier untuk melihat produk dan riwayat transaksinya.'],'master-employee':['Karyawan & sopir','Satu daftar staf toko; kolom posisi menandai siapa yang bertugas sebagai sopir.'],'master-vehicle':['Mobil','Armada pengiriman. Tekan nomor polisi untuk melihat riwayat pemakaian dan sopirnya.'],penerimaan:['Penerimaan barang','Catat barang masuk dan tagihan supplier melalui formulir penerimaan.'],shift:['Kas & shift','Riwayat kas awal, uang fisik, dan pemeriksaan selisih.'],laporan:['Laporan harian','Tunai, transfer terverifikasi, dan transfer menunggu dipisahkan.']};
+groups.akun=['#login-accounts'];text.akun=['Akun Login','Kelola akun Admin dan Kasir; terpisah dari master karyawan.'];
 const panels=new Map();
-groups.ringkasan=['#admin-overview'];text.ringkasan=['Ringkasan Admin','Pengawasan operasional seluruh kasir.'];paths.ringkasan=paths.laporan;
-groups.keuangan=['#financial-reports'];text.keuangan=['Keuangan & Pembukuan','Jurnal, neraca, laba rugi, arus kas, dan akun COA.'];paths.keuangan=paths.laporan;
-groups.persetujuan=['#h-verify','#reject-heading'];text.persetujuan=['Persetujuan Pembayaran','Verifikasi transfer dan persetujuan pembayaran supplier.'];paths.persetujuan=paths.tagihan;
+groups['master-unit']=['#master-section-unit'];text['master-unit']=['Satuan','Satuan dipakai pada setiap produk; mengarsipkan tidak menghapus riwayat.'];
+groups['master-category']=['#master-section-category'];text['master-category']=['Kategori','Kelompok produk untuk mempermudah pencarian di kasir.'];
+groups.ringkasan=['#admin-overview'];text.ringkasan=['Ringkasan Admin','Pengawasan operasional seluruh kasir.'];
+groups.persetujuan=['#h-verify','#reject-heading'];text.persetujuan=['Persetujuan Pembayaran','Verifikasi transfer dan persetujuan pembayaran supplier.'];
 groups.tagihan=['#tagihan','#supplier-pay-heading'];
 const defaultTask=navigation.dataset.defaultTask||'kasir';
-for(const link of links){
- const key=link.dataset.task,panel=document.createElement('div');panel.id='panel-'+key;panel.className='task-panel';panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby','tab-'+key);panel.tabIndex=0;
- for(const selector of groups[key]||[]){const target=document.querySelector(selector);const section=target?.matches('section')?target:target?.closest('section');if(section)panel.append(section);}
- host.append(panel);panels.set(key,panel);link.id='tab-'+key;link.setAttribute('role','tab');link.setAttribute('aria-controls',panel.id);link.setAttribute('aria-label',link.textContent.trim());link.title=link.textContent.trim();
- const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('aria-hidden','true');const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',paths[key]);path.setAttribute('stroke-linecap','round');path.setAttribute('stroke-linejoin','round');svg.append(path);link.prepend(svg);
+const financialEntry=navigation.querySelector('[data-menu-group="keuangan"] a');
+if(location.hash==='#keuangan'&&financialEntry){location.hash='#'+financialEntry.dataset.task;}
+// Halaman keuangan (jurnal, laporan, bagan akun) dimuat ke panel saat dibuka, bukan ikut muatan awal.
+const remoteState=new Map();const remoteLast=new Map();
+const remoteCache=new Map();        // kunci -> {url, html, at}
+const remoteFetching=new Map();     // mencegah permintaan ganda untuk alamat yang sama
+const CACHE_FRESH_MS=20000;         // isi selama ini dianggap masih baru
+function partialUrl(url){const u=new URL(url,location.href);u.searchParams.set('partial','1');return u.toString();}
+// Halaman Keuangan lama (Bagan akun) memanggil openModal/closeModal/showLockInfo milik layouts.app, yang tidak dimuat workspace.
+// Tanpa pengganti ini, Tambah akun/Ubah/Terkunci di panel tidak bereaksi. Perilaku sama dengan versi layouts.app.
+if(typeof window.openModal!=='function'){
+ window.openModal=id=>{const m=document.getElementById(id);if(!m)return;if(m.parentElement!==document.body)document.body.appendChild(m);m.classList.add('open');document.body.style.overflow='hidden';const first=m.querySelector('input:not([type=hidden]):not([readonly]),.select-trigger,textarea');if(first)setTimeout(()=>first.focus(),80);};
+ window.closeModal=id=>{const m=document.getElementById(id);if(!m)return;m.classList.remove('open');document.body.style.overflow='';};
 }
-navigation.setAttribute('role','tablist');navigation.setAttribute('aria-orientation','vertical');
+if(typeof window.showLockInfo!=='function'){
+ window.showLockInfo=(title,message)=>{
+  let d=document.getElementById('lock-info-dialog');
+  if(!d){d=document.createElement('dialog');d.id='lock-info-dialog';d.className='input-dialog uf-dialog';d.setAttribute('aria-labelledby','lock-info-dialog-title');
+   d.innerHTML='<div class="popup-heading"><h2 id="lock-info-dialog-title"></h2><button type="button" class="popup-close" aria-label="Tutup">×</button></div><div class="popup-content"><p class="note"></p><div class="uf-actions"><span></span><button type="button" class="uf-primary">Mengerti</button></div></div>';
+   d.addEventListener('click',e=>{if(e.target===d||e.target.closest('.popup-close,.uf-primary'))d.close();});document.body.append(d);}
+  d.querySelector('h2').textContent=title;d.querySelector('.note').textContent=message;d.showModal();d.querySelector('.uf-primary').focus();
+ };
+}
+const remoteCleanup=new Map(); // kunci -> fungsi penghenti
+function runScripts(root,key){
+ const timers=[],listeners=[];
+ const realInterval=window.setInterval,realTimeout=window.setTimeout;
+ const targets=[document,window];
+ const realAdd=targets.map(target=>target.addEventListener);
+ window.setInterval=function(...args){const id=realInterval.apply(window,args);timers.push(['i',id]);return id;};
+ window.setTimeout=function(...args){const id=realTimeout.apply(window,args);timers.push(['t',id]);return id;};
+ targets.forEach((target,i)=>{target.addEventListener=function(type,handler,options){listeners.push([target,type,handler,options]);return realAdd[i].call(target,type,handler,options);};});
+ try{
+  for(const old of root.querySelectorAll('script')){
+   const copy=document.createElement('script');
+   for(const attribute of old.attributes)copy.setAttribute(attribute.name,attribute.value);
+   copy.textContent=old.textContent;old.replaceWith(copy);
+  }
+ }finally{
+  window.setInterval=realInterval;window.setTimeout=realTimeout;
+  targets.forEach((target,i)=>{target.addEventListener=realAdd[i];});
+ }
+ remoteCleanup.set(key,()=>{
+  for(const [kind,id]of timers)kind==='i'?clearInterval(id):clearTimeout(id);
+  for(const [target,type,handler,options]of listeners)target.removeEventListener(type,handler,options);
+ });
+}
+function stopRemote(key){
+ const stop=remoteCleanup.get(key);
+ if(stop){stop();remoteCleanup.delete(key);}
+}
+function remoteBusy(panel,message){
+ panel.replaceChildren();
+ const box=document.createElement('p');box.className='ui-status-line';box.setAttribute('role','status');box.textContent=message;panel.append(box);
+}
+function fetchRemote(key,url){
+ const pending=remoteFetching.get(key);
+ if(pending&&pending.url===url)return pending.promise;
+ const promise=fetch(partialUrl(url),{credentials:'same-origin',headers:{'X-Requested-With':'fetch'}})
+  .then(response=>{if(!response.ok)throw new Error('HTTP '+response.status);return response.text();})
+  .then(html=>{remoteCache.set(key,{url,html,at:Date.now()});return html;})
+  .finally(()=>{if(remoteFetching.get(key)?.promise===promise)remoteFetching.delete(key);});
+ remoteFetching.set(key,{url,promise});
+ return promise;
+}
+function paintRemote(key,url,html){
+ const panel=panels.get(key);if(!panel)return;
+ stopRemote(key);
+ const holder=document.createElement('div');holder.innerHTML=html;
+ panel.replaceChildren(...holder.childNodes);
+ runScripts(panel,key);
+ remoteState.set(key,url);remoteLast.set(key,url);
+ bindRemote(key,panel);
+}
+/** Isi sedang dipakai bila ada dialog terbuka atau kolom isian sedang disentuh; jangan ditimpa diam-diam. */
+function remoteBusyWithUser(panel){
+ if(panel.querySelector('dialog[open]'))return true;
+ const focused=document.activeElement;
+ return !!(focused&&panel.contains(focused)&&focused.matches('input,select,textarea'));
+}
+async function loadRemote(key,url,{force=false}={}){
+ const panel=panels.get(key);if(!panel)return;
+ if(!force&&remoteState.get(key)===url)return;
+ const cached=remoteCache.get(key);
+ const usable=cached&&cached.url===url;
+ if(usable){
+  paintRemote(key,url,cached.html);window.uiMotion?.enter(panel); // langsung tampil dari simpanan
+  if(Date.now()-cached.at<=CACHE_FRESH_MS&&!force)return; // masih baru, tidak perlu diambil lagi
+  try{
+   const html=await fetchRemote(key,url);
+   if(active===key&&html!==cached.html&&!remoteBusyWithUser(panel))paintRemote(key,url,html);
+  }catch{}
+  return;
+ }
+ remoteBusy(panel,'Memuat halaman…');
+ try{
+  paintRemote(key,url,await fetchRemote(key,url));window.uiMotion?.enter(panel);
+ }catch(error){
+  remoteBusy(panel,'Halaman tidak dapat dimuat di sini.');
+  const link=document.createElement('a');link.className='ui-btn';link.href=url;link.textContent='Buka halaman penuh';panel.append(link);
+ }
+}
+/** Menyiapkan isi sebelum menu ditekan, selagi kursor masih di atasnya. */
+function prefetchRemote(link){
+ const key=link.dataset.task,url=remoteLast.get(key)||link.dataset.remote;
+ if(!key||!url)return;
+ const cached=remoteCache.get(key);
+ if(cached&&cached.url===url&&Date.now()-cached.at<=CACHE_FRESH_MS)return;
+ fetchRemote(key,url).catch(()=>{});
+}
+function bindRemote(key,panel){
+ // Saringan (GET) tetap di dalam panel; simpan/hapus (POST) dan unduhan dibiarkan memuat halaman seperti biasa.
+ for(const form of panel.querySelectorAll('form')){
+  if((form.getAttribute('method')||'get').toLowerCase()!=='get')continue;
+  form.addEventListener('submit',event=>{
+   event.preventDefault();
+   const data=new URLSearchParams(new FormData(form));
+   const url=new URL(form.getAttribute('action')||location.href,location.href);
+   for(const [field,value]of data)url.searchParams.set(field,value);
+   remoteState.delete(key);loadRemote(key,url.toString(),{force:true});
+  });
+ }
+ for(const link of panel.querySelectorAll('a[href]')){
+  const url=new URL(link.getAttribute('href'),location.href);
+  if(url.origin!==location.origin||link.hasAttribute('download')||/csv|print/i.test(url.pathname+url.search))continue;
+  const owner=links.find(item=>item.dataset.remote&&new URL(item.dataset.remote,location.href).pathname===url.pathname);
+  if(!owner)continue;
+  link.addEventListener('click',event=>{event.preventDefault();select(owner.dataset.task);if(url.search)loadRemote(owner.dataset.task,url.toString(),{force:true});});
+ }
+}
+// Menu gabungan (data-tabs) memiliki beberapa panel; satu tautan sidebar menjadi pemiliknya.
+const owner=new Map(),tabsOf=new Map();
+for(const link of links){
+ let tabs=null;try{tabs=link.dataset.tabs?JSON.parse(link.dataset.tabs):null;}catch{}
+ const remote=link.dataset.remote||null;
+ if(remote){
+  let warm=null;
+  link.addEventListener('pointerenter',()=>{clearTimeout(warm);warm=setTimeout(()=>prefetchRemote(link),90);});
+  link.addEventListener('pointerleave',()=>clearTimeout(warm));
+  link.addEventListener('focus',()=>prefetchRemote(link));
+ }
+ const keys=tabs?Object.keys(tabs):[link.dataset.task];
+ link.id='tab-'+link.dataset.task;link.setAttribute('aria-label',link.textContent.trim());link.title=link.textContent.trim();
+ for(const key of keys){
+  const panel=document.createElement('div');panel.id='panel-'+key;panel.className='task-panel';
+  // Kelas lapis DNA (ui-dna bagian 18 dan 20): halaman Operasional dan Master.
+  if(key.startsWith('master-')||['tagihan','pengiriman','penerimaan','shift','laporan','persetujuan'].includes(key))panel.classList.add('ui-dna-ops');if(key.startsWith('master-'))panel.classList.add('ui-dna-master');
+  panel.setAttribute('role','region');panel.setAttribute('aria-labelledby',link.id);panel.tabIndex=0;
+  if(tabs){
+   const bar=document.createElement('div');bar.className='ui-subtabs';bar.setAttribute('role','tablist');bar.setAttribute('aria-label',link.textContent.trim());
+   for(const [tabKey,tabLabel]of Object.entries(tabs)){const tab=document.createElement('a');tab.href='#'+tabKey;tab.className='ui-subtab';tab.setAttribute('role','tab');tab.setAttribute('aria-selected',String(tabKey===key));tab.textContent=tabLabel;tab.addEventListener('click',e=>{e.preventDefault();select(tabKey);});bar.append(tab);}
+   panel.append(bar);
+  }
+  if(remote){host.append(panel);panels.set(key,panel);owner.set(key,link);tabsOf.set(key,null);text[key]=[link.textContent.trim(),'Halaman keuangan dimuat di sini; menu lain tetap siap.'];continue;}
+  const monitoring=document.querySelector('[data-monitoring-task="'+key+'"]');if(monitoring)panel.append(monitoring);
+  for(const selector of groups[key]||[]){const target=document.querySelector(selector);const section=target?.matches('section')?target:target?.closest('section');if(section)panel.append(section);}
+  host.append(panel);panels.set(key,panel);owner.set(key,link);tabsOf.set(key,tabs);
+ }
+ link.setAttribute('aria-controls','panel-'+keys[0]);
+}
 for(const input of document.querySelectorAll('input[name=idempotency_key][readonly]')){
  const field=input.closest('.field');if(!field)continue;const details=document.createElement('details');details.className='technical';const summary=document.createElement('summary');summary.textContent='Referensi transaksi otomatis';field.before(details);details.append(summary,field);
 }
 const report=document.querySelector('#report-date')?.form;if(report)report.action=report.action.split('#')[0]+'#laporan';
-for(const table of document.querySelectorAll('.scroll table')){const heads=Array.from(table.querySelectorAll('thead th')).map(e=>e.textContent.trim());for(const row of table.querySelectorAll('tbody tr'))Array.from(row.cells).forEach((cell,i)=>{cell.dataset.label=heads[i]||cell.dataset.field||'';});}
+for(const table of document.querySelectorAll('.scroll table')){
+ const heading=table.closest('section')?.querySelector('h2')?.textContent.trim()||'Data';
+ const scroll=table.closest('.scroll');scroll.tabIndex=0;scroll.setAttribute('role','region');if(!scroll.hasAttribute('aria-label'))scroll.setAttribute('aria-label','Tabel '+heading);
+ const heads=Array.from(table.querySelectorAll('thead th')).map(e=>{e.setAttribute('scope','col');return e.textContent.trim();});
+ for(const row of table.querySelectorAll('tbody tr'))Array.from(row.cells).forEach((cell,i)=>{if(cell.colSpan===1)cell.dataset.label=heads[i]||cell.dataset.field||'';});
+}
 for(const box of document.querySelectorAll('[data-error]')){box.setAttribute('role','alert');box.tabIndex=-1;}
 for(const box of document.querySelectorAll('[data-ok]')){box.setAttribute('role','status');box.setAttribute('aria-live','polite');}
 // Move, never clone, real forms: values, listeners and row-scoped handlers survive.
@@ -35,11 +193,15 @@ function popup(node,title,label,{wide=false,toolbar=null}={}){
  if(!window.HTMLDialogElement||!HTMLDialogElement.prototype.showModal)return null;
  const button=document.createElement('button');button.type='button';button.className='popup-action';button.textContent=label;
  const dialog=document.createElement('dialog');dialog.className='input-dialog'+(wide?' popup-wide':'');dialog.id='input-popup-'+(++popupSerial);dialog.setAttribute('aria-labelledby',dialog.id+'-title');button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls',dialog.id);
- const header=document.createElement('div');header.className='popup-heading';const heading=document.createElement('h2');heading.id=dialog.id+'-title';heading.textContent=title;const close=document.createElement('button');close.type='button';close.className='popup-close secondary';close.setAttribute('aria-label','Tutup '+title);close.textContent='×';header.append(heading,close);
- const content=document.createElement('div');content.className='popup-content';const footer=document.createElement('div');footer.className='popup-footer';const cancel=document.createElement('button');cancel.type='button';cancel.className='secondary';cancel.textContent='Batal / tutup';footer.append(cancel);dialog.append(header,content,footer);
+ const header=document.createElement('div');header.className='popup-heading';const titles=document.createElement('div');titles.className='popup-titles';const heading=document.createElement('h2');heading.id=dialog.id+'-title';heading.textContent=title;titles.append(heading);const close=document.createElement('button');close.type='button';close.className='popup-close secondary';close.setAttribute('aria-label','Tutup '+title);close.textContent='×';header.append(titles,close);
+ const content=document.createElement('div');content.className='popup-content';const footer=document.createElement('div');footer.className='popup-footer';const cancel=document.createElement('button');cancel.type='button';cancel.className='secondary';cancel.textContent='Batal';footer.append(cancel);dialog.append(header,content,footer);
  node.before(button,dialog);content.append(node);if(toolbar)toolbar.append(button);
+ // Tombol kirim pindah ke baris aksi di dasar formulir (tetap di dalam form agar penangan submit/busy tidak berubah): Batal kiri, aksi utama kanan.
+ const forms=node.matches('form')?[node]:Array.from(node.querySelectorAll('form'));
+ if(forms.length===1){const form=forms[0];const submits=Array.from(form.querySelectorAll('button[type=submit],button:not([type])')).filter(b=>!b.closest('dialog dialog'));const submit=submits[submits.length-1];
+  if(submit&&submits.length===1){const holder=submit.parentElement;const bar=document.createElement('div');bar.className='popup-submit';bar.append(cancel,submit);form.append(bar);footer.remove();dialog.classList.add('has-submit-bar');if(holder&&holder!==form&&!holder.children.length&&!holder.textContent.trim())holder.remove();}}
  let opener=null,closing=false;
- function hide(){if(closing||dialog.querySelector('[data-busy="1"]'))return;closing=true;const done=()=>{dialog.close();closing=false;opener?.focus({preventScroll:true});};if(matchMedia('(prefers-reduced-motion: reduce)').matches){done();return;}dialog.animate([{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(6px)'}],{duration:120,easing:'ease-out'}).finished.then(done,done);}
+ function hide(){if(closing||dialog.querySelector('[data-busy="1"]'))return;closing=true;const done=()=>{dialog.close();closing=false;opener?.focus({preventScroll:true});};if(matchMedia('(prefers-reduced-motion: reduce)').matches){done();return;}dialog.animate([{opacity:1,transform:'none'},{opacity:0,transform:'translateY(10px) scale(.98)'}],{duration:160,easing:'cubic-bezier(.4,0,1,1)'}).finished.then(done,done);}
  button.addEventListener('click',()=>{opener=button;dialog.showModal();const first=content.querySelector('input:not([type=hidden]):not([disabled]):not([readonly]),select:not([disabled]),textarea:not([disabled]),button');(first||close).focus({preventScroll:true});});
  close.addEventListener('click',hide);cancel.addEventListener('click',hide);dialog.addEventListener('cancel',e=>{e.preventDefault();hide();});
  dialog.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();hide();return;}if(e.key!=='Tab')return;const controls=Array.from(dialog.querySelectorAll('button,input,select,textarea,a[href],summary,[tabindex]')).filter(el=>!el.disabled&&el.tabIndex>=0&&el.getBoundingClientRect().height&&getComputedStyle(el).visibility!=='hidden');const first=controls[0],last=controls[controls.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}});
@@ -47,8 +209,11 @@ function popup(node,title,label,{wide=false,toolbar=null}={}){
  return {dialog,button,content};
 }
 // POS keeps the approved catalogue/cart workflow; only its payment steps are popups.
-const wholeSections=[['#receipt-heading','Penerimaan barang','Tambah penerimaan'],['#trip-heading','Biaya ritase sopir','Catat biaya ritase'],['#opening-heading','Saldo awal pembukuan','Isi saldo awal']];
-for(const [selector,title,label]of wholeSections){const section=document.querySelector(selector)?.closest('section');if(!section)continue;const shell=document.createElement('section');shell.className='card';const h=document.createElement('h2');h.textContent=title;const note=section.querySelector('.note')?.cloneNode(true);section.before(shell);shell.append(h);if(note)shell.append(note);popup(section,title,label,{toolbar:shell});}
+const wholeSections=[['#receipt-heading','Catat barang masuk','Tambah penerimaan'],['#trip-heading','Biaya ritase sopir','Catat biaya ritase'],['#opening-heading','Saldo awal pembukuan','Isi saldo awal']];
+for(const [selector,title,label]of wholeSections){const section=document.querySelector(selector)?.closest('section');if(!section)continue;
+ // Penerimaan: tombol pembuka langsung di kepala kartu Riwayat (rancangan 'Penerimaan barang'), tanpa kartu terpisah.
+ const history=selector==='#receipt-heading'?document.querySelector('#receipt-history'):null;
+ if(history){history.classList.add('has-head-action');const opened=popup(section,title,'+ Catat penerimaan',{toolbar:history});if(opened){opened.button.classList.add('card-head-action');const sub=document.createElement('p');sub.className='popup-sub';sub.textContent=section.querySelector('.note')?.textContent.trim()||'';if(sub.textContent)opened.dialog.querySelector('.popup-titles').append(sub);}continue;}const shell=document.createElement('section');shell.className='card';const h=document.createElement('h2');h.textContent=title;const note=section.querySelector('.note')?.cloneNode(true);section.before(shell);shell.append(h);if(note)shell.append(note);popup(section,title,label,{toolbar:shell});}
 // Shared Dialog Management: semantics, focus restoration, reduced motion & busy guard
 function closeCustomDialog(dialog) {
   if (!dialog || dialog.dataset.closing || dialog.querySelector('[data-busy="1"]') || dialog.dataset.busy) return;
@@ -59,7 +224,7 @@ function closeCustomDialog(dialog) {
     dialog._openerTrigger?.focus({preventScroll: true});
   };
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { finish(); return; }
-  dialog.animate([{opacity: 1, transform: 'translateY(0)'}, {opacity: 0, transform: 'translateY(6px)'}], {duration: 120, easing: 'ease-out'}).finished.then(finish, finish);
+  dialog.animate([{opacity: 1, transform: 'none'}, {opacity: 0, transform: 'translateY(10px) scale(.98)'}], {duration: 160, easing: 'cubic-bezier(.4,0,1,1)'}).finished.then(finish, finish);
 }
 
 document.addEventListener('click', e => {
@@ -71,7 +236,9 @@ document.addEventListener('click', e => {
     if (dialog && typeof dialog.showModal === 'function') {
       dialog._openerTrigger = trigger;
       dialog.showModal();
-      const first = dialog.querySelector('input:not([type=hidden]):not([disabled]):not([readonly]),select:not([disabled]),textarea:not([disabled]),button:not(.popup-close)');
+      // Fokus ke kolom wajib pertama yang masih kosong (kode sudah terisi otomatis), bukan kolom pertama.
+      const fields = Array.from(dialog.querySelectorAll('input:not([type=hidden]):not([type=radio]):not([type=file]):not([disabled]):not([readonly]),textarea:not([disabled])')).filter(el => el.getClientRects().length);
+      const first = fields.find(el => el.required && !el.value) || dialog.querySelector('input:not([type=hidden]):not([disabled]):not([readonly]),select:not([disabled]),textarea:not([disabled]),button:not(.popup-close)');
       (first || dialog.querySelector('.popup-close') || dialog).focus({preventScroll: true});
     }
     return;
@@ -90,7 +257,10 @@ document.querySelectorAll('.master-entity-card dialog.input-dialog').forEach(dia
   dialog.addEventListener('click', e => {
     if (e.target !== dialog) return;
     const r = dialog.getBoundingClientRect();
-    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeCustomDialog(dialog);
+    if (!(e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) return;
+    // Isian yang sudah diketik tidak hilang karena salah klik di luar popup: popup bergetar halus, tetap terbuka.
+    if (dialog.querySelector('form[data-dirty]')) { if (!matchMedia('(prefers-reduced-motion: reduce)').matches) dialog.animate([{transform: 'none'}, {transform: 'scale(1.015)'}, {transform: 'none'}], {duration: 220, easing: 'ease-out'}); return; }
+    closeCustomDialog(dialog);
   });
   dialog.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.preventDefault(); closeCustomDialog(dialog); return; }
@@ -103,21 +273,41 @@ document.querySelectorAll('.master-entity-card dialog.input-dialog').forEach(dia
   });
 });
 
+// Popup Catat pembayaran: ringkasan tagihan (dibaca dari baris tabel), jumlah terisi sisa, metode sebagai tombol pilihan.
+function cellText(row,label){return Array.from(row?.cells||[]).find(c=>c.dataset.label===label)?.textContent.trim()||'';}
+function segmentSelect(select){
+ if(!select||select.dataset.segmented)return;select.dataset.segmented='1';
+ const group=document.createElement('div');group.className='ui-segment';group.setAttribute('role','radiogroup');
+ const label=select.id?document.querySelector('label[for="'+select.id+'"]'):null;if(label){label.id=label.id||select.id+'-label';group.setAttribute('aria-labelledby',label.id);}
+ const buttons=Array.from(select.options).map(o=>{const b=document.createElement('button');b.type='button';b.textContent=o.textContent;b.dataset.value=o.value;b.setAttribute('role','radio');b.addEventListener('click',()=>{select.value=o.value;select.dispatchEvent(new Event('change',{bubbles:true}));sync();});group.append(b);return b;});
+ function sync(){for(const b of buttons){const on=b.dataset.value===select.value;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;}}
+ group.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const i=buttons.findIndex(b=>b.dataset.value===select.value);const n=buttons[(i+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length];n.click();n.focus();});
+ select.addEventListener('change',sync);
+ const shell=select.closest('.select-shell')||select;shell.after(group);shell.classList.add('ui-segment-source');sync();
+}
+function enhanceCollect(form,result){
+ const row=result.dialog.closest('tr');if(!row)return;
+ const number=cellText(row,'Nomor'),name=cellText(row,'Nama'),rest=cellText(row,'Sisa');
+ const sub=result.dialog.querySelector('.popup-sub');if(sub)sub.textContent=[name,number].filter(Boolean).join(' · ');
+ const summary=document.createElement('dl');summary.className='popup-summary';
+ for(const [label,value,strong] of [['Total tagihan',cellText(row,'Total')],['Terbayar',cellText(row,'Terbayar')],['Sisa',rest,true]]){const d=document.createElement('div');if(strong)d.className='is-due';const t=document.createElement('dt');t.textContent=label;const v=document.createElement('dd');v.textContent=value||'—';d.append(t,v);summary.append(d);}
+ const srHead=form.querySelector('h3.sr');if(srHead)srHead.after(summary);else form.prepend(summary);
+ const amount=form.querySelector('input[name=amount]');const digits=rest.replace(/[^0-9]/g,'');
+ if(amount){const l=form.querySelector('label[for="'+amount.id+'"]');if(l)l.textContent='Jumlah dibayar';if(!amount.value&&digits&&digits!=='0')amount.value=digits;}
+ const ref=form.querySelector('input[name=reference]');if(ref&&!ref.placeholder)ref.placeholder='No. transfer / catatan';
+ segmentSelect(form.querySelector('select[name=method]'));
+ const hint=document.createElement('p');hint.className='note popup-hint';hint.textContent='Tunai langsung tercatat. Transfer menunggu verifikasi admin.';form.querySelector('.popup-submit')?.before(hint);
+}
 for(const form of document.querySelectorAll('main form')){
  if(form.id==='form-checkout'||form.closest('dialog')||(form.getAttribute('method')||'').toLowerCase()==='get')continue;
  if(!form.querySelector('input:not([type=hidden]),select,textarea'))continue;
- const submit=form.querySelector('button[type=submit],button:not([type])');const label=form.id==='form-open'?'Buka shift':(submit?.textContent.trim()||'Isi formulir');const context=form.querySelector('h3,p:not([data-error]):not([data-ok])')?.textContent.trim();const result=popup(form,label,label);if(result&&context){const note=document.createElement('p');note.className='note';note.textContent=context;result.content.prepend(note);}
+ const submit=form.querySelector('button[type=submit],button:not([type])');const label=form.id==='form-open'?'Buka shift':(submit?.textContent.trim()||'Isi formulir');const contextEl=form.querySelector('h3,p:not([data-error]):not([data-ok])');const context=contextEl?.tagName==='H3'&&contextEl.textContent.trim()!==label?contextEl.textContent.trim():'';if(contextEl?.tagName==='H3'&&contextEl.textContent.trim()===label)contextEl.classList.add('sr');const result=popup(form,label,label);if(result&&context){const note=document.createElement('p');note.className='popup-sub';note.textContent=context;result.dialog.querySelector('.popup-titles').append(note);}
+ if(result&&form.matches('.form-collect'))enhanceCollect(form,result);
 }
 // List filter remains a GET, not a mutation; labels keep their stored enum values.
 const kinds={customer:'Pelanggan',supplier:'Supplier',employee:'Karyawan / staf',product:'Produk',vehicle:'Kendaraan'};
 for(const option of document.querySelectorAll('select[name=master_kind] option'))option.textContent=kinds[option.value]||option.textContent;
-const sidebar=document.querySelector('#workspace-sidebar'),menu=document.querySelector('.mobile-menu-toggle'),overlay=document.querySelector('#sidebar-overlay'),top=document.querySelector('.top'),main=document.querySelector('main');
-function mobile(){return matchMedia('(max-width:900px)').matches;}
-function drawer(open,{restore=true}={}){open=mobile()&&open;document.body.classList.toggle('sidebar-open',open);menu.setAttribute('aria-expanded',String(open));sidebar.inert=mobile()&&!open;main.inert=open;top.inert=open;overlay.tabIndex=-1;if(open)sidebar.querySelector('.sidebar-close').focus({preventScroll:true});else if(restore&&mobile())menu.focus({preventScroll:true});}
-sidebar.querySelector('.sidebar-brand').addEventListener('dblclick',()=>{if(mobile())return;const pinned=document.body.classList.toggle('sidebar-pinned');sidebar.classList.toggle('pinned',pinned);});
-menu.addEventListener('click',()=>drawer(true));sidebar.querySelector('.sidebar-close').addEventListener('click',()=>drawer(false));overlay.addEventListener('click',()=>drawer(false));
-window.addEventListener('resize',()=>drawer(false,{restore:false}));
-document.addEventListener('keydown',e=>{if(!document.body.classList.contains('sidebar-open'))return;if(e.key==='Escape'){e.preventDefault();drawer(false);}if(e.key==='Tab'){const nodes=Array.from(sidebar.querySelectorAll('button,a')).filter(el=>el.tabIndex>=0&&el.getBoundingClientRect().height);const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
+const main=document.querySelector('main');
 const storageKey='v2-workspace-task:'+navigation.dataset.role;
 function store(value){try{sessionStorage.setItem(storageKey,value);}catch{}}
 let saved;try{saved=sessionStorage.getItem(storageKey);}catch{}
@@ -125,15 +315,21 @@ const requested=()=>({admin:'master-product',master:'master-product'}[location.h
 function select(key,{focus=false,updateURL=true}={}){
   if(!panels.has(key))key=defaultTask;const changed=active!==key;
  for(const [id,panel]of panels){panel.hidden=id!==key;panel.inert=id!==key;}
- for(const link of links){const selected=link.dataset.task===key;link.setAttribute('aria-selected',String(selected));link.tabIndex=selected?0:-1;}
- active=key;store(key);document.body.dataset.activeTask=key;document.querySelector('#workspace-title').textContent=text[key][0];document.querySelector('#workspace-description').textContent=text[key][1];document.querySelector('.top-context strong').textContent=text[key][0];
- if(updateURL&&changed)history.replaceState(null,'','#'+key);if(focus)links.find(l=>l.dataset.task===key).focus({preventScroll:true});
- if(changed&&document.body.classList.contains('workspace-enhanced')){if(!matchMedia('(prefers-reduced-motion: reduce)').matches)panels.get(key).animate([{opacity:.5,transform:'translateY(4px)'},{opacity:1,transform:'translateY(0)'}],{duration:160,easing:'cubic-bezier(.16,1,.3,1)'});window.scrollTo({top:0,behavior:'instant'});}
+  for(const link of links){const selected=owner.get(key)===link;if(selected){link.setAttribute('aria-current','page');const group=link.closest('[data-menu-group]');if(group)group.open=true;}else{link.removeAttribute('aria-current');}link.tabIndex=0;}
+ active=key;store(key);document.body.dataset.activeTask=key;
+ document.querySelector('main.wrap')?.setAttribute('data-ready','1');
+ // Panel keuangan yang ditinggalkan dibongkar agar pembaruan otomatisnya berhenti; alamat terakhir diingat.
+ for(const [other,link]of owner)if(other!==key&&link.dataset.remote&&remoteState.has(other)){stopRemote(other);panels.get(other)?.replaceChildren();remoteState.delete(other);}
+ const remoteUrl=owner.get(key)?.dataset.remote;
+ document.body.toggleAttribute('data-remote-task',!!remoteUrl);
+ if(remoteUrl)loadRemote(key,remoteLast.get(key)||remoteUrl);const own=owner.get(key);document.querySelector('#workspace-title').textContent=tabsOf.get(key)?own.textContent.trim():text[key][0];document.querySelector('#workspace-description').textContent=text[key][1];document.querySelector('.top-context strong').textContent=key==='kasir'?'Kasir':(own?.textContent.trim()||text[key][0]);
+ if(updateURL&&changed)history.replaceState(null,'','#'+key);if(focus)own?.focus({preventScroll:true});
+ if(changed&&document.body.classList.contains('workspace-enhanced')){window.uiMotion?.enter(panels.get(key));window.scrollTo({top:0,behavior:'instant'});}
 }
-for(const link of links){link.addEventListener('click',e=>{e.preventDefault();select(link.dataset.task);if(mobile())drawer(false);});link.addEventListener('keydown',e=>{const i=links.indexOf(link);let n;if(['ArrowDown','ArrowRight'].includes(e.key))n=(i+1)%links.length;if(['ArrowUp','ArrowLeft'].includes(e.key))n=(i-1+links.length)%links.length;if(e.key==='Home')n=0;if(e.key==='End')n=links.length-1;if(n!==undefined){e.preventDefault();select(links[n].dataset.task,{focus:true});}});}
+for(const link of links){link.addEventListener('click',e=>{e.preventDefault();select(link.dataset.task);if(matchMedia('(max-width:900px)').matches)window.v2Sidebar?.close();});link.addEventListener('keydown',e=>{const visible=links.filter(item=>item.closest('[data-menu-group]')?.open!==false),i=visible.indexOf(link);let n;if(e.key==='ArrowDown')n=(i+1)%visible.length;if(e.key==='ArrowUp')n=(i-1+visible.length)%visible.length;if(e.key==='Home')n=0;if(e.key==='End')n=visible.length-1;if(n!==undefined){e.preventDefault();visible[n].focus({preventScroll:true});}});}
 for(const link of document.querySelectorAll('[data-task-link]'))link.addEventListener('click',e=>{e.preventDefault();select(link.dataset.taskLink);panels.get(active).querySelector('.popup-action,input,button')?.focus({preventScroll:true});});
 window.addEventListener('hashchange',()=>select(requested(),{updateURL:false}));
-select(panels.has(requested())?requested():(panels.has(saved)?saved:defaultTask),{updateURL:false});document.body.classList.add('workspace-enhanced');drawer(false,{restore:false});window.scrollTo({top:0,behavior:'instant'});
+select(panels.has(requested())?requested():(panels.has(saved)?saved:defaultTask),{updateURL:false});document.body.classList.add('workspace-enhanced');window.scrollTo({top:0,behavior:'instant'});
 const busyWatch=new MutationObserver(records=>{for(const record of records){const form=record.target;if(form.matches('form'))form.setAttribute('aria-busy',form.dataset.busy?'true':'false');}});busyWatch.observe(main,{subtree:true,attributes:true,attributeFilter:['data-busy']});
 })();
 </script>

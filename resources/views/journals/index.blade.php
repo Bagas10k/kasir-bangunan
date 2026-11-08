@@ -1,4 +1,5 @@
-@extends('layouts.app')
+{{-- Panel workspace memuat halaman ini lewat fetch (?partial=1); URL penuh tetap berfungsi. --}}
+@extends(request()->boolean('partial') ? 'layouts.partial' : 'layouts.app')
 
 @section('content')
 @php
@@ -186,7 +187,7 @@
         <h1>Jurnal Umum</h1>
         <p>Pantau saldo dan riwayat jurnal pembukuan.</p>
     </div>
-    <div class="ledger-status" id="feed-status">PEMBARUAN OTOMATIS · 10 DETIK</div>
+    <div class="ledger-status" id="feed-status">Pembaruan otomatis · 10 detik</div>
 </header>
 
 @if($errors->has('opening_balance'))
@@ -206,7 +207,7 @@
     </article>
     <article class="balance-tile">
         <small>Status Saldo Pembukaan</small>
-        <strong>{{ $openingStatus === 'posted' ? 'TERKUNCI' : ($openingStatus === 'draft' ? 'DRAF' : 'BELUM DIISI') }}</strong>
+        <strong>{{ $openingStatus === 'posted' ? 'Terkunci' : ($openingStatus === 'draft' ? 'Draf' : 'Belum diisi') }}</strong>
         <span>{{ $openingStatus === 'posted' ? 'Koreksi melalui jurnal penyesuaian' : 'Dapat ditinjau sebelum Mulai Pembukuan' }}</span>
     </article>
 </section>
@@ -434,9 +435,9 @@
             } else {
                 note.textContent = 'Tidak ada aktivitas baru. Pemeriksaan terakhir berhasil.';
             }
-            status.textContent = 'TERHUBUNG · PEMBARUAN 10 DETIK';
+            status.textContent = 'Terhubung · pembaruan 10 detik'; status.classList.remove('is-offline');
         } catch (error) {
-            status.textContent = 'TERPUTUS · COBA LAGI OTOMATIS';
+            status.textContent = 'Terputus · coba lagi otomatis'; status.classList.add('is-offline');
             note.textContent = 'Feed gagal diperiksa; data yang sudah tampil tetap aman.';
         }
     }
@@ -453,4 +454,5 @@
     });
 })();
 </script>
+@include('v2.finance-dna')
 @endsection

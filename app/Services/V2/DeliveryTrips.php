@@ -21,9 +21,14 @@ use Illuminate\Validation\ValidationException;
 class DeliveryTrips
 {
     private const CASH = '1101';
+
     private const BANK = '1102';
+
     private const ADVANCE_ASSET = '1191';
+
     private const TRIP_EXPENSE = '6101';
+
+    public function __construct(private TransportAssignment $assignment) {}
 
     /** prepared -> sent: snapshot kendaraan/sopir + audit dispatched_by/at. Tanpa jurnal/stok. */
     public function dispatch(int $actor, int $deliveryId, array $data): void
@@ -33,35 +38,26 @@ class DeliveryTrips
         }
 
         $vehicleId = $this->id($data['vehicle_id'] ?? null, 'Kendaraan');
-        $driver = $this->text($data['driver_name'] ?? null, 'Nama sopir', 100);
-        if ($driver === null) {
-            $this->invalid('Nama sopir wajib diisi.');
-        }
+        $driverId = $this->id($data['driver_id'] ?? null, 'Sopir');
 
-        DB::transaction(function () use ($actor, $deliveryId, $vehicleId, $driver) {
+        DB::transaction(function () use ($actor, $deliveryId, $vehicleId, $driverId) {
             $this->lockActor($actor);
 
-            $delivery = DB::table('v2_deliveries')->where('id', $deliveryId)->lockForUpdate()->first();
-            if (! $delivery) {
-                $this->invalid('Pengiriman tidak ditemukan.');
-            }
+            $delivery = $this->assignment->delivery($deliveryId);
             $this->access($actor, $delivery);
 
             if ($delivery->status === 'sent') {
+                $this->assignment->assertMatches($delivery, $driverId, $vehicleId);
+
                 return; // kirim ulang identik: tanpa efek samping
             }
             if ($delivery->status === 'received') {
                 $this->invalid('Pengiriman yang sudah diterima tidak dapat dikirim ulang.');
             }
 
-            $vehicle = DB::table('vehicles')->where('id', $vehicleId)->lockForUpdate()->first();
-            if (! $vehicle || $vehicle->status !== 'active') {
-                $this->invalid('Kendaraan tidak ditemukan atau tidak aktif.');
-            }
+            $this->assignment->resolve($driverId, $vehicleId, $delivery);
 
             DB::table('v2_deliveries')->where('id', $deliveryId)->update([
-                'vehicle_id' => $vehicleId,
-                'driver_name' => $driver,
                 'status' => 'sent',
                 'dispatched_by' => $actor,
                 'dispatched_at' => now(),
@@ -80,10 +76,7 @@ class DeliveryTrips
         DB::transaction(function () use ($actor, $deliveryId) {
             $this->lockActor($actor);
 
-            $delivery = DB::table('v2_deliveries')->where('id', $deliveryId)->lockForUpdate()->first();
-            if (! $delivery) {
-                $this->invalid('Pengiriman tidak ditemukan.');
-            }
+            $delivery = $this->assignment->delivery($deliveryId);
             $this->access($actor, $delivery);
 
             if ($delivery->status === 'received') {
@@ -113,14 +106,11 @@ class DeliveryTrips
         $this->requireAdmin($actor);
 
         $vehicleId = $this->id($data['vehicle_id'] ?? null, 'Kendaraan');
-        $driver = $this->text($data['driver_name'] ?? null, 'Nama sopir', 100);
-        if ($driver === null) {
-            $this->invalid('Nama sopir wajib diisi.');
-        }
-        $destination = $this->text($data['destination'] ?? null, 'Tujuan', 150);
+        $driverId = $this->id($data['driver_id'] ?? null, 'Sopir');
         $deliveryId = ($data['delivery_id'] ?? null) === null || ($data['delivery_id'] ?? null) === ''
             ? null
             : $this->id($data['delivery_id'], 'Pengiriman');
+        $destination = $deliveryId === null ? $this->text($data['destination'] ?? null, 'Tujuan', 150) : null;
         $date = ($data['date'] ?? null) === null || ($data['date'] ?? null) === ''
             ? now()->toDateString()
             : $this->date($data['date'], 'Tanggal uang muka');
@@ -138,7 +128,7 @@ class DeliveryTrips
         $key = $this->key($data['idempotency_key'] ?? null);
         $hash = $this->hash('advance', $actor, [
             'vehicle_id' => $vehicleId,
-            'driver_name' => $driver,
+            'driver_id' => $driverId,
             'destination' => $destination,
             'delivery_id' => $deliveryId,
             'date' => $date,
@@ -147,20 +137,16 @@ class DeliveryTrips
         ]);
 
         try {
-            return DB::transaction(function () use ($actor, $vehicleId, $deliveryId, $driver, $destination, $date, $amount, $method, $key, $hash) {
+            return DB::transaction(function () use ($actor, $vehicleId, $deliveryId, $driverId, $destination, $date, $amount, $method, $key, $hash) {
                 $this->lockActor($actor);
                 $seen = $this->replay($actor, 'advance', $key, $hash);
                 if ($seen !== null) {
                     return $seen;
                 }
 
-                $vehicle = DB::table('vehicles')->where('id', $vehicleId)->lockForUpdate()->first();
-                if (! $vehicle || $vehicle->status !== 'active') {
-                    $this->invalid('Kendaraan tidak ditemukan atau tidak aktif.');
-                }
-                if ($deliveryId !== null && ! DB::table('v2_deliveries')->where('id', $deliveryId)->exists()) {
-                    $this->invalid('Pengiriman tidak ditemukan.');
-                }
+                $delivery = $deliveryId === null ? null : $this->assignment->delivery($deliveryId);
+                $driver = $this->assignment->resolve($driverId, $vehicleId, $delivery);
+                $destination = $delivery?->destination ?? $destination;
 
                 $account = $method === 'cash' ? self::CASH : self::BANK;
                 $shift = null;
@@ -177,7 +163,8 @@ class DeliveryTrips
                 $now = now();
                 $advanceId = (int) DB::table('v2_driver_advances')->insertGetId([
                     'vehicle_id' => $vehicleId,
-                    'driver_name' => $driver,
+                    'driver_id' => $driverId,
+                    'driver_name' => $driver->name,
                     'destination' => $destination,
                     'delivery_id' => $deliveryId,
                     'date' => $date,
@@ -192,7 +179,7 @@ class DeliveryTrips
                     'updated_at' => $now,
                 ]);
 
-                $journalId = Ledger::post('v2_driver_advance', $advanceId, 'Uang muka sopir '.$driver.' '.$date, [
+                $journalId = Ledger::post('v2_driver_advance', $advanceId, 'Uang muka sopir '.$driver->name.' '.$date, [
                     ['account_code' => self::ADVANCE_ASSET, 'debit' => $this->str($amount), 'credit' => '0.00'],
                     ['account_code' => $account, 'debit' => '0.00', 'credit' => $this->str($amount)],
                 ], $date);
@@ -210,7 +197,7 @@ class DeliveryTrips
                         'amount' => $this->str($amount),
                         'reference_type' => 'v2_driver_advance',
                         'reference_id' => $advanceId,
-                        'note' => 'Uang muka sopir '.$driver,
+                        'note' => 'Uang muka sopir '.$driver->name,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ]);

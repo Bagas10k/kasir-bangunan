@@ -19,10 +19,16 @@ use Illuminate\Validation\ValidationException;
 class SupplyTrips
 {
     private const CASH = '1101';
+
     private const BANK = '1102';
+
     private const INVENTORY = '1301';
+
     private const PAYABLE = '2101';
+
     private const TRIP_EXPENSE = '6101';
+
+    public function __construct(private TransportAssignment $assignment) {}
 
     /**
      * Penerimaan barang kredit: stok + moving average, jurnal DR 1301 / CR 2101,
@@ -105,7 +111,18 @@ class SupplyTrips
             if ($products->count() !== count($items)) {
                 $this->invalid('Sebagian produk tidak ditemukan.');
             }
+            $links = DB::table('v2_product_suppliers')
+                ->where('supplier_id', $supplierId)
+                ->whereIn('product_id', array_keys($items))
+                ->orderBy('product_id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('product_id');
+
             foreach ($items as $productId => $row) {
+                if (! $links->has($productId)) {
+                    $this->invalid('Produk #'.$productId.' belum terhubung ke supplier yang dipilih. Atur relasi produk-supplier pada master terlebih dahulu.');
+                }
                 if (DB::table('stock_movements')->where('product_id', $productId)->whereDate('created_at', '>', $date)->exists()) {
                     $this->invalid('Penerimaan mundur melewati mutasi stok berikutnya; gunakan tanggal operasional yang benar.');
                 }
@@ -225,13 +242,10 @@ class SupplyTrips
             ? null
             : $this->id($deliveryRaw, 'Pengiriman');
 
-        $driver = $this->text($data['driver_name'] ?? null, 'Nama sopir', 100);
-        if ($driver === null) {
-            $this->invalid('Nama sopir wajib diisi.');
-        }
+        $driverId = $this->id($data['driver_id'] ?? null, 'Sopir');
         $date = $this->date($data['date'] ?? null, 'Tanggal perjalanan');
-        $destination = $this->text($data['destination'] ?? null, 'Tujuan', 150);
-        if ($destination === null) {
+        $destination = $deliveryId === null ? $this->text($data['destination'] ?? null, 'Tujuan', 150) : null;
+        if ($deliveryId === null && $destination === null) {
             $this->invalid('Tujuan perjalanan wajib diisi.');
         }
 
@@ -255,7 +269,7 @@ class SupplyTrips
         $hash = $this->hash('trip', $actor, [
             'delivery_id' => $deliveryId,
             'vehicle_id' => $vehicleId,
-            'driver_name' => $driver,
+            'driver_id' => $driverId,
             'date' => $date,
             'destination' => $destination,
             'fuel_cost' => (string) $fuel,
@@ -264,7 +278,7 @@ class SupplyTrips
         ]);
 
         try {
-            return DB::transaction(function () use ($actor, $vehicleId, $deliveryId, $driver, $date, $destination, $fuel, $allowance, $method, $key, $total, $hash) {
+            return DB::transaction(function () use ($actor, $vehicleId, $deliveryId, $driverId, $date, $destination, $fuel, $allowance, $method, $key, $total, $hash) {
                 $this->lockActor($actor);
 
                 $seen = $this->replay($actor, 'trip', $key, $hash);
@@ -272,13 +286,9 @@ class SupplyTrips
                     return $seen;
                 }
 
-                $vehicle = DB::table('vehicles')->where('id', $vehicleId)->lockForUpdate()->first();
-                if (! $vehicle || $vehicle->status !== 'active') {
-                    $this->invalid('Kendaraan tidak ditemukan atau tidak aktif.');
-                }
-                if ($deliveryId !== null && ! DB::table('v2_deliveries')->where('id', $deliveryId)->exists()) {
-                    $this->invalid('Pengiriman tidak ditemukan.');
-                }
+                $delivery = $deliveryId === null ? null : $this->assignment->delivery($deliveryId);
+                $driver = $this->assignment->resolve($driverId, $vehicleId, $delivery);
+                $destination = $delivery?->destination ?? $destination;
 
                 $account = $method === 'cash' ? self::CASH : self::BANK;
                 $shift = null;
@@ -310,7 +320,8 @@ class SupplyTrips
                 $tripId = (int) DB::table('v2_trips')->insertGetId([
                     'delivery_id' => $deliveryId,
                     'vehicle_id' => $vehicleId,
-                    'driver_name' => $driver,
+                    'driver_id' => $driverId,
+                    'driver_name' => $driver->name,
                     'date' => $date,
                     'destination' => $destination,
                     'fuel_cost' => $this->str($fuel),

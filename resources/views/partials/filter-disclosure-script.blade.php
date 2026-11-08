@@ -1,9 +1,9 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const pickers = [];
-    const selector = '.master-toolbar, .ledger-filter, .receivables-filter, .ritase-history-toolbar, .table-filters, .sales-filter-grid, .report-toolbar';
+    const selector = '.master-toolbar, .ledger-filter, .receivables-filter, .ritase-history-toolbar, .table-filters, .sales-filter-grid';
     document.querySelectorAll(selector).forEach(function (panel, index) {
-        if (panel.closest('.filter-disclosure')) return;
+        if (panel.closest('.filter-disclosure') || panel.hasAttribute('data-filter-inline')) return;
         const disclosure = document.createElement('details');
         disclosure.className = 'filter-disclosure';
         if (panel.classList.contains('no-print')) disclosure.classList.add('no-print');

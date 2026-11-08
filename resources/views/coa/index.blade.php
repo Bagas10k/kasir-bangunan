@@ -1,4 +1,5 @@
-@extends('layouts.app')
+{{-- Panel workspace memuat halaman ini lewat fetch (?partial=1); URL penuh tetap berfungsi. --}}
+@extends(request()->boolean('partial') ? 'layouts.partial' : 'layouts.app')
 
 @php
     $typeLabels = ['asset' => 'Aset', 'liability' => 'Kewajiban', 'equity' => 'Ekuitas', 'revenue' => 'Pendapatan', 'expense' => 'Beban'];
@@ -452,6 +453,7 @@
         @include('partials.pagination', ['paginator' => $accounts])
     </section>
 </div>
+@include('v2.finance-dna')
 @endsection
 
 @section('modals')

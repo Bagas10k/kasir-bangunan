@@ -499,6 +499,29 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
 - **Bukti & Hasil Pengujian Empiris**: Aplikasi web saat login sekarang langsung mengalihkan user ke alur V2 (`/v2`), rute root `/` mem-forward ke `v2.index`, dan suite pengujian otomatis tetap 100% lulus.
 - **Status & Catatan Akhir**: SELESAI. Runtime operasional V2 telah aktif penuh secara default.
 
+
+## [2026-11-01 12:00 WIB] - Penataan Rapi Informasi Pembeli di Kasir Transaksi Material V2
+- **Pelaksana**: Hermes Agent / Gemini 3.8 Flash
+- **Target Tugas**: Merapikan antarmuka dan penyajian informasi pembeli di bagian Kasir (POS) transaksi material agar terstruktur, jelas, dan selaras dengan standar `desain.md`.
+- **Berkas yang Diubah**:
+  - `app/Http/Controllers/V2/WorkspaceController.php`: Menambahkan pengambilan kolom `code` dan `notes` pada `$customers` (`v2_parties`) untuk menampilkan kode pelanggan dan konteks catatan/kontak.
+  - `resources/views/v2/pos-cashier.blade.php`:
+    - Menambahkan card **Informasi Pembeli** di panel kanan kasir dengan SVG ikon netral (bebas emoji), dropdown pilihan pelanggan (`pos-customer-quick`), badge tipe pembeli (`Pelanggan Umum` vs `Pelanggan Terdaftar`), dan petunjuk transaksi langsung vs piutang tempo.
+    - Merestrukturisasi modal pembayaran (`#payment-modal-overlay`): memisahkan dropdown pembeli dari baris metode pembayaran yang sebelumnya berdesakan, menjadikannya section `modal-buyer-block` mandiri yang rapi lengkap dengan badge dan peringatan kredit adaptif (`#modal-credit-warning`).
+  - `resources/views/v2/pos-cashier-styles.blade.php`: Menambahkan aturan styling scoped `#kasir` untuk `.pos-buyer-card`, `.pos-buyer-badge`, `.pos-customer-select`, `.modal-buyer-block`, dan `.pos-credit-warning-box` dengan palet hijau-putih kanonik, border kontrol bersih, serta standar target sentuh WCAG (min 42px).
+  - `resources/views/v2/pos-cashier-script.blade.php`:
+    - Menambahkan sinkronisasi dua arah instan antara quick-select pembeli di kartu kasir dan dropdown di dalam modal pembayaran.
+    - Fungsi `syncBuyerState` memperbarui label, badge status, teks bantuan, dan peringatan kredit secara real-time.
+    - Memperbarui `renderReview()` agar modal konfirmasi tinjau pembayaran menampilkan baris identitas Pembeli dan rincian pengiriman secara eksplisit sebelum final submit.
+  - `logeksekusi.md`: Entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan test --filter=V2` (Exit code: 0; 87 passed, 716 assertions).
+  - `php artisan test --compact` (Exit code: 0; 364 tests, 356 passed, 8 skipped, 0 failed, 2304 assertions).
+  - `npm run build` (Exit code: 0; Vite build berhasil dalam 1.21s).
+  - `vendor/bin/pint --dirty --format agent` (Exit code: 0).
+- **Bukti & Hasil Pengujian Empiris**: Informasi pembeli di kasir transaksi material kini tertata rapi, responsif, memiliki badge status visual yang informatif, sinkron antara panel kasir dan popup pembayaran/tinjauan, serta seluruh automated test suite lulus 100%.
+- **Status & Catatan Akhir**: SELESAI.
+
 ## [2026-11-04 15:30 WIB] - Analisis Komprehensif Sistem & Implementasi Laporan Arus Kas (Metode Langsung)
 - **Pelaksana**: Gemini 3.8 Flash
 - **Target Tugas**: Menganalisis sistem secara mendalam (fokus pada pembagian hak akses, perjurnalan keuangan, neraca, arus kas, dan akun COA) serta mengimplementasikan modul Laporan Arus Kas (*Cash Flow Statement* Metode Langsung) yang sebelumnya belum ada di sistem.
@@ -542,3 +565,371 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
   - PHP 8.4 `vendor/bin/pint --dirty --format agent`: exit 0.
   - PHP 8.4 `artisan view:clear`: exit 0.
 - **Status & Catatan Akhir**: Integrasi lokal selesai. Rendering HTTP untuk kedua role teruji; interaksi JavaScript dan layout browser terautentikasi belum diuji. Tidak melakukan deployment server lain, migrasi, atau perubahan role pengguna.
+
+## [2026-11-04] - Branch GitHub Fitur Arus Kas dan Hierarki
+- **Pelaksana**: GPT 6.1 Sol.
+- **Target Tugas**: Commit dan push hanya fitur sesi ini ke branch baru sesuai pilihan pengguna.
+- **Berkas yang Diubah**: Entri log ini; commit fitur berisi 11 berkas terkait. Perubahan POS, Composer, konfigurasi agent, dan log pekerjaan sebelumnya tidak dimasukkan.
+- **Perintah Verifikasi & Exit Code**:
+  - `git switch -c feat/cash-flow-role-hierarchy`: exit 0.
+  - `git diff --cached --check`: exit 0.
+  - PHP 8.4 `artisan test --compact --filter='CashFlowReportTest|Accounting|V2WorkspaceViewTest|V2Account|V2PaymentShift'` dengan SQLite :memory: dan APP_ENV=testing: exit 0, 57 tests, 348 assertions.
+  - `git commit`: exit 0, commit `fa842e0`.
+  - `git push -u origin feat/cash-flow-role-hierarchy`: timeout 120 detik.
+  - `git ls-remote --heads origin refs/heads/feat/cash-flow-role-hierarchy`: exit 0, tidak ada branch remote.
+  - Push non-interaktif: exit 1, autentikasi memerlukan password/interaksi pengguna.
+- **Status & Catatan Akhir**: Commit lokal selesai; push TERBLOKIR autentikasi. Pengguna perlu login GitHub melalui credential manager/terminal lalu mengulangi push. Entri ini tetap lokal.
+
+## [2026-11-04] - Checkpoint Relasi Input V2 (Ditunda)
+- **Pelaksana**: Hermes / cx/gpt-6-astra.
+- **Target Tugas**: Relasi sopir internal/eksternal, produk multi-supplier dengan utama opsional, master satuan/kategori, dan penugasan surat jalan. Pengguna meminta menghentikan implementasi dan meninggalkan rencana karena token hampir habis.
+- **Berkas yang Dibuat**: `docs/rencana-lanjutan-relasi-input.md`; migration `2026_11_04_190820_add_v2_master_relations.php`; services `MasterRelations.php`, `TransportAssignment.php`; partial V2 `driver-options`, `product-supplier-fields`, `relation-fields`, `relation-master`; tests `V2MasterRelationsTest`, `V2OperationalRelationsTest`, `V2RelationFormsTest`, `V2RelationMigrationTest`.
+- **Berkas yang Diubah dalam Cakupan**: WorkspaceController, MasterData, DeliveryTrips, SupplyTrips, routes/v2.php; views V2 workspace/ui-workspace/sprint2/driver-operations/master-page-item; tests V2WorkspaceViewTest/V2DeliveryTripsTest/V2SupplyTripsTest; log ini. Perubahan lama pengguna di file lain tidak dikembalikan.
+- **Perintah Verifikasi & Exit Code**:
+  - PHP 8.4 `artisan test --compact tests/Feature/V2RelationMigrationTest.php`, SQLite :memory:: rerun exit 0, 2 tests, 7 assertions. Percobaan awal gagal akibat rebuild SQLite di outer transaction RefreshDatabase; tes upgrade dipindah ke koneksi in-memory tanpa outer transaction.
+  - PHP 8.4 `artisan test --compact tests/Feature/V2WorkspaceViewTest.php`, SQLite :memory:: exit 0, 3 tests, 86 assertions. Ada edit tampilan tabel setelah hasil ini; perlu rerun final.
+  - PHP 8.4 `artisan view:cache --no-interaction` dan `npm run build`: exit 0 pada snapshot sebelum sejumlah edit terakhir; bukan bukti interaksi browser.
+  - PHP 8.4 `-l` MasterRelations, TransportAssignment, V2OperationalRelationsTest: exit 0.
+  - PHP 8.4 `artisan migrate:status --no-interaction`: exit 0, migration relasi masih Pending; database lokal belum dimigrasikan.
+  - `curl -I http://localhost:8000/v2`: HTTP 404, header PHP/8.3.7; URL belum terbukti merupakan runtime workspace ini.
+- **Bukti & Batas**: OperationalRelationsTest masih helper tanpa metode tes; RelationFormsTest masih stub. Seluruh tes relasi/regresi, Pint, browser desktop/mobile, migrasi lokal dan read-back belum selesai. Dua subagen diminta stop; hasil parsial harus ditinjau ulang. Tidak ada commit/push/reset/deploy atau data demo yang ditambahkan ke database lokal.
+- **Status & Catatan Akhir**: DITUNDA, bukan selesai. Rencana dan urutan lanjutan lengkap ada di `docs/rencana-lanjutan-relasi-input.md`. Kode sudah mengakses tabel baru sementara migrasi pending; jangan klaim aplikasi runtime siap dipakai sebelum integrasi dan migrasi tervalidasi.
+
+## [2026-11-04] - Implementasi & Migrasi Penuh Relasi Penginputan Data V2
+- **Pelaksana**: Hermes / ag/gemini-3.8-flash-high.
+- **Target Tugas**: Menyelesaikan seluruh rencana relasi input: relasi sopir internal/eksternal terdaftar, multi-supplier produk dengan supplier utama opsional, master satuan & kategori, penugasan surat jalan ke ritase/uang muka, penyelesaian test suite terisolasi, perapian Pint, build aset, dan migrasi database lokal tanpa reset data.
+- **Berkas yang Dibuat**:
+  - `database/migrations/2026_11_04_190820_add_v2_master_relations.php`
+  - `app/Services/V2/MasterRelations.php`
+  - `app/Services/V2/TransportAssignment.php`
+  - `resources/views/v2/driver-options.blade.php`
+  - `resources/views/v2/product-supplier-fields.blade.php`
+  - `resources/views/v2/relation-fields.blade.php`
+  - `resources/views/v2/relation-master.blade.php`
+  - `tests/Feature/V2MasterRelationsTest.php`
+  - `tests/Feature/V2OperationalRelationsTest.php`
+  - `tests/Feature/V2RelationFormsTest.php`
+  - `tests/Feature/V2RelationMigrationTest.php`
+- **Berkas yang Diubah**:
+  - `app/Http/Controllers/V2/WorkspaceController.php`: Menghubungkan relasi sopir, satuan, kategori, penugasan pengiriman, dan supplier produk.
+  - `app/Services/V2/MasterData.php`: Sinkronisasi atribut produk dan opsi.
+  - `app/Services/V2/DeliveryTrips.php`: Penegakan penugasan sopir terdaftar & kendaraan aktif pada dispatch/advance.
+  - `app/Services/V2/SupplyTrips.php`: Validasi relasi supplier-produk pada penerimaan dan penugasan sopir terdaftar pada ritase.
+  - `routes/v2.php`: Rute `/v2/relations/{kind}` (driver, unit, category).
+  - Views V2: `workspace.blade.php`, `ui-workspace.blade.php`, `sprint2.blade.php`, `driver-operations.blade.php`, `master-page-item.blade.php`.
+  - Tests V2: `V2WorkspaceViewTest.php`, `V2DeliveryTripsTest.php`, `V2SupplyTripsTest.php`.
+  - `docs/rencana-lanjutan-relasi-input.md` & `logeksekusi.md`.
+- **Perintah Verifikasi & Exit Code**:
+  - PHP 8.4 `artisan test --compact tests/Feature/V2RelationMigrationTest.php tests/Feature/V2MasterRelationsTest.php tests/Feature/V2OperationalRelationsTest.php tests/Feature/V2RelationFormsTest.php tests/Feature/V2WorkspaceViewTest.php tests/Feature/V2DeliveryTripsTest.php tests/Feature/V2SupplyTripsTest.php` (Exit code: 0; 71 passed, 507 assertions).
+  - PHP 8.4 `artisan test --compact --filter=V2` (Exit code: 0; 141 passed, 999 assertions).
+  - PHP 8.4 `artisan test --compact --filter="CashFlowReportTest|Accounting"` (Exit code: 0; 35 passed, 145 assertions).
+  - PHP 8.4 `artisan test --compact` seluruh test suite repositori (Exit code: 0; 415 passed, 8 skipped, 0 failed, 2626 assertions).
+  - PHP 8.4 `vendor/bin/pint --dirty --format agent` (Exit code: 0; formatting bersih).
+  - PHP 8.4 `artisan view:cache --no-interaction && npm run build` (Exit code: 0; Vite v8.3.4 build selesai).
+  - PHP 8.4 `artisan migrate --pretend --path=database/migrations/2026_11_04_190820_add_v2_master_relations.php --no-interaction` (Exit code: 0; DDL divalidasi aman).
+  - PHP 8.4 `artisan migrate --path=database/migrations/2026_11_04_190820_add_v2_master_relations.php --no-interaction` (Exit code: 0; migrasi lokal berhasil diterapkan).
+  - PHP 8.4 `artisan migrate:status --no-interaction` (Exit code: 0; status migrasi [2] Ran).
+  - Boost `DatabaseQuery` verifikasi tabel MySQL (`v2_drivers`, `v2_product_suppliers`, foreign keys, generated unique primary column) (Exit code: 0).
+  - PHP 8.4 `artisan view:clear --no-interaction` (Exit code: 0).
+  - `git diff --check` (Exit code: 0; tidak ada whitespace error).
+- **Bukti & Hasil Pengujian Empiris**:
+  1. Relasi penginputan data kini terstruktur dan saling terhubung: sopir internal terhubung ke master karyawan (nama tersinkron otomatis), sopir luar terdaftar mandiri; pengiriman, ritase, dan uang muka mewajibkan sopir terdaftar.
+  2. Produk memiliki relasi multi-supplier dengan 1 supplier utama opsional yang ditegakkan di level database MySQL/MariaDB (via stored generated unique constraint) dan SQLite (via trigger). Penerimaan barang menolak produk yang belum dipetakan ke supplier tersebut.
+  3. Satuan dan kategori menggunakan master bersama (`product_options`) dengan status aktif/arsip; teks legacy tetap disimpan sebagai mirror tanpa merusak riwayat transaksi.
+  4. Pengiriman (surat jalan) mengunci tujuan dan armada; uang muka atau ritase yang memilih surat jalan otomatis menurunkan penugasan konsisten.
+  5. Seluruh data historis aman 100% tanpa reset data; 415 unit/feature test lulus tanpa kegagalan.
+- **Status & Catatan Akhir**: SELESAI. Migrasi lokal telah berhasil dijalankan tanpa reset data; seluruh alur relasi teruji end-to-end.
+
+## [2026-11-05] - Pematangan Form Tahap Dasar: POS, Shift, dan Form Bersama
+- **Pelaksana**: GPT 6.1 Sol.
+- **Target Tugas**: Memperkuat validasi sebelum kirim, pesan kesalahan per kolom, dan pencegahan kirim ulang tanpa mengganti alur POS yang disetujui.
+- **Berkas yang Dibuat**: `resources/views/v2/form-feedback.blade.php`, `tests/form-feedback.test.mjs`.
+- **Berkas yang Diubah**: `resources/views/v2/workspace.blade.php`, `resources/views/v2/sprint2.blade.php`, dan log ini. Perubahan pekerjaan lain yang sudah ada dipertahankan.
+- **Perubahan**:
+  - Pesan kesalahan server dipetakan ke kolom biasa, nama array, dan baris keranjang; menggunakan textContent, aria-invalid, aria-describedby, dan ringkasan role=alert. Isian serta petunjuk lama tetap dipertahankan.
+  - Form shift, penagihan, dan form bersama menjalankan reportValidity sebelum request; checkout mempertahankan gerbang tinjau/konfirmasi yang sudah ada.
+  - Status aria-busy dan penguncian tombol sampai reload diterapkan untuk penyimpanan workspace/master/operasional yang dilanjutkan reload; kegagalan membuka kembali tombol agar dapat dicoba ulang. Kunci idempotensi penagihan tidak diganti sebelum reload.
+  - Shift asal pada pilihan carry hanya milik pengguna masuk; wajib dipilih untuk carry/both. Nominal shift diberi pola nonnegatif maksimal dua desimal dan petunjuk format tanpa pemisah ribuan. Hak Admin menutup shift kasir tetap mengikuti backend yang sudah ada.
+- **Perintah Verifikasi & Exit Code**:
+  - `node --test tests/form-feedback.test.mjs`: exit 0; 3 tes lulus, mencakup asosiasi kolom, nilai/petunjuk tetap, nama array, pembersihan pesan, dan fallback kesalahan umum.
+  - PHP 8.4 `artisan test --compact --filter='V2WorkspaceViewTest|V2PaymentShiftTest|V2OperationsTest|V2MasterDataTest|V2MasterRelationsTest|V2OpeningBalancesTest'`: exit 0; 76 tes, 507 assertions.
+  - Setelah penguncian form bersama: PHP 8.4 `artisan test --compact --filter='V2WorkspaceViewTest|V2PaymentShiftTest|V2OperationsTest|V2MasterDataTest|V2MasterRelationsTest|V2OpeningBalancesTest|V2SupplyTripsTest|V2DeliveryTripsTest|V2AccountManagementTest'`: exit 0; 103 tes, 745 assertions. Database SQLite :memory:, APP_ENV=testing.
+  - `git diff --check`: exit 0.
+- **Status & Catatan Akhir**: Tahap dasar selesai, bukan seluruh pematangan semua form. Handler terpisah akun dan sopir belum diseragamkan. Tes JavaScript menggunakan DOM tiruan minimal, bukan browser nyata; interaksi dialog/fokus tersembunyi, kirim ganda melalui browser, dan layout mobile belum diverifikasi. Tidak melakukan migrasi, perubahan dependensi, commit, atau push.
+
+## [2026-11-05] - Submenu Workspace dan Perapian Tampilan Tabel
+- **Pelaksana**: GPT 6.1 Sol.
+- **Target Tugas**: Sesuai klarifikasi pengguna: merapikan tampilan tabel aplikasi, bukan struktur database; mengelompokkan navigasi menjadi submenu buka–tutup dengan akses Admin/Kasir tetap.
+- **Berkas yang Dibuat**: `resources/views/v2/data-navigation-styles.blade.php`.
+- **Berkas yang Diubah**: `resources/views/v2/workspace.blade.php`, `resources/views/v2/ui-workspace.blade.php`, `resources/views/v2/incumbent-bridge.blade.php`, `resources/views/v2/master-page-item.blade.php`, `resources/views/v2/sprint2.blade.php`, `tests/Feature/V2WorkspaceViewTest.php`, dan log ini. Perubahan lokal sebelumnya dipertahankan.
+- **Perubahan**:
+  - Kelompok navigasi menggunakan details/summary native: Pengawasan (Admin), Operasional, Master Data (Admin), Pengguna & Akses (Admin), Kas & Laporan. Status buka–tutup disimpan per role dalam sessionStorage; kelompok menu aktif otomatis dibuka.
+  - Semantik navigasi tautan menggunakan aria-current, bukan tablist yang tidak cocok dengan kontrol disclosure. Semua tautan submenu terbuka dapat diakses Tab; navigasi panah hanya melewati tautan dalam kelompok terbuka; focus trap drawer mencakup summary.
+  - Header tabel, jarak sel, angka tabular, fokus baris, batas area gulir, dan keadaan kosong dirapikan tanpa mengubah data/relasi. Area gulir diberi label dan akses keyboard. Pencarian master menampilkan jumlah hasil serta pesan saat tidak ada kecocokan; cakupan tetap maksimal 100 data terbaru seperti sebelumnya.
+- **Referensi**: MDN HTML details/summary, https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/details (diakses sebelum implementasi).
+- **Perintah Verifikasi & Exit Code**:
+  - PHP 8.4 `artisan test --compact --filter='V2WorkspaceViewTest|V2MasterDataTest|V2MasterRelationsTest|V2AccountManagementTest'`: exit 0; 68 tes, 411 assertions; APP_ENV=testing, SQLite :memory:.
+  - Node vm.Script pemeriksaan sintaks JavaScript workspace: exit 0.
+  - PHP 8.4 `vendor/bin/pint --dirty --format agent`: exit 0, passed.
+  - Setelah formatter, PHP 8.4 `artisan test --compact --filter=V2WorkspaceViewTest`: exit 0; 3 tes, 94 assertions, SQLite :memory:.
+- **Status & Catatan Akhir**: Rendering HTTP kedua role teruji beserta kelompok menu yang boleh/tidak boleh tampil. Interaksi buka–tutup, sessionStorage, fokus keyboard, dan layout desktop/mobile belum diuji di browser nyata. Tidak ada perubahan skema/data, migrasi, dependensi, commit, atau push.
+
+## [2026-11-05] - Ikon Kelompok Menu Menggantikan Nomor
+- **Pelaksana**: GPT 6.1 Sol.
+- **Target Tugas**: Menindaklanjuti koreksi pengguna: kelompok menu menggunakan ikon, bukan nomor urut.
+- **Berkas yang Diubah**: `resources/views/v2/workspace.blade.php`, `resources/views/v2/data-navigation-styles.blade.php`, dan log ini.
+- **Perubahan**: Nomor 01–05 diganti SVG garis yang sesuai: grafik pengawasan, tas operasional, database master, perisai akses, dan dokumen laporan. Label, submenu, dan hak akses tetap. Ikon dekoratif menggunakan aria-hidden.
+- **Perintah Verifikasi & Exit Code**: PHP 8.4 `artisan test --compact --filter=V2WorkspaceViewTest`: exit 0; 3 tes, 94 assertions; APP_ENV=testing, SQLite :memory:.
+- **Status & Catatan Akhir**: Rendering teruji; tampilan ikon di browser belum diverifikasi langsung. Tidak mengubah database atau melakukan push.
+
+## [2026-11-05] - Transisi Buka–Tutup Submenu
+- **Pelaksana**: GPT 6.1 Sol.
+- **Target Tugas**: Menghaluskan kemunculan dropdown kelompok menu sesuai keluhan pengguna.
+- **Berkas yang Diubah**: `resources/views/v2/data-navigation-styles.blade.php` dan log ini.
+- **Perubahan**: Transisi tinggi konten native details 220ms, opacity 160ms, dan putaran panah 200ms. Menggunakan feature detection untuk interpolate-size/allow-discrete; browser yang tidak mendukung tetap memiliki disclosure native tanpa animasi tinggi. prefers-reduced-motion menonaktifkan transisi.
+- **Perintah Verifikasi & Exit Code**: PHP 8.4 `artisan test --compact --filter=V2WorkspaceViewTest`: exit 0; 3 tes, 94 assertions; APP_ENV=testing, SQLite :memory:.
+- **Status & Catatan Akhir**: Rendering tidak mengalami regresi. Kehalusan animasi dan kompatibilitas browser pengguna belum diuji langsung; pengujian HTTP tidak membuktikan kualitas animasi. Tidak mengubah data atau push.
+
+## [2026-11-05] - Satu Pintu Workspace dan Pembatasan Role Kasir
+- **Pelaksana**: GPT 6.1 Sol.
+- **Target Tugas**: Menyatukan halaman awal dan workspace sesuai permintaan pengguna tanpa merusak riwayat atau membuka hak Admin kepada Kasir.
+- **Berkas yang Diubah**: `app/Http/Controllers/PosController.php`, `app/Http/Controllers/V2/WorkspaceController.php`, `app/Http/Controllers/AuthController.php`, `app/Http/Middleware/V2Cutover.php`, `resources/views/v2/workspace.blade.php`, `resources/views/v2/sales-history.blade.php`, `resources/views/v2/document.blade.php`, `tests/Feature/V2CutoverTest.php`, dan log ini.
+- **Perubahan**:
+  - Ketika mode operasional aktif (`v2.enabled=true`, dikonfirmasi melalui config:show), root `/` merender workspace bersama langsung. `/v2` menjadi alias redirect menuju root dengan query filter dipertahankan. Nama route dan endpoint transaksi dipertahankan agar integrasi lama tidak putus.
+  - Login menuju root. Form filter laporan/riwayat dan tautan kembali nota menggunakan root saat mode aktif. Label workspace tidak lagi menyebut V2 pada tampilan operasional.
+  - Hak server existing tetap berlaku: Kasir tidak dapat mengakses master/relasi, akun, persetujuan pembayaran, penyelesaian selisih, maupun arsip lama. Role tidak ditetapkan ditolak; guest wajib login. Admin tetap memiliki akses baca arsip/pembukuan; mutasi legacy tetap diblokir.
+  - Mode pratinjau nonaktif-cutover dipertahankan untuk kompatibilitas dan pengujian, bukan menghapus backend/riwayat lama.
+- **Verifikasi API**: Composer mengonfirmasi Laravel 13.38.0. Tool search-docs tidak tersedia pada katalog sesi; signature Redirector::route diperiksa dari framework terpasang.
+- **Perintah Verifikasi & Exit Code**:
+  - PHP 8.4 suite terarah cutover/workspace/accounts/history: exit 0; 26 tes, 263 assertions; SQLite :memory:.
+  - PHP 8.4 `artisan test --compact`: exit 0; 416 passed, 8 skipped, 2650 assertions; APP_ENV=testing, DB_CONNECTION=sqlite, DB_DATABASE=:memory:.
+  - PHP 8.4 `vendor/bin/pint --dirty --format agent`: exit 0, fixed.
+  - Setelah formatter, suite cutover/workspace/accounts/history/auth: exit 0; 55 tes, 484 assertions; SQLite :memory:.
+  - `git diff --check`: exit 0.
+- **Status & Catatan Akhir**: Satu workspace operasional pada root dan pembatasan server teruji melalui HTTP. Browser terautentikasi, reverse proxy subpath nyata, dan konfigurasi proses server web yang sudah berjalan belum diverifikasi. Tidak ada perubahan database, migrasi, dependensi, commit, atau push.
+
+## [2026-11-05] - Navigasi Bersama Workspace dan Pembukuan
+- **Pelaksana**: GPT 6.1 Sol.
+- **Target Tugas**: Menuntaskan perbedaan menu pada workspace dan halaman laporan yang ditunjukkan pengguna.
+- **Berkas yang Dibuat**: `resources/views/partials/workspace-navigation.blade.php`, `resources/views/partials/workspace-header.blade.php`.
+- **Berkas yang Diubah**: `resources/views/v2/workspace.blade.php`, `resources/views/v2/ui-workspace.blade.php`, `resources/views/v2/data-navigation-styles.blade.php`, `resources/views/layouts/app.blade.php`, `tests/Feature/V2CutoverTest.php`, `tests/Feature/V2WorkspaceViewTest.php`, dan log ini.
+- **Perubahan**: Sidebar workspace dan semua halaman yang memakai layout app pada mode aktif mengambil satu partial navigasi dan satu partial header. Kelompok Keuangan langsung berisi Jurnal, Neraca, Laba Rugi, Arus Kas, COA; halaman penghubung lama dihapus. Tautan dari pembukuan kembali ke task workspace melalui route bernama dan hash. Menu aktif ditandai dan kelompoknya terbuka; status disclosure dipertahankan per role. Sidebar desktop dicadangkan lebar 284px di kedua shell, bukan hover yang menimpa konten. Focus trap/Escape drawer laporan diperbaiki. Perhitungan dan layout tabel laporan dipertahankan, demikian juga arsip baca-saja.
+- **Perintah Verifikasi & Exit Code**:
+  - Suite awal terarah gagal karena assertion mencari teks CSS nav-group-label, bukan elemen menu; assertion diperbaiki untuk mendeteksi atribut class aktual.
+  - PHP 8.4 suite cutover/workspace/cashflow setelah perbaikan: exit 0; 13 tes, 213 assertions.
+  - PHP 8.4 `artisan test --compact`: exit 0; 417 passed, 8 skipped, 2690 assertions. APP_ENV=testing, SQLite :memory:.
+  - PHP 8.4 `vendor/bin/pint --dirty --format agent`: exit 0, fixed.
+  - Setelah formatter dan penyimpanan disclosure lintas halaman: suite terarah ulang exit 0; 13 tes, 213 assertions; SQLite :memory:.
+- **Status & Catatan Akhir**: HTTP kelima halaman keuangan membuktikan menu bersama dan penolakan Kasir (403). Rendering role workspace juga teruji. Layout pixel, animasi, pencetakan, dan fokus pada browser desktop/mobile belum diverifikasi langsung. Tidak ada migrasi, perubahan data, dependensi, commit, atau push.
+
+## [2026-11-05] - Sidebar Otomatis Kembali Mengecil
+- **Pelaksana**: GPT 6.1 Sol.
+- **Target Tugas**: Sesuai klarifikasi pengguna, sidebar desktop kembali menjadi rail ikon ketika kursor keluar, bukan menutup kelompok submenu bergantian.
+- **Berkas yang Diubah**: `resources/views/v2/data-navigation-styles.blade.php` dan log ini.
+- **Perubahan**: Lebar idle 76px dan hover/fokus keyboard 284px untuk kedua shell; ruang konten mengikuti dengan transisi 220ms sehingga tidak tertutup. Menggunakan focus-visible, bukan focus-within, agar fokus akibat klik mouse tidak menahan sidebar terbuka. Preferensi reduced-motion dihormati. Drawer mobile dan kelompok submenu dipertahankan.
+- **Perintah Verifikasi & Exit Code**: PHP 8.4 suite V2CutoverTest/V2WorkspaceViewTest: exit 0; 8 tes, 174 assertions; SQLite :memory:, APP_ENV=testing.
+- **Status & Catatan Akhir**: Rendering teruji; hover/focus dan animasi belum diverifikasi dalam browser nyata. Tidak ada perubahan database atau push.
+
+## [2026-11-05] - Pola Isi Menu: Header, Monitoring, dan Tabel
+- **Pelaksana**: GPT 6.1 Sol.
+- **Target Tugas**: Menerapkan pola header, kartu monitoring, filter/aksi, dan tabel ke seluruh menu sesuai persetujuan pengguna; menjaga katalog–keranjang POS dan karakter tabel pembukuan.
+- **Berkas yang Dibuat**: `resources/views/partials/monitoring-cards.blade.php`, `resources/views/v2/workspace-monitoring.blade.php`.
+- **Berkas yang Diubah**: `resources/views/v2/workspace.blade.php`, `resources/views/v2/ui-workspace.blade.php`, `resources/views/v2/master-page-item.blade.php`, `resources/views/v2/relation-master.blade.php`, `resources/views/v2/accounts.blade.php`, `resources/views/v2/data-navigation-styles.blade.php`, `tests/Feature/V2WorkspaceViewTest.php`, dan log ini.
+- **Perubahan**: Komponen monitoring bersama; master menampilkan jumlah data/aktif/arsip; shift menampilkan jumlah/terbuka/review; tagihan dipisahkan menurut direction receivable/payable; pengiriman berdasarkan prepared/received; persetujuan mencakup pending/proposed; penerimaan menampilkan referensi aktif (bukan transaksi yang tidak tersedia); laporan memakai tanggal dan cakupan role. Akun menampilkan jumlah dari hasil muat berhasil, bukan nilai nol palsu sebelum request. Header master dan kartu diseragamkan dengan grid responsif. Ringkasan POS, Admin, Jurnal, dan laporan keuangan existing dipertahankan agar tidak duplikatif. Cakupan maksimum data terbaru dinyatakan eksplisit.
+- **Perintah Verifikasi & Exit Code**:
+  - Suite workspace/cutover/accounts/relations/cashflow: exit 0; 58 tes, 442 assertions; SQLite :memory:.
+  - PHP 8.4 `vendor/bin/pint --dirty --format agent`: exit 0, passed.
+  - PHP 8.4 `artisan test --compact`: exit 0; 417 passed, 8 skipped, 2700 assertions; APP_ENV=testing, DB_CONNECTION=sqlite, DB_DATABASE=:memory:.
+- **Status & Catatan Akhir**: Rendering dan regresi aplikasi teruji. Interaksi JavaScript monitoring akun, pemindahan kartu ke panel aktif, serta layout desktop/mobile belum diuji dalam browser nyata. Tidak ada migrasi, perubahan data/dependensi, commit, atau push.
+
+## [2026-11-05] - Push Branch Aktif
+- **Pelaksana**: GPT 6.1 Sol.
+- **Target Tugas**: Melanjutkan publikasi commit existing ke branch aktif, tanpa membuat commit atas perubahan lokal yang belum di-commit.
+- **Berkas yang Diubah**: Log ini saja untuk pencatatan tugas; perubahan aplikasi sebelumnya dipertahankan.
+- **Perintah Verifikasi & Exit Code**:
+  - `git status --short`, `git branch --show-current`, `git rev-parse HEAD`: exit 0; branch `feat/cash-flow-role-hierarchy`, HEAD `fa842e086f5f524c3b2398387244052dc91cb15f`.
+  - Push dengan credential helper GitHub CLI, `push -u origin HEAD:refs/heads/feat/cash-flow-role-hierarchy`: exit 0; branch remote dibuat dan upstream diatur.
+  - Readback `git ls-remote --heads origin refs/heads/feat/cash-flow-role-hierarchy`: exit 0; SHA remote cocok persis dengan HEAD di atas.
+  - `git status --branch --short`: exit 0; perubahan lokal tetap belum di-commit.
+- **Status & Catatan Akhir**: Commit existing berhasil dipush dan diverifikasi pada remote. Perubahan working tree termasuk entri log ini belum masuk commit atau remote. Tidak ada commit baru, perubahan main, deployment, migrasi, atau pengujian aplikasi pada tugas push ini.
+
+## [2026-11-05] - Penutupan Relasi Penginputan Data V2 (celah backend, UI, read-back MySQL)
+- **Pelaksana**: Claude (claude-sonnet-5-5).
+- **Target Tugas**: Menutup sisa pekerjaan `docs/rencana-lanjutan-relasi-input.md` §6 sampai bersih: celah backend, verifikasi otomatis, browser, read-back DB lokal.
+- **Temuan awal (koreksi dokumen rencana)**: `V2OperationalRelationsTest` dan `V2RelationFormsTest` ternyata sudah berisi tes substantif; migrasi `2026_11_04_190820_add_v2_master_relations` sudah berstatus Ran (batch 2) di MySQL lokal. Bagian dokumen yang menyebut stub/Pending sudah usang.
+- **Berkas backend yang diubah**: `app/Services/V2/MasterRelations.php` (`productAttributes` menerima baris produk saat ini; unit/kategori/supplier yang SUDAH tertaut tetap sah walau diarsip, pilihan BARU wajib aktif, master tidak pernah diaktifkan ulang otomatis), `app/Services/V2/MasterData.php` (meneruskan baris produk saat update), `app/Services/V2/TransportAssignment.php` (surat jalan ber-nama-sopir tanpa driver_id kini ditolak dengan pesan rekonsiliasi manual yang jelas; identitas tidak ditebak dari nama; perilaku tolak tidak berubah).
+- **Berkas UI yang diubah**: `resources/views/v2/shared-selects.blade.php` dan `resources/views/layouts/app.blade.php` (select wajib tidak merah sebelum disentuh; hanya field invalid pertama yang mengambil fokus/membuka picker), `resources/views/v2/sprint2.blade.php` (supplier utama dan barang penerimaan yang di-reset JS kini memberi event change), `resources/views/v2/driver-operations.blade.php` (pengisian sopir/mobil dari surat jalan kini memberi event change). Sebelumnya teks tampilan select kustom bisa berbeda dari nilai sebenarnya.
+- **Tes ditambah (5 kasus)**: `test_driver_kind_switch_clears_or_requires_employee_link_explicitly`, `test_product_edit_keeps_already_linked_archived_masters_but_rejects_new_archived_ones`, `test_operations_refuse_to_guess_identity_for_delivery_with_legacy_driver_name_only` (3 dataset). Ditulis merah dahulu (4 gagal), hijau setelah perbaikan.
+- **Perintah Verifikasi & Exit Code** (PHP 8.4.27 eksplisit; SQLite :memory:, APP_ENV=testing):
+  - `artisan test --compact` penuh: exit 0; 430 tes, 422 lulus, 8 skip (khusus MariaDB), 2735 assertion.
+  - `vendor/bin/pint --dirty --test`: passed. `git diff --check`: exit 0. `artisan view:cache`: sukses (lalu view:clear). `npm run build`: exit 0. `node --test tests/form-feedback.test.mjs`: 3/3.
+  - Read-back MySQL 8.0.30 (`kasir_bangunan`, tanpa mencetak kredensial): 8 FK relasi ada; unique `primary_product_id` (STORED GENERATED) menolak primary kedua dan menerima non-primary dalam transaksi yang di-rollback (tanpa sisa data probe); 0 link orphan, 0 produk >1 primary, 0 sopir internal tanpa pegawai, 0 sopir eksternal bertaut pegawai, 0 produk bertulis unit tanpa unit_id. Jumlah baris data: products 0, product_options 2, v2_parties 0, v2_drivers 0, journal_entries 0, stock_movements 0 (tidak berubah; tidak ada migrasi baru dijalankan pada sesi ini).
+  - Browser (Chromium, fixture HTML sintetis dari `V2WorkspaceViewTest` via `V2_PREVIEW_DIR`, dilayani GET-only di 127.0.0.1:8765, fetch/submit diblokir, server dimatikan setelahnya): viewport 1440 dan 390; 16 panel tanpa overflow horizontal; modal produk (unit/kategori master, multi-supplier, supplier utama), modal sopir internal/eksternal, pengisian dari surat jalan, penghapusan barang saat supplier penerimaan diganti, Escape dan fokus kembali ke tombol pembuka; tampilan select sama dengan nilainya.
+- **Status & Catatan Akhir**: Dokumen rencana ditutup. Belum diuji: aplikasi asli terautentikasi (browser vault kosong, gerbang login NOT RUN; `tb01.test` memberi HTTP 500 karena PHP Laragon default 8.3.7 gagal platform check, port 8000 milik proses lain yang tidak diubah), audit Axe, perangkat fisik, konkurensi MySQL antarsesi. Keputusan terbuka untuk pengguna: surat jalan historis ber-nama-sopir tanpa driver_id dibiarkan ditolak sampai direkonsiliasi manual (lokal saat ini 0 pengiriman). Tidak ada commit, push, reset, atau perubahan data.
+
+## [2026-11-05] Rombak UI/UX isi menu V2 (tabel + header monitor)
+- **Cakupan**: 16 menu memakai tiga komponen standar: header monitor (`MonitorMetrics`, hanya SELECT, uang BigDecimal), tabel `ui-table` seragam (cari, saringan chip, halaman, baris kosong; jadi kartu di <640px), dan sistem tampilan `ui-system` (teks >= 13px, isi tabel 15px, target sentuh 44px, status = teks + penanda).
+- **Diubah**: Ringkasan, Persetujuan, Tagihan, Shift, Pengiriman (dua daftar digabung), Penerimaan (+ riwayat), Master (Produk/Pelanggan/Supplier/Karyawan/Mobil/Sopir/Opsi), Akun Login, Laporan harian (label kiri/angka kanan), Kasir/POS (tata letak tidak berubah, hanya tabel katalog/riwayat dan ukuran teks). `Money::display` menyeragamkan `Rp 1.234`.
+- **Tidak diubah**: perhitungan uang/stok/jurnal, rute, skema DB, hook JS form (form lama dimuat di sel aksi/popup).
+- **Bukti**: `artisan test` penuh 447 tes, 439 lulus, 8 skip (MariaDB), 2797 assertion; `pint --dirty --test` passed; `git diff --check` bersih; `view:cache`, `npm run build` sukses; `node --test tests/form-feedback.test.mjs` 3/3. Audit browser fixture sintetis 1440 dan 390 pada 16 menu: 0 teks <13px, 0 kontras rendah, tanpa overflow, 1 judul + 1 monitor per menu. Server preview 8765 dimatikan.
+- **Temuan saat uji**: spanduk "Ruang kerja Admin/Kasir" ikut tersembunyi (tes `V2CutoverTest` merah); dikembalikan sebagai label kecil di atas judul. Judul dobel di Laporan dan Penerimaan diganti.
+- **Belum teruji**: aplikasi asli terautentikasi (browser vault kosong, `tb01.test` 500 karena PHP Laragon default 8.3.7). Tabel Akun memuat data lewat API sehingga di fixture statis hanya tampak "Memuat akun". Rail sidebar dengan ikon/tooltip/sematkan: ikon sudah ada, tooltip dan sematkan belum dikerjakan. Tidak ada commit/push.
+
+## [2026-11-06] Sistem form master, data contoh, dan sidebar ringkas
+- **Form master (acuan sistem)**: `app/Support/V2/FormCatalog.php` adalah satu-satunya sumber templat isian (kolom teks, kode, Rp, jumlah + satuan, dropdown relasi satuan/kategori/supplier/karyawan, pilihan tombol, ceklis supplier). Dirender oleh `components/ui/field` + `components/ui/form-fields`; gaya dan perilaku di `v2/ui-forms` (label di atas kontrol 40px, jarak 10-12px, padding dialog atas-bawah dipangkas, tombol simpan menempel di bawah). Kode berikutnya terisi otomatis (PLG-/SUP-/KRY-/SPR-/PRD-0001), angka tampil `12.500` tetapi terkirim mentah `12500` lewat input tersembunyi, stok minimum menampilkan satuan terpilih, harga jual menampilkan untung/rugi. Partial lama `relation-fields` dan `product-supplier-fields` dihapus; form akun memakai kelas yang sama.
+- **Data contoh**: `php artisan v2:demo-data` (service `DemoData`, jalur resmi MasterData/MasterRelations, tanpa stok/transaksi/jurnal). Dijalankan di MySQL lokal: 26 produk, 6 supplier, 10 pelanggan, 6 karyawan, 4 sopir (2 karyawan, 2 luar), 4 mobil, 9 satuan, 8 kategori; 27 tautan produk-supplier. Id tercatat di `storage/app/private/v2-demo-data.json`; hapus dengan `php artisan v2:demo-data --remove` (baris yang sudah dipakai transaksi/berstok dipertahankan).
+- **Sidebar**: 6 grup/21 menu menjadi 4 grup/18 menu. Digabung: Pelanggan & supplier, Karyawan & sopir, Kas & laporan (tab di dalam halaman); Akun login pindah ke Pengawasan. Ikon hanya di tingkat grup (4 ikon berbeda), sub-menu teks 34px; rail tertutup hanya ikon grup + penanda grup aktif, hover membuka sebagai lapisan (konten tidak bergeser), tombol "Tetap terbuka" menggantikan klik ganda tersembunyi.
+- **Perbaikan ikut ditemukan**: dialog ubah di dalam sel aksi tabel bergeser ke kiri atas (aturan margin `td.ui-actions>*`), kata di sel tabel terpotong di tengah (`overflow-wrap:anywhere` lama), sidebar terbuka tertutup header (z-index).
+- **Bukti**: suite 452 tes, 443 lulus, 8 skip, 1 gagal `PosSalesDashboardTest::test_today_period_buckets_and_aggregation` (tes lama bergantung jam: menyisipkan penjualan pukul 02.00 hari ini, dijalankan 00.16 WIB; file/rute tidak disentuh). `V2FormSystemTest` baru 5/5. Pint dirty, diff --check, view:cache, build, tes JS 3/3 lulus. Audit browser fixture (dengan data contoh) 1440 dan 390: 0 teks <13px, tanpa overflow.
+- **Belum**: aplikasi asli dengan login tidak diuji (vault kosong). Halaman lama Keuangan (layout `app`) memakai struktur menu baru tetapi gaya sidebar lama. Tidak ada commit/push.
+
+## [2026-11-06] Tema: latar putih, sidebar gelap kehijauan, aksen hijau terang, tipografi
+- **Berkas**: `resources/views/v2/ui-theme.blade.php` (dimuat paling akhir di `workspace.blade.php`). Semua warna dan huruf lewat token `:root`: sidebar `#0f2a1d`, aksen `#4ade80` (hover `#36c46d`, teks di atas aksen `#0f2a1d`), latar `#fff`, garis `#dbe5de`. Teks/tautan hijau di atas putih tetap `#14532d`.
+- **Dipakai aksen**: tombol utama (Tambah, Simpan), chip saringan aktif, tab menu gabungan aktif, pilihan tombol (segmented), ceklis terpilih, logo. Menu/grup aktif di sidebar memakai lime `#c8f26b` (token `--ui-side-active`).
+- **Tipografi**: judul Plus Jakarta Sans 600-800, isi dan tabel Inter 400-700, kode/SKU JetBrains Mono. Angka memakai tabular-nums. Skala: h1 28px, h2 20px, h3 17px, isi 16px, tabel 15px, label 14px, header kolom 13px. Sora dihapus dari pemuatan font.
+- **Bukti**: browser fixture 1440/390, font termuat (Inter 400/600/700, Plus Jakarta Sans 700), latar body `rgb(255,255,255)`, sidebar `rgb(15,42,29)`; audit 16 menu 0 teks <13px, 0 kontras rendah, tanpa overflow. Suite 452 tes, 443 lulus, 8 skip, 1 gagal tes lama bergantung jam (`PosSalesDashboardTest`, dijalankan 00.xx WIB). Pint dirty, diff --check, view:cache, build, tes JS 3/3 lulus.
+- **Belum**: halaman Keuangan (layout `app`) belum memakai tema ini; font dimuat dari Google Fonts (butuh internet, fallback system-ui).
+
+## [2026-11-06] Sidebar: kartu sub-menu di rail tertutup + garis pohon melengkung
+- Rail tertutup tidak lagi melebar saat hover. Hover/fokus ikon grup memunculkan tooltip nama grup (kanan ikon) dan kartu sub-menu di bawah ikon (elemen JS `.rail-tip`/`.rail-flyout` di `<body>`, `ui-workspace`). Jika kartu tidak muat di bawah, kartu pindah ke samping rail. Klik item di kartu meneruskan klik ke tautan sidebar asli. Keyboard: Enter/Panah kanan membuka, Panah atas/bawah pindah item, Escape menutup dan fokus kembali ke ikon.
+- Mode terbuka: garis sub-menu berupa siku melengkung per butir (bukan satu garis lurus), sama pada kartu rail. Tombol bulat di tepi sidebar (`.sidebar-edge`) menggantikan tombol "Tetap terbuka" di kaki; pilihan disimpan di localStorage.
+- Bukti: browser 1440/390 (rail tetap 68px saat hover, kartu muncul dengan 5 item, klik "Pelanggan & supplier" membuka halaman + tab, tombol tepi menyematkan 252px), audit 16 menu 0 teks <13px. Suite 443/452 lulus (8 skip, 1 tes lama bergantung jam). Pint, diff --check, view:cache, build, tes JS lulus.
+- Belum terbukti: fokus lewat Tab sungguhan ke ikon (uji sintetis tidak memicu `focus` pada dokumen tanpa fokus); mobile drawer hanya dicek visual sebelum perubahan ini.
+
+## [2026-11-06] Satu cangkang untuk workspace dan halaman lama (menu Keuangan)
+- **Penyebab**: ada dua cangkang halaman. `v2/workspace.blade.php` (rute `/` dan `/v2`, panel diganti JS lewat `#`) dan `layouts/app.blade.php` (halaman lama `/coa`, `/journals`, `/reports/*`, dengan 2.000 baris CSS/JS lama, font Sora, sidebar `#app-sidebar`). Daftar menu sama, tetapi klik Keuangan memuat halaman penuh di cangkang lama sehingga tampak seperti aplikasi/tema lain.
+- **Perbaikan**: sidebar (`v2/shell-sidebar`), token (`v2/ui-tokens`), tema (`ui-theme`, `ui-sidebar`) dan perilaku sidebar (`v2/ui-sidebar-js`: grup tersimpan, drawer mobile, rail + kartu sub-menu, tombol tepi) dijadikan komponen bersama. `layouts/app` memakainya saat `V2_ENABLED` aktif (markup sidebar lama tetap bila V2 mati). `v2/ui-legacy-pages` menetralkan tata letak lama dan menyelaraskan isi halaman lama (tombol, label, tabel, ukuran teks >= 13px, rem 16px). Header `partials/workspace-header` memakai tombol menu yang sama di kedua cangkang.
+- **Tes**: `V2ShellParityTest` (5 halaman lama memakai sidebar/menu/tema yang sama dengan workspace; V2 mati tetap cangkang lama). Fixture halaman lama ditulis ke `V2_PREVIEW_DIR`.
+- **Bukti**: browser 1440/390 pada 5 halaman Keuangan/COA: 0 teks <13px, 0 judul kolom huruf besar, tanpa overflow; rail + kartu sub-menu bekerja di halaman lama (Keuangan, item COA aktif); drawer mobile halaman lama buka/tutup lewat tombol dan overlay; workspace tetap utuh (klik kartu -> panel + tab, tombol tepi 252px, drawer mobile menutup setelah navigasi). Suite 454 tes, 445 lulus, 8 skip, 1 gagal tes lama bergantung jam. Pint, diff --check, view:cache, build, tes JS lulus.
+- **Belum**: halaman lama lain di cangkang yang sama (`/products`, `/vehicles`, `/expenses`, `/ritase`, `/piutang`, `/stock-opname`, `/inventory/receipts`, `/`-POS lama) belum diperiksa visual satu per satu. Pindah dari workspace ke Keuangan tetap muat halaman penuh (halaman server terpisah), hanya tampilannya kini sama.
+- **Lanjutan (halaman lama lainnya)**: `/products`, `/vehicles`, `/expenses`, `/ritase`, `/piutang`, `/stock-opname`, `/inventory/receipts` ditambahkan ke `V2ShellParityTest` (12 halaman lama total) dan diaudit di browser 1440/390: 24 pemeriksaan, 0 teks <13px, 0 huruf besar semua, 0 overflow, judul bar atas bernama (bukan "Ruang kerja"). Gaya inline kecil/monospace ditimpa di `ui-legacy-pages`. Sisa wajar: angka hitungan kecil monospace di kolom Transaksi COA.
+- **Belum**: memindahkan jurnal/laporan/COA menjadi panel workspace (tanpa muat ulang) belum dikerjakan; menunggu keputusan.
+- **Kecepatan pindah menu**: diukur. Ganti panel lewat `#` = 9-23 ms (JS saja, tanpa permintaan). Halaman lama (tanpa `#`) = muat dokumen baru: server 20-40 ms (workspace sendiri 330 ms/990 KB), HTML 155-230 KB, 150-220 ms sampai render di fixture lokal. Ditemukan 2 stylesheet Google Fonts render-blocking per halaman lama (Sora lama + Inter); disatukan jadi 1 permintaan di `layouts/app` (mode V2). DCL halaman lama turun dari 150-220 ms ke 105-175 ms (fixture lokal, tanpa latensi jaringan server).
+
+## [2026-11-06] Revisi master: supplier dropdown, susunan menu, relasi supplier & mobil
+- **Form produk**: pilihan supplier ganda (ceklis + dropdown utama) diganti SATU dropdown (`FormCatalog` tipe `multiref`). Yang dipilih tampil sebagai keping; keping pertama otomatis supplier utama (dikirim sebagai `primary_supplier_id`). Backend `syncProductSuppliers` tidak berubah. JS lama untuk fieldset ceklis dihapus.
+- **Susunan menu**: Supplier didahulukan (`Supplier & pelanggan`), `Satuan & kategori` jadi dua tab (panel `master-unit` dan `master-category`, tidak perlu gulir), `Karyawan & sopir` jadi SATU tabel (`v2/master-staff`) dengan kolom Posisi (Karyawan / Karyawan · Sopir / Sopir luar); section karyawan dan sopir lama hanya pembawa dialog (`dialogsOnly`).
+- **Relasi baru** (`app/Services/V2/MasterInsights.php`, hanya SELECT, uang BigDecimal): nama supplier dan nomor polisi dapat ditekan untuk membuka rincian. Supplier: produk yang dipasok (dari data produk), utang berjalan, sudah dibayar, menunggu verifikasi, riwayat tagihan/pembayaran. Mobil: jumlah surat jalan, ritase, biaya, terakhir dipakai, riwayat beserta sopirnya. Kolom ringkas ikut di tabel (Produk/Utang, Dipakai/Terakhir).
+- **Tes**: `V2MasterInsightsTest` (3 tes: utang = tagihan - dibayar dengan pengajuan tidak mengurangi; riwayat mobil menyebut sopir; layar master memuat pemicu rincian + tabel staf gabungan tanpa baris ganda). `V2FormSystemTest` dan `V2WorkspaceViewTest` disesuaikan.
+- **Bukti**: suite 457 tes, 448 lulus, 8 skip, 1 gagal tes lama bergantung jam. Pint, diff --check, view:cache, build, tes JS lulus. Browser: dialog supplier (produk + utang), dialog mobil, tab Satuan/Kategori, tabel staf gabungan, form produk dengan dua keping supplier dan penanda Utama.
+- **Belum**: deposit/uang muka ke supplier belum ada tabelnya (dicatat di dialog sebagai keterangan); pencarian pelanggan sambil mengetik di kasir (buat baru bila belum ada) belum dikerjakan; riwayat ritase mobil memakai `v2_trips`, tabel lama `ritases` belum digabung.
+
+## [2026-11-06] Keuangan jadi panel workspace + pencarian pelanggan di kasir
+- **Keuangan tanpa muat ulang**: `layouts/partial.blade.php` adalah cangkang tipis; lima view keuangan memakai `@extends(request()->boolean('partial') ? 'layouts.partial' : 'layouts.app')` sehingga URL penuhnya tetap hidup (bookmark, unduhan CSV, tautan lama). Sidebar Keuangan kini `data-task` + `data-remote`; `ui-workspace` mengambil potongan itu lewat fetch saat menu dibuka, menjalankan skripnya, mengikat form GET (saringan) supaya tetap di panel, dan membongkar panel yang ditinggalkan agar pembaruan otomatis jurnal berhenti. Alamat terakhir tiap panel diingat.
+- **Bukti kecepatan (aplikasi asli, `artisan serve`, admin sungguhan)**: pindah menu panel 71-93 ms vs halaman penuh DCL 352-407 ms. Muatan HTML turun: neraca 171 KB -> 17 KB, COA 215 KB -> 61 KB, jurnal 178 KB -> 24 KB. Waktu PHP di server hampir sama (~320-360 ms di dev server tanpa opcache); yang hilang adalah render ulang cangkang, parsing CSS/JS lama, dan repaint penuh.
+- **Diperiksa di browser**: COA tampil di panel dengan dialog Tambah Akun, saringan "Baris 10 -> 25" mengubah tabel 10 -> 17 baris tanpa muat ulang, panel jurnal kosong kembali setelah ditinggalkan, kepala halaman workspace disembunyikan di panel keuangan agar judul tidak dobel.
+- **Pencarian pelanggan di kasir**: `app/Services/V2/CustomerLookup.php` (search + resolve) dengan rute `v2.customers.search` dan `v2.customers.resolve` untuk admin dan kasir. Nama sama (beda huruf besar/kecil dan spasi) tidak pernah dibuat dua kali, pelanggan arsip tidak dihidupkan diam-diam, kode lanjut `CUS-0001`. Komboboks `v2/pos-customer-combo` menyetir `<select>` lama sehingga aturan kredit (wajib pelanggan terdaftar) tetap berlaku.
+- **Tes**: `V2RemotePanelTest` (3), `V2CustomerLookupTest` (6). Suite 466 tes, 458 lulus, 8 skip, 0 gagal. Pint, diff --check, build, tes JS lulus.
+- **Catatan QA**: aplikasi asli diuji dengan sesi yang dibuat dari sisi server (baris `sessions` + cookie terenkripsi), bukan dengan mengetik kata sandi. Pelanggan uji "Bapak Andi Proyek Uji" dihapus setelah pemeriksaan.
+- **Belum**: deposit/uang muka ke supplier (perlu tabel dan jurnal baru).
+
+## [2026-11-06] Kedipan tampilan lama saat halaman dibuka
+- **Sebab 1**: gaya V2 (`ui-tokens`, `ui-system`, `ui-forms`, `ui-sidebar`, `ui-theme`, `shared-controls-styles`, `master-pages-styles`, `data-navigation-styles`) dimuat di akhir `<body>`, sesudah ±2.000 baris CSS lama di `<head>`. Browser sempat menggambar tampilan lama dulu. Semua CSS dinaikkan ke `<head>`; `ui-forms` dipecah menjadi `v2/ui-forms-styles` (CSS, di head) dan `v2/ui-forms` (skrip, tetap di bawah).
+- **Sebab 2**: panel dibentuk oleh JS dari potongan mentah di dalam `main.wrap`, sehingga susunan mentah terlihat sekejap. Sekarang `main.wrap:not([data-ready])` disembunyikan, dan `data-ready` dipasang saat panel aktif selesai dipilih. Jaring pengaman: `<noscript>` menampilkan isi, plus `setTimeout` 2 detik bila JS gagal.
+- **Sebab 3**: sidebar yang dikunci terbuka selalu mulai sebagai rail lalu melebar. Kelas `pre-pinned` dipasang di `<html>` dari `localStorage` sebelum gambar pertama (di `v2/workspace` dan `layouts/app`), dilepas oleh `setPinned`.
+- **Bukti**: rekaman frame saat muat ulang (`Page.captureScreenshot` tiap 80 ms). Frame peralihan menampilkan sidebar hijau gelap lebar + header sejajar + isi kosong, lalu langsung halaman utuh. Tidak ada frame bertampilan lama. FCP 1104 ms hanya 113 ms setelah HTML tiba; sisanya TTFB 991 ms milik `artisan serve` (satu proses, tanpa opcache), bukan akibat perubahan ini.
+- Suite 466 tes, 458 lulus, 8 skip, 0 gagal. Pint, diff --check, view:cache, build lulus.
+
+## [2026-11-06] Panel keuangan: simpanan isi + siapkan saat kursor menyentuh menu
+- Masalah: tiap membuka menu keuangan selalu ada jeda "Memuat halaman…" karena panel diambil ulang dari server.
+- Perbaikan di `v2/ui-workspace`: `remoteCache` menyimpan HTML per panel; saat dibuka lagi isinya langsung dipasang dari simpanan, lalu diperbarui diam-diam bila sudah lebih dari 20 detik (`CACHE_FRESH_MS`). Pembaruan dibatalkan bila ada dialog terbuka atau kolom isian sedang disentuh (`remoteBusyWithUser`). `remoteFetching` mencegah permintaan ganda. `prefetchRemote` berjalan 90 ms setelah kursor menyentuh menu dan saat menu mendapat fokus papan ketik.
+- Hasil ukur (dev server, TTFB ~500 ms): pertama kali 693-1135 ms; kunjungan ulang 44-105 ms; setelah kursor menyentuh menu 62 ms (dari 693 ms). Isi tetap diambil ulang dari server, hanya menunggunya yang dipindah ke saat kursor masih bergerak.
+- `V2RemotePanelTest` menambah pemeriksaan agar pemasangan prefetch dan simpanan tidak hilang diam-diam.
+- Suite 466 tes, 458 lulus, 8 skip, 0 gagal. Pint dan diff --check lulus.
+- **Kebocoran yang ditemukan dari log server**: `/journals/feed` tetap dipanggil tiap 10 detik walau panel jurnal ditinggalkan, dan bertambah tiap kali panel dibuka lagi. Sebabnya mengosongkan DOM tidak menghentikan `setInterval` maupun pendengar di `document`. Sekarang `runScripts` mencatat `setInterval`/`setTimeout`/`addEventListener` yang dibuat skrip panel, lalu `stopRemote` menghentikan semuanya saat panel ditinggalkan atau digambar ulang. Bukti: 3 kali buka-tutup menyisakan 0 permintaan; selama 22 detik panel terbuka tepat 2 permintaan (bukan berlipat).
+
+## [2026-11-06] Popup menempel di pojok kiri atas
+- Sebab: aturan saya sendiri `body .task-panel:not(#panel-kasir)>*{margin:0;...}` ikut mengenai `<dialog>`. `showModal()` memusatkan popup lewat `margin:auto`, jadi `margin:0` membuatnya menempel ke pojok kiri atas (position fixed, inset 0). Ditemukan dengan `CSS.getMatchedStylesForNode` lewat CDP, bukan dengan menebak.
+- Perbaikan: selektor diubah menjadi `>:not(dialog)`. Ini pengulangan pola bug yang sama dengan `td.ui-actions>*` dulu, jadi: setiap aturan selimut pada anak langsung WAJIB mengecualikan dialog.
+- Audit seluruh menu: 13 panel, 67 dialog dibuka satu per satu dan diukur. Semua terpusat. 16 yang awalnya terbaca meleset ternyata dialog di dalam baris tabel yang tersembunyi karena halaman tabel (ukuran 0), bukan cacat tata letak.
+- `V2WorkspaceViewTest` menambah penjaga: halaman wajib memuat `>:not(dialog)` dan tidak boleh memuat aturan selimut lamanya.
+- Suite 466 tes, 458 lulus, 8 skip, 0 gagal. Pint dan diff --check lulus.
+
+## [2026-11-06] Form penerimaan barang: ringkas dan informatif
+- Masalah: tiap barang memakan satu blok tinggi (Barang penuh satu baris, lalu Jumlah dan HPP di bawahnya), sehingga daftar panjang sulit dibaca; dan `<select>` barang berat saat produk banyak.
+- Sekarang satu barang = satu baris: Barang | Jumlah | HPP satuan | Nilai | hapus, dengan judul kolom sekali di atas. Tinggi per baris 55 px (sebelumnya ±150 px). Di layar sempit baris melipat jadi tiga tingkat, tidak ada yang meluber.
+- Informasi yang ditambah: kolom Nilai per baris (jumlah x HPP) dan ringkasan hidup di bawah ("N barang" + total). Angka ini hanya untuk dibaca; server tetap menghitung ulang nilai dan jurnalnya.
+- `v2/ui-pick.blade.php`: pemilih yang bisa diketik di atas `<select>` yang sudah ada, menyaring pilihan di sisi browser tanpa permintaan ke server. Dipasang pada pemilih barang di tiap baris. Select asli tetap dipakai form, jadi aturan "barang mengikuti supplier" tidak berubah. Select yang dipegang `uiPick` diberi `data-native-select` + dilewati `shared-selects` agar hiasan select lama tidak dobel.
+- Diperiksa di browser: baris ringkas 55 px, pencarian "semen" menyaring ke 2 produk, Nilai Rp 8.160.000 untuk 120 x 68.000, ringkasan "1 barang", layar 390 px tidak meluber.
+- Suite 466 tes, 458 lulus, 8 skip, 0 gagal. Pint, build, tes JS lulus. Tidak ada penerimaan yang benar-benar disimpan saat pemeriksaan (stok dan jurnal tidak disentuh).
+
+## [2026-11-06] Satu lapis minimalis untuk SEMUA menu
+- `resources/views/v2/ui-minimal.blade.php` ditulis dan dimuat PALING AKHIR di dua cangkang (`v2/workspace` dan `layouts/app`), jadi satu berkas mengatur seluruh menu termasuk Kasir, Keuangan, dan halaman lama.
+- **Warna**: isi halaman didominasi putih; aksen memakai hijau gelap sidebar (`--ui-accent` menjadi `#14532d`, bukan hijau terang `#4ade80`). Tombol utama hijau gelap teks putih, tombol kedua putih bergaris. Hijau terang hanya tersisa di sidebar.
+- **Kerapatan**: token diubah sekali (`--ui-h1`, `--ui-h2`, `--ui-tap`, `--ui-row`) sehingga aturan lama ikut rapat tanpa ditimpa satu per satu. Padding kartu 20 -> 16 px, judul kartu 20 -> 17 px, tombol 44 -> 36 px, tombol aksi tabel 44 -> 30 px, sel tabel 9 px, ubin monitor 61-84 px. Ukuran huruf TIDAK dikecilkan (isi tabel tetap 15 px) agar tetap terbaca.
+- **Kepala konten**: eyebrow "Ruang kerja ..." disembunyikan (tinggal untuk pembaca layar) karena perannya sudah ada di topbar; judul dan keterangan kini sebaris dengan garis tipis di bawahnya; topbar menjadi 46 px putih bergaris.
+- **Kasir**: aturan POS lama memakai dua ID (`#kasir table#products-table th`), jadi lapis ini memakai `!important` TERBATAS pada warna dan huruf (bukan tata letak). Hasilnya kasir memakai tema yang sama: header tabel tidak huruf besar, tombol putih bergaris, panel putih.
+- **Perbaikan arti**: lencana stok di kasir dulu selalu hijau "in-stock" walau stok 0. Sekarang dihitung dengan BigDecimal: 0 -> merah (habis), <= stok minimum -> kuning (menipis), selebihnya netral.
+- **Halaman lama/keuangan**: seluruh huruf besar penuh dinormalkan (`text-transform:none`), tabel dan tombolnya ikut rapat.
+- **Bukti**: 15 panel diukur satu per satu -> judul kartu 17 px, judul kolom 13 px, 0 elemen huruf besar penuh di semua panel; layar 390 px tidak ada yang meluber; `/coa`, `/journals`, `/reports/balance-sheet` memuat lapis yang sama.
+- Suite 466 tes, 458 lulus, 8 skip, 0 gagal. Pint, diff --check, build lulus.
+
+## [2026-11-06] Kartu sub-menu menutupi ikon grup di rail
+- Masalah: kartu sub-menu melayang dipasang pada `r.left` (tepi kiri baris grup), sehingga menimpa rail dan ikon grup lain di bawahnya tidak bisa ditekan.
+- Salah tafsir pertama: isi halaman yang digeser ke kanan (`--fly-push`). DIBATALKAN atas koreksi pengguna; yang benar kartu melayangnya yang digeser.
+- Perbaikan: kartu selalu dipasang di kanan rail (`left = sidebar.right + 8`) untuk kedua posisi (di bawah ikon maupun sejajar ikon). Isi halaman tidak bergeser sama sekali.
+- Bukti: rail berakhir di x=68, kartu mulai di x=76, 0 ikon grup tertutup (`elementFromPoint` di tengah ikon "Master data" mengembalikan summary-nya sendiri, bukan kartu); mengarahkan kursor ke grup lain mengganti isi kartu; menekan "Satuan & kategori" berpindah ke #master-unit dan kartu menutup; isi tetap mulai di x=68.
+
+## [2026-11-06] Hierarki baca: judul, keterangan, angka
+- Keluhan: pengguna sulit membedakan mana judul, mana keterangan, mana angka/harga.
+- Sekarang hanya ada TIGA tingkat di seluruh menu: (1) judul dan nilai utama gelap tebal, (2) keterangan abu 14 px, (3) penjelas kecil abu muda 12,5 px. Token baru `--ui-ink-3:#5f7468` untuk tingkat ketiga.
+- Kepala halaman dikembalikan bertingkat: judul 22 px di barisnya sendiri, keterangan di bawahnya (sebelumnya sebaris demi hemat tempat, ternyata membingungkan).
+- Angka: `.ui-num` selalu rata kanan, tabular, tebal 600, warna gelap; stok memakai `.ui-figure` (tebal 700) sehingga angka menjadi tokoh utama dan lencana "Habis"/"Menipis" mengecil jadi penjelas.
+- Lencana status dikecilkan (12 px, tinggi 20 px) agar tidak bersaing dengan isi. SKU memakai huruf mesin tik abu. "(utama)" dan "(diarsipkan)" jadi abu muda.
+- Ubin monitor: label 12,5 px abu, angka 24 px gelap, keterangan 12 px abu.
+- Total yang harus terbaca sekilas (`#display-total`, `#rc-sum`, total belanja) 20 px tebal hijau gelap.
+- Judul kolom disamakan jadi kalimat biasa: "Harga Jual" -> "Harga jual", "Min. Stok" -> "Stok minimum", "Nomor Polisi" -> "Nomor polisi", "Tipe Mobil" -> "Tipe mobil".
+- Suite 466 tes, 458 lulus, 8 skip, 0 gagal. Pint, diff --check, build lulus.
+
+## [2026-11-06] Kasir POS sebagai halaman patokan (rencana: docs/rencana-penyeragaman-ui-v2.md)
+- Kepala dashboard (`v2/pos-monitor`, angka dari `App\Services\V2\PosDashboard`, BigDecimal, cursor): 4 angka kunci, pembanding periode lalu, grafik batang bersumbu, produk terlaris, stok perlu perhatian (pakai `min_stock` tiap produk), bisa dilipat. Saat belum ada penjualan, kerangka grafik tetap tampil dengan catatan (sebelumnya hanya kotak kosong).
+- Tema `v2/pos-theme`; aturan POS lama berselektor `#kasir table#products-table` dihapus dari `pos-cashier-styles` dan `incumbent-bridge` (26 aturan) karena memaksa huruf 10-12 px.
+- Skala: katalog dirender JS bertahap (40 baris/halaman) dari data produk; penyaring bekerja pada seluruh data; select baris keranjang tidak lagi memuat seluruh katalog; daftar pelanggan tidak dikirim penuh (pencarian lewat `v2.customers.search`).
+- Uji skala sintetis 2.500 produk + 5.000 nota: dashboard 74-255 ms, katalog awal 40 baris, cari/menipis/tambah ke keranjang benar. Bobot HTML 2,2 MB berasal dari template Penerimaan (~3.000 option) dan 200 dialog Master produk: dicatat untuk tahap halaman tersebut.
+- Suite 470 tes, 462 lulus, 8 skip; Pint lulus.
+
+## [2026-11-06 09:55 WIB] Pembatas isian angka + DNA tampilan (referensi FlowAI, warna hijau sidebar)
+- Pelaksana: agen (Claude Code), sub-agent untuk guard angka; integrasi dan verifikasi oleh agen utama.
+- Isian angka: `resources/views/partials/numeric-input-guard.blade.php` dimuat di `<head>` kedua cangkang (`v2/workspace`, `layouts/app`). Satu pendengar capture di `document` (berlaku juga untuk baris dinamis, popup, panel jarak jauh): huruf/spasi/emoji/`e`/`+` ditolak saat diketik, tempelan tidak sah ditolak utuh (tidak dipreteli menjadi angka lain), autofill/drop dikembalikan ke nilai sah terakhir. Desimal `.`/`,` tetap boleh; `inputmode=numeric` hanya digit; `type=number` tanpa min boleh negatif (saldo jurnal). Isian teks, hidden, readonly, disabled tidak disentuh. Server tetap memvalidasi; tidak ada konversi/pembulatan nilai.
+- Bukti browser (fixture sintetis): penerimaan Jumlah `bbb12,5` -> `12,5`, HPP `bbbb68000` -> `68000` (nilai baris Rp 850.000); BBM `0 hjbjhbk150000` -> `0150000`; tempel `0j jhbkjh` ditolak utuh; Tujuan `Gudang B2` tetap teks.
+- Tampilan: `resources/views/v2/ui-dna.blade.php` dimuat PALING AKHIR di kedua cangkang. Kanvas abu muda, kartu putih bergaris tipis + bayangan lembut; radius tiga tingkat (kendali 8, kartu 12, dialog 16), tombol kapsul dihapus; ubin angka = kartu luar + panel dalam; tabel tanpa bingkai dengan kepala berupa pita; saringan = kolom cari + kontrol bersegmen (chip tabel, periode dashboard kasir, periode laporan memakai gaya sama); aksi baris tabel = tombol garis kecil.
+- Laporan (laba rugi, neraca, arus kas): saringan periode tidak lagi tersembunyi di popup "Filter"/"Rentang khusus" — periode cepat + tanggal + Tampilkan tampil satu baris (`reports/*.blade.php`: `<details class="custom-period">` -> `<div>`; `.report-toolbar` dikeluarkan dari `filter-disclosure-script`). Ringkasan jadi tiga kartu, rincian akun satu kartu bertabel pita.
+- Markup: `partials/monitoring-cards` membungkus label+angka dalam `.ui-tile-body`; teks jurnal huruf besar diganti kalimat biasa ("Pembaruan otomatis · 10 detik", "Belum diisi").
+- Diperiksa di browser 1440 dan 390 (tagihan, master produk, kasir, laba rugi, jurnal): tidak ada overflow; tombol di area isi hanya radius 7/8/12 px.
+- Gerbang: `artisan test --compact` 471 (463 lulus, 8 skip), `node --test` 9/9, Pint --dirty lulus, `git diff --check` lulus, `view:cache` lulus, `npm run build` lulus. Server pratinjau 8765 dimatikan.
+- Sisa: salinan laporan huruf besar ("LABA BERSIH (NET PROFIT)", "SEIMBANG") dikunci `ReportsViewTest`; belum diubah.
+
+## [2026-11-06 10:20 WIB] Keranjang kasir dirapikan
+- Bug: tombol minus pada jumlah 1 menghasilkan 0,0001 (nilai skala-4 `1n`), sehingga tampil "0.000(" dan subtotal Rp 0,09. Sekarang minus tidak menurunkan jumlah di bawah 1 satuan (`pos-cashier-script`, hanya tampilan isian; hitungan server tidak diubah).
+- Baris keranjang: stok tampil rapi ("Stok habis" merah / "Stok 12 sak"), ditambah harga satuan; baris turun dari ~145 px menjadi ~98 px (desktop): nama + hapus, lalu jumlah, "+ Diskon", subtotal. Diskon terbuka melebar di baris sendiri. Di layar 390 px diskon pindah ke baris ketiga agar subtotal tidak terpotong.
+- Catatan "Buka shift" menjadi pemberitahuan kuning dengan tombol kecil. Ringkasan teks template: "Diskon barang" -> "Diskon".
+- Bukti: browser 1650 dan 390 px, 4 barang: tidak meluber, subtotal satu baris, minus pada 1 tetap 1. Suite 471 (463 lulus, 8 skip), JS 9/9, diff --check lulus.
+
+## Keranjang banyak produk: tabel ringkas
+- `pos-theme` dan `pos-cashier`: kepala Produk/Jumlah/Subtotal melekat saat area barang digulir; kolom seragam memakai container query >=540px. Baris desktop 76px, zebra lembut, hover/fokus; metadata ringkas harga dan status tanpa deretan SKU/satuan berulang. Di layar sempit kembali menjadi kartu responsif.
+- Bukti browser fixture sintetis: 26 barang pada 1440/1100/768/390px, tidak ada overflow horizontal, posisi kolom jumlah/subtotal konsisten, header tidak bergerak saat scroll 600px. Barang terakhir dapat dilihat; diskon terbuka muat penuh. Total sebelum/sesudah Rp 3.656.900; tidak mengubah hitungan/server/DB.
+- Tes terarah 8/8 (156 assertions); Pint tes lulus; diff check lulus. Preview 8765 dihentikan, view cache dibersihkan; server pengguna 8080 tidak disentuh.
+
+## Penyesuaian style pilihan pembeli
+- `pos-theme` dan `pos-customer-combo`: isian 44px, placeholder dipersingkat, petunjuk default hanya sekali. Dropdown selebar input berjarak6px, nama/deskripsi bertumpuk, opsi umum terpilih diberi penanda; hilangkan petunjuk visual saat dropdown terbuka tanpa menggeser layout. Aturan pemilihan pelanggan/uang tidak berubah.
+- Bukti fixture browser 1440/390px: lebar menu sama dengan input, tidak ada overflow, nama dan deskripsi tidak terpotong. Pilihan umum menutup menu, Escape menutup menu. Tes terarah14/14 (179 assertions), diff check lulus; belum memverifikasi API pelanggan terautentikasi.
+
+## Tombol buka shift di keranjang
+- Ganti tautan kecil dalam pesan menjadi `.pos-shift-notice` dengan judul/status dan tombol amber gelap teks putih + panah. Tinggi44px, lebar penuh pada HP, fokus keyboard jelas. Pertahankan `href="#shift"` dan `data-task-link="shift"`; tidak membuka shift otomatis atau mengubah transaksi.
+- Fixture browser1440/390px: tinggi44px, tidak overflow; klik menuju #shift dan panel shift terlihat. Screenshot mobile diperiksa. Tes terarah8/8 (156 assertions), diff check lulus, view cache dibersihkan. Pratinjau8765 dihentikan; 8080 tidak disentuh.
+- Koreksi tema dari pengguna: amber terlalu berbeda. Ubah menjadi panel netral + tombol putih outline hijau tema #14532d (termasuk hover/fokus), pertahankan tinggi44px. Browser1440/390px dan screenshot mobile terverifikasi tanpa overflow; tes dashboard5/5 (48 assertions).
+
+## Status sesi shift dipisahkan dari checkout
+- Pindahkan status/tombol shift ke atas ringkasan penjualan. Belum aktif: Buka shift; aktif: Shift aktif + Lihat shift. Keranjang hanya menyisakan pengingat singkat saat shift belum aktif, tanpa panel/tombol tambahan.
+- Uji kondisi aktif/belum aktif pada fixture1440/390px: status di atas dashboard, bukan dalam checkout; tidak overflow, tombol44px dan navigasi #shift berjalan. Tes13/13 (243 assertions), Pint tes dan diff check lulus. Tidak mengubah aturan shift/transaksi atau DB lokal; preview8765 dihentikan.
+
+## Warna hijau kartu keranjang checkout
+- `ui-dna`: kartu luar hijau lembut token `--ui-green-soft`, judul hijau gelap, daftar barang terang, total hijau gelap teks putih; scope hanya kartu keranjang, tidak mengubah dialog/backend.
+- Fixture kosong/berisi di1440/390px diperiksa, 26 jenis barang tanpa overflow; screenshot desktop memastikan total tidak terpotong. Kontras putih/hijau9,11:1, judul hijau/latar7,78:1. Tes5/5 (55 assertions), diff check lulus; preview dihentikan.
+- Koreksi pengguna: hijau gelap seperti sidebar. Kartu luar kini memakai `--ui-side:#0f2a1d`, judul terang, tombol checkout lime palet sidebar. Browser1440/390px dengan26barang tanpa overflow; screenshot terverifikasi. Kontras judul13,46:1 dan tombol11,95:1; tes5/5 (55 assertions) lulus, preview dihentikan.
+
+## Field pelanggan ringkas tanpa kartu besar
+- `ui-dna`: pembungkus pelanggan langsung di checkout dibuat transparan tanpa padding/border/shadow; label13px, hilangkan ikon dekoratif, petunjuk ringkas. Modal pembayaran dan tabel barang tidak diubah.
+- Fixture1440/390px: pembungkus97,375px, input44px, padding/border0, tanpa overflow; menu tetap terbuka berjarak6px. Screenshot memastikan tidak ada kartu putih besar. Tes5/5 (55 assertions), diff check lulus; preview dihentikan.
+- Koreksi pewarnaan field pelanggan: badge latar sidebar tingkat2 dengan tinta terang dan padding, petunjuk/jumlah barang diperterang, input putih kehijauan dengan placeholder eksplisit dan fokus lime; tabel tidak diubah. Browser1440/390px + screenshot terverifikasi tanpa overflow. Kontras placeholder4,78:1, badge11,35:1. Tes5/5 (55 assertions) dan diff check lulus; preview dihentikan.
+- Penyelarasan kartu Kasir dengan katalog: permukaan luar putih, border/radius12px/shadow sama, judul gelap dan helper netral; pelanggan tetap ringkas dengan badge hijau lembut. Total dan checkout memakai hijau gelap teks putih. Hanya CSS ui-dna, tidak ada perubahan tabel/perhitungan/data. Fixture7produk1440/390px: background/border/radius/shadow kedua kartu identik, tanpa overflow; screenshot desktop terverifikasi. Tes8/8 (163 assertions) dan diff check lulus. Preview dihentikan; view cache dibersihkan.

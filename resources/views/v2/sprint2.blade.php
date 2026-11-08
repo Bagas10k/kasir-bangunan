@@ -3,7 +3,12 @@
     $masterDefs = ['product'=>['Master Produk','Katalog produk, satuan, harga jual dan stok.'],'customer'=>['Master Pelanggan','Daftar pelanggan dan catatan.'],'supplier'=>['Master Supplier','Daftar pemasok dan catatan.'],'employee'=>['Master Karyawan','Daftar staf operasional.'],'vehicle'=>['Master Mobil','Daftar armada pengiriman.']];
 @endphp
 @foreach ($masterDefs as $entityKind => $entityMeta)
-    @include('v2.master-page-item', ['kind'=>$entityKind,'title'=>$entityMeta[0],'subtitle'=>$entityMeta[1],'records'=>$allMasterRecords[$entityKind] ?? collect()])
+    @include('v2.master-page-item', ['kind'=>$entityKind,'title'=>$entityMeta[0],'subtitle'=>$entityMeta[1],'records'=>$allMasterRecords[$entityKind] ?? collect(),'dialogsOnly'=>$entityKind === 'employee'])
+@endforeach
+@include('v2.master-staff')
+
+@foreach(['driver' => 'Sopir', 'unit' => 'Satuan', 'category' => 'Kategori'] as $relationKind => $relationTitle)
+    @include('v2.relation-master', ['kind' => $relationKind, 'title' => $relationTitle, 'records' => $relationRecords[$relationKind] ?? collect(), 'dialogsOnly' => $relationKind === 'driver'])
 @endforeach
 
 <section class="card" aria-labelledby="opening-heading">
@@ -73,6 +78,7 @@
 <section class="card" aria-labelledby="receipt-heading">
 <h2 id="receipt-heading">Penerimaan barang berutang</h2>
 <p class="note">Satu penerimaan menambah stok dan menambah tagihan supplier satu kali. Satu penerimaan boleh berisi beberapa barang.</p>
+<p class="note">Pilih supplier dahulu. Barang yang tersedia mengikuti relasi pada Master Produk.</p>
 <form id="receipt-form" novalidate>
 <div class="row">
     <div class="field">
@@ -89,10 +95,14 @@
         <input id="rc-date" type="date" name="receipt_date" value="{{ now()->toDateString() }}" required>
     </div>
 </div>
-<fieldset style="border:0;padding:0;margin:8px 0 0">
+<fieldset class="rc-items">
     <legend class="lbl">Barang diterima</legend>
+    <div class="rc-head" aria-hidden="true"><span>Barang</span><span>Jumlah</span><span>HPP satuan</span><span>Nilai</span><span></span></div>
     <div id="receipt-items"></div>
-    <p><button type="button" class="secondary" id="receipt-add">Tambah barang</button></p>
+    <div class="rc-foot">
+        <button type="button" class="secondary" id="receipt-add">Tambah barang</button>
+        <p class="rc-total" role="status" aria-live="polite"><span id="rc-count">0 barang</span><strong id="rc-sum">Rp 0</strong></p>
+    </div>
 </fieldset>
 <p class="note">HPP satuan dipakai untuk nilai persediaan, bukan harga jual.</p>
 <p><button type="submit">Simpan penerimaan</button></p>
@@ -100,15 +110,66 @@
 <p data-ok class="ok" hidden></p>
 </form>
 </section>
+<section class="card" id="receipt-history" aria-labelledby="h-receipt-history">
+<h2 id="h-receipt-history">Riwayat penerimaan</h2>
+<p class="note">Total nilai halaman ini: <strong data-receipt-page-total>{{ \App\Services\V2\Money::display('0') }}</strong></p>
+@php
+    $receiptTypes = ['purchase' => ['Pembelian', 'ok'], 'opening' => ['Stok awal', 'mute'], 'restock' => ['Tambah stok', 'info']];
+    $receiptItems = $receiptItems ?? collect();
+    // Qty tampil tanpa nol di belakang koma, ribuan pakai titik (3.000; 2,5).
+    $qty = function ($value): string {
+        [$int, $frac] = array_pad(explode('.', (string) $value), 2, '');
+        $frac = rtrim($frac, '0');
+        return preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', ltrim($int, '0') === '' ? '0' : ltrim($int, '0')).($frac !== '' ? ','.$frac : '');
+    };
+    $receiptPay = ['2101' => ['payable', 'Utang supplier'], '1101' => ['cash', 'Tunai'], '1102' => ['bank', 'Bank'], '3101' => ['equity', 'Modal awal']];
+@endphp
+<x-ui.toolbar search="Cari nomor, pemasok, atau produk" label="Cari penerimaan" :chips="['Semua' => 'all', 'Pembelian' => 'type:purchase,restock', 'Stok awal' => 'type:opening', 'Utang supplier' => 'pay:payable', 'Tunai atau bank' => 'pay:cash,bank']"/>
+<div class="ui-table-wrap scroll" data-ui-table data-ui-noun="penerimaan" tabindex="0" role="region" aria-label="Riwayat penerimaan barang">
+<table class="ui-table">
+<caption class="sr">Riwayat penerimaan barang</caption>
+<thead><tr><th scope="col">Tanggal</th><th scope="col">Nomor dan pemasok</th><th scope="col">Produk</th><th scope="col">Tipe</th><th scope="col" class="ui-num">Qty</th><th scope="col" class="ui-num">HPP satuan</th><th scope="col" class="ui-num">Total</th></tr></thead>
+<tbody>
+@forelse($receiptHistory as $receipt)
+@php [$payKey, $payLabel] = $receiptPay[$receipt->credit_account ?? ''] ?? ['other', (string) ($receipt->credit_account ?? '—')]; @endphp
+@php
+    [$typeLabel, $typeTone] = $receiptTypes[$receipt->receipt_type ?? ''] ?? [(string) ($receipt->receipt_type ?? '—'), 'mute'];
+    $lines = $receiptItems->get($receipt->id, collect());
+    $account = (string) ($receipt->credit_account ?? '');
+@endphp
+<tr data-pay="{{ $payKey }}" data-type="{{ $receipt->receipt_type }}" data-amount="{{ $receipt->total_amount }}">
+<td data-label="Tanggal" class="ui-nowrap rh-date">{{ \Carbon\Carbon::parse($receipt->receipt_date)->locale('id')->translatedFormat('d M Y') }}</td>
+<td data-label="Nomor" class="ui-primary rh-number">{{ $receipt->receipt_number ?: '#'.$receipt->id }}<span class="ui-sub">{{ $receipt->supplier_name ? 'Pemasok: '.$receipt->supplier_name : ($receipt->receipt_type === 'opening' ? 'Stok awal gudang' : 'Tanpa pemasok') }}@if($receipt->notes)<span class="rh-ref"> · {{ \Illuminate\Support\Str::limit($receipt->notes, 40) }}</span>@endif</span></td>
+<td data-label="Produk" class="rh-lines rh-product">@forelse($lines as $line)<span>{{ $line->product_name }}</span>@empty<span class="ui-muted">—</span>@endforelse</td>
+<td data-label="Tipe" class="rh-type"><span class="ui-badge ui-badge--{{ $typeTone }}">{{ $typeLabel }}</span><span class="ui-sub" title="{{ $payLabel }}">Akun {{ $account !== '' ? $account : '—' }} · {{ $payLabel }}</span></td>
+<td data-label="Qty" class="ui-num rh-lines">@forelse($lines as $line)<span>{{ $qty($line->quantity) }} <small>{{ $line->product_unit }}</small></span>@empty<span>—</span>@endforelse</td>
+<td data-label="HPP satuan" class="ui-num rh-lines">@forelse($lines as $line)<span>{{ \App\Services\V2\Money::display($line->unit_cost) }}</span>@empty<span>—</span>@endforelse</td>
+<td data-label="Total" class="ui-num rh-total"><strong>{{ \App\Services\V2\Money::display($receipt->total_amount) }}</strong></td>
+</tr>
+@empty
+<tr data-ui-empty-static><td colspan="7" class="ui-empty"><strong>Belum ada penerimaan barang.</strong>Tekan "Catat penerimaan" untuk mencatat barang masuk pertama.</td></tr>
+@endforelse
+</tbody>
+</table>
+</div>
+<script>
+/* Total nilai baris yang sedang tampil. Dijumlah dalam sen (BigInt) dari atribut data-amount, bukan float; hanya tampilan. */
+(()=>{const wrap=document.querySelector('#receipt-history [data-ui-table]');const out=document.querySelector('[data-receipt-page-total]');if(!wrap||!out)return;
+ const cents=v=>{const [i,f='']=String(v||'0').split('.');return BigInt(i||'0')*100n+BigInt((f+'00').slice(0,2));};
+ const fmt=c=>{const neg=c<0n;if(neg)c=-c;const i=(c/100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.'),f=(c%100n).toString().padStart(2,'0');return (neg?'-':'')+'Rp '+i+(f==='00'?'':','+f);};
+ const update=()=>{let sum=0n;for(const r of wrap.querySelectorAll('tbody tr[data-amount]'))if(!r.hidden)sum+=cents(r.dataset.amount);out.textContent=fmt(sum);};
+ wrap.addEventListener('ui-table:render',update);update();})();
+</script>
+</section>
 
 <template id="receipt-tpl">
-<div class="item-row">
+<div class="rc-row">
     <div class="field">
         <label class="sr" data-label>Barang</label>
         <select data-name="product_id" required>
             <option value="">— pilih barang —</option>
             @foreach ($products as $product)
-                <option value="{{ $product->id }}">{{ $product->name }}</option>
+                <option value="{{ $product->id }}" data-suppliers="{{ collect($productSupplierLinks[$product->id] ?? [])->where('is_active', true)->pluck('supplier_id')->implode(',') }}" data-primary-supplier="{{ collect($productSupplierLinks[$product->id] ?? [])->firstWhere('is_primary', true)?->supplier_id }}">{{ $product->name }} · {{ $product->unit }}</option>
             @endforeach
         </select>
     </div>
@@ -120,14 +181,15 @@
         <label class="sr" data-label>HPP satuan</label>
         <input data-name="unit_cost" type="text" inputmode="decimal" maxlength="30" placeholder="HPP satuan" required>
     </div>
-    <button type="button" class="secondary" data-remove aria-label="Hapus baris barang">×</button>
+    <output class="rc-value" data-line-total>Rp 0</output>
+    <button type="button" class="secondary rc-remove" data-remove aria-label="Hapus baris barang">×</button>
 </div>
 </template>
 
 <section class="card" aria-labelledby="trip-heading">
 <h2 id="trip-heading">Biaya ritase sopir</h2>
 <p class="note">Untuk perjalanan tanpa uang muka. Jika sudah ada uang muka, gunakan realisasi sopir agar biaya tidak dicatat dua kali.</p>
-<form id="trip-form" novalidate>
+<form id="trip-form" data-transport-form novalidate>
 <div class="row">
     <div class="field">
         <label for="trip-vehicle">Mobil</label>
@@ -139,7 +201,7 @@
     </div>
     <div class="field">
         <label for="trip-driver">Sopir</label>
-        <input id="trip-driver" name="driver_name" required maxlength="100" autocomplete="off">
+        <select id="trip-driver" name="driver_id" required>@include('v2.driver-options')</select>
     </div>
     <div class="field">
         <label for="trip-date">Tanggal</label>
@@ -155,8 +217,8 @@
         <label for="trip-delivery">Surat jalan</label>
         <select id="trip-delivery" name="delivery_id">
             <option value="">Tanpa tautan</option>
-            @foreach ($deliveries as $delivery)
-                <option value="{{ $delivery->id }}">{{ $delivery->number }}</option>
+            @foreach ($transportDeliveries as $delivery)
+                <option value="{{ $delivery->id }}" data-vehicle="{{ $delivery->vehicle_id }}" data-driver="{{ $delivery->driver_id }}" data-destination="{{ $delivery->destination }}">{{ $delivery->number }} · {{ $delivery->destination }}</option>
             @endforeach
         </select>
     </div>
@@ -244,15 +306,18 @@ const csrf = csrfMeta ? csrfMeta.content : '';
 const key = () => (window.crypto && typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
 document.querySelectorAll('[data-fresh-key]').forEach(e => { e.value = key(); });
 
-async function send(form, url, data, multipart = false, btn = null) {
-    if (!form || form.dataset.busy) { return null; }
+async function send(form, url, data, multipart = false, btn = null, lockOnSuccess = false) {
+    if (!form || form.dataset.busy || !form.reportValidity()) { return null; }
     form.dataset.busy = '1';
+    form.setAttribute('aria-busy', 'true');
+    window.v2FormFeedback?.clear(form);
     const button = btn || form.querySelector('button[type="submit"], button:not([type])');
     if (button) { button.disabled = true; }
     const error = form.querySelector('[data-error]');
     const ok = form.querySelector('[data-ok]');
     if (error) { error.hidden = true; error.textContent = ''; }
     if (ok) { ok.hidden = true; ok.textContent = ''; }
+    let saved = false;
     try {
         const res = await fetch(url, {
             method: 'POST',
@@ -265,25 +330,53 @@ async function send(form, url, data, multipart = false, btn = null) {
         const result = await res.json().catch(() => ({}));
         if (!res.ok) {
             const messages = Object.values(result.errors || {}).flat().join(' ') || result.message || ('Gagal menyimpan (HTTP ' + res.status + ').');
-            throw new Error(messages);
+            const failure = new Error(messages);
+            failure.errors = result.errors;
+            throw failure;
         }
+        saved = true;
         return result;
     } catch (e) {
-        if (error) { error.textContent = e.message; error.hidden = false; }
+        window.v2FormFeedback.summary(form, e.message, e.errors);
         return null;
     } finally {
-        if (button) { button.disabled = false; }
-        delete form.dataset.busy;
+        if (!saved || !lockOnSuccess) {
+            if (button) { button.disabled = false; }
+            delete form.dataset.busy;
+            form.removeAttribute('aria-busy');
+        }
     }
 }
 
 document.querySelectorAll('.v2-json-form').forEach(f => f.addEventListener('submit', async e => {
     e.preventDefault();
     if (!f.reportValidity()) { return; }
-    if (await send(f, f.action, Object.fromEntries(new FormData(f)))) { location.reload(); }
+    if (await send(f, f.action, Object.fromEntries(new FormData(f)), false, null, true)) { location.reload(); }
 }));
 
 // === Master Entity V2 Handlers ===
+const masterPayload = form => {
+    const data = Object.fromEntries(new FormData(form));
+    if (form.querySelector('[data-product-suppliers]')) {
+        data.supplier_ids = new FormData(form).getAll('supplier_ids[]');
+        delete data['supplier_ids[]'];
+    }
+    return data;
+};
+document.querySelectorAll('[data-driver-master]').forEach(form => {
+    const sync = () => {
+        const internal = form.elements.kind.value === 'internal';
+        const employee = form.elements.employee_id;
+        form.querySelector('[data-driver-employee]').hidden = !internal;
+        employee.disabled = !internal;
+        employee.required = internal;
+        form.elements.name.readOnly = internal;
+        if (internal) form.elements.name.value = employee.selectedOptions[0]?.dataset.name || '';
+    };
+    // Jenis sopir berupa tombol pilihan (radio): dengarkan perubahan di tingkat form.
+    form.addEventListener('change', e => { if (e.target.name === 'kind' || e.target.name === 'employee_id') sync(); });
+    sync();
+});
 // 1. Create master records
 document.querySelectorAll('form.master-create-form').forEach(form => {
     form.addEventListener('submit', async e => {
@@ -293,8 +386,8 @@ document.querySelectorAll('form.master-create-form').forEach(form => {
         if (err) { err.hidden = true; err.textContent = ''; }
         const ok = form.querySelector('[data-ok]');
         if (ok) { ok.hidden = true; ok.textContent = ''; }
-        const res = await send(form, form.action, Object.fromEntries(new FormData(form)));
-        if (res) { location.reload(); }
+        const res = await send(form, form.action, masterPayload(form), false, null, true);
+        if (res) { window.uiMotion?.markSaved(form); location.reload(); }
     });
 });
 
@@ -304,12 +397,12 @@ document.querySelectorAll('form[data-master-form]').forEach(form => {
         e.preventDefault();
         if (form.dataset.busy || !form.reportValidity()) return;
         const method = (form.dataset.method || 'POST').toUpperCase();
-        const data = Object.fromEntries(new FormData(form));
+        const data = masterPayload(form);
         if (method !== 'POST') data._method = method;
         const statusEl = form.querySelector('.mr-msg') || form.querySelector('[data-error]');
         if (statusEl) { statusEl.textContent = ''; if (statusEl.hasAttribute('hidden')) statusEl.hidden = true; }
-        const res = await send(form, form.action, data);
-        if (res) { location.reload(); }
+        const res = await send(form, form.action, data, false, null, true);
+        if (res) { window.uiMotion?.markSaved(form); location.reload(); }
     });
 });
 
@@ -405,7 +498,7 @@ document.querySelectorAll('form.master-import-form').forEach(impForm => {
             if (!currentBatchId || commitBtn.disabled) return;
             commitBtn.disabled = true;
             const commitUrl = @json(url('/v2/import-batches')) + '/' + encodeURIComponent(currentBatchId) + '/commit';
-            const r = await send(impForm, commitUrl, {}, false, commitBtn);
+            const r = await send(impForm, commitUrl, {}, false, commitBtn, true);
             if (r) { location.reload(); } else { commitBtn.disabled = false; }
         });
     }
@@ -422,8 +515,11 @@ document.querySelectorAll('input.master-instant-search').forEach(input => {
         rows.forEach(tr => {
             const dataCells = Array.from(tr.querySelectorAll('td[data-field]'));
             const matches = !term || dataCells.some(td => td.textContent.toLowerCase().includes(term));
-            tr.style.display = matches ? '' : 'none';
-        });
+             tr.style.display = matches ? '' : 'none';
+         });
+        const count = Array.from(rows).filter(row => row.style.display !== 'none').length;
+        const status = document.querySelector('[data-master-search-status="' + table.id + '"]');
+        if (status) { status.textContent = count ? count + ' dari ' + rows.length + ' data ditampilkan.' : 'Tidak ada data sesuai pencarian. Ubah kata kunci untuk mencoba lagi.'; }
     });
 });
 
@@ -484,22 +580,60 @@ if (receipt) {
     const box = document.querySelector('#receipt-items');
     const tpl = document.querySelector('#receipt-tpl');
     const labels = { product_id: 'Barang', quantity: 'Jumlah', unit_cost: 'HPP satuan' };
+    const filterProducts = row => {
+        const select = row.querySelector('[data-name=product_id]');
+        const supplier = receipt.elements.supplier_id.value;
+        for (const option of select.options) {
+            if (!option.value) continue;
+            const allowed = supplier !== '' && option.dataset.suppliers.split(',').includes(supplier);
+            option.disabled = !allowed;
+            option.hidden = !allowed;
+        }
+        if (select.selectedOptions[0]?.disabled) {
+            select.value = '';
+            select.dispatchEvent(new Event('change', {bubbles: true}));
+        }
+        select.disabled = !supplier;
+        select._uiPickSync?.();
+    };
+    receipt.elements.supplier_id.addEventListener('change', () => Array.from(box.children).forEach(filterProducts));
     const renumber = () => Array.from(box.children).forEach((row, i) => {
         row.querySelectorAll('[data-name]').forEach(el => { el.setAttribute('aria-label', labels[el.dataset.name] + ' baris ' + (i + 1)); });
     });
+    // Nilai per baris dan ringkasan di bawah: angka dipakai untuk membaca, server tetap menghitung ulang.
+    const rupiah = value => 'Rp ' + Math.round(value).toLocaleString('id-ID');
+    const number = text => { const n = parseFloat(String(text).replace(/[^0-9,.-]/g, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
+    const recalc = () => {
+        let total = 0, filled = 0;
+        for (const row of box.children) {
+            const qty = number(row.querySelector('[data-name=quantity]').value);
+            const cost = number(row.querySelector('[data-name=unit_cost]').value);
+            const line = qty * cost;
+            row.querySelector('[data-line-total]').textContent = line > 0 ? rupiah(line) : '—';
+            if (row.querySelector('[data-name=product_id]').value) { filled++; }
+            total += line;
+        }
+        document.querySelector('#rc-count').textContent = filled + ' barang';
+        document.querySelector('#rc-sum').textContent = rupiah(total);
+    };
+    box.addEventListener('input', recalc);
+    box.addEventListener('change', recalc);
     const addRow = focus => {
         const node = tpl.content.firstElementChild.cloneNode(true);
-        node.querySelector('[data-remove]').addEventListener('click', () => { node.remove(); renumber(); });
+        node.querySelector('[data-remove]').addEventListener('click', () => { node.remove(); renumber(); recalc(); });
         box.append(node);
+        filterProducts(node);
         renumber();
-        if (focus) { node.querySelector('select').focus(); }
+        if (window.uiPick) { window.uiPick(node.querySelector('[data-name=product_id]')); }
+        recalc();
+        if (focus) { (node.querySelector('.ui-pick-input') || node.querySelector('select')).focus(); }
     };
     receipt.dataset.key = key();
     addRow(false);
     document.querySelector('#receipt-add').addEventListener('click', () => addRow(true));
     receipt.addEventListener('submit', async e => {
         e.preventDefault();
-        if (receipt.dataset.busy) { return; }
+        if (receipt.dataset.busy || !receipt.reportValidity()) { return; }
         const error = receipt.querySelector('[data-error]');
         const fail = msg => { error.textContent = msg; error.hidden = false; };
         const items = Array.from(box.children).map(row => {
@@ -516,7 +650,7 @@ if (receipt) {
             items: items,
             idempotency_key: receipt.dataset.key
         };
-        if (await send(receipt, @json(route('v2.receipts.store')), payload)) { location.reload(); }
+        if (await send(receipt, @json(route('v2.receipts.store')), payload, false, null, true)) { location.reload(); }
     });
 }
 
@@ -525,10 +659,10 @@ if (trip) {
     trip.dataset.key = key();
     trip.addEventListener('submit', async e => {
         e.preventDefault();
-        if (trip.dataset.busy) { return; }
+        if (trip.dataset.busy || !trip.reportValidity()) { return; }
         const d = Object.fromEntries(new FormData(trip));
         d.idempotency_key = trip.dataset.key;
-        if (await send(trip, @json(route('v2.trips.store')), d)) { location.reload(); }
+        if (await send(trip, @json(route('v2.trips.store')), d, false, null, true)) { location.reload(); }
     });
 }
 })();

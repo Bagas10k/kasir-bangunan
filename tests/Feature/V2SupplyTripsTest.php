@@ -69,6 +69,23 @@ class V2SupplyTripsTest extends TestCase
         ]);
     }
 
+    private function linkSupplier(int $supplierId, int $productId): void
+    {
+        DB::table('v2_product_suppliers')->insert([
+            'supplier_id' => $supplierId, 'product_id' => $productId, 'is_primary' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
+    private function driver(): int
+    {
+        return (int) DB::table('v2_drivers')->insertGetId([
+            'code' => 'SYN-DRIVER-001', 'name' => 'Sopir Sintetis',
+            'kind' => 'external', 'employee_id' => null, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
     private function vehicle(string $status = 'active'): int
     {
         return (int) DB::table('vehicles')->insertGetId([
@@ -130,12 +147,13 @@ class V2SupplyTripsTest extends TestCase
         $cashier = $this->actor('cashier');
         $supplier = $this->supplier();
         $product = $this->product();
+        $this->linkSupplier($supplier, $product);
         $vehicle = $this->vehicle();
         $service = app(SupplyTrips::class);
 
         $this->assertForbidden(fn () => $service->receive($cashier->id, $this->receiptPayload($supplier, $product)));
         $this->assertForbidden(fn () => $service->trip($cashier->id, [
-            'vehicle_id' => $vehicle, 'driver_name' => 'Sopir Sintetis', 'date' => '2026-10-30',
+            'vehicle_id' => $vehicle, 'driver_id' => $this->driver(), 'date' => '2026-10-30',
             'destination' => 'Zona Beta', 'fuel_cost' => '10.00', 'allowance' => '0.00',
             'payment_method' => 'transfer', 'idempotency_key' => 'syn-trip-cashier-01',
         ]));
@@ -151,6 +169,7 @@ class V2SupplyTripsTest extends TestCase
         $admin = $this->actor('admin');
         $supplier = $this->supplier();
         $product = $this->product();
+        $this->linkSupplier($supplier, $product);
 
         $result = app(SupplyTrips::class)->receive($admin->id, $this->receiptPayload($supplier, $product));
 
@@ -197,6 +216,7 @@ class V2SupplyTripsTest extends TestCase
         $admin = $this->actor('admin');
         $supplier = $this->supplier();
         $product = $this->product();
+        $this->linkSupplier($supplier, $product);
         $service = app(SupplyTrips::class);
 
         $first = $service->receive($admin->id, $this->receiptPayload($supplier, $product));
@@ -226,7 +246,7 @@ class V2SupplyTripsTest extends TestCase
         $service = app(SupplyTrips::class);
 
         $payload = [
-            'vehicle_id' => $vehicle, 'driver_name' => 'Sopir Sintetis', 'date' => '2026-10-30',
+            'vehicle_id' => $vehicle, 'driver_id' => $this->driver(), 'date' => '2026-10-30',
             'destination' => 'Zona Beta', 'fuel_cost' => '100.00', 'allowance' => '50.00',
             'payment_method' => 'cash', 'idempotency_key' => 'syn-trip-cash-0001',
         ];
@@ -237,6 +257,8 @@ class V2SupplyTripsTest extends TestCase
         $trip = DB::table('v2_trips')->where('id', $result['trip_id'])->first();
         $this->assertSame('posted', $trip->status);
         $this->assertSame('cash', $trip->payment_method);
+        $this->assertSame($payload['driver_id'], (int) $trip->driver_id);
+        $this->assertSame('Sopir Sintetis', $trip->driver_name);
         $this->assertSame('150.00', number_format((float) $trip->total_cost, 2, '.', ''));
         $this->assertSame((int) $admin->id, (int) $trip->requested_by);
         $this->assertSame((int) $result['journal_entry_id'], (int) $trip->journal_entry_id);
@@ -279,7 +301,7 @@ class V2SupplyTripsTest extends TestCase
         $service = app(SupplyTrips::class);
 
         $payload = [
-            'vehicle_id' => $vehicle, 'driver_name' => 'Sopir Sintetis', 'date' => '2026-10-30',
+            'vehicle_id' => $vehicle, 'driver_id' => $this->driver(), 'date' => '2026-10-30',
             'destination' => 'Zona Gamma', 'fuel_cost' => '100.00', 'allowance' => '0.00',
             'payment_method' => 'transfer', 'idempotency_key' => 'syn-trip-bank-0001',
         ];
@@ -313,6 +335,7 @@ class V2SupplyTripsTest extends TestCase
         $admin = $this->actor('admin');
         $supplier = $this->supplier();
         $product = $this->product();
+        $this->linkSupplier($supplier, $product);
         $service = app(SupplyTrips::class);
 
         DB::table('v2_parties')->where('id', $supplier)->update(['is_active' => false]);

@@ -3,10 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    @include('partials.numeric-input-guard')
     <title>Kasir Material &amp; Bangunan</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    @if(config('v2.enabled'))
+        {{-- Satu permintaan font saja (sama dengan v2/workspace); Sora lama tidak dipakai lagi di cangkang V2. --}}
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    @else
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    @endif
     <style>
         :root {
             --font-sans: 'Sora', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -1321,9 +1327,24 @@
             }
         }
     </style>
+    @if(config('v2.enabled'))
+        @include('v2.data-navigation-styles')
+        {{-- Cangkang V2 bersama: token, sidebar, tema (sama dengan v2/workspace). --}}
+        @include('v2.ui-tokens')
+        @include('v2.ui-sidebar')
+        @include('v2.ui-theme')
+        @include('v2.ui-legacy-pages')
+        @include('v2.ui-minimal')
+        @include('v2.ui-dna')
+    @endif
+{{-- Keadaan sidebar dipasang sebelum gambar pertama supaya tidak melompat dari tertutup ke terbuka. --}}
+<script>try{localStorage.removeItem('v2-sidebar-pinned');}catch{}</script>
 </head>
-<body>
-    <div class="app-layout">
+<body @if(request()->routeIs('journals.*', 'reports.*', 'coa.*')) data-finance-page @endif>
+    <div class="app-layout" @if(config('v2.enabled')) data-unified-shell @endif>
+        @if(config('v2.enabled'))
+            @include('v2.shell-sidebar')
+        @else
         <!-- Sidebar Backdrop for Mobile -->
         <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
 
@@ -1351,6 +1372,9 @@
                 </button>
             </div>
 
+            @if(config('v2.enabled'))
+                @include('partials.workspace-navigation')
+            @else
             <nav class="sidebar-nav">
                 <!-- Kategori: TRANSAKSI -->
                 <div class="nav-group">
@@ -1478,6 +1502,7 @@
                     </a>
                 </div>
             </nav>
+            @endif
 
             <div class="sidebar-footer">
                 @auth
@@ -1495,9 +1520,13 @@
                 @endauth
             </div>
         </aside>
+        @endif
 
         <!-- Main Content Area -->
         <div class="app-main">
+            @if(config('v2.enabled'))
+                @include('partials.workspace-header')
+            @else
             <header class="main-topbar">
                 <div class="topbar-left">
                     <button type="button" id="sidebar-toggle" class="hamburger-btn" aria-label="Buka Menu">
@@ -1528,6 +1557,7 @@
                     <span class="topbar-location">{{ $headerTitle }}</span>
                 </div>
             </header>
+            @endif
 
             <main class="main-content">
                 @yield('content')
@@ -1631,16 +1661,49 @@
             function openSidebar() {
                 if (sidebar) sidebar.classList.add('open');
                 if (backdrop) backdrop.classList.add('open');
+                if (toggle) toggle.setAttribute('aria-expanded', 'true');
+                if (closeBtn) closeBtn.focus();
             }
 
             function closeSidebar() {
                 if (sidebar) sidebar.classList.remove('open');
                 if (backdrop) backdrop.classList.remove('open');
+                if (toggle) toggle.setAttribute('aria-expanded', 'false');
             }
 
             if (toggle) toggle.addEventListener('click', openSidebar);
             if (backdrop) backdrop.addEventListener('click', closeSidebar);
             if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+            const navigation = sidebar?.querySelector('[data-role]');
+            if (navigation) {
+                const groups = Array.from(navigation.querySelectorAll('[data-menu-group]'));
+                const storageKey = 'v2-workspace-groups:' + navigation.dataset.role;
+                try {
+                    const saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
+                    if (saved && typeof saved === 'object') {
+                        for (const group of groups) {
+                            if (typeof saved[group.dataset.menuGroup] === 'boolean') group.open = saved[group.dataset.menuGroup];
+                        }
+                    }
+                } catch {}
+                const current = navigation.querySelector('[aria-current="page"]');
+                if (current) current.closest('details').open = true;
+                for (const group of groups) {
+                    group.addEventListener('toggle', () => {
+                        try { sessionStorage.setItem(storageKey, JSON.stringify(Object.fromEntries(groups.map(item => [item.dataset.menuGroup, item.open])))); } catch {}
+                    });
+                }
+            }
+            document.addEventListener('keydown', function (event) {
+                if (!sidebar || !sidebar.classList.contains('open')) return;
+                if (event.key === 'Escape') { closeSidebar(); toggle?.focus(); }
+                if (event.key === 'Tab') {
+                    const controls = Array.from(sidebar.querySelectorAll('a,button,summary')).filter(node => node.tabIndex >= 0 && node.getClientRects().length);
+                    const first = controls[0], last = controls[controls.length - 1];
+                    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+                    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+                }
+            });
 
             // Collapsible icon rail: default collapsed, hover expands, pin keeps open.
             var pinBtn = document.getElementById('sidebar-pin');
@@ -1774,12 +1837,15 @@
                     select.setAttribute('aria-hidden', 'true');
                     function sync() {
                         trigger.textContent = select.selectedOptions[0]?.textContent || 'Pilih...';
-                        shell.classList.toggle('is-invalid', !select.validity.valid);
+                        shell.classList.toggle('is-invalid', !select.validity.valid && shell.dataset.validated === 'true');
                     }
                     select.addEventListener('change', sync);
                     select.addEventListener('invalid', event => {
                         event.preventDefault();
+                        shell.dataset.validated = 'true';
                         sync();
+                        const firstInvalid = select.form ? [...select.form.elements].find(el => el.willValidate && !el.validity.valid) : select;
+                        if (firstInvalid && firstInvalid !== select) return;
                         trigger.focus();
                         if (current !== shell) openPicker(shell);
                     });
@@ -1965,5 +2031,9 @@
             initPlateInputs();
         }
     </script>
+    @if(config('v2.enabled'))
+        @include('v2.ui-sidebar-js')
+    @endif
+    @include('v2.ui-motion')
 </body>
 </html>

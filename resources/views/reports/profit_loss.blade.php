@@ -1,4 +1,5 @@
-@extends('layouts.app')
+{{-- Panel workspace memuat halaman ini lewat fetch (?partial=1); URL penuh tetap berfungsi. --}}
+@extends(request()->boolean('partial') ? 'layouts.partial' : 'layouts.app')
 @section('content')
 @include('reports._styles')
 
@@ -83,11 +84,10 @@
                             <a class="preset-btn {{ $isPresetActive($range[0], $range[1]) ? 'active' : '' }}"
                                href="{{ route('reports.profit_loss', ['start_date' => $range[0], 'end_date' => $range[1]]) }}">{{ $label }}</a>
                         @endforeach
-                        <a class="preset-btn" href="{{ route('reports.profit_loss') }}">Semua</a>
+                        <a class="preset-btn {{ ! request()->filled('start_date') && ! request()->filled('end_date') ? 'active' : '' }}" href="{{ route('reports.profit_loss') }}">Semua</a>
                     </div>
                 </div>
-                <details class="custom-period">
-                    <summary>Rentang khusus</summary>
+                <div class="custom-period">
                     <form method="GET" action="{{ route('reports.profit_loss') }}" class="date-cluster">
                         <div class="field">
                             <label for="start_date">Dari</label>
@@ -101,7 +101,7 @@
                         <button type="submit" class="btn report-apply">Tampilkan</button>
                         <a href="{{ route('reports.profit_loss') }}" class="report-reset">Reset</a>
                     </form>
-                </details>
+                </div>
             </div>
         </div>
     </div>
@@ -223,4 +223,5 @@
         </table>
     </div>
 </div>
+@include('v2.finance-dna')
 @endsection

@@ -76,7 +76,7 @@
                 (panel.querySelector('input') || panel.querySelector('.select-option[aria-selected="true"]:not(:disabled)') || panel.querySelector('.select-option:not(:disabled)'))?.focus();
             }
             function enhanceSelects(root) {
-                root.querySelectorAll('select:not([multiple]):not([data-native-select])').forEach(select => {
+                root.querySelectorAll('select:not([multiple]):not([data-native-select]):not([data-pick-ready])').forEach(select => {
                     if (select.closest('.select-shell') || select.hidden || select.closest('template')) return;
                     const shell = document.createElement('div');
                     shell.className = 'select-shell';
@@ -106,13 +106,16 @@
                         trigger.textContent = select.selectedOptions[0]?.textContent || 'Pilih...';
                         trigger.disabled = select.disabled;
                         trigger.setAttribute('aria-label',labelText+': '+trigger.textContent);
-                        shell.classList.toggle('is-invalid', !select.validity.valid);
+                        shell.classList.toggle('is-invalid', !select.validity.valid && shell.dataset.validated === 'true');
                     }
                     select.addEventListener('change', sync);
                     new MutationObserver(sync).observe(select,{attributes:true,attributeFilter:['disabled']});
                     select.addEventListener('invalid', event => {
                         event.preventDefault();
+                        shell.dataset.validated = 'true';
                         sync();
+                        const firstInvalid = select.form ? [...select.form.elements].find(el => el.willValidate && !el.validity.valid) : select;
+                        if (firstInvalid && firstInvalid !== select) return;
                         trigger.focus();
                         if (current !== shell) openPicker(shell);
                     });

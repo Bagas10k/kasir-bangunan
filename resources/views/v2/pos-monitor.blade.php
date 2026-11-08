@@ -1,125 +1,153 @@
+{{--
+    Kepala dashboard kasir. Semua angka datang dari App\Services\V2\PosDashboard (BigDecimal); tampilan ini hanya merangkai.
+    Tiga periode dirender sekaligus di server dan hanya ditukar tampil oleh JS, jadi tidak ada hitungan di browser.
+--}}
 @php
-// Same monitoring surface as the incumbent; read-only, actor-scoped V2 data.
-$monitorAdmin = ($role ?? '') === 'admin';
-$monitorNow = now('Asia/Jakarta');
-$monitorStart = $monitorNow->copy()->subDays(29)->startOfDay();
-$monitorSales = \Illuminate\Support\Facades\DB::table('v2_sales')->where('created_at','>=',$monitorStart)->where('created_at','<=',$monitorNow->copy()->endOfDay())->when(!$monitorAdmin,fn($q)=>$q->where('user_id',auth()->id()))->get(['id','total','created_at']);
-$monitorItems = $monitorSales->isEmpty() ? collect() : \Illuminate\Support\Facades\DB::table('v2_sale_items')->whereIn('sale_id',$monitorSales->pluck('id'))->get(['sale_id','product_id','name','quantity']);
-$decimal = fn($v) => \Brick\Math\BigDecimal::of((string)$v);
-$formatRupiah = function($v) use($decimal) { $s=(string)$decimal($v)->toScale(2,\Brick\Math\RoundingMode::HalfUp);[$i,$f]=explode('.',$s);return 'Rp '.preg_replace('/\B(?=(\d{3})+(?!\d))/','.',$i).','.$f; };
-$formatQty = function($v) use($decimal) { $s=(string)$decimal($v)->toScale(4,\Brick\Math\RoundingMode::HalfUp);[$i,$f]=explode('.',$s);$f=rtrim($f,'0');return preg_replace('/\B(?=(\d{3})+(?!\d))/','.',$i).($f!==''?','.$f:''); };
-$catalogProducts=collect($products);$productUnits=$catalogProducts->pluck('unit','id');
-$lowProducts=$catalogProducts->filter(fn($p)=>$decimal($p->stock_quantity)->isGreaterThan(0)&&$decimal($p->stock_quantity)->isLessThanOrEqualTo(10))->sort(fn($a,$b)=>$decimal($a->stock_quantity)->compareTo($b->stock_quantity));
-$stockSummary=['products'=>$catalogProducts->count(),'low'=>$lowProducts->count(),'out'=>$catalogProducts->filter(fn($p)=>$decimal($p->stock_quantity)->isLessThanOrEqualTo(0))->count()];
-$lowStockList=$lowProducts->take(5)->map(fn($p)=>['name'=>$p->name,'formatted_qty'=>$formatQty($p->stock_quantity),'unit'=>$p->unit])->values()->all();
-$precomputedData=[];
-foreach(['today'=>[1,'Hari ini'],'7d'=>[7,'7 hari terakhir'],'30d'=>[30,'30 hari terakhir']] as $key=>[$days,$label]) {
- $start=$monitorNow->copy()->subDays($days-1)->startOfDay();$periodSales=$monitorSales->filter(fn($s)=>\Illuminate\Support\Carbon::parse($s->created_at)->greaterThanOrEqualTo($start));
- $sum=$decimal('0');$buckets=[];$units=[];$ids=$periodSales->pluck('id')->flip();
- $count=$key==='today'?24:$days;
- for($i=0;$i<$count;$i++) { $date=$key==='today'?$start->copy()->addHours($i):$start->copy()->addDays($i);$bucketKey=$date->format($key==='today'?'Y-m-d H':'Y-m-d');$buckets[$bucketKey]=['label'=>$date->format($key==='today'?'H:00':'d/m'),'total'=>'0.00']; }
- foreach($periodSales as $sale){$sum=$sum->plus((string)$sale->total);$bucketKey=\Illuminate\Support\Carbon::parse($sale->created_at)->format($key==='today'?'Y-m-d H':'Y-m-d');if(isset($buckets[$bucketKey]))$buckets[$bucketKey]['total']=(string)$decimal($buckets[$bucketKey]['total'])->plus((string)$sale->total)->toScale(2);}
- foreach($monitorItems as $item){if(!$ids->has($item->sale_id))continue;$id=$item->product_id;if(!isset($units[$id]))$units[$id]=['name'=>$item->name,'qty'=>$decimal('0'),'unit'=>$productUnits[$id]??''];$units[$id]['qty']=$units[$id]['qty']->plus((string)$item->quantity);}
- uasort($units,fn($a,$b)=>$b['qty']->compareTo($a['qty']));$top=[];foreach(array_slice($units,0,5) as $unit)$top[]=['name'=>$unit['name'],'formatted_qty'=>$formatQty($unit['qty']),'unit'=>$unit['unit']];
- $max=$decimal('0');foreach($buckets as $bucket)if($decimal($bucket['total'])->isGreaterThan($max))$max=$decimal($bucket['total']);
- foreach($buckets as &$bucket){$bucket['height']=$max->isZero()?0:$decimal($bucket['total'])->multipliedBy(85)->dividedBy($max,0,\Brick\Math\RoundingMode::HalfUp)->toInt();$bucket['formatted_total']=$formatRupiah($bucket['total']);}unset($bucket);
- $precomputedData[$key]=['period'=>$key,'sub_label'=>$label,'formatted_revenue'=>$formatRupiah($sum),'transaction_count'=>$periodSales->count(),'buckets'=>array_values($buckets),'top_products'=>$top];
-}
-$initialPeriod=$precomputedData['7d'];$topProducts7d=$initialPeriod['top_products'];$slotW=420/count($initialPeriod['buckets']);$barW=32;$chartBaseY=115;
+    $posDashboard = $posDashboard ?? [];
+    $decimal = fn ($v) => \Brick\Math\BigDecimal::of((string) ($v ?? '0'));
+    $catalog = collect($products ?? []);
+    $stockOut = $catalog->filter(fn ($p) => $decimal($p->stock_quantity)->isLessThanOrEqualTo(0));
+    $stockLow = $catalog->filter(fn ($p) => $decimal($p->stock_quantity)->isGreaterThan(0)
+        && $decimal($p->min_stock ?? 0)->isGreaterThan(0)
+        && $decimal($p->stock_quantity)->isLessThanOrEqualTo($decimal($p->min_stock)));
+    $stockTotal = $catalog->count();
+    $isAdminView = ($role ?? '') === 'admin';
+    $periodButtons = ['today' => 'Hari ini', '7d' => '7 hari', '30d' => '30 hari'];
+    $initial = '7d';
+    $deltaText = function (array $d, string $against): array {
+        return match ($d['direction']) {
+            'naik' => ['up', 'Naik '.$d['pct'].'% dari '.$against],
+            'turun' => ['down', 'Turun '.$d['pct'].'% dari '.$against],
+            'baru' => ['new', 'Belum ada data '.$against],
+            default => ['flat', 'Sama seperti '.$against],
+        };
+    };
 @endphp
 
-<div class="monitor-grid">
-    <section class="dash-card sales-dashboard-card" id="sales-dashboard-card" aria-labelledby="sales-dashboard-title">
-        <div class="sales-dashboard-head">
-            <div>
-                <div class="dash-label" id="sales-dashboard-title">Penjualan</div>
-                <div class="dash-sub" id="sales-period-label">{{ $initialPeriod['sub_label'] }}</div>
+<section class="pd" id="pos-dashboard" aria-labelledby="pd-title">
+    <header class="pd-head">
+        <div class="pd-heading">
+            <h2 id="pd-title">Ringkasan penjualan</h2>
+            <p class="pd-sub" id="pd-sub">{{ $posDashboard[$initial]['sub_label'] ?? '' }}</p>
+        </div>
+        <div class="pd-controls">
+            <div class="pos-shift-notice" data-pos-shift-state="{{ $ownOpenShift ? 'open' : 'closed' }}" role="note" aria-label="Status shift kasir">
+                <strong>{{ $ownOpenShift ? 'Shift aktif' : 'Shift belum dibuka' }}</strong>
+                <a class="pos-shift-action" href="#shift" data-task-link="shift"><span>{{ $ownOpenShift ? 'Lihat shift' : 'Buka shift' }}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
             </div>
-            <div class="sales-period-control" id="sales-period-control" role="group" aria-label="Pilih rentang waktu penjualan">
-                <span class="sales-period-pill" aria-hidden="true"></span>
-                <button type="button" class="sales-period-btn" data-period="today" aria-pressed="false" onclick="loadSalesDashboard('today')">Hari Ini</button>
-                <button type="button" class="sales-period-btn active" data-period="7d" aria-pressed="true" onclick="loadSalesDashboard('7d')">7 Hari</button>
-                <button type="button" class="sales-period-btn" data-period="30d" aria-pressed="false" onclick="loadSalesDashboard('30d')">30 Hari</button>
+            <div class="pd-seg" id="sales-period-control" role="group" aria-label="Pilih rentang waktu">
+                @foreach ($periodButtons as $key => $text)
+                    <button type="button" data-period="{{ $key }}" aria-pressed="{{ $key === $initial ? 'true' : 'false' }}">{{ $text }}</button>
+                @endforeach
             </div>
         </div>
-        <div class="sales-dashboard-body" id="sales-dashboard-body" aria-live="polite" aria-busy="false">
-            <div class="sales-metric">
-                <div class="dash-value" id="sales-revenue">{{ $initialPeriod['formatted_revenue'] }}</div>
-                <div class="dash-sub" id="sales-transactions">{{ number_format($initialPeriod['transaction_count'], 0, ',', '.') }} transaksi</div>
-                <div class="sales-status" id="sales-status">Nominal dan grafik untuk periode yang sama</div>
-            </div>
-            <div class="sales-chart-shell">
-                <div class="skeleton sales-chart-skeleton" id="sales-chart-skeleton" hidden></div>
-                <svg class="sales-chart" id="sales-chart" viewBox="0 0 420 150" preserveAspectRatio="none" role="img" aria-label="Grafik penjualan {{ $initialPeriod['sub_label'] }}">
-                    @foreach($initialPeriod['buckets'] as $idx => $bucket)
-                        @php
-                            $bHeight = max($bucket['height'], $bucket['total'] !== '0.00' ? 4 : 0);
-                            $barX = (int) round($idx * $slotW + ($slotW - $barW) / 2);
-                            $barY = $chartBaseY - $bHeight;
-                            $labelX = (int) round($idx * $slotW + $slotW / 2);
-                        @endphp
-                        @if($bHeight > 0)
-                            <rect x="{{ $barX }}" y="{{ $barY }}" width="{{ $barW }}" height="{{ $bHeight }}" rx="3" fill="var(--primary, #2563eb)"></rect>
-                        @endif
-                        <text x="{{ $labelX }}" y="135" text-anchor="middle" font-size="10" fill="var(--text-caption, #6b7280)">{{ $bucket['label'] }}</text>
-                    @endforeach
-                </svg>
-            </div>
-        </div>
-    </section>
+    </header>
 
-    <div class="dash-card">
-        <div class="dash-label">Produk Unggulan</div>
-        <div class="dash-toggle">
-            <button type="button" id="dash-toggle-best" class="active" onclick="switchDashList('best')">Terlaris</button>
-            <button type="button" id="dash-toggle-low" onclick="switchDashList('low')">Stok Menipis</button>
-        </div>
-        <div id="dash-list-best" class="dash-panel active">
-            <ul class="dash-list">
-                @forelse($topProducts7d as $tp)
-                    <li>
-                        <span class="dash-item-name" title="{{ $tp['name'] }}">{{ $tp['name'] }}</span>
-                        <span class="dash-item-num">{{ $tp['formatted_qty'] }} {{ $tp['unit'] }}</span>
-                    </li>
-                @empty
-                    <li style="color: var(--text-caption, #6b7280);">Belum ada penjualan.</li>
-                @endforelse
-            </ul>
-        </div>
-        <div id="dash-list-low" class="dash-panel">
-            <ul class="dash-list">
-                @forelse($lowStockList as $ls)
-                    <li>
-                        <span class="dash-item-name" title="{{ $ls['name'] }}">{{ $ls['name'] }}</span>
-                        <span class="dash-item-num">{{ $ls['formatted_qty'] }} {{ $ls['unit'] }}</span>
-                    </li>
-                @empty
-                    <li style="color: var(--text-caption, #6b7280);">Stok aman.</li>
-                @endforelse
-            </ul>
-        </div>
-    </div>
+    <div class="pd-body" id="pd-body">
+        @foreach ($posDashboard as $key => $d)
+            @php [$tone, $deltaLabel] = $deltaText($d['delta'], $d['previous_label']); @endphp
+            <div class="pd-pane" data-pane="{{ $key }}" @if ($key !== $initial) hidden @endif>
+                <div class="pd-kpis">
+                        <div class="pd-kpi pd-kpi--lead">
+                            <span class="pd-kpi-label">Penjualan</span>
+                            <strong class="pd-kpi-value" @if ($key === $initial) id="sales-revenue" @endif>{{ $d['formatted_revenue'] }}</strong>
+                            <span class="pd-delta pd-delta--{{ $tone }}">{{ $deltaLabel }}</span>
+                        </div>
+                        <div class="pd-kpi">
+                            <span class="pd-kpi-label">Transaksi</span>
+                            <strong class="pd-kpi-value">{{ number_format($d['transaction_count'], 0, ',', '.') }}</strong>
+                            <span class="pd-kpi-note">{{ number_format($d['previous_count'], 0, ',', '.') }} {{ $d['previous_label'] }}</span>
+                        </div>
+                        <div class="pd-kpi">
+                            <span class="pd-kpi-label"><span class="pd-long">Rata-rata per nota</span><span class="pd-short">Rata-rata</span></span>
+                            <strong class="pd-kpi-value">{{ $d['formatted_average'] }}</strong>
+                            <span class="pd-kpi-note">dari {{ number_format($d['transaction_count'], 0, ',', '.') }} nota</span>
+                        </div>
+                        <div class="pd-kpi pd-kpi--stock @if ($stockOut->count() > 0) is-bad @elseif ($stockLow->count() > 0) is-warn @endif">
+                            <span class="pd-kpi-label"><span class="pd-long">Stok perlu perhatian</span><span class="pd-short">Stok perhatian</span></span>
+                            <strong class="pd-kpi-value">{{ $stockOut->count() + $stockLow->count() }}</strong>
+                            <span class="pd-kpi-note">{{ $stockOut->count() }} habis · {{ $stockLow->count() }} menipis<span class="pd-long"> dari {{ number_format($stockTotal, 0, ',', '.') }} produk</span></span>
+                            @if ($isAdminView && ($stockOut->count() + $stockLow->count()) > 0)
+                                <a class="pd-kpi-link" href="#master-product" data-task-link="master-product">Lihat stok</a>
+                            @endif
+                        </div>
+                    </div>
 
-    <div class="dash-card">
-        <div class="dash-label">Ringkasan Produk</div>
-        <ul class="dash-list">
-            <li><span>Total Produk</span><span class="dash-item-num">{{ $stockSummary['products'] }}</span></li>
-            <li><span>Stok Menipis</span><span class="dash-item-num" style="{{ $stockSummary['low'] > 0 ? 'color: #854d0e;' : '' }}">{{ $stockSummary['low'] }}</span></li>
-            <li><span>Stok Habis</span><span class="dash-item-num" style="{{ $stockSummary['out'] > 0 ? 'color: #b91c1c;' : '' }}">{{ $stockSummary['out'] }}</span></li>
-        </ul>
+                @php
+                    $bucketLabels = array_column($d['buckets'] ?? [], 'label');
+                    $rangeLabel = $key === 'today' || count($bucketLabels) === 0 ? $d['sub_label'] : reset($bucketLabels).' – '.end($bucketLabels);
+                @endphp
+                <div class="pd-main">
+                    <div class="pd-card-head"><h3 class="pd-card-title">{{ $key === 'today' ? 'Penjualan per jam' : 'Penjualan harian' }}</h3><p class="pd-card-sub">{{ $rangeLabel }}</p></div>
+                    <figure class="pd-chart" @if ($key === $initial) id="sales-dashboard-card" @endif>
+                        {{-- Pertahankan titik kait grafik; periode kosong hanya menampilkan keterangan, bukan batang semu. --}}
+                        @php $emptyChart = $d['peak'] === null; @endphp
+                        <div class="pd-plot @if ($emptyChart) is-empty @endif" role="img" aria-label="Grafik penjualan {{ $d['sub_label'] }}. @if ($emptyChart)Belum ada penjualan.@else Tertinggi {{ $d['peak']['formatted'] }} pada {{ $d['peak']['label'] }}.@endif">
+                                <div class="pd-y" aria-hidden="true">
+                                    @foreach (array_reverse($d['axis']) as $tick)<span>{{ $emptyChart && $tick['pct'] > 0 ? '' : $tick['label'] }}</span>@endforeach
+                                </div>
+                                <div class="pd-area">
+                                    <div class="pd-grid" aria-hidden="true"><i></i><i></i><i></i></div>
+                                    <div class="pd-bars" @if ($key === $initial) id="sales-chart" @endif>
+                                        @foreach ($d['buckets'] as $bucket)
+                                            <div class="pd-col @if ($bucket['peak']) is-peak @endif" title="{{ $bucket['label'] }} · {{ $bucket['formatted_total'] }}">
+                                                <i style="height: {{ $bucket['height'] }}%"></i>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                    <div class="pd-x" aria-hidden="true">
+                                        @foreach ($d['buckets'] as $bucket)<span>{{ $bucket['show'] ? $bucket['label'] : '' }}</span>@endforeach
+                                    </div>
+                                    @if ($emptyChart)<p class="pd-plot-note" role="status">Belum ada penjualan pada periode ini. Batang muncul setelah ada nota.</p>@endif
+                                </div>
+                            </div>
+                            @unless ($emptyChart)
+                                <figcaption>Tertinggi <strong>{{ $d['peak']['formatted'] }}</strong> pada {{ $d['peak']['label'] }}</figcaption>
+                            @endunless
+                    </figure>
+                </div>
+
+                <aside class="pd-side" aria-label="Produk terlaris {{ $d['sub_label'] }}">
+                    <div class="pd-card-head"><h3 class="pd-card-title">Produk terlaris</h3><p class="pd-card-sub">@if (count($d['top_products']) > 1){{ count($d['top_products']) }} besar · @endif{{ $d['sub_label'] }}</p></div>
+                    @if (count($d['top_products']) === 0)
+                        <p class="pd-empty">Belum ada barang terjual.</p>
+                    @else
+                        <ol class="pd-top" style="--pd-rows: {{ (int) ceil(count($d['top_products']) / 2) }}">
+                            @foreach ($d['top_products'] as $i => $top)
+                                <li>
+                                    <span class="pd-rank">{{ $i + 1 }}</span>
+                                    <span class="pd-top-name" title="{{ $top['name'] }}">{{ $top['name'] }}</span>
+                                    <span class="pd-top-qty">{{ $top['formatted_qty'] }} {{ $top['unit'] }}</span>
+                                    <i class="pd-top-bar" style="width: {{ $top['share'] }}%" aria-hidden="true"></i>
+                                </li>
+                            @endforeach
+                        </ol>
+                    @endif
+                </aside>
+            </div>
+        @endforeach
     </div>
-</div>
+</section>
 
 <script id="pos-monitor-precomputed" type="application/json">
-{!! json_encode($precomputedData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}
+{!! json_encode($posDashboard, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}
 </script>
 
 <script>
 (()=>{
- const data=JSON.parse(document.querySelector('#pos-monitor-precomputed').textContent);
- const svg=document.querySelector('#sales-chart');
- const el=(name,attrs,text)=>{const n=document.createElementNS('http://www.w3.org/2000/svg',name);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;};
- window.switchDashList=kind=>{for(const k of ['best','low']){document.querySelector('#dash-list-'+k).classList.toggle('active',k===kind);document.querySelector('#dash-toggle-'+k).classList.toggle('active',k===kind);}};
- window.loadSalesDashboard=period=>{const d=data[period];if(!d)return;for(const b of document.querySelectorAll('.sales-period-btn'))b.setAttribute('aria-pressed',String(b.dataset.period===period));document.querySelector('#sales-revenue').textContent=d.formatted_revenue;document.querySelector('#sales-transactions').textContent=d.transaction_count+' transaksi';document.querySelector('#sales-period-label').textContent=d.sub_label;svg.replaceChildren();svg.setAttribute('aria-label','Grafik penjualan '+d.sub_label);const w=420/d.buckets.length;d.buckets.forEach((b,i)=>{const height=Math.max(b.height,b.total!=='0.00'?3:0);svg.append(el('rect',{x:i*w+w*.2,y:115-height,width:w*.6,height,rx:3,fill:'#2d6a4f'}));if(d.buckets.length<=7||i%5===0)svg.append(el('text',{x:i*w+w/2,y:135,'text-anchor':'middle','font-size':10,fill:'#526359'},b.label));});const list=document.querySelector('#dash-list-best ul');list.replaceChildren();for(const p of d.top_products){const row=document.createElement('li'),name=document.createElement('span'),qty=document.createElement('span');name.className='dash-item-name';qty.className='dash-item-num';name.textContent=p.name;qty.textContent=p.formatted_qty+' '+p.unit;row.append(name,qty);list.append(row);}if(!d.top_products.length){const row=document.createElement('li');row.textContent='Belum ada penjualan.';list.append(row);}};
+ const root=document.querySelector('#pos-dashboard');if(!root)return;
+ const buttons=[...root.querySelectorAll('.pd-seg button')],panes=[...root.querySelectorAll('.pd-pane')],sub=root.querySelector('#pd-sub');
+ const data=JSON.parse(document.querySelector('#pos-monitor-precomputed').textContent||'{}');
+ function show(period){
+  for(const b of buttons)b.setAttribute('aria-pressed',String(b.dataset.period===period));
+  for(const p of panes)p.hidden=p.dataset.pane!==period;
+  if(sub&&data[period])sub.textContent=data[period].sub_label;
+  try{localStorage.setItem('pd-period',period);}catch{}
+ }
+ for(const b of buttons)b.addEventListener('click',()=>show(b.dataset.period));
+ let saved=null;try{saved=localStorage.getItem('pd-period');}catch{}
+ if(saved&&data[saved])show(saved);
+ // Ringkasan selalu tampil (fitur lipat dihapus sesuai desain); bersihkan pilihan lipat lama.
+ try{localStorage.removeItem('pd-folded');}catch{}
 })();
 </script>

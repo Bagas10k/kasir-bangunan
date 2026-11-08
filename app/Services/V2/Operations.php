@@ -275,10 +275,17 @@ class Operations
             $this->invalid('Pelanggan wajib untuk transaksi transfer atau kredit.');
         }
 
+        // Harga kontraktor: dipilih kasir per transaksi; bila tidak dikirim, mengikuti penanda pelanggan.
+        $tier = isset($data['price_tier']) && $data['price_tier'] !== '' ? (string) $data['price_tier'] : null;
+        if ($tier !== null && !in_array($tier, ['retail', 'contractor'], true)) {
+            $this->invalid('Jenis harga tidak valid.');
+        }
+        $tier ??= $customerId !== null && DB::table('v2_parties')->where('id', $customerId)->value('price_tier') === 'contractor' ? 'contractor' : 'retail';
+
         $vehicleId = isset($data['vehicle_id']) && $data['vehicle_id'] !== '' ? (int) $data['vehicle_id'] : null;
         $driverName = isset($data['driver_name']) && trim((string) $data['driver_name']) !== '' ? trim((string) $data['driver_name']) : null;
 
-        return DB::transaction(function () use ($actor, $data, $key, $method, $fulfillment, $destination, $items, $deliveryFee, $customerId, $vehicleId, $driverName) {
+        return DB::transaction(function () use ($actor, $data, $key, $method, $fulfillment, $destination, $items, $deliveryFee, $customerId, $vehicleId, $driverName, $tier) {
             $shift = $this->openShiftFor($actor, true);
             $requestHash = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
             $existing = DB::table('v2_sales')->where('idempotency_key', $key)->first();
@@ -331,7 +338,9 @@ class Operations
                     $this->invalid('Stok '.$product->name.' tidak mencukupi.');
                 }
 
-                $price = Money::value((string) $product->selling_price, 2)->toScale(2, RoundingMode::HalfUp);
+                // Harga kontraktor kosong = harga jual biasa.
+                $unitPrice = $tier === 'contractor' && $product->contractor_price !== null ? $product->contractor_price : $product->selling_price;
+                $price = Money::value((string) $unitPrice, 2)->toScale(2, RoundingMode::HalfUp);
                 $cost = Money::value((string) $product->cost_price, 4);
                 $gross = $qty->multipliedBy($price)->toScale(2, RoundingMode::HalfUp);
                 $discount = Money::value(Money::discount((string) $gross, $this->discount($item['discount'] ?? null)), 2);
@@ -425,6 +434,7 @@ class Operations
                 'change_amount' => $this->str($change),
                 'request_hash' => $requestHash,
                 'payment_method' => $method,
+                'price_tier' => $tier,
                 'status' => $status,
                 'fulfillment' => $fulfillment,
                 'idempotency_key' => $key,

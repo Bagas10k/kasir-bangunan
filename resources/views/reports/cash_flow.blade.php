@@ -1,4 +1,5 @@
-@extends('layouts.app')
+{{-- Panel workspace memuat halaman ini lewat fetch (?partial=1); URL penuh tetap berfungsi. --}}
+@extends(request()->boolean('partial') ? 'layouts.partial' : 'layouts.app')
 @section('content')
 @include('reports._styles')
 
@@ -80,8 +81,7 @@
                         @endforeach
                     </div>
                 </div>
-                <details class="custom-period">
-                    <summary>Rentang tanggal</summary>
+                <div class="custom-period">
                     <form method="GET" action="{{ route('reports.cash_flow') }}" class="date-cluster">
                         <div class="field">
                             <label for="start_date">Mulai</label>
@@ -95,7 +95,7 @@
                         <button type="submit" class="btn report-apply">Tampilkan</button>
                         <a href="{{ route('reports.cash_flow') }}" class="report-reset">Reset</a>
                     </form>
-                </details>
+                </div>
             </div>
         </div>
     </div>
@@ -229,4 +229,5 @@
         </table>
     </div>
 </div>
+@include('v2.finance-dna')
 @endsection

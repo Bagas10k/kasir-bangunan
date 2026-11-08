@@ -2,9 +2,7 @@
 
 namespace App\Services\V2;
 
-use App\Services\V2\Operations;
 use Brick\Math\RoundingMode;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Phar;
@@ -14,6 +12,8 @@ use RuntimeException;
 class MasterData
 {
     private const KINDS = ['product', 'customer', 'supplier', 'employee', 'vehicle'];
+
+    private const RELATION_KINDS = ['driver', 'unit', 'category'];
 
     /** Batas panjang teks per kolom (kolom DB string 255, kode lebih pendek). */
     private const MAX_TEXT = [
@@ -28,9 +28,13 @@ class MasterData
     ];
 
     private const MAX_ROWS = 1000;
+
     private const MAX_COLS = 128;
+
     private const MAX_CELLS_PER_ROW = 512;
+
     private const MAX_ZIP_ENTRIES = 100;
+
     private const MAX_UNCOMPRESSED = 10 * 1024 * 1024;
 
     private const FORBIDDEN_COLUMNS = ['stock', 'stock_quantity', 'stock_qty', 'balance', 'opening_balance', 'saldo', 'stok'];
@@ -63,12 +67,22 @@ class MasterData
     public function records(int $actor, string $kind): object
     {
         $this->requireAdmin($actor);
-        if (!in_array($kind, self::KINDS, true)) {
+        if (! in_array($kind, self::KINDS, true)) {
             throw new RuntimeException("Kind {$kind} tidak valid.");
         }
 
         if ($kind === 'product') {
-            return DB::table('products')->orderBy('id', 'desc')->limit(100)->get();
+            $records = DB::table('products')->orderBy('id', 'desc')->limit(100)->get();
+            $links = DB::table('v2_product_suppliers')->whereIn('product_id', $records->pluck('id'))
+                ->orderBy('supplier_id')->get()->groupBy('product_id');
+            foreach ($records as $record) {
+                $suppliers = $links->get($record->id, collect());
+                $record->supplier_ids = $suppliers->pluck('supplier_id')->map(fn ($id): int => (int) $id)->all();
+                $primary = $suppliers->first(fn (object $link): bool => (bool) $link->is_primary);
+                $record->primary_supplier_id = $primary ? (int) $primary->supplier_id : null;
+            }
+
+            return $records;
         }
 
         if ($kind === 'vehicle') {
@@ -81,7 +95,7 @@ class MasterData
     public function store(int $actor, string $kind, array $data): int
     {
         $this->requireAdmin($actor);
-        if (!in_array($kind, self::KINDS, true)) {
+        if (! in_array($kind, self::KINDS, true)) {
             throw new RuntimeException("Kind {$kind} tidak valid.");
         }
 
@@ -96,6 +110,7 @@ class MasterData
 
             $now = now();
             if ($kind === 'product') {
+                $row = app(MasterRelations::class)->productAttributes($data, $row);
                 $payload = $row + ['stock_quantity' => '0.0000', 'is_active' => true]; // zero product stock
             } elseif ($kind === 'vehicle') {
                 $payload = $row + ['status' => 'active'];
@@ -105,7 +120,12 @@ class MasterData
             $payload['created_at'] = $now;
             $payload['updated_at'] = $now;
 
-            return DB::table($table)->insertGetId($payload);
+            $id = DB::table($table)->insertGetId($payload);
+            if ($kind === 'product') {
+                app(MasterRelations::class)->syncProductSuppliers($id, $data);
+            }
+
+            return $id;
         });
     }
 
@@ -121,7 +141,7 @@ class MasterData
         DB::transaction(function () use ($kind, $id, $data): void {
             [$table, $keyColumn, $keyLabel] = $this->keySpec($kind);
             $current = $this->rowQuery($kind, $id)->lockForUpdate()->first();
-            if (!$current) {
+            if (! $current) {
                 throw new RuntimeException('Data tidak ditemukan.');
             }
 
@@ -130,12 +150,20 @@ class MasterData
             // Field yang tidak dikirim dipertahankan, bukan di-reset ke 0/null.
             if ($kind === 'product') {
                 foreach (['cost_price' => 4, 'selling_price' => 2, 'min_stock' => 4] as $field => $scale) {
-                    if (!array_key_exists($field, $data)) {
+                    if (! array_key_exists($field, $data)) {
                         $row[$field] = $this->decimal($current->{$field} ?? '0', $field, $scale);
                     }
                 }
-            } elseif ($kind !== 'vehicle' && !array_key_exists('notes', $data)) {
-                $row['notes'] = $current->notes;
+                if (! array_key_exists('contractor_price', $data)) {
+                    $row['contractor_price'] = $current->contractor_price;
+                }
+            } elseif ($kind !== 'vehicle') {
+                if (! array_key_exists('notes', $data)) {
+                    $row['notes'] = $current->notes;
+                }
+                if ($kind === 'customer' && ! array_key_exists('price_tier', $data)) {
+                    $row['price_tier'] = $current->price_tier ?? 'retail';
+                }
             }
 
             if (DB::table($table)->where($keyColumn, $row[$keyColumn])->where('id', '<>', $id)->exists()) {
@@ -150,6 +178,10 @@ class MasterData
                 throw new RuntimeException('HPP tidak dapat diubah: produk sudah punya stok atau riwayat pergerakan. Ubah HPP lewat penerimaan/saldo awal.');
             }
 
+            if ($kind === 'product') {
+                $row = app(MasterRelations::class)->productAttributes($data, $row, $current);
+                app(MasterRelations::class)->syncProductSuppliers($id, $data);
+            }
             $row['updated_at'] = now();
             DB::table($table)->where('id', $id)->update($row);
         });
@@ -163,7 +195,7 @@ class MasterData
 
         DB::transaction(function () use ($kind, $id): void {
             [$table] = $this->keySpec($kind);
-            if (!$this->rowQuery($kind, $id)->lockForUpdate()->exists()) {
+            if (! $this->rowQuery($kind, $id)->lockForUpdate()->exists()) {
                 throw new RuntimeException('Data tidak ditemukan.');
             }
 
@@ -190,7 +222,7 @@ class MasterData
 
     private function assertKind(string $kind): void
     {
-        if (!in_array($kind, self::KINDS, true)) {
+        if (! in_array($kind, self::KINDS, true)) {
             throw new RuntimeException("Kind {$kind} tidak valid.");
         }
     }
@@ -211,10 +243,11 @@ class MasterData
             return [
                 'sku' => $this->text($data['sku'] ?? '', 'sku', true),
                 'name' => $this->text($data['name'] ?? '', 'name', true),
-                'unit' => $this->text($data['unit'] ?? '', 'unit', true),
-                'category' => $this->text($data['category'] ?? 'Umum', 'category') ?: 'Umum',
+                'unit' => isset($data['unit_id']) && $data['unit_id'] !== '' ? '' : $this->text($data['unit'] ?? '', 'unit', true),
+                'category' => isset($data['category_id']) && $data['category_id'] !== '' ? '' : ($this->text($data['category'] ?? 'Umum', 'category') ?: 'Umum'),
                 'cost_price' => $this->decimal($data['cost_price'] ?? '0', 'cost_price', 4),
                 'selling_price' => $this->decimal($data['selling_price'] ?? '0', 'selling_price', 2),
+                'contractor_price' => $this->optionalPrice($data['contractor_price'] ?? null, 'contractor_price'),
                 'min_stock' => $this->decimal($data['min_stock'] ?? '0', 'min_stock', 4),
             ];
         }
@@ -227,17 +260,39 @@ class MasterData
         }
 
         $notes = $this->text($data['notes'] ?? '', 'notes');
-
-        return [
+        $row = [
             'code' => $this->text($data['code'] ?? '', 'code', true),
             'name' => $this->text($data['name'] ?? '', 'name', true),
             'notes' => $notes === '' ? null : $notes,
         ];
+        if ($kind === 'customer') {
+            $tier = trim((string) ($data['price_tier'] ?? '')) ?: 'retail';
+            if (! in_array($tier, ['retail', 'contractor'], true)) {
+                throw new RuntimeException("Kolom 'price_tier' harus retail atau contractor.");
+            }
+            $row['price_tier'] = $tier;
+        }
+
+        return $row;
+    }
+
+    /** Harga opsional (mis. harga kontraktor): kosong = NULL, selain itu wajib lebih dari 0. */
+    private function optionalPrice(mixed $value, string $field): ?string
+    {
+        if ($value === null || (is_scalar($value) && trim((string) $value) === '')) {
+            return null;
+        }
+        $amount = $this->decimal($value, $field, 2);
+        if (\Brick\Math\BigDecimal::of($amount)->isZero()) {
+            throw new RuntimeException("Kolom '{$field}' harus lebih dari 0 atau dikosongkan.");
+        }
+
+        return $amount;
     }
 
     private function text(mixed $value, string $field, bool $required = false): string
     {
-        if (!is_scalar($value) && $value !== null) {
+        if (! is_scalar($value) && $value !== null) {
             throw new RuntimeException("Kolom '{$field}' tidak valid.");
         }
         $text = trim((string) $value);
@@ -245,6 +300,7 @@ class MasterData
             if ($required) {
                 throw new RuntimeException("Kolom '{$field}' wajib diisi.");
             }
+
             return '';
         }
         $max = self::MAX_TEXT[$field] ?? 255;
@@ -265,7 +321,7 @@ class MasterData
         try {
             $amount = Money::value($raw, $scale);
         } catch (InvalidArgumentException $e) {
-            throw new RuntimeException("Kolom '{$field}' bukan angka valid: " . $e->getMessage());
+            throw new RuntimeException("Kolom '{$field}' bukan angka valid: ".$e->getMessage());
         }
         if ($amount->isNegative()) {
             throw new RuntimeException("Kolom '{$field}' tidak boleh negatif.");
@@ -298,18 +354,18 @@ class MasterData
     public function template(int $actor, string $kind): string
     {
         $this->requireAdmin($actor);
+        $this->assertXlsxKind($kind);
         $cols = $this->columns($kind);
+
         return $this->buildMinimalXlsx($cols);
     }
 
     public function preview(int $actor, string $kind, string $filePath): array
     {
         $this->requireAdmin($actor);
-        if (!in_array($kind, self::KINDS, true)) {
-            throw new RuntimeException("Kind {$kind} tidak valid.");
-        }
+        $this->assertXlsxKind($kind);
 
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             throw new RuntimeException('Berkas tidak ditemukan.');
         }
 
@@ -318,7 +374,7 @@ class MasterData
         }
 
         $parseResult = $this->parseXlsxFile($filePath, $this->columns($kind));
-        if (!empty($parseResult['errors'])) {
+        if (! empty($parseResult['errors'])) {
             return $this->previewReject($parseResult['errors'][0]);
         }
 
@@ -328,7 +384,7 @@ class MasterData
             return $this->previewReject('Berkas tidak memuat baris data.');
         }
         if ($rowCount > self::MAX_ROWS) {
-            return $this->previewReject('Jumlah baris melebihi batas maksimum ' . self::MAX_ROWS . ' baris.');
+            return $this->previewReject('Jumlah baris melebihi batas maksimum '.self::MAX_ROWS.' baris.');
         }
 
         $keyColumn = $this->keySpec($kind)[1];
@@ -341,7 +397,8 @@ class MasterData
             try {
                 $record = $this->validateRow($kind, $row);
             } catch (RuntimeException $e) {
-                $errors[] = "Baris {$rowNum}: " . $e->getMessage();
+                $errors[] = "Baris {$rowNum}: ".$e->getMessage();
+
                 continue;
             }
 
@@ -357,12 +414,12 @@ class MasterData
         // Unik terhadap data yang sudah ada: batch tidak boleh dibuat bila ada bentrok.
         if (empty($errors)) {
             $existing = $this->existingKeys($kind, array_keys($uniqueKeys));
-            if (!empty($existing)) {
-                $errors[] = 'Data sudah terdaftar di database: ' . implode(', ', $existing) . '.';
+            if (! empty($existing)) {
+                $errors[] = 'Data sudah terdaftar di database: '.implode(', ', $existing).'.';
             }
         }
 
-        if (!empty($errors)) {
+        if (! empty($errors)) {
             return [
                 'batch_id' => null,
                 'count' => $rowCount,
@@ -397,7 +454,7 @@ class MasterData
 
         return DB::transaction(function () use ($actor, $batchId) {
             $batch = DB::table('v2_import_batches')->where('id', $batchId)->lockForUpdate()->first();
-            if (!$batch) {
+            if (! $batch) {
                 throw new RuntimeException('Batch import tidak ditemukan.');
             }
             if ((int) $batch->actor_id !== $actor) {
@@ -416,6 +473,7 @@ class MasterData
             }
 
             $kind = $batch->kind;
+            $this->assertXlsxKind($kind);
             $rows = json_decode($batch->rows, true, 512, JSON_THROW_ON_ERROR);
 
             // Revalidasi + insert per baris lewat satu jalur (store): aturan sama dengan form manual,
@@ -440,6 +498,14 @@ class MasterData
         });
     }
 
+    private function assertXlsxKind(string $kind): void
+    {
+        if (in_array($kind, self::RELATION_KINDS, true)) {
+            throw new RuntimeException("XLSX tidak tersedia untuk master {$kind}.");
+        }
+        $this->assertKind($kind);
+    }
+
     private function previewReject(string $error): array
     {
         return [
@@ -452,42 +518,42 @@ class MasterData
 
     private function buildMinimalXlsx(array $headers): string
     {
-        $tmpDir = storage_path('app/private/tmp_xlsx_' . bin2hex(random_bytes(8)));
-        if (!is_dir($tmpDir)) {
+        $tmpDir = storage_path('app/private/tmp_xlsx_'.bin2hex(random_bytes(8)));
+        if (! is_dir($tmpDir)) {
             mkdir($tmpDir, 0755, true);
         }
-        $zipPath = $tmpDir . '/template.zip';
+        $zipPath = $tmpDir.'/template.zip';
 
         try {
-            $contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
-                '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' .
-                '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' .
-                '<Default Extension="xml" ContentType="application/xml"/>' .
-                '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' .
-                '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' .
-                '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>' .
+            $contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.
+                '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'.
+                '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'.
+                '<Default Extension="xml" ContentType="application/xml"/>'.
+                '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'.
+                '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'.
+                '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>'.
                 '</Types>';
 
-            $rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
-                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' .
-                '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' .
+            $rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'.
+                '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'.
                 '</Relationships>';
 
-            $wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
-                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' .
-                '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' .
-                '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>' .
+            $wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'.
+                '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'.
+                '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>'.
                 '</Relationships>';
 
-            $workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
-                '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' .
-                '<sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>' .
+            $workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.
+                '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'.
+                '<sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>'.
                 '</workbook>';
 
             // Shared strings for headers
             $sstCount = count($headers);
-            $sstXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
-                '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="' . $sstCount . '" uniqueCount="' . $sstCount . '">';
+            $sstXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.
+                '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="'.$sstCount.'" uniqueCount="'.$sstCount.'">';
             foreach ($headers as $h) {
                 $cleanH = htmlspecialchars((string) $h, ENT_XML1, 'UTF-8');
                 $sstXml .= "<si><t>{$cleanH}</t></si>";
@@ -495,12 +561,12 @@ class MasterData
             $sstXml .= '</sst>';
 
             // Sheet xml
-            $sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
-                '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' .
+            $sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.
+                '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'.
                 '<sheetData><row r="1">';
             foreach ($headers as $colIdx => $h) {
                 $colLetter = chr(65 + $colIdx);
-                $sheetXml .= '<c r="' . $colLetter . '1" t="s"><v>' . $colIdx . '</v></c>';
+                $sheetXml .= '<c r="'.$colLetter.'1" t="s"><v>'.$colIdx.'</v></c>';
             }
             $sheetXml .= '</row></sheetData></worksheet>';
 
@@ -514,6 +580,7 @@ class MasterData
             unset($phar);
 
             $bytes = file_get_contents($zipPath);
+
             return $bytes;
         } finally {
             if (file_exists($zipPath)) {
@@ -527,12 +594,12 @@ class MasterData
 
     private function parseXlsxFile(string $filePath, array $expectedColumns): array
     {
-        $tmpDir = storage_path('app/private/tmp_extract_' . bin2hex(random_bytes(8)));
-        if (!is_dir($tmpDir)) {
+        $tmpDir = storage_path('app/private/tmp_extract_'.bin2hex(random_bytes(8)));
+        if (! is_dir($tmpDir)) {
             mkdir($tmpDir, 0755, true);
         }
 
-        $copyZip = $tmpDir . '/source.zip';
+        $copyZip = $tmpDir.'/source.zip';
         copy($filePath, $copyZip);
 
         try {
@@ -546,7 +613,8 @@ class MasterData
             foreach (new \RecursiveIteratorIterator($phar) as $file) {
                 if (++$entries > self::MAX_ZIP_ENTRIES) {
                     unset($phar);
-                    return $this->reject('Jumlah entri di dalam ZIP melebihi batas ' . self::MAX_ZIP_ENTRIES . '.');
+
+                    return $this->reject('Jumlah entri di dalam ZIP melebihi batas '.self::MAX_ZIP_ENTRIES.'.');
                 }
                 if ($file->isDir()) {
                     continue;
@@ -557,21 +625,25 @@ class MasterData
 
                 if ($file->isLink()) {
                     unset($phar);
+
                     return $this->reject('Berkas mengandung symlink yang dilarang.');
                 }
-                if (!$this->isSafeEntryPath($rel)) {
+                if (! $this->isSafeEntryPath($rel)) {
                     unset($phar);
-                    return $this->reject('Berkas mengandung path entri tidak aman: ' . $rel);
+
+                    return $this->reject('Berkas mengandung path entri tidak aman: '.$rel);
                 }
                 // Reject macros and external references
                 if (str_ends_with($lowerRel, '.bin') || str_contains($lowerRel, 'vba') || str_contains($lowerRel, 'externallink')) {
                     unset($phar);
+
                     return $this->reject('Berkas mengandung macro/bin/externalLinks yang dilarang.');
                 }
 
                 $totalUncompressed += $file->getSize();
                 if ($totalUncompressed > self::MAX_UNCOMPRESSED) {
                     unset($phar);
+
                     return $this->reject('Ukuran uncompressed berkas melebihi batas 10MB.');
                 }
 
@@ -585,9 +657,9 @@ class MasterData
 
             // Semua XML diperiksa sebelum parsing: DOCTYPE/ENTITY, external links, formula (sheet apa pun).
             foreach ($xmlEntries as $rel) {
-                $path = $tmpDir . '/' . $rel;
-                if (!is_file($path)) {
-                    return $this->reject('Entri XML tidak dapat dibaca: ' . $rel);
+                $path = $tmpDir.'/'.$rel;
+                if (! is_file($path)) {
+                    return $this->reject('Entri XML tidak dapat dibaca: '.$rel);
                 }
                 $content = (string) file_get_contents($path);
 
@@ -604,7 +676,7 @@ class MasterData
 
             // Read shared strings
             $sharedStrings = [];
-            $sstPath = $tmpDir . '/xl/sharedStrings.xml';
+            $sstPath = $tmpDir.'/xl/sharedStrings.xml';
             if (is_file($sstPath)) {
                 $sstXml = simplexml_load_string((string) file_get_contents($sstPath), 'SimpleXMLElement', LIBXML_NONET);
                 if ($sstXml !== false) {
@@ -625,8 +697,8 @@ class MasterData
             }
 
             // Find sheet1
-            $sheetPath = $tmpDir . '/xl/worksheets/sheet1.xml';
-            if (!is_file($sheetPath)) {
+            $sheetPath = $tmpDir.'/xl/worksheets/sheet1.xml';
+            if (! is_file($sheetPath)) {
                 return $this->reject('Worksheet sheet1.xml tidak ditemukan di dalam XLSX.');
             }
 
@@ -643,22 +715,22 @@ class MasterData
                 foreach ($sheetXml->sheetData->row as $r) {
                     $rowIndex++;
                     if ($rowIndex > self::MAX_ROWS + 1) {
-                        return $this->reject('Jumlah baris melebihi batas maksimum ' . self::MAX_ROWS . ' baris.');
+                        return $this->reject('Jumlah baris melebihi batas maksimum '.self::MAX_ROWS.' baris.');
                     }
 
                     $cells = [];
                     $cellCount = 0;
                     foreach ($r->c as $c) {
                         if (++$cellCount > self::MAX_CELLS_PER_ROW) {
-                            return $this->reject('Jumlah sel pada baris ' . $rowIndex . ' melebihi batas ' . self::MAX_CELLS_PER_ROW . '.');
+                            return $this->reject('Jumlah sel pada baris '.$rowIndex.' melebihi batas '.self::MAX_CELLS_PER_ROW.'.');
                         }
                         $cellRef = strtoupper((string) $c['r']);
                         if (preg_match('/^([A-Z]{1,3})(\d{1,7})$/', $cellRef, $m) !== 1) {
-                            return $this->reject('Referensi sel tidak valid: "' . $cellRef . '".');
+                            return $this->reject('Referensi sel tidak valid: "'.$cellRef.'".');
                         }
                         $colIdx = $this->colLetterToIndex($m[1]);
                         if ($colIdx < 0 || $colIdx >= self::MAX_COLS) {
-                            return $this->reject('Referensi kolom ' . $m[1] . ' di luar batas ' . self::MAX_COLS . ' kolom.');
+                            return $this->reject('Referensi kolom '.$m[1].' di luar batas '.self::MAX_COLS.' kolom.');
                         }
 
                         $type = (string) $c['t'];
@@ -680,6 +752,7 @@ class MasterData
                         if ($headerError !== null) {
                             return $this->reject($headerError);
                         }
+
                         continue;
                     }
 
@@ -709,7 +782,7 @@ class MasterData
 
             return ['rows' => $rows, 'errors' => []];
         } catch (\Throwable $e) {
-            return $this->reject('Gagal memproses berkas XLSX: ' . $e->getMessage());
+            return $this->reject('Gagal memproses berkas XLSX: '.$e->getMessage());
         } finally {
             $this->recursiveDelete($tmpDir);
         }
@@ -724,7 +797,7 @@ class MasterData
         $headers = [];
         $maxIdx = $cells === [] ? -1 : max(array_keys($cells));
         if ($maxIdx + 1 > self::MAX_COLS) {
-            return 'Header melebihi batas ' . self::MAX_COLS . ' kolom.';
+            return 'Header melebihi batas '.self::MAX_COLS.' kolom.';
         }
 
         $seen = [];
@@ -732,6 +805,7 @@ class MasterData
             $name = strtolower((string) ($cells[$i] ?? ''));
             if ($name === '') {
                 $headers[$i] = '';
+
                 continue;
             }
             if (in_array($name, self::FORBIDDEN_COLUMNS, true)) {
@@ -740,16 +814,16 @@ class MasterData
             if (isset($seen[$name])) {
                 return "Kolom header ganda '{$name}' pada XLSX.";
             }
-            if (!in_array($name, $expectedColumns, true)) {
-                return "Kolom header '{$name}' tidak dikenal. Kolom wajib: " . implode(', ', $expectedColumns);
+            if (! in_array($name, $expectedColumns, true)) {
+                return "Kolom header '{$name}' tidak dikenal. Kolom wajib: ".implode(', ', $expectedColumns);
             }
             $seen[$name] = true;
             $headers[$i] = $name;
         }
 
         $missing = array_diff($expectedColumns, array_values($headers));
-        if (!empty($missing)) {
-            return 'Kolom header XLSX tidak sesuai. Kolom wajib: ' . implode(', ', $expectedColumns);
+        if (! empty($missing)) {
+            return 'Kolom header XLSX tidak sesuai. Kolom wajib: '.implode(', ', $expectedColumns);
         }
 
         return null;
@@ -763,7 +837,7 @@ class MasterData
     /** Path entri relatif di dalam arsip (tanpa prefix phar://…/source.zip/). */
     private function relativeEntryPath(string $pathName, string $copyZip): string
     {
-        $prefix = 'phar://' . $copyZip . '/';
+        $prefix = 'phar://'.$copyZip.'/';
         if (str_starts_with($pathName, $prefix)) {
             return substr($pathName, strlen($prefix));
         }
@@ -800,18 +874,19 @@ class MasterData
         for ($i = 0; $i < $len; $i++) {
             $idx = $idx * 26 + (ord($col[$i]) - 64);
         }
+
         return $idx - 1;
     }
 
     private function recursiveDelete(string $dir): void
     {
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             return;
         }
         $files = array_diff(scandir($dir), ['.', '..']);
         foreach ($files as $file) {
             $path = "$dir/$file";
-            if (is_dir($path) && !is_link($path)) {
+            if (is_dir($path) && ! is_link($path)) {
                 $this->recursiveDelete($path);
             } else {
                 @unlink($path);

@@ -61,6 +61,15 @@ class V2DeliveryTripsTest extends TestCase
         ]);
     }
 
+    private function driver(): int
+    {
+        return (int) DB::table('v2_drivers')->insertGetId([
+            'code' => 'SYN-DRIVER-'.++self::$seq, 'name' => 'Sopir Sintetis',
+            'kind' => 'external', 'employee_id' => null, 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
     private function shift(User $user, string $opening = '1000.00'): int
     {
         return (int) DB::table('v2_shifts')->insertGetId([
@@ -99,7 +108,7 @@ class V2DeliveryTripsTest extends TestCase
     {
         return $overrides + [
             'vehicle_id' => $vehicleId,
-            'driver_name' => 'Sopir Sintetis',
+            'driver_id' => $this->driver(),
             'destination' => 'Zona Beta',
             'date' => '2026-10-30',
             'amount' => '100.00',
@@ -155,6 +164,7 @@ class V2DeliveryTripsTest extends TestCase
         $other = $this->actor('cashier');
         $admin = $this->actor('admin');
         $vehicle = $this->vehicle();
+        $driver = $this->driver();
         $delivery = $this->delivery($cashier);
         $product = (int) DB::table('products')->insertGetId([
             'sku' => 'SYN-DLV-001', 'name' => 'Material Sintetis Gamma', 'unit' => 'unit',
@@ -164,13 +174,14 @@ class V2DeliveryTripsTest extends TestCase
         ]);
         $service = app(DeliveryTrips::class);
 
-        $this->assertForbidden(fn () => $service->dispatch($other->id, $delivery, ['vehicle_id' => $vehicle, 'driver_name' => 'Penyusup']));
+        $this->assertForbidden(fn () => $service->dispatch($other->id, $delivery, ['vehicle_id' => $vehicle, 'driver_id' => $driver]));
 
-        $service->dispatch($cashier->id, $delivery, ['vehicle_id' => $vehicle, 'driver_name' => 'Sopir Sintetis']);
+        $service->dispatch($cashier->id, $delivery, ['vehicle_id' => $vehicle, 'driver_id' => $driver]);
 
         $row = DB::table('v2_deliveries')->where('id', $delivery)->first();
         $this->assertSame('sent', $row->status);
         $this->assertSame($vehicle, (int) $row->vehicle_id);
+        $this->assertSame($driver, (int) $row->driver_id);
         $this->assertSame('Sopir Sintetis', $row->driver_name);
         $this->assertSame($cashier->id, (int) $row->dispatched_by);
         $this->assertNotNull($row->dispatched_at);
@@ -182,7 +193,7 @@ class V2DeliveryTripsTest extends TestCase
 
         // Kirim ulang identik: tanpa efek samping, stempel audit tidak berubah.
         $stamp = (string) $row->dispatched_at;
-        $service->dispatch($cashier->id, $delivery, ['vehicle_id' => $vehicle, 'driver_name' => 'Sopir Sintetis']);
+        $service->dispatch($cashier->id, $delivery, ['vehicle_id' => $vehicle, 'driver_id' => $driver]);
         $this->assertSame('sent', DB::table('v2_deliveries')->where('id', $delivery)->value('status'));
         $this->assertSame($stamp, (string) DB::table('v2_deliveries')->where('id', $delivery)->value('dispatched_at'));
         $this->assertSame(0, DB::table('journal_entries')->count());
@@ -198,7 +209,7 @@ class V2DeliveryTripsTest extends TestCase
         $service->receive($cashier->id, $delivery);
         $this->assertSame('received', DB::table('v2_deliveries')->where('id', $delivery)->value('status'));
 
-        $this->assertInvalid(fn () => $service->dispatch($admin->id, $delivery, ['vehicle_id' => $vehicle, 'driver_name' => 'Sopir Sintetis']));
+        $this->assertInvalid(fn () => $service->dispatch($admin->id, $delivery, ['vehicle_id' => $vehicle, 'driver_id' => $driver]));
         $this->assertSame('received', DB::table('v2_deliveries')->where('id', $delivery)->value('status'));
         $this->assertSame(0, DB::table('journal_entries')->count());
         $this->assertSame(0, DB::table('stock_movements')->count());

@@ -124,35 +124,13 @@
     border-radius: 10px;
 }
 
-#kasir table#products-table {
-    width: 100%;
-    min-width: 620px;
-    border-collapse: collapse;
-}
 
-#kasir table#products-table th {
-    background: var(--pos-mint-surface);
-    color: var(--pos-primary-hover);
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 8px 10px;
-    border-bottom: 2px solid var(--pos-mint-border);
-    text-align: left;
-    white-space: nowrap;
-}
 
-#kasir table#products-table td {
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--pos-border-subtle);
-    font-size: 13px;
-    vertical-align: middle;
-}
 
-#kasir table#products-table tr:hover td {
-    background-color: #fafcfb;
-}
+
+
+
+
 
 /* Pill buttons */
 #kasir .btn-table-action,
@@ -477,19 +455,19 @@
 #kasir .pos-catalog-pane,#kasir .pos-cart-pane,#kasir .pos-cart-pane .card{min-width:0}
 #kasir .catalog-filter-row{grid-template-columns:repeat(2,minmax(0,1fr)) auto}
 #kasir .catalog-filter-row>div{min-width:0}
-#kasir table#products-table{min-width:0;table-layout:fixed;font-size:12px}
-#kasir table#products-table th:nth-child(1){width:13%}
-#kasir table#products-table th:nth-child(2){width:25%}
-#kasir table#products-table th:nth-child(3){width:15%}
-#kasir table#products-table th:nth-child(4){width:13%}
-#kasir table#products-table th:nth-child(5){width:17%}
-#kasir table#products-table th:nth-child(6){width:17%}
-#kasir table#products-table th{font-size:10px;letter-spacing:0}
-#kasir table#products-table td,#kasir table#products-table th{padding-inline:4px}
+
+
+
+
+
+
+
+
+
 #kasir .pos-catalog-pane .btn-table-action{padding-inline:8px;font-size:12px}
-#kasir table#products-table td,#kasir table#products-table th{padding:8px 6px;white-space:normal;overflow-wrap:anywhere}
-#kasir table#products-table td:first-child{font-size:11px}
-#kasir table#products-table th{white-space:nowrap}
+
+
+
 #kasir [hidden]{display:none!important}
 #kasir .money{white-space:nowrap!important;text-align:right;font-variant-numeric:tabular-nums}
 #kasir .cart-label{display:flex;justify-content:space-between;gap:8px;margin-bottom:12px}
@@ -503,6 +481,109 @@
 #kasir .btn-table-action{min-height:44px;color:#123c26}
 #kasir input:focus-visible,#kasir select:focus-visible,#kasir button:focus-visible{outline:3px solid #14532d;outline-offset:2px}
 #kasir .summary-total{border-top:0;padding-top:0;margin-top:0}
+/* --- INFORMASI PEMBELI (KASIR & MODAL) --- */
+#kasir .pos-buyer-card {
+    background: #f8faf8;
+    border: 1px solid var(--pos-border-control);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+#kasir .pos-buyer-card:focus-within {
+    border-color: var(--pos-primary);
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.12);
+}
+#kasir .pos-buyer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+#kasir .pos-buyer-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--pos-text-main);
+    letter-spacing: -0.01em;
+}
+#kasir .pos-buyer-title svg {
+    color: var(--pos-primary);
+    flex-shrink: 0;
+}
+#kasir .pos-buyer-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 999px;
+    line-height: 1.2;
+}
+#kasir .pos-buyer-badge.badge-general {
+    background: #e9ecef;
+    color: #495057;
+    border: 1px solid #dee2e6;
+}
+#kasir .pos-buyer-badge.badge-registered {
+    background: var(--pos-mint-surface);
+    color: var(--pos-primary);
+    border: 1px solid var(--pos-mint-border);
+}
+#kasir select.pos-customer-select {
+    width: 100%;
+    min-height: 42px;
+    padding: 8px 12px;
+    font-size: 13.5px;
+    font-family: inherit;
+    font-weight: 500;
+    color: var(--pos-text-main);
+    background: #ffffff;
+    border: 1px solid var(--pos-border-control);
+    border-radius: 8px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+#kasir select.pos-customer-select:focus {
+    outline: none;
+    border-color: var(--pos-primary);
+    box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.2);
+}
+#kasir .pos-buyer-meta {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--pos-text-caption);
+}
+#kasir .pos-req-indicator {
+    color: #c92a2a;
+    font-weight: 700;
+    font-size: 11.5px;
+    margin-left: 4px;
+}
+#kasir .modal-buyer-block {
+    background: #f8faf8;
+    border: 1px solid var(--pos-border-control);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+}
+#kasir .pos-credit-warning-box {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: #fff5f5;
+    border: 1px solid #ffc9c9;
+    border-radius: 6px;
+    color: #c92a2a;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+}
 #kasir .input-dialog{width:min(560px,calc(100vw - 24px));max-width:min(560px,calc(100vw - 24px))}
 #kasir .input-dialog .summary-box{margin:0 0 18px;padding:14px}
 #kasir .input-dialog .row{margin-top:12px}
@@ -513,8 +594,6 @@
 #kasir .review-line{display:flex;justify-content:space-between;gap:16px;font-variant-numeric:tabular-nums}
 @media(max-width:700px){
  #kasir .input-dialog .row>.field{flex:1 1 100%}
- #kasir table#products-table th:last-child,#kasir table#products-table td:last-child{position:sticky;right:0;background:#fff;box-shadow:-3px 0 7px rgb(18 60 38 / .05)}
- #kasir table#products-table th:last-child{background:#e8f5e9;z-index:1}
 }
-@media(max-width:700px){#kasir .catalog-filter-row{grid-template-columns:repeat(2,minmax(0,1fr))}#kasir .catalog-filter-row>button{grid-column:1/-1}#kasir .catalog-table-scroll{max-height:280px}#kasir table#products-table{min-width:560px}#kasir .search-kbd-hint{display:none}#kasir .cart-table-scroll{max-height:260px}#kasir .item-row .item-subtotal{font-size:12px}#kasir .qty-stepper input[data-name=quantity]{width:64px;max-width:64px}}
+@media(max-width:700px){#kasir .catalog-filter-row{grid-template-columns:repeat(2,minmax(0,1fr))}#kasir .catalog-filter-row>button{grid-column:1/-1}#kasir .catalog-table-scroll{max-height:280px}#kasir .search-kbd-hint{display:none}#kasir .cart-table-scroll{max-height:260px}#kasir .item-row .item-subtotal{font-size:12px}#kasir .qty-stepper input[data-name=quantity]{width:64px;max-width:64px}}
 </style>

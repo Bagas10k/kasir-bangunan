@@ -39,6 +39,29 @@ final class Money
     }
 
     /**
+     * Format tampilan Rupiah tunggal untuk seluruh layar: `Rp 1.234.567`, sen hanya bila ada
+     * (`Rp 1.234,50`). Murni tampilan; perhitungan tetap memakai string desimal dan BigDecimal.
+     */
+    public static function display(mixed $value): string
+    {
+        if ($value === null || $value === '' || ! is_scalar($value)) {
+            return '—';
+        }
+
+        try {
+            $decimal = BigDecimal::of(trim((string) $value))->toScale(2, RoundingMode::HalfUp);
+        } catch (\Throwable) {
+            return '—';
+        }
+
+        $negative = $decimal->isNegative();
+        [$integer, $fraction] = explode('.', (string) $decimal->abs());
+        $grouped = preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', $integer);
+
+        return ($negative ? '-' : '').'Rp '.$grouped.($fraction === '00' ? '' : ','.$fraction);
+    }
+
+    /**
      * Hitung diskon atas dasar (base) tertentu.
      * $discount: ['type' => 'amount'|'percent', 'value' => string]; array kosong = 0.
      * Persen 0-100, nominal 0..base. Hasil tidak boleh melebihi base.
@@ -58,11 +81,11 @@ final class Money
         $type = $discount['type'] ?? null;
         $raw = $discount['value'] ?? '0';
 
-        if (is_float($raw) || !is_scalar($raw) || is_bool($raw)) {
+        if (is_float($raw) || ! is_scalar($raw) || is_bool($raw)) {
             throw new InvalidArgumentException('Nilai diskon harus berupa string desimal.');
         }
 
-        if (!in_array($type, ['amount', 'percent'], true)) {
+        if (! in_array($type, ['amount', 'percent'], true)) {
             throw new InvalidArgumentException('Tipe diskon harus "amount" atau "percent".');
         }
 

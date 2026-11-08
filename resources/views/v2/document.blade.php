@@ -110,7 +110,7 @@
     <div class="wrap">
         <h1>Kasir Bangunan V2 · Dokumen</h1>
         <div class="nav">
-            <a href="{{ route('v2.index') }}">Kembali ke ruang kerja</a>
+            <a href="{{ route(config('v2.enabled') ? 'pos.index' : 'v2.index') }}">Kembali ke ruang kerja</a>
             <button type="button" class="no-print" onclick="window.print()">Cetak</button>
         </div>
     </div>

@@ -2,15 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\V2\WorkspaceController;
 use App\Services\PosCheckoutService;
 use App\Services\RitaseService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class PosController extends Controller
 {
     public function index(Request $request)
     {
+        if (config('v2.enabled')) {
+            return app(WorkspaceController::class)->index($request);
+        }
+
         $productQ = trim((string) $request->input('product_q', ''));
         $productCategory = trim((string) $request->input('product_category', ''));
         $productStock = (string) $request->input('product_stock', 'all');
@@ -30,7 +37,7 @@ class PosController extends Controller
             })
             ->when($productStock === 'low', function ($q) {
                 $q->where('stock_quantity', '>', 0)
-                  ->where('stock_quantity', '<=', 10);
+                    ->where('stock_quantity', '<=', 10);
             })
             ->when($productStock === 'out', function ($q) {
                 $q->where('stock_quantity', '<=', 0);
@@ -66,7 +73,7 @@ class PosController extends Controller
             'out' => DB::table('products')->where('is_active', true)->where('stock_quantity', '<=', 0)->count(),
         ];
 
-        $fleetReady = \Illuminate\Support\Facades\Schema::hasColumn('ritases', 'inventory_receipt_id');
+        $fleetReady = Schema::hasColumn('ritases', 'inventory_receipt_id');
         $vehicles = $fleetReady
             ? DB::table('vehicles')->where('status', 'active')->orderBy('license_plate')->get(['id', 'license_plate', 'vehicle_type'])
             : collect();
@@ -98,10 +105,10 @@ class PosController extends Controller
             ->when($search !== '', function ($q) use ($search) {
                 $q->where('invoice_number', 'like', "%{$search}%");
             })
-            ->when(!empty($filters['payment_method']), fn ($q) => $q->where('payment_method', $filters['payment_method']))
-            ->when(!empty($filters['customer_type']), fn ($q) => $q->where('customer_type', $filters['customer_type']))
-            ->when(!empty($filters['start_date']), fn ($q) => $q->whereDate('created_at', '>=', $filters['start_date']))
-            ->when(!empty($filters['end_date']), fn ($q) => $q->whereDate('created_at', '<=', $filters['end_date']))
+            ->when(! empty($filters['payment_method']), fn ($q) => $q->where('payment_method', $filters['payment_method']))
+            ->when(! empty($filters['customer_type']), fn ($q) => $q->where('customer_type', $filters['customer_type']))
+            ->when(! empty($filters['start_date']), fn ($q) => $q->whereDate('created_at', '>=', $filters['start_date']))
+            ->when(! empty($filters['end_date']), fn ($q) => $q->whereDate('created_at', '<=', $filters['end_date']))
             ->orderBy($sortCol, $dir)
             ->paginate($perPage);
 
@@ -134,10 +141,10 @@ class PosController extends Controller
         $products = DB::table('products')
             ->select('id', 'sku', 'name', 'unit', 'category', 'stock_quantity', 'selling_price')
             ->where('is_active', true)
-            ->when(!empty($filters['category']), fn ($query) => $query->where('category', $filters['category']))
+            ->when(! empty($filters['category']), fn ($query) => $query->where('category', $filters['category']))
             ->where(function ($query) use ($lower) {
                 $query->where(DB::raw('LOWER(sku)'), 'like', "%{$lower}%")
-                      ->orWhere(DB::raw('LOWER(name)'), 'like', "%{$lower}%");
+                    ->orWhere(DB::raw('LOWER(name)'), 'like', "%{$lower}%");
             })
             ->orderBy('name')
             ->limit(10)
@@ -164,7 +171,7 @@ class PosController extends Controller
             return response()->json(['error' => 'Pilih penggunaan armada untuk mengisi biaya ritase.'], 422);
         }
 
-        if ((string) $request->input('use_armada') === '1' && !\Illuminate\Support\Facades\Schema::hasColumn('ritases', 'inventory_receipt_id')) {
+        if ((string) $request->input('use_armada') === '1' && ! Schema::hasColumn('ritases', 'inventory_receipt_id')) {
             return response()->json(['error' => 'Pilihan armada belum tersedia sampai pembaruan database selesai.'], 422);
         }
 
@@ -184,12 +191,14 @@ class PosController extends Controller
                         (int) $sale['sale_id']
                     );
                 }
+
                 return $sale;
             });
         } catch (\InvalidArgumentException|\RuntimeException $e) {
             if ($request->wantsJson()) {
                 return response()->json(['error' => $e->getMessage()], 422);
             }
+
             return redirect()->back()->withInput()->withErrors(['error' => $e->getMessage()]);
         }
 
@@ -203,7 +212,7 @@ class PosController extends Controller
     public function receipt($id)
     {
         $sale = DB::table('sales')->where('id', $id)->first();
-        if (!$sale) {
+        if (! $sale) {
             abort(404, 'Sale not found');
         }
 
@@ -223,7 +232,7 @@ class PosController extends Controller
     public function dashboardSales(Request $request)
     {
         $period = (string) $request->input('period', '7d');
-        if (!in_array($period, ['today', '7d', '30d'], true)) {
+        if (! in_array($period, ['today', '7d', '30d'], true)) {
             $period = '7d';
         }
 
@@ -242,7 +251,7 @@ class PosController extends Controller
 
             $hourlyTotals = [];
             foreach ($sales as $sale) {
-                $hour = (int) \Carbon\Carbon::parse($sale->created_at)->format('H');
+                $hour = (int) Carbon::parse($sale->created_at)->format('H');
                 $hourlyTotals[$hour] = ($hourlyTotals[$hour] ?? 0) + (float) $sale->total_amount;
             }
 
@@ -269,7 +278,7 @@ class PosController extends Controller
 
             $dailyTotals = [];
             foreach ($sales as $sale) {
-                $dayKey = \Carbon\Carbon::parse($sale->created_at)->toDateString();
+                $dayKey = Carbon::parse($sale->created_at)->toDateString();
                 $dailyTotals[$dayKey] = ($dailyTotals[$dayKey] ?? 0) + (float) $sale->total_amount;
             }
 

@@ -41,9 +41,10 @@ class AuthSecurityTest extends TestCase
     {
         $response = $this->get('/login');
         $response->assertStatus(200);
-        $response->assertSee('LOGIN KASIR');
-        $response->assertSee('Email');
-        $response->assertSee('Password');
+        $response->assertSee('Masuk ke Kasir');
+        $response->assertSee('Nama pengguna atau email');
+        $response->assertSee('Kata sandi');
+        $response->assertSee('name="remember"', false);
     }
 
     public function test_authenticated_synthetic_user_can_access_protected_routes(): void
