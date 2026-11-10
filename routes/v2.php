@@ -24,7 +24,9 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::get('/templates/{kind}', [WorkspaceController::class, 'template'])->name('templates');
     Route::post('/imports/{kind}/preview', [WorkspaceController::class, 'importPreview'])->name('imports.preview');
     Route::post('/import-batches/{id}/commit', [WorkspaceController::class, 'importCommit'])->whereNumber('id')->name('imports.commit');
+    Route::get('/suppliers/{id}/products', [WorkspaceController::class, 'supplierProducts'])->whereNumber('id')->name('suppliers.products');
     Route::post('/receipts', [WorkspaceController::class, 'receive'])->name('receipts.store');
+    Route::post('/receipts/{id}/void', [WorkspaceController::class, 'voidReceipt'])->whereNumber('id')->name('receipts.void');
     Route::post('/trips', [WorkspaceController::class, 'trip'])->name('trips.store');
     Route::put('/master/{kind}/{id}', [WorkspaceController::class, 'updateMaster'])->whereNumber('id')->name('master.update');
     Route::patch('/master/{kind}/{id}', [WorkspaceController::class, 'archiveMaster'])->whereNumber('id')->name('master.archive');

@@ -87,7 +87,7 @@ Halus tapi terasa (180–320 ms), satu sistem bersama di `ui-dna` bagian 21 dan 
 - **Pindah menu**: kartu di panel naik 14px dan memudar bertahap (0,32 dtk, jeda 70 ms per kartu); ubin ringkasan menyusul (jeda 50 ms per ubin).
 - **Baris tabel**: muncul bertahap (0,26 dtk, jeda 26 ms, maks 12 baris) setiap halaman, pencarian, atau saringan tabel berganti (event `ui-table:render`).
 - **Tombol**: menekan `scale(.96)` saat ditekan; ubin ringkasan yang bisa diklik terangkat 2px saat disorot.
-- **Setelah simpan**: form memanggil `uiMotion.markSaved(form)` sebelum muat ulang; setelah halaman dimuat, tabel membuka halaman yang memuat baris itu, menggulir ke baris, lalu menyorotnya hijau muda dengan garis kiri hijau tua (2,2 dtk).
+- **Setelah simpan**: form memanggil `uiMotion.markSaved(form)`; setelah data diperbarui di tempat (bagian 19), tabel membuka halaman yang memuat baris itu, menggulir ke baris, lalu menyorotnya hijau muda dengan garis kiri hijau tua (2,2 dtk).
 - Hanya `opacity`/`transform`/`scale`/`translate`, dengan `animation-fill-mode: backwards` agar tidak ada transform tertinggal pada panel.
 - `prefers-reduced-motion: reduce` mematikan semuanya; sorotan simpan tetap tampil sebagai warna diam.
 
@@ -150,3 +150,94 @@ Ada di `v2/admin-summary.blade.php` dengan gaya dan skrip di `admin-summary-styl
 - 1000–1100px (tablet mendatar): katalog dan keranjang berdampingan (keranjang 360px, menempel saat digulir). Kolom Stok/Harga/Aksi lebarnya tetap, sisa lebar untuk nama barang, dan keterangan SKU dipotong satu baris.
 - 761–1100px: tinggi ubin ringkasan mengikuti isinya (tidak meluap) dan tautan "Lihat stok" pindah ke bawah ubin.
 - Batas 1000px dipilih karena di bawahnya kolom nama barang menjadi lebih sempit dari 120px bila keranjang ikut berdampingan.
+
+## 16. Hasil proses: popup penjualan dan pemberitahuan
+
+Berkas: `resources/views/v2/ui-result.blade.php` (CSS `#ui-result-dna`, kelas `ur-*`; API `window.uiResult`).
+
+- Penjualan berhasil: dialog `ur-dialog` di tengah (HP: lembar bawah). Isi: lencana centang lime yang menggambar sendiri, nomor nota, total besar, ringkasan Pembeli, Metode, Dibayar, Kembalian (bila ada), Status (pil Lunas/Dibayar sebagian/Belum lunas), dan nomor surat jalan bila dikirim. Aksi: Cetak nota, Surat jalan (bila dikirim), Penjualan berikutnya (utama, fokus awal). Menutup dialog (Esc, klik latar, tombol) menyiapkan transaksi berikutnya tanpa memuat ulang: keranjang dan form dikosongkan, stok katalog dikurangi sesuai nota, ringkasan dan riwayat diperbarui lewat `uiLive`. Transfer menampilkan catatan menunggu verifikasi admin.
+- Proses lain (buka/tutup shift, pembayaran, persetujuan, pengiriman, uang muka, ritase, penerimaan, saldo awal, impor, master, akun login): toast di kanan atas bawah kepala aplikasi (HP: di atas bar bawah). Muncul otomatis dari pembungkus `fetch` berdasarkan alamat dan metode permintaan (daftar `RULES`); tidak ada handler yang perlu diubah. Hanya jawaban sukses yang memunculkan toast. Penanda di `sessionStorage` (`ur-pending`) membuat toast tampil lagi tanpa animasi setelah halaman dimuat ulang (maks 3 detik sesudah dibuat).
+- Nada: hijau untuk sukses, kuning untuk perhatian (shift ditutup dengan selisih, pembayaran ditolak). Toast sukses 5,2 detik, perhatian 8 detik; berhenti saat kursor atau fokus di atasnya; tombol tutup 44px. Memakai `popover="manual"` agar berada di atas dialog modal.
+- Gerak: dialog `--ui-dialog-in`, lencana memantul, toast geser masuk; semua mati saat reduced-motion.
+- Untuk menambah toast bagi rute baru, tambahkan satu baris di `RULES` dan uji di `tests/ui-result.test.mjs`.
+
+## 17. Popup Catat barang masuk (Penerimaan)
+
+- Popup memakai lebar `popup-wide` (860px). Pada 520px kolom Barang runtuh jadi 30px karena empat kolom lain bersisa tetap (92/128/112/44px). Di bawah 720px baris otomatis jadi dua tingkat (Barang penuh, lalu Jumlah dan HPP).
+- Kalimat pengantar tampil sekali, di kepala popup. Salinannya di badan form dihapus saat popup dibuat.
+- Kartu `section.card` pembungkus form tidak lagi digambar di dalam popup (tanpa bingkai ganda, bar Batal/Simpan menempel penuh ke tepi). Aturan ini berlaku untuk semua popup `input-popup-*` (Penerimaan, Biaya ritase, Saldo awal).
+- Pilihan supplier satu baris dengan elipsis (tidak membungkus jadi dua baris). Tombol hapus baris 44px.
+- Pemilih barang berupa kolom pencarian (`ui-pick`, ikon kaca pembesar, placeholder "Cari nama atau SKU barang"), bukan daftar turun, karena produk bisa ribuan. Sumber pilihan: `GET /v2/suppliers/{id}/products?q=` (admin; 30 teratas; hanya barang aktif yang tertaut ke supplier aktif). Daftar pilihan `position:fixed` agar tidak terpotong dialog dan membalik ke atas bila ruang bawah sempit. Tinggi daftar maksimal tepat 6 pilihan (dihitung dari tinggi baris sebenarnya); lebih dari itu digulir, kurang dari itu mengikuti isi. Tiap pilihan dua baris: nama dan satuan, lalu SKU, stok, HPP saat ini. Barang yang sudah dipilih di baris lain redup dan tidak bisa dipilih. HPP saat ini juga tampil sebagai petunjuk di kolom HPP satuan (bukan isian otomatis).
+- Efisiensi: daftar produk tidak lagi disematkan di templat baris, jadi HTML halaman tidak membesar mengikuti jumlah produk (uji skala ribuan produk turun dari 2413 KB ke 2108 KB).
+
+## 18. Kalender: tanggal tunggal dan rentang
+
+Berkas: `resources/views/v2/shared-date-picker.blade.php` (dan salinan lama `partials/themed-date-picker.blade.php`).
+
+- Satu tanggal (mis. Tanggal terima, tanggal transaksi): kalender ringkas satu bulan, lebar 344px. Judul bulan ("November 2026") ada di antara panah, tanpa judul bulan kedua. Baris aksi: Hapus, Hari ini, Tutup, Oke, masing-masing satu baris.
+- Rentang (tanggal mulai dan tanggal akhir, mis. filter riwayat): kalender dua bulan berdampingan, lebar 620px, judul "Pilih rentang tanggal" dengan ringkasan rentang.
+- Pilihan ditentukan otomatis: bila form memiliki pasangan `start_date` dan `end_date` (atau kolom rentang `data-date-range-start`) kalender rentang dipakai, selain itu kalender satu tanggal. Berlaku untuk semua form yang memakai pemilih ini.
+- Di HP (<=720px) keduanya selebar layar dikurangi 24px dan hanya satu bulan yang tampil.
+
+## 19. Simpan tanpa muat ulang halaman (uiLive)
+
+Berkas: `resources/views/v2/ui-live.blade.php` (dimuat di `<head>` sebelum skrip lain). Aturan: setelah simpan, halaman TIDAK dimuat ulang.
+
+- Setelah simpan berhasil, form memanggil `uiLive.saved(form)`: kunci form dibuka, dialognya ditutup, form tambah dikosongkan, lalu `uiLive.refresh()` mengambil halaman yang sama di latar belakang dan menyalin datanya ke halaman yang sedang terbuka. Panel aktif, gulir, saringan, dan halaman tabel tetap.
+- Yang disalin: isi `<tbody>` diganti utuh (lalu `ui-tables` membaca ulang baris lewat `wrap._uiTableReload`), teks/angka lain disamakan di tempat (kartu ringkasan, status, kepala aplikasi), pilihan `<select>` disamakan (nilai terpilih tetap), dan nilai bawaan form tambah (mis. kode berikutnya PRD-0005) diperbarui. Wadah `[data-live-list]` (daftar form berulang) diganti utuh. Isian pengguna di form tidak ditimpa.
+- `[data-live-skip]` menandai elemen yang diatur skrip (katalog dan keranjang Kasir, status pencarian, judul halaman di kepala, total halaman riwayat penerimaan). Elemen seperti ini wajib diberi tanda itu agar tidak ditimpa teks dari server.
+- Perilaku untuk isi baru dipasang ulang lewat `uiLive.onPatch(fn(root))`: label kolom HP dan popup form baris (`ui-workspace`), form master (`ui-forms`), sopir master dan kunci transaksi (`sprint2`), kunci tagihan (`workspace`). Penangan submit form di baris tabel dipasang di tingkat dokumen (delegasi), bukan per form.
+- Kasir: `kasirNextSale()` mengurangi stok katalog sesuai nota yang sudah dikonfirmasi server, mengosongkan keranjang dan form, membuat kunci transaksi baru, lalu memperbarui ringkasan.
+- Bila halaman gagal diambil (sesi habis, server mati), barulah halaman dimuat ulang penuh sebagai cadangan.
+- Uji: `tests/ui-live.test.mjs` menolak `location.reload()` baru di `resources/views/v2`. Untuk elemen yang diatur skrip, uji `uiLive.refresh()` tanpa perubahan data: teks semua panel harus sama sebelum dan sesudah.
+
+## 20. Penerimaan: tinjau sebelum simpan dan pembatalan
+
+- Form Catat barang masuk: tombol utama **Periksa penerimaan**. Ringkasan tampil di popup yang sama (bagian isian disembunyikan): supplier, tanggal, daftar barang (jumlah × harga = nilai, HPP lama → baru), total utang besar hijau, tombol Ubah lagi dan Ya, simpan penerimaan (44px). Fokus pindah ke judul ringkasan.
+- Harga di bawah ½ atau di atas 2× HPP saat ini: baris berlatar kuning muda dengan garis kiri kuning tua dan teks peringatan cokelat; tidak memblokir simpan.
+- HP: baris ringkasan bertumpuk (nama, hitungan, HPP), tombol berbagi lebar.
+- Riwayat: kolom Aksi berisi Batalkan penerimaan (popup: alasan wajib, penjelasan akibatnya). Baris batal: lencana merah Dibatalkan + waktu · admin · alasan, angka dicoret abu.
+
+## 21. Kolom nominal uang
+
+Berkas: `resources/views/v2/ui-money.blade.php` (dimuat di `<head>` ruang kerja, setelah `ui-live`).
+
+- Kolom uang diberi `data-money` (V2) atau `data-currency-input` (halaman lama yang dimuat di panel Keuangan). Saat mengetik, titik ribuan muncul sendiri (1.250.000); desimal pakai koma. Titik yang diketik pengguna diabaikan karena titik selalu pemisah ribuan. Posisi kursor dijaga.
+- Tidak ada isian 0 bawaan: kolom yang dulu berisi 0 kini kosong dengan placeholder 0, dan bila dibiarkan kosong tetap dikirim 0 (kolom itu tidak lagi wajib diketik). Kolom tanpa 0 bawaan (kas awal, uang fisik, nominal bayar) tetap wajib.
+- Nilai yang dibaca skrip (`.value`) dan yang dikirim (FormData maupun submit biasa) tetap angka mentah (1250000 / 1250000.5), sehingga server dan perhitungan tidak berubah.
+- Dibayar di Kasir memakai `data-money-display` (hanya format, skrip Kasir tetap mengurai sendiri) dan kosong bila nol.
+- Kolom master produk (`data-ui-number`) sudah punya format sendiri dan tidak disentuh.
+- Uji: `tests/ui-money.test.mjs`.
+
+## 22. Popup bayar tagihan
+
+- Satu popup untuk piutang pelanggan dan utang supplier, dibuka dari tombol di kolom Aksi tabel Tagihan: judul sesuai aksi (Catat pembayaran / Bayar ke supplier / Ajukan pembayaran), subjudul nama · nomor, ringkasan Total/Terbayar/Sisa (Sisa hijau tua), Jumlah dibayar (kosong, format ribuan), tombol sekunder lebar penuh **Lunasi Rp …** di bawahnya, Metode sebagai tombol pilihan Tunai/Transfer, Referensi, petunjuk akibat sesuai arah dan peran, tombol utama lime.
+- Bagian terpisah "Pengajuan pembayaran supplier" dihapus.
+
+## 23. Audit popup formulir (standar yang berlaku)
+
+Seluruh popup ruang kerja (35 jenis) diperiksa di 1440 dan 390. Aturan yang ditetapkan:
+
+- Footer selalu Batal (kiri, sempit) + aksi utama lime (kanan, lebar). Tombol di dalam bagian `[data-popup-skip]` (mis. tinjau penerimaan) tidak dihitung sebagai tombol kirim utama, sehingga Periksa penerimaan ikut pindah ke footer.
+- Form sopir (Kirim barang, Bayarkan uang muka, Realisasi uang muka) di popup memakai grid dua kolom selebar popup; satu kolom di bawah 560px. Label `<label>Teks<select>` dipaksa satu kolom penuh (`grid-template-columns:minmax(0,1fr)`), karena tanpa itu pilihan menyusut selebar teksnya.
+- Realisasi uang muka menghitung langsung "Uang muka − biaya = sisa dikembalikan sopir" (kuning bila biaya melebihi uang muka). Tombol "Simpan realisasi"; judul popup lewat `data-popup-title`.
+- Kunci transaksi otomatis (idempotency) tidak ditampilkan sama sekali.
+- Tolak pengajuan menampilkan nominal Rupiah, arah (Bayar ke/Dari), nama, nomor tagihan, metode, dan pengaju; bukan "Pembayaran #2 · 100000.00".
+- Buka shift: tanpa label kecil ganda; pilihan "Tidak membawa sisa" (bukan "tanpa carry").
+- Form Tambah master: kolom harga/stok minimum kosong (bukan 0); nilai yang dikirim tetap 0.
+- HP: tombol tutup popup, tombol Lunasi, dan saran jenis mobil minimal 44px. Selektor penimpa memakai `:is(…,#u#u#u)` karena aturan tema berbobot ID.
+
+## 24. Peringatan entri dobel
+
+- Bila server menolak dengan `duplicate_payment` atau `duplicate_receipt`, kotak pesan form berubah kuning (`form.is-duplicate-warning`), bukan merah, dan tombol simpan berganti **Ya, tetap catat** / **Ya, tetap simpan** (`window.uiConfirmDuplicate`). Label tombol kembali saat popup ditutup atau supplier/nomor nota diganti.
+- Di tinjauan penerimaan, pesan dipindah tepat di atas tombol Ubah lagi / simpan; tombol simpan tinjauan memakai lime seperti aksi utama lain.
+## 25. Kontinuitas gerak: tidak ada yang muncul tiba-tiba
+
+Aturan: elemen yang **tidak punya asal** masuk dengan animasi; elemen yang **punya asal** memakai morph (objek yang sama berpindah/berubah, isinya berganti mulus). Semua mati saat `prefers-reduced-motion`. Kode: `resources/views/v2/ui-motion.blade.php` (`window.uiMotion`).
+
+- **Kartu sub-menu rail**: buka = keluar dari arah ikon grup (geser kanan + skala, titik asal di tengah ikon); pindah ke grup lain = kartu yang sama meluncur ke posisi baru dan berubah ukuran (`morphBox`, FLIP 300 ms), isi lama memudar 110 ms sementara isi baru naik bertahap; tutup = keluar 140 ms (ease-in) setelah jeda 170 ms. Klik tautan, ubah ukuran jendela, dan pin menutup seketika.
+- **Penanda pilihan meluncur** (`slidePill`): segmen (Tunai/Transfer), chip saringan, tab, pilihan periode/harga (`[role=radiogroup]`, `[role=tablist]`, `.ui-chips`, `.ui-segment`, `.ui-subtabs`, `.pd-seg`, `.period-presets`). Lapisan sementara bergerak dari pilihan lama ke baru (240 ms); warna teks bertukar di tengah jalan supaya selalu terbaca. Dipicu otomatis dari perubahan `aria-checked/pressed/selected` atau kelas `active`, tanpa mengubah penangan.
+- **Popup berubah tinggi** (galat muncul, tinjau penerimaan, bagian form bersyarat): tinggi popup bertransisi 240 ms. Tema mengunci `height:fit-content !important`, jadi dipakai transisi tinggi inline `!important`, bukan WAAPI.
+- **Bagian yang muncul** di dalam popup atau kotak galat/sukses di form (`hidden` dilepas): pudar-turun 220 ms (`reveal`). Baris tabel, daftar pilihan, kalender, dan panel punya animasinya sendiri dan dikecualikan.
+- **Judul halaman** di kepala pudar-naik saat pindah menu; warna grup aktif di rail bertransisi.
+- Uji gerak: ukur posisi/tinggi tiap frame (`requestAnimationFrame`) lalu periksa rangkaian screenshot; angka transform saja bukan bukti.

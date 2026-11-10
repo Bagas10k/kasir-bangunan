@@ -257,6 +257,7 @@ Kode: `Operations::checkout` (server), `pos-cashier-script` (layar). Menu: **Ope
 6. Tekan **Checkout & Pembayaran**, lalu pilih metode Tunai, Transfer, atau Kredit dan isi nominal.
 7. (Opsional) Buka "Diskon nota & pengiriman": diskon nota, cara penyerahan (diambil atau dikirim), tujuan kirim, ongkir.
 8. **Tinjau Pembayaran**, lalu **Konfirmasi & Simpan Transaksi**.
+9. Setelah tersimpan, muncul popup **Penjualan berhasil** berisi nomor nota, total, kembalian, status, dan tombol Cetak nota (serta Surat jalan bila dikirim). Menutup popup langsung menyiapkan transaksi berikutnya tanpa memuat ulang halaman: keranjang kosong, stok di katalog sudah berkurang, ringkasan penjualan diperbarui.
 
 Isi keranjang disimpan di browser, jadi tidak hilang bila halaman tertutup sebelum disimpan.
 
@@ -363,7 +364,7 @@ Menampilkan penjualan, jumlah transaksi, rata-rata per nota, stok yang perlu per
 
 ## 8. Tagihan dan pembayaran
 
-Kode: `Operations::collect`. Menu: **Operasional › Tagihan**.
+Kode: `Operations::collect`. Menu: **Operasional › Tagihan**. Setiap baris tagihan yang belum lunas (pelanggan maupun supplier) punya tombol bayar sendiri yang membuka popup berisi total, terbayar, sisa, jumlah dibayar, metode, dan referensi. Kolom jumlah dibayar kosong; tombol **Lunasi Rp …** mengisi sisa tagihan dengan satu klik.
 
 ### 8.1 Jenis tagihan
 
@@ -381,18 +382,24 @@ Status tagihan: **Terbuka** (`open`) atau **Lunas** (`paid`). Sisa = nilai − s
 - **Transfer**: dicatat sebagai **menunggu verifikasi**, tanpa jurnal dan tanpa mengubah sisa tagihan sampai admin memverifikasi (bagian 9).
 - Pembayaran sebagian boleh dilakukan berkali-kali.
 
-### 8.3 Mengajukan pembayaran utang supplier
+### 8.3 Pembayaran utang supplier
 
-- Pembayaran ke supplier selalu dimulai sebagai **pengajuan** (`proposed`) dan baru mengurangi utang setelah disetujui.
-- **Tunai**: pemohon wajib punya shift terbuka, karena uang akan keluar dari lacinya.
-- **Transfer**: tidak perlu shift.
-- Pengajuan tidak membuat jurnal.
+- Tombol di baris tagihan supplier: **Bayar ke supplier** (admin) atau **Ajukan pembayaran** (kasir).
+- **Admin**: pembayaran langsung tercatat (`posted`) dan mengurangi utang, dengan pemeriksaan yang sama seperti persetujuan (bagian 9.2): tunai keluar dari laci shift admin yang harus terbuka dan cukup; saldo Kas/Bank tidak boleh negatif; jurnal debit 2101, kredit 1101 atau 1102.
+- **Kasir**: dicatat sebagai **pengajuan** (`proposed`) tanpa jurnal dan baru mengurangi utang setelah admin menyetujui. Tunai mewajibkan shift kasir terbuka, karena uang akan keluar dari lacinya; transfer tidak perlu shift.
+- Nominal tidak boleh melebihi sisa tagihan.
+
+### 8.5 Penjaga entri dobel pembayaran
+
+- Form bayar membawa id pembayaran terakhir (bukan ditolak) saat halaman dibuat (`seen_payment_id`). Bila sebelum disimpan sudah ada pembayaran baru pada tagihan itu (mis. kasir dan admin mencatat uang yang sama), server menolak dengan pesan berisi nominal, metode, nama pencatat, dan jam, lalu tombol simpan berubah menjadi **Ya, tetap catat**. Simpan berikutnya dikirim dengan `confirm_duplicate` dan dicatat seperti biasa.
+- Pemeriksaan berjalan di dalam kunci baris tagihan, jadi berlaku juga untuk simpan yang benar-benar bersamaan. Tagihan lunas tetap ditolak "Tagihan sudah lunas".
+- Pemanggil tanpa `seen_payment_id` tidak diperiksa. Klik dobel dengan kunci transaksi yang sama tetap dianggap satu pembayaran.
 
 ### 8.4 Status pembayaran
 
 | Status | Arti |
 |---|---|
-| Diajukan (`proposed`) | Pembayaran utang ke supplier, menunggu persetujuan admin |
+| Diajukan (`proposed`) | Pembayaran utang ke supplier oleh kasir, menunggu persetujuan admin |
 | Menunggu (`pending`) | Transfer dari pelanggan, menunggu admin mencocokkan dengan mutasi bank |
 | Tercatat (`posted`) | Sudah masuk pembukuan dan mengurangi sisa tagihan |
 | Ditolak (`rejected`) | Dibatalkan admin dengan alasan; tidak pernah masuk pembukuan |
@@ -411,7 +418,7 @@ Kode: `Operations::approvePayment`, `rejectPayment`. Menu: **Pengawasan › Pers
 
 ### 9.2 Persetujuan pembayaran ke supplier
 
-- **Pemohon tidak boleh menyetujui pengajuannya sendiri.** Admin lain atau admin yang bukan pemohon harus menyetujui.
+- Pengajuan datang dari kasir. Pengajuan lama yang dibuat admin sebelum aturan bayar langsung juga bisa disetujui admin (larangan menyetujui pengajuan sendiri dihapus karena toko hanya punya satu admin).
 - Pembayaran tunai:
   - shift pemohon harus masih terbuka;
   - uang di laci pemohon harus cukup;
@@ -493,16 +500,19 @@ Dipakai bila biaya perjalanan dibayar tanpa uang muka.
 
 ## 11. Penerimaan barang dari supplier
 
-Kode: `SupplyTrips::receive`. Menu: **Operasional › Penerimaan barang** (admin).
+Kode: `SupplyTrips::receive`, `SupplyTrips::voidReceipt`. Menu: **Operasional › Penerimaan barang** (admin).
 
 ### 11.1 Aturan
 
 - Pilih supplier aktif, tanggal penerimaan, catatan, dan 1–100 baris barang (produk, jumlah, harga beli per satuan).
+- Barang dipilih lewat kolom **pencarian** (nama atau SKU), bukan daftar turun. Pencarian dilakukan di server dan hanya menampilkan barang aktif yang tertaut ke supplier terpilih (30 teratas, dengan keterangan "Menampilkan 30 dari N"). Setiap pilihan menampilkan SKU, stok, dan HPP saat ini. Barang yang sudah ada di baris lain tampak redup dan tidak bisa dipilih lagi. Mengganti supplier mengosongkan pilihan barang (jumlah dan harga tetap).
 - Setiap produk **harus sudah ditautkan ke supplier itu** di master Produk.
 - Satu produk hanya boleh satu baris.
 - Produk harus aktif.
 - Tanggal tidak boleh lebih awal dari mutasi stok terakhir produk itu (mencegah penerimaan mundur yang mengacaukan HPP).
 - Total harus lebih dari nol.
+- **No. nota supplier** (opsional, maks 64 karakter) disimpan di `inventory_receipts.supplier_invoice_number`. Bila nomor yang sama (tanpa membedakan huruf besar/kecil dan spasi tepi) sudah tercatat untuk supplier yang sama dan penerimaannya tidak dibatalkan, server menolak dengan pesan berisi nomor RCV, tanggal, dan nilainya; tombol berubah menjadi **Ya, tetap simpan** untuk konfirmasi. Supplier lain dengan nomor sama tidak diperiksa.
+- Sebelum disimpan, tombol **Periksa penerimaan** menampilkan ringkasan: supplier, tanggal, tiap barang (jumlah × harga = nilai), perkiraan HPP lama → baru, dan total utang. Harga yang di bawah setengah atau di atas dua kali HPP saat ini ditandai kuning ("Harga jauh berbeda dari HPP saat ini") supaya salah ketik nol terlihat. Baru tombol **Ya, simpan penerimaan** yang mengirim ke server. Perkiraan HPP di ringkasan hanya tampilan; server menghitung ulang.
 
 ### 11.2 Yang terjadi
 
@@ -513,10 +523,24 @@ Kode: `SupplyTrips::receive`. Menu: **Operasional › Penerimaan barang** (admin
    Contoh: stok 20 sak @ 50.000, masuk 30 sak @ 55.000 → (1.000.000 + 1.650.000) ÷ 50 = **53.000**.
 4. Tagihan utang `AP-000001` dibuat sebesar total.
 5. Jurnal: debit 1301 Persediaan, kredit 2101 Utang usaha (tanggal = tanggal penerimaan).
+6. HPP produk sebelum penerimaan disimpan per baris (`inventory_receipt_items.cost_before`) untuk keperluan pembatalan.
 
 Pembayaran ke supplier dilakukan terpisah lewat Tagihan (bagian 8.3) dan disetujui admin (bagian 9.2).
 
 Riwayat penerimaan menampilkan 50 penerimaan terakhir per barang, lengkap dengan total nilai per halaman.
+
+### 11.3 Salah input: batalkan lalu catat ulang
+
+Penerimaan yang sudah disimpan tidak bisa diubah. Bila harga atau jumlahnya salah, admin membatalkannya lalu mencatat ulang yang benar.
+
+- Tombol **Batalkan penerimaan** ada di kolom Aksi riwayat. Hanya admin, dan wajib menulis alasan (minimal 5 karakter).
+- Syarat: tagihan supplier penerimaan itu belum punya pembayaran atau pengajuan pembayaran (yang ditolak tidak dihitung), dan barang-barangnya belum punya mutasi stok sesudah penerimaan itu (penjualan atau penerimaan lain). Bila sudah, server menolak dengan pesan yang menyebut alasannya. Tombol hanya tampil bila tagihan masih bersih; pemeriksaan mutasi stok dilakukan server saat membatalkan.
+- Yang terjadi:
+  1. Stok tiap barang dikurangi sebesar jumlah penerimaan (mutasi `v2_receipt_void`) dan HPP kembali ke nilai sebelum penerimaan (`cost_before`). Untuk penerimaan lama tanpa `cost_before`, HPP dihitung balik dari rata-rata tertimbang.
+  2. Jurnal balik: debit 2101 Utang usaha, kredit 1301 Persediaan, sebesar total, tanggal = hari pembatalan.
+  3. Tagihan `AP-…` ditutup: nilai menjadi 0, status lunas, ditandai `voided_at`. Nilai asli tetap di penerimaan.
+  4. Penerimaan tidak dihapus: ditandai `voided_at`, `voided_by`, `void_reason`, `void_journal_entry_id`. Riwayat menampilkan lencana **Dibatalkan** dengan waktu, nama admin, dan alasan; nilainya dicoret dan tidak ikut total halaman maupun ringkasan bulanan.
+- Idempoten per kunci; penerimaan yang sudah dibatalkan tidak bisa dibatalkan lagi.
 
 ---
 
@@ -654,6 +678,7 @@ Nama akun di database bisa berbeda dengan tabel ini (lihat bagian 21); kodenya y
 | Verifikasi transfer pelanggan | 1102 | 1103 | `v2_payment` |
 | Persetujuan bayar supplier | 2101 | 1101 atau 1102 | `v2_payment` |
 | Penerimaan barang | 1301 | 2101 | `v2_receipt` |
+| Pembatalan penerimaan | 2101 | 1301 | `v2_receipt_void` |
 | Uang muka sopir | 1191 | 1101 atau 1102 | `v2_driver_advance` |
 | Penyelesaian uang muka | 6101 biaya; 1101/1102 sisa | 1191 | `v2_driver_advance_settlement` |
 | Biaya ritase langsung | 6101 | 1101 atau 1102 | `v2_trip` |
@@ -766,6 +791,7 @@ Kode: `generateCashFlow`. Metode langsung, hanya dari jurnal yang menyentuh 1101
 |---|---|---|---|
 | Saldo awal | Diisi | Diisi | `v2_opening_balance` |
 | Penerimaan dari supplier | Bertambah | Rata-rata tertimbang | `v2_receipt` |
+| Pembatalan penerimaan | Berkurang | Kembali ke sebelum penerimaan | `v2_receipt_void` |
 | Penjualan | Berkurang | Tetap | `v2_sale` |
 | Pengiriman | Tetap | Tetap | – |
 | Ubah master produk | Tidak bisa | Hanya bila belum ada stok/mutasi | – |
@@ -888,7 +914,7 @@ Daftar ini jujur tentang apa yang belum ditangani sistem. Butir bertanda **[cek 
 3. **Halaman Keuangan hanya bisa dibaca.** Setelah V2 aktif, menambah/mengubah akun di Bagan akun, jurnal penyesuaian, dan saldo awal lama di halaman Jurnal ditolak (403). Belum ada jalur V2 untuk menambah akun atau membuat jurnal penyesuaian.
 4. **Selisih kas shift tidak dijurnal.** Bila uang fisik kurang atau lebih, buku besar Kas tetap memakai angka seharusnya. Selisih hanya dicatat di shift dengan alasan dari admin.
 5. **Belum ada beban operasional di V2.** Listrik, gaji, perlengkapan, dan beban lain (6102–6199) hanya ada di halaman lama, yang sekarang hanya bisa dibaca.
-6. **Belum ada retur atau pembatalan nota.** Nota yang sudah disimpan tidak bisa dibatalkan atau dikembalikan lewat sistem.
+6. **Belum ada retur atau pembatalan nota penjualan.** Nota yang sudah disimpan tidak bisa dibatalkan atau dikembalikan lewat sistem. (Penerimaan barang sudah bisa dibatalkan, bagian 11.3.)
 7. **Belum ada stok opname atau penyesuaian stok di V2.** Stok hanya berubah lewat saldo awal, penerimaan, dan penjualan.
 8. **Penjualan kredit tidak punya jatuh tempo.** "Lewat tempo" hanya bisa terjadi pada piutang dari saldo awal.
 9. **Biaya perjalanan melebihi uang muka belum didukung.** Selisih lebih harus dicatat terpisah, padahal jalur pengeluaran terpisah belum ada (lihat butir 5).
@@ -917,3 +943,10 @@ Daftar ini jujur tentang apa yang belum ditangani sistem. Butir bertanda **[cek 
 | Tanggal | Perubahan |
 |---|---|
 | 2026-11-08 | Dokumen pertama: seluruh alur V2 dari shift sampai laporan keuangan, termasuk harga kontraktor, tampilan HP/tablet, dan daftar batasan. |
+| 2026-11-08 | Penjualan: popup "Penjualan berhasil" setelah simpan (bagian 7.1 langkah 9). Tidak ada perubahan aturan atau angka. |
+| 2026-11-08 | Penerimaan barang: pemilih barang berupa pencarian server (nama/SKU) per supplier (bagian 11.1). Tidak ada perubahan aturan stok, HPP, atau jurnal. |
+| 2026-11-08 | Seluruh ruang kerja: setelah simpan (tambah/ubah/arsip master, penerimaan, shift, pembayaran, persetujuan, pengiriman, penjualan) halaman tidak lagi dimuat ulang; data diperbarui di tempat. Tidak ada perubahan aturan atau angka. |
+| 2026-11-08 | Penerimaan barang: langkah Periksa sebelum simpan dan pembatalan penerimaan salah input oleh admin dengan alasan, jurnal balik, stok dan HPP kembali (bagian 11.1, 11.3, 14, 16). Migrasi `2026_11_08_164504_add_v2_receipt_void`. |
+| 2026-11-08 | Input nominal uang: titik ribuan otomatis saat mengetik; kolom tanpa isian 0 bawaan, kosong berarti 0 untuk kolom yang dulu berisi 0 (biaya BBM, uang jalan, ongkir, saldo awal di halaman Jurnal). Nilai yang dikirim ke server tetap angka mentah; aturan dan angka tidak berubah. |
+| 2026-11-08 | Pembayaran tagihan: tombol bayar di tiap baris (pelanggan dan supplier), nominal kosong + tombol Lunasi; admin membayar utang supplier langsung tercatat, kasir tetap mengajukan; larangan admin menyetujui pengajuan sendiri dihapus (bagian 8, 9.2). |
+| 2026-11-10 | Penjaga entri dobel: pembayaran tagihan yang sudah berubah sejak form dibuka dan nomor nota supplier yang sama meminta konfirmasi (bagian 8.5, 11.1). Migrasi `2026_11_10_010937_add_v2_supplier_invoice_number`. Tidak ada perubahan perhitungan. |

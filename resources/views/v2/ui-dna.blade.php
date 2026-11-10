@@ -723,7 +723,7 @@ html body #panel-kasir #kasir .pd-top .pd-top-bar{display:none !important}
 @keyframes ui-dialog-in{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
 @keyframes ui-fade-in{from{opacity:0}to{opacity:1}}
 :root{--ui-dialog-in:ui-dialog-in .26s cubic-bezier(.22,.8,.24,1);--ui-ease-out:cubic-bezier(.22,.8,.24,1)}
-html body :is(.select-options,.app-calendar,.pos-combo-list,.ui-pick-list,.rail-flyout,.filter-disclosure[open]>.filter-popup):not([hidden]){animation:var(--ui-float-in) !important;transform-origin:top center}
+html body :is(.select-options,.app-calendar,.pos-combo-list,.ui-pick-list,.filter-disclosure[open]>.filter-popup):not([hidden]){animation:var(--ui-float-in) !important;transform-origin:top center}
 html body dialog[open]{animation:var(--ui-dialog-in) !important;transform-origin:center bottom}
 html body dialog[open]::backdrop{animation:ui-fade-in .22s ease-out}
 @media (prefers-reduced-motion:reduce){
@@ -856,6 +856,8 @@ html :is(body#ui-dna-strong,body) dialog.input-dialog[id^="input-popup-"] :is(fo
 html :is(body#ui-dna-strong,body) dialog.input-dialog[id^="input-popup-"] .row{display:grid !important;grid-template-columns:repeat(auto-fit,minmax(180px,1fr)) !important;gap:16px !important;align-items:start}
 html :is(body#ui-dna-strong,body) dialog.input-dialog[id^="input-popup-"] .field{display:flex !important;flex-direction:column;gap:6px;margin:0 0 16px !important;min-width:0}
 html :is(body#ui-dna-strong,body) dialog.input-dialog[id^="input-popup-"] .row>.field{margin-bottom:0 !important}
+html :is(body#ui-dna-strong,body) dialog.input-dialog[id^="input-popup-"] .popup-content>section.card{margin:0 !important;padding:0 !important;border:0 !important;border-radius:0 !important;background:none !important;box-shadow:none !important}
+html :is(body#ui-dna-strong,body) dialog.input-dialog[id^="input-popup-"] .select-shell .select-trigger{white-space:nowrap !important;overflow:hidden;text-overflow:ellipsis}
 html :is(body#ui-dna-strong,body) dialog.input-dialog[id^="input-popup-"] .row{margin-bottom:16px !important}
 html :is(body#ui-dna-strong,body) dialog.input-dialog[id^="input-popup-"] label{font-size:14px !important;font-weight:600 !important;color:#102A1D !important;justify-content:flex-start !important}
 html :is(body#ui-dna-strong,body) dialog.input-dialog[id^="input-popup-"] :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),textarea,.select-shell .select-trigger){width:100% !important;min-height:46px;border:1px solid #DFE6E1 !important;border-radius:8px !important;background:#fff !important;font-size:15px !important;color:#102A1D !important;padding:0 14px !important;box-shadow:none !important}

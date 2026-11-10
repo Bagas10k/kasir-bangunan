@@ -11,6 +11,9 @@ tambahkan templatnya di App\Support\V2\FormCatalog lalu panggil komponen ini.
     $raw = is_scalar($raw) ? (string) $raw : '';
     $max = $field['max'] ?? null;
     $placeholder = $field['placeholder'] ?? null;
+    // Form Tambah: angka bawaan 0 tidak ditampilkan (pengguna tidak perlu menghapusnya); nilai yang dikirim tetap 0.
+    $blankZero = $mode === 'add' && in_array($type, ['money', 'qty'], true) && preg_match('/^0*(\.0*)?$/', trim($raw)) === 1;
+    if ($blankZero && ! $placeholder) { $placeholder = '0'; }
     $numberText = function (string $value, int $scale): string {
         $value = trim($value);
         if ($value === '') { return ''; }
@@ -85,7 +88,7 @@ tambahkan templatnya di App\Support\V2\FormCatalog lalu panggil komponen ini.
 @case('qty')
 <div class="uf-affix">
 @if($type === 'money')<span class="uf-pre" aria-hidden="true">Rp</span>@endif
-<input id="{{ $id }}" type="text" inputmode="decimal" autocomplete="off" data-ui-number="{{ $name }}" data-scale="{{ $field['scale'] ?? 2 }}" @if(! empty($field['nullable'])) data-ui-blank @endif @if($placeholder) placeholder="{{ $placeholder }}" @endif value="{{ $numberText($raw, (int) ($field['scale'] ?? 2)) }}" @if($required) required @endif @if($locked) readonly aria-describedby="{{ $id }}-lock{{ $hintId ? ' '.$hintId : '' }}" @elseif($hintId) aria-describedby="{{ $hintId }}" @endif>
+<input id="{{ $id }}" type="text" inputmode="decimal" autocomplete="off" data-ui-number="{{ $name }}" data-scale="{{ $field['scale'] ?? 2 }}" @if(! empty($field['nullable'])) data-ui-blank @endif @if($placeholder) placeholder="{{ $placeholder }}" @endif value="{{ $blankZero ? '' : $numberText($raw, (int) ($field['scale'] ?? 2)) }}" @if($required) required @endif @if($locked) readonly aria-describedby="{{ $id }}-lock{{ $hintId ? ' '.$hintId : '' }}" @elseif($hintId) aria-describedby="{{ $hintId }}" @endif>
 @if($type === 'qty')<span class="uf-suf" data-unit-suffix="{{ $field['unit_from'] ?? '' }}" aria-hidden="true">satuan</span>@endif
 <input type="hidden" name="{{ $name }}" value="{{ $raw === '' ? ($field['default'] ?? '') : $raw }}">
 </div>

@@ -37,7 +37,7 @@ final class MonitorMetrics
         $advances = DB::table('v2_driver_advances')->where('status', 'open')->get(['amount']);
         [$advanceTotal, $advanceCount] = $this->sumRows($advances, fn (object $row): BigDecimal => BigDecimal::of((string) $row->amount));
 
-        $receipts = DB::table('inventory_receipts')->whereBetween('receipt_date', [$monthStart, $monthEnd])->get(['total_amount', 'receipt_type']);
+        $receipts = DB::table('inventory_receipts')->whereNull('voided_at')->whereBetween('receipt_date', [$monthStart, $monthEnd])->get(['total_amount', 'receipt_type']);
         [$receiptTotal, $receiptCount] = $this->sumRows($receipts, fn (object $row): BigDecimal => BigDecimal::of((string) $row->total_amount));
 
         $shiftScope = fn () => DB::table('v2_shifts')->when(! $admin, fn ($q) => $q->where('user_id', $actor));

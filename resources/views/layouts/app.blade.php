@@ -1978,6 +1978,14 @@
         function initCurrencyInputs() {
             var els = document.querySelectorAll('[data-currency-input]');
             for (var i = 0; i < els.length; i++) {
+                // Isian 0 bawaan dikosongkan (placeholder 0); bila dibiarkan kosong tetap dikirim 0.
+                if (/^0*([.,]0*)?$/.test(String(els[i].value).trim()) && /0/.test(els[i].value)) {
+                    els[i].setAttribute('data-currency-zero', '1');
+                    els[i].required = false;
+                    els[i].value = '';
+                    if (!els[i].placeholder) els[i].placeholder = '0';
+                    continue;
+                }
                 els[i].value = rawToDisplay(els[i].value, currencyScale(els[i]));
             }
         }
@@ -2020,7 +2028,7 @@
             if (!form || !form.querySelectorAll) return;
             var els = form.querySelectorAll('[data-currency-input]');
             for (var i = 0; i < els.length; i++) {
-                els[i].value = displayToRaw(els[i].value);
+                els[i].value = displayToRaw(els[i].value) || (els[i].hasAttribute('data-currency-zero') ? '0' : '');
             }
         }, true);
 

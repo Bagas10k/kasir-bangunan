@@ -5,7 +5,7 @@ const navigation=document.querySelector('.nav');
 const links=Array.from(navigation?.querySelectorAll('[data-task]')||[]);
 const host=document.querySelector('#task-panels');
 if(!host||!links.length)return;
-const groups={kasir:['#kasir','#h-sales'],tagihan:['#tagihan','#h-verify','#supplier-pay-heading','#reject-heading'],pengiriman:['#pengiriman','#trip-heading','#uang-muka-sopir','#h-deliveries'],'master-product':['#master-section-product'],'master-customer':['#master-section-customer'],'master-supplier':['#master-section-supplier'],'master-employee':['#master-section-staff','#master-section-employee','#master-section-driver'],'master-vehicle':['#master-section-vehicle'],penerimaan:['#receipt-heading','#receipt-history'],shift:['#h-shift','#review-heading','#opening-heading'],laporan:['#laporan']};
+const groups={kasir:['#kasir','#h-sales'],tagihan:['#tagihan','#h-verify','#reject-heading'],pengiriman:['#pengiriman','#trip-heading','#uang-muka-sopir','#h-deliveries'],'master-product':['#master-section-product'],'master-customer':['#master-section-customer'],'master-supplier':['#master-section-supplier'],'master-employee':['#master-section-staff','#master-section-employee','#master-section-driver'],'master-vehicle':['#master-section-vehicle'],penerimaan:['#receipt-heading','#receipt-history'],shift:['#h-shift','#review-heading','#opening-heading'],laporan:['#laporan']};
 const text={kasir:['Kasir','Pilih barang di katalog, lalu lanjutkan pembayaran.'],tagihan:['Tagihan & pembayaran','Piutang pelanggan, utang supplier, dan pemeriksaan pembayaran.'],pengiriman:['Pengiriman & sopir','Surat jalan, status pengiriman, dan biaya perjalanan.'],'master-product':['Produk','Katalog barang: satuan, kategori, harga jual, stok minimum, dan supplier.'],'master-customer':['Pelanggan','Opsional saat penjualan; kasir boleh mengetik nama pembeli langsung.'],'master-supplier':['Supplier','Pemasok barang. Tekan nama supplier untuk melihat produk dan riwayat transaksinya.'],'master-employee':['Karyawan & sopir','Satu daftar staf toko; kolom posisi menandai siapa yang bertugas sebagai sopir.'],'master-vehicle':['Mobil','Armada pengiriman. Tekan nomor polisi untuk melihat riwayat pemakaian dan sopirnya.'],penerimaan:['Penerimaan barang','Catat barang masuk dan tagihan supplier melalui formulir penerimaan.'],shift:['Kas & shift','Riwayat kas awal, uang fisik, dan pemeriksaan selisih.'],laporan:['Laporan harian','Tunai, transfer terverifikasi, dan transfer menunggu dipisahkan.']};
 groups.akun=['#login-accounts'];text.akun=['Akun Login','Kelola akun Admin dan Kasir; terpisah dari master karyawan.'];
 const panels=new Map();
@@ -13,7 +13,7 @@ groups['master-unit']=['#master-section-unit'];text['master-unit']=['Satuan','Sa
 groups['master-category']=['#master-section-category'];text['master-category']=['Kategori','Kelompok produk untuk mempermudah pencarian di kasir.'];
 groups.ringkasan=['#admin-overview'];text.ringkasan=['Ringkasan Admin','Pengawasan operasional seluruh kasir.'];
 groups.persetujuan=['#h-verify','#reject-heading'];text.persetujuan=['Persetujuan Pembayaran','Verifikasi transfer dan persetujuan pembayaran supplier.'];
-groups.tagihan=['#tagihan','#supplier-pay-heading'];
+groups.tagihan=['#tagihan'];
 const defaultTask=navigation.dataset.defaultTask||'kasir';
 const financialEntry=navigation.querySelector('[data-menu-group="keuangan"] a');
 if(location.hash==='#keuangan'&&financialEntry){location.hash='#'+financialEntry.dataset.task;}
@@ -175,18 +175,28 @@ for(const link of links){
  }
  link.setAttribute('aria-controls','panel-'+keys[0]);
 }
-for(const input of document.querySelectorAll('input[name=idempotency_key][readonly]')){
- const field=input.closest('.field');if(!field)continue;const details=document.createElement('details');details.className='technical';const summary=document.createElement('summary');summary.textContent='Referensi transaksi otomatis';field.before(details);details.append(summary,field);
-}
+function tuckKeys(root){for(const input of root.querySelectorAll('input[name=idempotency_key][readonly]')){
+ const field=input.closest('.field');if(!field||field.closest('details.technical'))continue;const details=document.createElement('details');details.className='technical';details.hidden=true;const summary=document.createElement('summary');summary.textContent='Referensi transaksi otomatis';field.before(details);details.append(summary,field);
+}}
+tuckKeys(document);window.uiLive?.onPatch(tuckKeys);
 const report=document.querySelector('#report-date')?.form;if(report)report.action=report.action.split('#')[0]+'#laporan';
+// Label kolom untuk tampilan kartu di HP, peran pesan: dipasang saat muat dan setiap kali uiLive mengganti isi tabel.
+function labelRows(root){
+ const tables=root.matches?.('table')?[root]:root.closest?.('table')?[root.closest('table')]:Array.from(root.querySelectorAll('.scroll table'));
+ for(const table of tables){
+  if(!table.closest('.scroll'))continue;
+  const heads=Array.from(table.querySelectorAll('thead th')).map(e=>{e.setAttribute('scope','col');return e.textContent.trim();});
+  for(const row of table.querySelectorAll('tbody tr'))Array.from(row.cells).forEach((cell,i)=>{if(cell.colSpan===1&&!cell.dataset.label)cell.dataset.label=heads[i]||cell.dataset.field||'';});
+ }
+ for(const box of root.querySelectorAll('[data-error]')){box.setAttribute('role','alert');box.tabIndex=-1;}
+ for(const box of root.querySelectorAll('[data-ok]')){box.setAttribute('role','status');box.setAttribute('aria-live','polite');}
+}
 for(const table of document.querySelectorAll('.scroll table')){
  const heading=table.closest('section')?.querySelector('h2')?.textContent.trim()||'Data';
  const scroll=table.closest('.scroll');scroll.tabIndex=0;scroll.setAttribute('role','region');if(!scroll.hasAttribute('aria-label'))scroll.setAttribute('aria-label','Tabel '+heading);
- const heads=Array.from(table.querySelectorAll('thead th')).map(e=>{e.setAttribute('scope','col');return e.textContent.trim();});
- for(const row of table.querySelectorAll('tbody tr'))Array.from(row.cells).forEach((cell,i)=>{if(cell.colSpan===1)cell.dataset.label=heads[i]||cell.dataset.field||'';});
 }
-for(const box of document.querySelectorAll('[data-error]')){box.setAttribute('role','alert');box.tabIndex=-1;}
-for(const box of document.querySelectorAll('[data-ok]')){box.setAttribute('role','status');box.setAttribute('aria-live','polite');}
+labelRows(document);
+window.uiLive?.onPatch(labelRows);
 // Move, never clone, real forms: values, listeners and row-scoped handlers survive.
 let popupSerial=0;
 function popup(node,title,label,{wide=false,toolbar=null}={}){
@@ -198,7 +208,7 @@ function popup(node,title,label,{wide=false,toolbar=null}={}){
  node.before(button,dialog);content.append(node);if(toolbar)toolbar.append(button);
  // Tombol kirim pindah ke baris aksi di dasar formulir (tetap di dalam form agar penangan submit/busy tidak berubah): Batal kiri, aksi utama kanan.
  const forms=node.matches('form')?[node]:Array.from(node.querySelectorAll('form'));
- if(forms.length===1){const form=forms[0];const submits=Array.from(form.querySelectorAll('button[type=submit],button:not([type])')).filter(b=>!b.closest('dialog dialog'));const submit=submits[submits.length-1];
+ if(forms.length===1){const form=forms[0];const submits=Array.from(form.querySelectorAll('button[type=submit],button:not([type])')).filter(b=>!b.closest('dialog dialog,[data-popup-skip]'));const submit=submits[submits.length-1];
   if(submit&&submits.length===1){const holder=submit.parentElement;const bar=document.createElement('div');bar.className='popup-submit';bar.append(cancel,submit);form.append(bar);footer.remove();dialog.classList.add('has-submit-bar');if(holder&&holder!==form&&!holder.children.length&&!holder.textContent.trim())holder.remove();}}
  let opener=null,closing=false;
  function hide(){if(closing||dialog.querySelector('[data-busy="1"]'))return;closing=true;const done=()=>{dialog.close();closing=false;opener?.focus({preventScroll:true});};if(matchMedia('(prefers-reduced-motion: reduce)').matches){done();return;}dialog.animate([{opacity:1,transform:'none'},{opacity:0,transform:'translateY(10px) scale(.98)'}],{duration:160,easing:'cubic-bezier(.4,0,1,1)'}).finished.then(done,done);}
@@ -213,7 +223,7 @@ const wholeSections=[['#receipt-heading','Catat barang masuk','Tambah penerimaan
 for(const [selector,title,label]of wholeSections){const section=document.querySelector(selector)?.closest('section');if(!section)continue;
  // Penerimaan: tombol pembuka langsung di kepala kartu Riwayat (rancangan 'Penerimaan barang'), tanpa kartu terpisah.
  const history=selector==='#receipt-heading'?document.querySelector('#receipt-history'):null;
- if(history){history.classList.add('has-head-action');const opened=popup(section,title,'+ Catat penerimaan',{toolbar:history});if(opened){opened.button.classList.add('card-head-action');const sub=document.createElement('p');sub.className='popup-sub';sub.textContent=section.querySelector('.note')?.textContent.trim()||'';if(sub.textContent)opened.dialog.querySelector('.popup-titles').append(sub);}continue;}const shell=document.createElement('section');shell.className='card';const h=document.createElement('h2');h.textContent=title;const note=section.querySelector('.note')?.cloneNode(true);section.before(shell);shell.append(h);if(note)shell.append(note);popup(section,title,label,{toolbar:shell});}
+ if(history){history.classList.add('has-head-action');const opened=popup(section,title,'+ Catat penerimaan',{toolbar:history,wide:true});if(opened){opened.button.classList.add('card-head-action');const sub=document.createElement('p');sub.className='popup-sub';sub.textContent=section.querySelector('.note')?.textContent.trim()||'';if(sub.textContent){opened.dialog.querySelector('.popup-titles').append(sub);const dup=section.querySelector('.note');if(dup)dup.hidden=true;}}continue;}const shell=document.createElement('section');shell.className='card';const h=document.createElement('h2');h.textContent=title;const note=section.querySelector('.note')?.cloneNode(true);section.before(shell);shell.append(h);if(note)shell.append(note);popup(section,title,label,{toolbar:shell});}
 // Shared Dialog Management: semantics, focus restoration, reduced motion & busy guard
 function closeCustomDialog(dialog) {
   if (!dialog || dialog.dataset.closing || dialog.querySelector('[data-busy="1"]') || dialog.dataset.busy) return;
@@ -293,17 +303,22 @@ function enhanceCollect(form,result){
  for(const [label,value,strong] of [['Total tagihan',cellText(row,'Total')],['Terbayar',cellText(row,'Terbayar')],['Sisa',rest,true]]){const d=document.createElement('div');if(strong)d.className='is-due';const t=document.createElement('dt');t.textContent=label;const v=document.createElement('dd');v.textContent=value||'—';d.append(t,v);summary.append(d);}
  const srHead=form.querySelector('h3.sr');if(srHead)srHead.after(summary);else form.prepend(summary);
  const amount=form.querySelector('input[name=amount]');const digits=rest.replace(/[^0-9]/g,'');
- if(amount){const l=form.querySelector('label[for="'+amount.id+'"]');if(l)l.textContent='Jumlah dibayar';if(!amount.value&&digits&&digits!=='0')amount.value=digits;}
+ if(amount){const l=form.querySelector('label[for="'+amount.id+'"]');if(l)l.textContent='Jumlah dibayar';
+  // Nominal tidak diisi otomatis; tombol cepat mengisi sisa tagihan dengan satu klik.
+  if(digits&&digits!=='0'&&!form.querySelector('.popup-fill')){const fill=document.createElement('button');fill.type='button';fill.className='secondary popup-fill';fill.textContent='Lunasi '+rest;fill.addEventListener('click',()=>{amount.value=digits;amount.dispatchEvent(new Event('input',{bubbles:true}));amount.focus();});amount.closest('.field')?.append(fill);}}
  const ref=form.querySelector('input[name=reference]');if(ref&&!ref.placeholder)ref.placeholder='No. transfer / catatan';
  segmentSelect(form.querySelector('select[name=method]'));
- const hint=document.createElement('p');hint.className='note popup-hint';hint.textContent='Tunai langsung tercatat. Transfer menunggu verifikasi admin.';form.querySelector('.popup-submit')?.before(hint);
+ const hint=document.createElement('p');hint.className='note popup-hint';hint.textContent=form.dataset.hint||'Tunai langsung tercatat. Transfer menunggu verifikasi admin.';form.querySelector('.popup-submit')?.before(hint);
 }
-for(const form of document.querySelectorAll('main form')){
+// Form isian di halaman menjadi popup. Dipasang saat muat dan pada baris/daftar baru dari uiLive (form di dalam dialog dilewati).
+function popupForms(root){for(const form of root.querySelectorAll(root===document?'main form':'form')){
  if(form.id==='form-checkout'||form.closest('dialog')||(form.getAttribute('method')||'').toLowerCase()==='get')continue;
  if(!form.querySelector('input:not([type=hidden]),select,textarea'))continue;
- const submit=form.querySelector('button[type=submit],button:not([type])');const label=form.id==='form-open'?'Buka shift':(submit?.textContent.trim()||'Isi formulir');const contextEl=form.querySelector('h3,p:not([data-error]):not([data-ok])');const context=contextEl?.tagName==='H3'&&contextEl.textContent.trim()!==label?contextEl.textContent.trim():'';if(contextEl?.tagName==='H3'&&contextEl.textContent.trim()===label)contextEl.classList.add('sr');const result=popup(form,label,label);if(result&&context){const note=document.createElement('p');note.className='popup-sub';note.textContent=context;result.dialog.querySelector('.popup-titles').append(note);}
+ const submit=form.querySelector('button[type=submit],button:not([type])');const label=form.dataset.popupTitle||(form.id==='form-open'?'Buka shift':(submit?.textContent.trim()||'Isi formulir'));const contextEl=form.querySelector('h3,p:not([data-error]):not([data-ok])');const context=contextEl?.tagName==='H3'&&contextEl.textContent.trim()!==label?contextEl.textContent.trim():'';if(contextEl?.tagName==='H3'&&contextEl.textContent.trim()===label)contextEl.classList.add('sr');const result=popup(form,label,label);if(result&&context){const note=document.createElement('p');note.className='popup-sub';note.textContent=context;result.dialog.querySelector('.popup-titles').append(note);}
  if(result&&form.matches('.form-collect'))enhanceCollect(form,result);
-}
+}}
+popupForms(document);
+window.uiLive?.onPatch(popupForms);
 // List filter remains a GET, not a mutation; labels keep their stored enum values.
 const kinds={customer:'Pelanggan',supplier:'Supplier',employee:'Karyawan / staf',product:'Produk',vehicle:'Kendaraan'};
 for(const option of document.querySelectorAll('select[name=master_kind] option'))option.textContent=kinds[option.value]||option.textContent;
@@ -324,10 +339,10 @@ function select(key,{focus=false,updateURL=true}={}){
  document.body.toggleAttribute('data-remote-task',!!remoteUrl);
  if(remoteUrl)loadRemote(key,remoteLast.get(key)||remoteUrl);const own=owner.get(key);document.querySelector('#workspace-title').textContent=tabsOf.get(key)?own.textContent.trim():text[key][0];document.querySelector('#workspace-description').textContent=text[key][1];document.querySelector('.top-context strong').textContent=key==='kasir'?'Kasir':(own?.textContent.trim()||text[key][0]);
  if(updateURL&&changed)history.replaceState(null,'','#'+key);if(focus)own?.focus({preventScroll:true});
- if(changed&&document.body.classList.contains('workspace-enhanced')){window.uiMotion?.enter(panels.get(key));window.scrollTo({top:0,behavior:'instant'});}
+ if(changed&&document.body.classList.contains('workspace-enhanced')){window.uiMotion?.enter(panels.get(key));window.uiMotion?.textIn(document.querySelector('#workspace-title'));window.uiMotion?.textIn(document.querySelector('#workspace-description'));window.scrollTo({top:0,behavior:'instant'});}
 }
 for(const link of links){link.addEventListener('click',e=>{e.preventDefault();select(link.dataset.task);if(matchMedia('(max-width:900px)').matches)window.v2Sidebar?.close();});link.addEventListener('keydown',e=>{const visible=links.filter(item=>item.closest('[data-menu-group]')?.open!==false),i=visible.indexOf(link);let n;if(e.key==='ArrowDown')n=(i+1)%visible.length;if(e.key==='ArrowUp')n=(i-1+visible.length)%visible.length;if(e.key==='Home')n=0;if(e.key==='End')n=visible.length-1;if(n!==undefined){e.preventDefault();visible[n].focus({preventScroll:true});}});}
-for(const link of document.querySelectorAll('[data-task-link]'))link.addEventListener('click',e=>{e.preventDefault();select(link.dataset.taskLink);panels.get(active).querySelector('.popup-action,input,button')?.focus({preventScroll:true});});
+document.addEventListener('click',e=>{const link=e.target.closest?.('[data-task-link]');if(!link)return;e.preventDefault();select(link.dataset.taskLink);panels.get(active).querySelector('.popup-action,input,button')?.focus({preventScroll:true});});
 window.addEventListener('hashchange',()=>select(requested(),{updateURL:false}));
 select(panels.has(requested())?requested():(panels.has(saved)?saved:defaultTask),{updateURL:false});document.body.classList.add('workspace-enhanced');window.scrollTo({top:0,behavior:'instant'});
 const busyWatch=new MutationObserver(records=>{for(const record of records){const form=record.target;if(form.matches('form'))form.setAttribute('aria-busy',form.dataset.busy?'true':'false');}});busyWatch.observe(main,{subtree:true,attributes:true,attributeFilter:['data-busy']});

@@ -115,7 +115,7 @@ dialog.input-dialog.uf-dialog-wide{width:min(780px,calc(100vw - 32px));max-width
 /* Penerimaan barang: satu baris per barang supaya daftar panjang tetap terbaca. */
 .rc-items{border:0;padding:0;margin:14px 0 0;min-width:0}
 .rc-items .lbl{padding:0;font-size:var(--ui-t-label);font-weight:600;color:var(--ui-muted)}
-.rc-head,.rc-row{display:grid;grid-template-columns:minmax(0,1fr) 92px 128px 112px 36px;gap:8px;align-items:center}
+.rc-head,.rc-row{display:grid;grid-template-columns:minmax(0,1fr) 92px 128px 112px 44px;gap:8px;align-items:center}
 .rc-head{margin:8px 0 4px;font-size:var(--ui-t-caption);font-weight:600;color:var(--ui-muted)}
 .rc-head>span:nth-child(2),.rc-head>span:nth-child(3),.rc-head>span:nth-child(4){text-align:right}
 .rc-row{padding:4px 0;border-top:1px solid var(--ui-line)}
@@ -123,11 +123,53 @@ dialog.input-dialog.uf-dialog-wide{width:min(780px,calc(100vw - 32px));max-width
 .rc-row input,.rc-row select,.rc-row .ui-pick-input{min-height:38px;margin:0}
 .rc-row input[data-name=quantity],.rc-row input[data-name=unit_cost]{text-align:right}
 .rc-value{justify-self:end;font-variant-numeric:tabular-nums;font-size:var(--ui-t-body);color:var(--ui-ink);white-space:nowrap}
-.rc-remove{width:36px;min-width:36px;height:36px;min-height:36px;padding:0;border-radius:9px;line-height:1}
+.rc-remove{width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border-radius:10px;line-height:1}
 .rc-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--ui-line)}
 .rc-total{display:flex;align-items:baseline;gap:10px;margin:0}
 .rc-total strong{font-size:1.125rem;font-variant-numeric:tabular-nums}
 #rc-count{font-size:var(--ui-t-label);color:var(--ui-muted)}
+/* Tinjau sebelum simpan (penerimaan): bagian isian disembunyikan oleh skrip, ringkasan tampil di popup yang sama. */
+html body :has(>#receipt-form.is-reviewing)>p.note{display:none !important}
+.rc-review h3{margin:0 0 4px;font-size:1rem;color:var(--ui-ink)}
+.rc-review h3:focus{outline:none}
+.rc-review-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin:12px 0}
+.rc-review-meta dt{font-size:var(--ui-t-label);color:var(--ui-muted)}
+.rc-review-meta dd{margin:0;font-weight:600;color:var(--ui-ink)}
+.rc-review-list{list-style:none;margin:0;padding:0;border-top:1px solid var(--ui-line)}
+.rc-review-list li{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 0;border-bottom:1px solid var(--ui-line)}
+.rc-review-list li>span{justify-self:end;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rc-review-list li>small{grid-column:1/-1;font-size:var(--ui-t-label);color:var(--ui-muted);font-variant-numeric:tabular-nums}
+.rc-review-list li.is-odd{background:#FEF7E0;box-shadow:inset 3px 0 0 #D19A00;padding-left:10px;padding-right:8px}
+.rc-review-list li.is-odd>small{color:#7A4B00;font-weight:600}
+.rc-review-total{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:12px 0}
+.rc-review-total strong{font-size:1.25rem;font-variant-numeric:tabular-nums;color:var(--ui-green,#14532D)}
+.rc-review-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin:0}
+.rc-review-actions button{min-height:44px}
+html body .rc-review-actions :is(button[type=submit],#u#u){background:#C8F26B !important;color:#14532D !important;border:0 !important;font-weight:700}
+.rc-review [data-error]{margin:0 0 12px}
+/* Form sopir (kirim barang, uang muka, realisasi) di popup: lebar penuh, dua kolom, label di atas kolom. */
+html body dialog.input-dialog .popup-content>form.driver-form{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px;width:100%;max-width:none;align-items:start}
+html body dialog.input-dialog form.driver-form>:is(h3,.note,.err,.ok,.popup-submit,label:has(>input[type=checkbox])){grid-column:1/-1}
+html body dialog.input-dialog form.driver-form>label{display:grid;grid-template-columns:minmax(0,1fr);justify-content:stretch;gap:7px;margin:0;font-weight:600;color:var(--ui-ink)}
+html body dialog.input-dialog form.driver-form>label :is(input,select){margin-top:0}
+html body dialog.input-dialog form.driver-form>label :is(.select-shell,.select-trigger,input:not([type=checkbox]),#u#u){width:100% !important;max-width:none !important;justify-self:stretch}
+html body dialog.input-dialog form.driver-form .popup-submit>button{justify-self:stretch;width:100%}
+html body dialog.input-dialog form.driver-form>label:has(>input[type=checkbox]){display:flex;align-items:flex-start;gap:10px;font-weight:500;min-height:44px}
+html body dialog.input-dialog form.driver-form .dv-calc{margin:0;padding:10px 12px;border-radius:10px;background:#F1F6F2;color:var(--ui-ink);font-variant-numeric:tabular-nums}
+html body dialog.input-dialog form.driver-form .dv-calc.is-warn{background:#FEF7E0;color:#7A4B00}
+html body dialog.input-dialog form.driver-form .dv-calc:empty{display:none}
+@media (max-width:560px){html body dialog.input-dialog .popup-content>form.driver-form{grid-template-columns:1fr}}
+.rc-opt{font-weight:500;color:var(--ui-muted)}
+/* Penjaga entri dobel: pesan sebagai peringatan kuning, tombol simpan menjadi konfirmasi. */
+html body form.is-duplicate-warning :is([data-error],#u#u){background:#FEF7E0 !important;border-color:#F4D47C !important;color:#7A4B00 !important}
+/* Popup bayar tagihan: tombol cepat mengisi sisa. */
+html body dialog :is(.popup-fill,#u#u){margin-top:8px;min-height:44px !important;height:44px;width:100%;font-variant-numeric:tabular-nums}
+/* HP: target sentuh minimal 44px untuk tombol tutup popup dan saran jenis mobil. */
+@media (max-width:720px){html body dialog :is(.popup-close,#u#u#u){min-width:44px !important;min-height:44px !important;width:44px !important;height:44px !important}html body dialog :is([data-suggest],#u#u#u){min-height:44px !important;height:44px !important}}
+/* Riwayat: penerimaan yang dibatalkan tetap tampil, nilai dicoret. */
+tr.rh-void .rh-total strong,tr.rh-void .ui-num.rh-lines span{text-decoration:line-through;color:var(--ui-muted)}
+.rh-void-note{white-space:normal}
+@media (max-width:720px){.rc-review-meta{grid-template-columns:1fr}.rc-review-list li{grid-template-columns:1fr}.rc-review-list li>span{justify-self:start}.rc-review-actions button{flex:1}}
 @media (max-width:720px){
   .rc-head{display:none}
   .rc-row{grid-template-columns:1fr 1fr;grid-template-areas:'barang barang' 'jumlah hpp' 'nilai hapus';padding:10px 0}

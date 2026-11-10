@@ -12,7 +12,8 @@ const camel=k=>k.replace(/-([a-z])/g,(_,c)=>c.toUpperCase());
 for(const wrap of wrappers){
   const table=wrap.querySelector('table');if(!table||!table.tBodies[0])continue;
   const body=table.tBodies[0];
-  const rows=Array.from(body.rows).filter(r=>!r.hasAttribute('data-ui-empty')&&!r.hasAttribute('data-ui-empty-static'));
+  const pick=()=>Array.from(body.rows).filter(r=>!r.hasAttribute('data-ui-empty')&&!r.hasAttribute('data-ui-empty-static'));
+  let rows=pick();
   const scope=wrap.closest('section')||wrap.parentElement;
   const toolbar=Array.from(scope.querySelectorAll('[data-ui-toolbar]')).find(t=>t.compareDocumentPosition(wrap)&Node.DOCUMENT_POSITION_FOLLOWING)||null;
   const searchInput=toolbar?.querySelector('[data-ui-search]')||null;
@@ -21,7 +22,8 @@ for(const wrap of wrappers){
   const isFirstInPanel=panel.querySelector('[data-ui-table]')===wrap;
   const tiles=isFirstInPanel?Array.from(panel.querySelectorAll('[data-ui-filter]')):[];
   // Teks yang dicari: isi sel tanpa formulir/dialog (agar kata di dalam popup tidak ikut cocok).
-  const text=new Map(rows.map(r=>{let t='';for(const c of r.cells){const copy=c.cloneNode(true);copy.querySelectorAll('dialog,form,template').forEach(n=>n.remove());t+=' '+copy.textContent;}return [r,norm(t)];}));
+  const index=list=>new Map(list.map(r=>{let t='';for(const c of r.cells){const copy=c.cloneNode(true);copy.querySelectorAll('dialog,form,template').forEach(n=>n.remove());t+=' '+copy.textContent;}return [r,norm(t)];}));
+  let text=index(rows);
   const state={q:'',filter:null,page:1,size:10};
   const colspan=table.tHead?.rows[0]?.cells.length||1;
   const emptyRow=document.createElement('tr');emptyRow.setAttribute('data-ui-empty','');emptyRow.hidden=true;
@@ -73,6 +75,8 @@ for(const wrap of wrappers){
   sizeSelect.addEventListener('change',()=>{state.size=Number(sizeSelect.value);state.page=1;render();});
   wrap.addEventListener('ui-table:reveal',e=>{const i=rows.filter(matches).indexOf(e.detail?.row);if(i>=0&&Math.floor(i/state.size)+1!==state.page){state.page=Math.floor(i/state.size)+1;render();}});
   prev.addEventListener('click',()=>{state.page--;render();});next.addEventListener('click',()=>{state.page++;render();});
+  // uiLive mengganti isi <tbody>: baca ulang baris, pertahankan kata kunci, saringan, dan halaman.
+  wrap._uiTableReload=()=>{rows=pick();text=index(rows);if(emptyRow.parentNode!==body)body.append(emptyRow);render();};
   const initial=chips.find(c=>c.getAttribute('aria-pressed')==='true');
   if(initial&&initial.dataset.uiChip!=='all')state.filter=parseFilter(initial.dataset.uiChip);
   render();

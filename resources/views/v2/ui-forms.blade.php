@@ -56,7 +56,8 @@ function syncMargin(form){
   }
 }
 // Dropdown banyak pilihan: pilih dari daftar, muncul sebagai keping. Keping pertama = utama.
-for(const box of document.querySelectorAll('[data-ui-multiref]')){
+function enhanceMultiref(box){
+ if(box.dataset.ufReady)return;box.dataset.ufReady='1';
  const picker=box.querySelector('[data-multiref-picker]'),list=box.querySelector('[data-multiref-list]'),blank=box.querySelector('[data-multiref-empty]'),primary=box.querySelector('[data-multiref-primary]');
  const name=box.closest('.uf')?.dataset.multirefName||'supplier_ids[]';
  function sync(){
@@ -76,6 +77,8 @@ for(const box of document.querySelectorAll('[data-ui-multiref]')){
   list.append(li);picker.selectedOptions[0].disabled=true;picker.value='';
   picker.dispatchEvent(new Event('ui-refresh',{bubbles:true}));sync();
  });
+ // Form dikosongkan setelah simpan: keping dibuang, pilihan dibuka lagi.
+ box.closest('form')?.addEventListener('reset',()=>setTimeout(()=>{list.replaceChildren();for(const o of picker.options)o.disabled=false;picker.dispatchEvent(new Event('ui-refresh',{bubbles:true}));sync();}));
  list.addEventListener('click',e=>{
   const button=e.target.closest('[data-multiref-remove]');if(!button)return;
   const li=button.closest('li'),id=li.querySelector('input')?.value;
@@ -101,7 +104,8 @@ function setFieldError(el,message){
   out.textContent=message;
 }
 function refreshCount(area){const out=area.closest('.uf')?.querySelector('[data-count-for="'+area.id+'"]');if(out){out.textContent=area.value.length+'/'+area.maxLength;out.dataset.near=String(area.value.length>=area.maxLength*0.9);}}
-for(const form of document.querySelectorAll('form.uf-form')){
+function enhanceForm(form){
+  if(form.dataset.ufReady)return;form.dataset.ufReady='1';
   form.addEventListener('invalid',e=>{
     const el=e.target;setFieldError(el,fieldMessage(el));
     if(el.matches('select'))return;               // select kustom memfokuskan dan membuka dirinya sendiri
@@ -136,6 +140,14 @@ for(const form of document.querySelectorAll('form.uf-form')){
   form.addEventListener('input',e=>{if(e.target.matches('[data-ui-number]'))syncMargin(form);});
   // Nilai tersembunyi diperbarui setelah event input; hitung ulang untung saat nilainya berubah.
   form.addEventListener('change',e=>{if(e.target.matches('input[type=hidden][name$=_price]'))syncMargin(form);});
+  form.addEventListener('reset',()=>setTimeout(()=>{for(const el of form.querySelectorAll('[data-ui-number]'))syncNumber(el);syncUnit(form);syncMargin(form);for(const box of form.querySelectorAll('.uf[data-invalid]'))box.querySelector('input,select,textarea')&&setFieldError(box.querySelector('input,select,textarea'),'');}));
 }
+// Dipasang saat muat dan pada isi baru dari uiLive (mis. form Ubah di baris tabel yang baru).
+function enhance(root){
+  for(const box of root.querySelectorAll('[data-ui-multiref]'))enhanceMultiref(box);
+  for(const form of root.querySelectorAll('form.uf-form'))enhanceForm(form);
+}
+enhance(document);
+window.uiLive?.onPatch(enhance);
 })();
 </script>

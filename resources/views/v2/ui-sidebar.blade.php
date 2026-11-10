@@ -54,7 +54,10 @@ body .task-panel>.ui-subtabs{width:auto!important}
 /* tooltip dan kartu sub-menu rail (elemen JS di <body>) */
 .rail-tip,.rail-flyout{position:fixed}
 .rail-tip{z-index:120;transform:translateY(-50%);padding:7px 13px;border-radius:10px;background:var(--ui-side,#0f2a1d);color:#fff;font:650 .8125rem/1.2 var(--font-display,system-ui);white-space:nowrap;pointer-events:none;box-shadow:0 8px 22px rgb(15 42 29 / .28)}
-.rail-flyout{z-index:119;min-width:220px;padding:8px 8px 8px 8px;display:flex;flex-direction:column;gap:2px;background:#fff;border:1px solid var(--ui-line);border-radius:16px;box-shadow:0 20px 48px rgb(15 42 29 / .24);animation:rail-fly .14s ease-out}
+.rail-flyout{z-index:119;min-width:220px;padding:8px 8px 8px 8px;display:flex;flex-direction:column;gap:2px;background:#fff;border:1px solid var(--ui-line);border-radius:16px;box-shadow:0 20px 48px rgb(15 42 29 / .24);animation:rail-fly-in .24s cubic-bezier(.22,.8,.24,1)}
+@keyframes rail-fly-in{from{opacity:0;transform:translateX(-8px) scale(.94)}to{opacity:1;transform:none}}
+/* Grup aktif berganti warna halus (bukan meloncat). */
+#workspace-sidebar .workspace-menu-group>summary,#workspace-sidebar .menu-group-mark{transition:color .2s ease,background-color .16s ease}
 .rail-tip[hidden],.rail-flyout[hidden]{display:none}
 /* Judul grup di dalam kartu, sebaris ikon. Jembatan tak terlihat menutup celah 8px antara rail dan kartu agar kursor tidak lepas. */
 .rail-flyout-title{display:flex;align-items:center;padding:0 12px;margin:0 0 2px;font:700 .875rem/1.2 var(--font-display,system-ui);color:#0f2a1d;white-space:nowrap}
@@ -68,7 +71,6 @@ body .task-panel>.ui-subtabs{width:auto!important}
 .rail-flyout a:hover::after,.rail-flyout a:focus-visible::after,.rail-flyout a[aria-current=page]::after{opacity:.7}
 .rail-flyout a[aria-current=page]{background:rgb(200 242 107 / .4);color:#0f2a1d;font-weight:650}
 .rail-flyout a:focus-visible{outline:3px solid var(--ui-focus,#0b5cab);outline-offset:-2px}
-@keyframes rail-fly{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 
 @media (min-width:901px){
   body:has(#workspace-sidebar){padding-left:var(--side-rail)!important;transition:padding-left .2s cubic-bezier(.2,0,0,1)}

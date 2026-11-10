@@ -20,26 +20,39 @@ const tip=document.createElement('div');tip.className='rail-tip';tip.hidden=true
 const fly=document.createElement('div');fly.className='rail-flyout';fly.hidden=true;fly.setAttribute('role','group');
 document.body.append(tip,fly);
 const isRail=()=>!mobile()&&!sidebar.classList.contains('pinned');
-let flyGroup=null,hideTimer=0,mute=false;
-function hideFly(){clearTimeout(hideTimer);hideTimer=0;fly.hidden=true;tip.hidden=true;flyGroup=null;}
+let flyGroup=null,hideTimer=0,mute=false,flyExit=null;
+function hideFly({instant=false}={}){clearTimeout(hideTimer);hideTimer=0;tip.hidden=true;flyGroup=null;
+ if(fly.hidden||flyExit)return;
+ if(instant||!window.uiMotion){fly.hidden=true;return;}
+ flyExit=window.uiMotion.dismiss(fly,()=>{fly.hidden=true;flyExit=null;});}
 function scheduleHide(){clearTimeout(hideTimer);hideTimer=setTimeout(hideFly,170);}
 function showFly(group,{focus=false}={}){
  if(!isRail())return;clearTimeout(hideTimer);
+ // Sedang keluar lalu disentuh lagi: batalkan keluarnya, kartu dianggap masih terbuka (asal untuk morph).
+ if(flyExit){flyExit.cancel();flyExit=null;}
+ if(flyGroup===group&&!fly.hidden){if(focus)fly.querySelector('a')?.focus({preventScroll:true});return;}
+ const fill=()=>buildFly(group);
+ if(!fly.hidden&&window.uiMotion){window.uiMotion.morphBox(fly,fill);}else{fill();}
+ if(focus)fly.querySelector('a')?.focus({preventScroll:true});
+}
+function buildFly(group){
  const summary=group.querySelector('summary'),r=summary.getBoundingClientRect(),name=summary.querySelector('span').textContent.trim();
  flyGroup=group;fly.replaceChildren();fly.setAttribute('aria-label',name);
  // Judul grup ada di dalam kartu, sebaris dan setinggi ikon rail: kursor bergerak lurus ke kanan langsung masuk kartu.
  const head=document.createElement('div');head.className='rail-flyout-title';head.setAttribute('aria-hidden','true');head.textContent=name;head.style.minHeight=Math.round(r.height)+'px';fly.append(head);
  for(const item of group.querySelectorAll('.workspace-submenu a')){
   const a=document.createElement('a');a.href=item.getAttribute('href');a.textContent=item.textContent.trim();if(item.getAttribute('aria-current'))a.setAttribute('aria-current','page');
-  a.addEventListener('click',e=>{e.preventDefault();hideFly();if(item.dataset.task)item.click();else location.href=item.href;});fly.append(a);
+  a.addEventListener('click',e=>{e.preventDefault();hideFly({instant:true});if(item.dataset.task)item.click();else location.href=item.href;});fly.append(a);
  }
  fly.hidden=false;
  const h=fly.offsetHeight,rail=sidebar.getBoundingClientRect();
  // Kartu sub-menu selalu di kanan rail (kalau menutupi ikon, grup lain tidak bisa ditekan), dan baris judulnya sejajar ikon.
  // Padding atas kartu = jarak judul ke tepi kartu, jadi kartu dimulai sedikit di atas ikon. Dekat dasar layar, kartu naik secukupnya.
  const pad=parseFloat(getComputedStyle(fly).paddingTop)||0;
- tip.hidden=true;fly.style.left=Math.round(rail.right+8)+'px';fly.style.top=Math.round(Math.max(8,Math.min(r.top-pad,innerHeight-8-h)))+'px';
- if(focus)fly.querySelector('a')?.focus({preventScroll:true});
+ const top=Math.round(Math.max(8,Math.min(r.top-pad,innerHeight-8-h)));
+ tip.hidden=true;fly.style.left=Math.round(rail.right+8)+'px';fly.style.top=top+'px';
+ // Titik asal animasi masuk = tengah ikon grup, sehingga kartu terasa keluar dari ikon.
+ fly.style.transformOrigin='0 '+Math.round(r.top+r.height/2-top)+'px';
 }
 for(const group of menuGroups){
  const summary=group.querySelector('summary');summary.removeAttribute('title');
@@ -57,8 +70,8 @@ fly.addEventListener('keydown',e=>{
  else if(e.key==='Tab'){e.preventDefault();items[(i+(e.shiftKey?-1:1)+items.length)%items.length].focus();}
 });
 document.addEventListener('pointerdown',e=>{if(!fly.hidden&&!fly.contains(e.target)&&!sidebar.contains(e.target))hideFly();});
-window.addEventListener('resize',hideFly);
-function setPinned(on){hideFly();document.body.classList.toggle('sidebar-pinned',on);sidebar.classList.toggle('pinned',on);edge.setAttribute('aria-pressed',String(on));edge.setAttribute('aria-label',on?'Ciutkan menu':'Buka menu tetap');edge.title=on?'Ciutkan menu':'Buka menu tetap';try{localStorage.setItem('v2-sidebar-pinned',on?'1':'0');}catch{}}
+window.addEventListener('resize',()=>hideFly({instant:true}));
+function setPinned(on){hideFly({instant:true});document.body.classList.toggle('sidebar-pinned',on);sidebar.classList.toggle('pinned',on);edge.setAttribute('aria-pressed',String(on));edge.setAttribute('aria-label',on?'Ciutkan menu':'Buka menu tetap');edge.title=on?'Ciutkan menu':'Buka menu tetap';try{localStorage.setItem('v2-sidebar-pinned',on?'1':'0');}catch{}}
 edge.addEventListener('click',()=>setPinned(!sidebar.classList.contains('pinned')));
 // Logo menjadi tombol: klik melebarkan atau menciutkan sidebar (desktop). Di HP sidebar tetap laci dari tombol menu.
 const brand=sidebar.querySelector('.brand-mark');

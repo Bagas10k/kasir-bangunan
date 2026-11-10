@@ -19,6 +19,12 @@
     .app-calendar button { border:0; background:transparent; color:inherit; cursor:pointer; font:inherit; font-size:12px; border-radius:8px; min-height:36px; }
     .calendar-nav { width:36px; font-size:20px !important; }
     .calendar-months { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+    .app-calendar.is-single .calendar-months { grid-template-columns:minmax(0,1fr); }
+    .app-calendar.is-single .calendar-month-title { display:none; }
+    .app-calendar.is-single .calendar-heading { text-transform:capitalize; }
+    .calendar-footer button { white-space:nowrap; }
+    body .app-calendar.is-single .calendar-footer button { padding:0 8px; }
+    body .app-calendar.is-single .calendar-footer .calendar-ok { min-width:68px; padding:0 14px; }
     .calendar-month-title { padding-bottom:8px; border-bottom:1px solid var(--border-card,#e5e7eb); text-align:center; font-size:13px; font-weight:700; text-transform:capitalize; }
     .calendar-week, .calendar-days { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:2px; }
     .calendar-week { margin-top:7px; }
@@ -99,7 +105,7 @@
         if (!active) return;
         calendar.style.margin='0';calendar.style.inset='auto';
         const rect = active.trigger.getBoundingClientRect();
-        const width = Math.min(620, innerWidth - 24);
+        const width = Math.min(active.range ? 620 : 344, innerWidth - 24);
         calendar.style.width = width + 'px';
         calendar.style.left = Math.max(12, Math.min(rect.left, innerWidth - width - 12)) + 'px';
         const above = rect.bottom + calendar.offsetHeight + 8 > innerHeight;
@@ -176,6 +182,7 @@
     function renderRange(focusDate) {
         if (!active?.range) return;
         calendar.replaceChildren();
+        calendar.classList.remove('is-single');
         const head = document.createElement('div'); head.className = 'calendar-head';
         const title = document.createElement('div'); title.className = 'calendar-title';
         const heading = document.createElement('span'); heading.className = 'calendar-heading'; heading.textContent = 'Pilih rentang tanggal';
@@ -194,7 +201,9 @@
         if (!active || active.range) return;
         calendar.replaceChildren();
         const head = document.createElement('div'); head.className = 'calendar-head';
-        const heading = document.createElement('span'); heading.className = 'calendar-heading'; heading.textContent = 'Pilih tanggal';
+        calendar.classList.add('is-single');
+        const heading = document.createElement('span'); heading.className = 'calendar-heading'; heading.setAttribute('aria-live', 'polite');
+        heading.textContent = month.toLocaleDateString('id-ID', {month:'long', year:'numeric'});
         const previous = button('‹', 'Bulan sebelumnya', () => { month.setMonth(month.getMonth() - 1); renderSingle(); }); previous.className = 'calendar-nav';
         const next = button('›', 'Bulan berikutnya', () => { month.setMonth(month.getMonth() + 1); renderSingle(); }); next.className = 'calendar-nav';
         head.append(previous, heading, next);

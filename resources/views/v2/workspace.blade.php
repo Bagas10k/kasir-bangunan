@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="{{ csrf_token() }}">
 @include('partials.numeric-input-guard')
+@include('v2.ui-live')
+@include('v2.ui-money')
 <title>Ruang Kerja — Kasir Bangunan</title>
 @include('v2.ui-styles')
 @include('v2.pos-cashier-styles')
@@ -90,11 +92,11 @@
 
                 <form id="form-open" action="{{ route('v2.shifts.open') }}" novalidate>
                     <fieldset style="border:0;padding:0;margin:0">
-                        <legend class="lbl">Buka shift</legend>
+                        <legend class="sr">Buka shift</legend>
                         <div class="row">
                             <div class="field">
                                 <label for="open-cash">Kas awal</label>
-                                <input id="open-cash" name="cash" type="text" inputmode="decimal" autocomplete="off" maxlength="30" pattern="[0-9]+([.][0-9]{1,2})?" aria-describedby="shift-money-help" required>
+                                <input id="open-cash" name="cash" type="text" data-money inputmode="decimal" autocomplete="off" maxlength="30" pattern="[0-9]+([.][0-9]{1,2})?" aria-describedby="shift-money-help" required>
                             </div>
                             <div class="field">
                                 <label for="open-source">Sumber</label>
@@ -107,7 +109,7 @@
                             <div class="field">
                                 <label for="open-carry">Bawa sisa dari shift</label>
                                 <select id="open-carry" name="carry_from">
-                                    <option value="">— tanpa carry —</option>
+                                    <option value="">Tidak membawa sisa</option>
                                     @foreach ($shifts as $s)
                                         @if (($s->status ?? '') === 'closed' && (int) $s->user_id === (int) auth()->id())
                                             <option value="{{ $s->id }}">#{{ $s->id }} · terkunci {{ $rp($s->counted_cash ?? null) }}</option>
@@ -116,7 +118,7 @@
                                 </select>
                             </div>
                         </div>
-                        <p class="note" id="shift-money-help">Kas awal adalah total uang di laci. Isi tanpa pemisah ribuan, misalnya 100000 atau 100000.50. Sisa shift hanya dapat dibawa sekali, paling banyak sebesar uang fisik yang ditutup.</p>
+                        <p class="note" id="shift-money-help">Kas awal adalah total uang di laci. Titik ribuan muncul sendiri saat mengetik, misalnya 100.000; desimal pakai koma. Sisa shift hanya dapat dibawa sekali, paling banyak sebesar uang fisik yang ditutup.</p>
                         <p><button type="submit">Buka shift</button></p>
                         <p class="err" data-error tabindex="-1" hidden></p>
                         <p class="ok" data-ok hidden></p>
@@ -147,8 +149,8 @@
                                         <div class="row">
                                             <div class="field">
                                                 <label for="counted-{{ $s->id }}">Uang fisik dihitung (shift #{{ $s->id }})</label>
-                                                <input id="counted-{{ $s->id }}" name="counted" type="text" inputmode="decimal" autocomplete="off" maxlength="30" pattern="[0-9]+([.][0-9]{1,2})?" aria-describedby="counted-help-{{ $s->id }}" required>
-                                                <p class="note" id="counted-help-{{ $s->id }}">Isi uang fisik yang dihitung, bukan saldo perkiraan. Tanpa pemisah ribuan; contoh 100000. Selisih akan masuk pemeriksaan Admin.</p>
+                                                <input id="counted-{{ $s->id }}" name="counted" type="text" data-money inputmode="decimal" autocomplete="off" maxlength="30" pattern="[0-9]+([.][0-9]{1,2})?" aria-describedby="counted-help-{{ $s->id }}" required>
+                                                <p class="note" id="counted-help-{{ $s->id }}">Isi uang fisik yang dihitung, bukan saldo perkiraan. Contoh 100.000 (titik ribuan muncul sendiri). Selisih akan masuk pemeriksaan Admin.</p>
                                             </div>
                                             <div class="field" style="flex:0 0 auto">
                                                 <button type="submit" class="secondary">Tutup shift</button>
@@ -176,7 +178,7 @@
         <div class="stack">
             <section class="card" id="tagihan" aria-labelledby="h-collect">
                 <h2 id="h-collect">Daftar tagihan</h2>
-                <p class="note">Piutang pelanggan dan utang ke supplier. Pembayaran tunai langsung tercatat; transfer menunggu verifikasi admin.</p>
+                <p class="note">Piutang pelanggan dan utang ke supplier. Tekan tombol bayar di baris tagihan untuk mencatat pembayaran.</p>
                 <x-ui.toolbar search="Cari nomor tagihan atau nama" label="Cari tagihan" :chips="['Semua' => 'all', 'Belum lunas' => 'state:unpaid,partial', 'Piutang pelanggan' => 'direction:receivable', 'Utang supplier' => 'direction:payable', 'Lunas' => 'state:paid']"/>
                 <div class="ui-table-wrap scroll" data-ui-table tabindex="0" role="region" aria-label="Daftar tagihan">
                     <table class="ui-table">
@@ -194,13 +196,22 @@
                                 <td data-label="Sisa" class="ui-num"><strong>{{ $rp($remaining($inv)) }}</strong></td>
                                 <td data-label="Status"><x-ui.status :status="$state"/></td>
                                 <td class="ui-actions">
-                                @if (($inv->direction ?? '') === 'receivable' && $state !== 'paid')
-                                    <form class="form-collect" action="{{ route('v2.payments.store', ['id' => $inv->id]) }}" data-invoice="{{ $inv->id }}" novalidate>
-                                        <h3 class="sr">Catat pembayaran tagihan {{ $inv->number ?? $inv->id }}</h3>
+                                @if ($state !== 'paid' && ! ($inv->voided_at ?? null))
+                                    @php
+                                        $payable = ($inv->direction ?? '') === 'payable';
+                                        $payLabel = ! $payable ? 'Catat pembayaran' : ($role === 'admin' ? 'Bayar ke supplier' : 'Ajukan pembayaran');
+                                        $payHint = ! $payable
+                                            ? 'Tunai langsung tercatat dan masuk laci shift. Transfer menunggu verifikasi admin.'
+                                            : ($role === 'admin'
+                                                ? 'Langsung tercatat dan mengurangi utang. Tunai keluar dari laci shift Anda; transfer dari rekening bank.'
+                                                : 'Diajukan ke admin. Utang berkurang setelah admin menyetujui.');
+                                    @endphp
+                                    <form class="form-collect" action="{{ route('v2.payments.store', ['id' => $inv->id]) }}" data-invoice="{{ $inv->id }}" data-direction="{{ $inv->direction }}" data-hint="{{ $payHint }}" novalidate>
+                                        <h3 class="sr">{{ $payLabel }} {{ $inv->number ?? $inv->id }}</h3>
                                         <div class="row">
                                             <div class="field">
                                                 <label for="amt-{{ $inv->id }}">Jumlah (invoice {{ $inv->number ?? $inv->id }})</label>
-                                                <input id="amt-{{ $inv->id }}" name="amount" type="text" inputmode="decimal" autocomplete="off" maxlength="30" required>
+                                                <input id="amt-{{ $inv->id }}" name="amount" type="text" data-money inputmode="decimal" autocomplete="off" maxlength="30" required>
                                             </div>
                                             <div class="field">
                                                 <label for="meth-{{ $inv->id }}">Metode</label>
@@ -218,12 +229,11 @@
                                             <label for="key-{{ $inv->id }}">Referensi sistem (otomatis)</label>
                                             <input id="key-{{ $inv->id }}" name="idempotency_key" type="text" maxlength="100" readonly required>
                                         </div>
-                                        <p><button type="submit">Catat pembayaran</button></p>
+                                        <input type="hidden" name="seen_payment_id" value="{{ (int) ($inv->last_payment_id ?? 0) }}">
+                                        <p><button type="submit">{{ $payLabel }}</button></p>
                                         <p class="err" data-error tabindex="-1" hidden></p>
                                         <p class="ok" data-ok hidden></p>
                                     </form>
-                                @elseif (($inv->direction ?? '') === 'payable' && $state !== 'paid')
-                                    <span class="ui-muted">Ajukan di bagian Pembayaran supplier</span>
                                 @else
                                     <span class="ui-muted">—</span>
                                 @endif
@@ -398,7 +408,8 @@
                 out.push(Array.isArray(v) ? v.join(' ') : String(v));
             });
         }
-        if (data && data.message) { out.unshift(data.message); }
+        // Pesan Laravel untuk validasi = salinan galat pertama; tampilkan hanya bila tidak ada rincian galat.
+        if (data && data.message && !out.length) { out.unshift(data.message); }
         if (out.length === 0) { out.push('Permintaan gagal. Periksa isian lalu coba lagi.'); }
         return out.join(' ');
     }
@@ -434,6 +445,7 @@
             }
             return data;
         }).catch(function (data) {
+            form._lastError = data;
             showErr(form, errorText(data), data && data.errors);
             return null;
         }).then(function (data) {
@@ -451,7 +463,8 @@
         return el ? String(el.value).trim() : '';
     }
 
-    function reloadSoon() { window.setTimeout(function () { window.location.reload(); }, 800); }
+    // Setelah simpan: data halaman diperbarui di tempat (uiLive), tanpa memuat ulang halaman.
+    function liveSaved(form, opts) { return window.uiLive.saved(form, opts); }
 
     // ---- buka shift ----
     var openForm = document.getElementById('form-open');
@@ -471,16 +484,17 @@
             var payload = { cash: val(openForm, 'cash'), source: val(openForm, 'source') };
             var carry = val(openForm, 'carry_from');
             payload.carry_from = carry === '' ? null : carry;
-            post(openForm, openForm.action, payload, true).then(function (data) { if (data) { reloadSoon(); } });
+            post(openForm, openForm.action, payload, true).then(function (data) { if (data) { liveSaved(openForm).then(syncCarry); } });
         });
     }
 
     // ---- tutup shift ----
-    Array.prototype.forEach.call(document.querySelectorAll('.form-close'), function (form) {
-        form.addEventListener('submit', function (ev) {
-            ev.preventDefault();
-            post(form, form.action, { counted: val(form, 'counted') }, true).then(function (data) { if (data) { reloadSoon(); } });
-        });
+    // Form di baris tabel (tutup shift, tagih, setujui) ditangani di tingkat dokumen agar baris baru dari uiLive ikut berfungsi.
+    document.addEventListener('submit', function (ev) {
+        var form = ev.target.closest && ev.target.closest('.form-close');
+        if (!form) { return; }
+        ev.preventDefault();
+        post(form, form.action, { counted: val(form, 'counted') }, true).then(function (data) { if (data) { liveSaved(form); } });
     });
 
     // ---- checkout ----
@@ -598,29 +612,60 @@
         });
     }
 
+    // Penjaga entri dobel: tombol simpan berganti menjadi konfirmasi; dikembalikan saat popup ditutup.
+    function confirmDuplicate(form, label) {
+        var btn = form.querySelector('button[type="submit"]');
+        form.dataset.confirmDuplicate = '1';
+        form.classList.add('is-duplicate-warning');
+        if (btn) { if (!btn.dataset.label) { btn.dataset.label = btn.textContent; } btn.textContent = label; }
+        var dialog = form.closest('dialog');
+        if (dialog && !dialog.dataset.duplicateReset) {
+            dialog.dataset.duplicateReset = '1';
+            dialog.addEventListener('close', function () {
+                delete form.dataset.confirmDuplicate;
+                form.classList.remove('is-duplicate-warning');
+                if (btn && btn.dataset.label) { btn.textContent = btn.dataset.label; }
+            });
+        }
+    }
+    window.uiConfirmDuplicate = confirmDuplicate;
+
     // ---- penagihan per invoice ----
-    Array.prototype.forEach.call(document.querySelectorAll('.form-collect'), function (form) {
-        setKey(form.elements['idempotency_key']);
-        form.addEventListener('submit', function (ev) {
+    function keyCollect(root) { Array.prototype.forEach.call(root.querySelectorAll('.form-collect'), function (form) { if (!val(form, 'idempotency_key')) { setKey(form.elements['idempotency_key']); } }); }
+    keyCollect(document);
+    if (window.uiLive) { window.uiLive.onPatch(keyCollect); }
+    document.addEventListener('submit', function (ev) {
+        var form = ev.target.closest && ev.target.closest('.form-collect');
+        if (!form) { return; }
+        {
             ev.preventDefault();
+            if (!val(form, 'idempotency_key')) { setKey(form.elements['idempotency_key']); }
             var payload = {
                 amount: val(form, 'amount'),
                 method: val(form, 'method'),
                 idempotency_key: val(form, 'idempotency_key'),
-                reference: val(form, 'reference') === '' ? null : val(form, 'reference')
+                reference: val(form, 'reference') === '' ? null : val(form, 'reference'),
+                seen_payment_id: val(form, 'seen_payment_id') === '' ? null : val(form, 'seen_payment_id'),
+                confirm_duplicate: form.dataset.confirmDuplicate === '1'
             };
+            form._lastError = null;
             post(form, form.action, payload, true).then(function (data) {
-                if (data) { reloadSoon(); }
+                if (data) { delete form.dataset.confirmDuplicate; liveSaved(form).then(function () { if (form.isConnected) { setKey(form.elements['idempotency_key']); } }); return; }
+                // Penjaga entri dobel: tagihan sudah dibayar orang lain sejak form dibuka. Simpan berikutnya = konfirmasi.
+                var err = form._lastError;
+                if (err && err.errors && err.errors.duplicate_payment) { confirmDuplicate(form, 'Ya, tetap catat'); }
             });
-        });
+        }
     });
 
     // ---- verifikasi admin ----
-    Array.prototype.forEach.call(document.querySelectorAll('.form-approve'), function (form) {
-        form.addEventListener('submit', function (ev) {
+    document.addEventListener('submit', function (ev) {
+        var form = ev.target.closest && ev.target.closest('.form-approve');
+        if (!form) { return; }
+        {
             ev.preventDefault();
-            post(form, form.action, {}, true).then(function (data) { if (data) { reloadSoon(); } });
-        });
+            post(form, form.action, {}, true).then(function (data) { if (data) { liveSaved(form); } });
+        }
     });
 })();
 </script>
@@ -637,5 +682,6 @@
 @include('v2.ui-tables')
 @include('v2.ui-motion')
 @include('v2.ui-forms')
+@include('v2.ui-result')
 </body>
 </html>

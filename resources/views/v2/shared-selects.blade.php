@@ -109,6 +109,8 @@
                         shell.classList.toggle('is-invalid', !select.validity.valid && shell.dataset.validated === 'true');
                     }
                     select.addEventListener('change', sync);
+                    select.addEventListener('ui-refresh', sync);
+                    select.form?.addEventListener('reset', () => setTimeout(sync));
                     new MutationObserver(sync).observe(select,{attributes:true,attributeFilter:['disabled']});
                     select.addEventListener('invalid', event => {
                         event.preventDefault();

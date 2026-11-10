@@ -22,11 +22,11 @@
     </div>
     <div class="field">
         <label for="ob-cash">Kas awal (tunai)</label>
-        <input id="ob-cash" name="cash" type="text" inputmode="decimal" autocomplete="off" maxlength="30" placeholder="0" required>
+        <input id="ob-cash" name="cash" type="text" data-money inputmode="decimal" autocomplete="off" maxlength="30" placeholder="0" required>
     </div>
     <div class="field">
         <label for="ob-bank">Bank awal</label>
-        <input id="ob-bank" name="bank" type="text" inputmode="decimal" autocomplete="off" maxlength="30" placeholder="0" required>
+        <input id="ob-bank" name="bank" type="text" data-money inputmode="decimal" autocomplete="off" maxlength="30" placeholder="0" required>
     </div>
     <div class="field">
         <label for="ob-ref">Referensi / catatan</label>
@@ -58,6 +58,7 @@
 <section class="card" aria-labelledby="review-heading">
 <h2 id="review-heading">Pemeriksaan selisih shift</h2>
 @php $reviewShifts = collect($shifts)->filter(fn ($s) => ($s->status ?? '') === 'review')->values()->all(); @endphp
+<div data-live-list>
 @if (count($reviewShifts) === 0)
     <p class="note">Tidak ada selisih shift yang perlu diperiksa.</p>
 @else
@@ -73,6 +74,7 @@
     </form>
     @endforeach
 @endif
+</div>
 </section>
 
 <section class="card" aria-labelledby="receipt-heading">
@@ -94,6 +96,10 @@
         <label for="rc-date">Tanggal terima</label>
         <input id="rc-date" type="date" name="receipt_date" value="{{ now()->toDateString() }}" required>
     </div>
+    <div class="field">
+        <label for="rc-nota">No. nota supplier <span class="rc-opt">(opsional)</span></label>
+        <input id="rc-nota" name="supplier_invoice_number" type="text" maxlength="64" autocomplete="off" placeholder="Nomor di nota/faktur supplier">
+    </div>
 </div>
 <fieldset class="rc-items">
     <legend class="lbl">Barang diterima</legend>
@@ -105,14 +111,22 @@
     </div>
 </fieldset>
 <p class="note">HPP satuan dipakai untuk nilai persediaan, bukan harga jual.</p>
-<p><button type="submit">Simpan penerimaan</button></p>
+<p class="rc-submit"><button type="submit">Periksa penerimaan</button></p>
+<div class="rc-review" id="receipt-review" data-popup-skip hidden>
+    <h3 id="receipt-review-heading" tabindex="-1">Periksa sebelum simpan</h3>
+    <p class="note">Pastikan jumlah dan harga sesuai nota supplier. Setelah disimpan, stok, HPP, dan utang supplier langsung berubah.</p>
+    <dl class="rc-review-meta"><div><dt>Supplier</dt><dd data-review-supplier></dd></div><div><dt>Tanggal terima</dt><dd data-review-date></dd></div><div data-review-nota-row><dt>No. nota supplier</dt><dd data-review-nota></dd></div></dl>
+    <ul class="rc-review-list" data-review-list></ul>
+    <p class="rc-review-total"><span>Total utang ke supplier</span><strong data-review-total></strong></p>
+    <p class="rc-review-actions"><button type="button" class="secondary" data-review-back>Ubah lagi</button><button type="submit">Ya, simpan penerimaan</button></p>
+</div>
 <p data-error class="err" tabindex="-1" hidden></p>
 <p data-ok class="ok" hidden></p>
 </form>
 </section>
 <section class="card" id="receipt-history" aria-labelledby="h-receipt-history">
 <h2 id="h-receipt-history">Riwayat penerimaan</h2>
-<p class="note">Total nilai halaman ini: <strong data-receipt-page-total>{{ \App\Services\V2\Money::display('0') }}</strong></p>
+<p class="note">Total nilai halaman ini: <strong data-receipt-page-total data-live-skip>{{ \App\Services\V2\Money::display('0') }}</strong></p>
 @php
     $receiptTypes = ['purchase' => ['Pembelian', 'ok'], 'opening' => ['Stok awal', 'mute'], 'restock' => ['Tambah stok', 'info']];
     $receiptItems = $receiptItems ?? collect();
@@ -128,7 +142,7 @@
 <div class="ui-table-wrap scroll" data-ui-table data-ui-noun="penerimaan" tabindex="0" role="region" aria-label="Riwayat penerimaan barang">
 <table class="ui-table">
 <caption class="sr">Riwayat penerimaan barang</caption>
-<thead><tr><th scope="col">Tanggal</th><th scope="col">Nomor dan pemasok</th><th scope="col">Produk</th><th scope="col">Tipe</th><th scope="col" class="ui-num">Qty</th><th scope="col" class="ui-num">HPP satuan</th><th scope="col" class="ui-num">Total</th></tr></thead>
+<thead><tr><th scope="col">Tanggal</th><th scope="col">Nomor dan pemasok</th><th scope="col">Produk</th><th scope="col">Tipe</th><th scope="col" class="ui-num">Qty</th><th scope="col" class="ui-num">HPP satuan</th><th scope="col" class="ui-num">Total</th><th scope="col">Aksi</th></tr></thead>
 <tbody>
 @forelse($receiptHistory as $receipt)
 @php [$payKey, $payLabel] = $receiptPay[$receipt->credit_account ?? ''] ?? ['other', (string) ($receipt->credit_account ?? '—')]; @endphp
@@ -137,17 +151,32 @@
     $lines = $receiptItems->get($receipt->id, collect());
     $account = (string) ($receipt->credit_account ?? '');
 @endphp
-<tr data-pay="{{ $payKey }}" data-type="{{ $receipt->receipt_type }}" data-amount="{{ $receipt->total_amount }}">
+@php $voided = $receipt->voided_at !== null; @endphp
+<tr data-pay="{{ $payKey }}" data-type="{{ $receipt->receipt_type }}" data-amount="{{ $voided ? '0' : $receipt->total_amount }}" @class(['rh-void' => $voided])>
 <td data-label="Tanggal" class="ui-nowrap rh-date">{{ \Carbon\Carbon::parse($receipt->receipt_date)->locale('id')->translatedFormat('d M Y') }}</td>
-<td data-label="Nomor" class="ui-primary rh-number">{{ $receipt->receipt_number ?: '#'.$receipt->id }}<span class="ui-sub">{{ $receipt->supplier_name ? 'Pemasok: '.$receipt->supplier_name : ($receipt->receipt_type === 'opening' ? 'Stok awal gudang' : 'Tanpa pemasok') }}@if($receipt->notes)<span class="rh-ref"> · {{ \Illuminate\Support\Str::limit($receipt->notes, 40) }}</span>@endif</span></td>
+<td data-label="Nomor" class="ui-primary rh-number">{{ $receipt->receipt_number ?: '#'.$receipt->id }}<span class="ui-sub">{{ $receipt->supplier_name ? 'Pemasok: '.$receipt->supplier_name : ($receipt->receipt_type === 'opening' ? 'Stok awal gudang' : 'Tanpa pemasok') }}@if(! empty($receipt->supplier_invoice_number))<span class="rh-ref"> · Nota {{ $receipt->supplier_invoice_number }}</span>@endif
+@if($receipt->notes)<span class="rh-ref"> · {{ \Illuminate\Support\Str::limit($receipt->notes, 40) }}</span>@endif</span></td>
 <td data-label="Produk" class="rh-lines rh-product">@forelse($lines as $line)<span>{{ $line->product_name }}</span>@empty<span class="ui-muted">—</span>@endforelse</td>
-<td data-label="Tipe" class="rh-type"><span class="ui-badge ui-badge--{{ $typeTone }}">{{ $typeLabel }}</span><span class="ui-sub" title="{{ $payLabel }}">Akun {{ $account !== '' ? $account : '—' }} · {{ $payLabel }}</span></td>
+<td data-label="Tipe" class="rh-type">@if($voided)<span class="ui-badge ui-badge--bad">Dibatalkan</span><span class="ui-sub rh-void-note">{{ \Carbon\Carbon::parse($receipt->voided_at)->locale('id')->translatedFormat('d M Y H:i') }}{{ $receipt->voided_by_name ? ' · '.$receipt->voided_by_name : '' }} · {{ $receipt->void_reason }}</span>@else<span class="ui-badge ui-badge--{{ $typeTone }}">{{ $typeLabel }}</span>@endif<span class="ui-sub" title="{{ $payLabel }}">Akun {{ $account !== '' ? $account : '—' }} · {{ $payLabel }}</span></td>
 <td data-label="Qty" class="ui-num rh-lines">@forelse($lines as $line)<span>{{ $qty($line->quantity) }} <small>{{ $line->product_unit }}</small></span>@empty<span>—</span>@endforelse</td>
 <td data-label="HPP satuan" class="ui-num rh-lines">@forelse($lines as $line)<span>{{ \App\Services\V2\Money::display($line->unit_cost) }}</span>@empty<span>—</span>@endforelse</td>
 <td data-label="Total" class="ui-num rh-total"><strong>{{ \App\Services\V2\Money::display($receipt->total_amount) }}</strong></td>
+<td data-label="Aksi" class="ui-actions">@if(! $voided && isset($voidableReceipts[$receipt->id]))
+    <form class="v2-json-form rh-void-form" action="{{ route('v2.receipts.void', $receipt->id) }}">
+        <h3 class="sr">{{ $receipt->receipt_number }} · {{ $receipt->supplier_name }} · {{ \App\Services\V2\Money::display($receipt->total_amount) }}</h3>
+        <p class="note">Stok dan HPP barang kembali seperti sebelum penerimaan ini, dan tagihan supplier-nya ditutup. Catatan asli tetap tersimpan dengan tanda Dibatalkan. Setelah itu catat ulang penerimaan yang benar.</p>
+        <div class="field">
+            <label for="void-reason-{{ $receipt->id }}">Alasan pembatalan</label>
+            <input id="void-reason-{{ $receipt->id }}" name="reason" required minlength="5" maxlength="255" placeholder="Contoh: harga satuan salah ketik">
+        </div>
+        <input type="hidden" name="idempotency_key" data-fresh-key>
+        <button type="submit" class="secondary">Batalkan penerimaan</button>
+        <p data-error class="err" tabindex="-1" hidden></p>
+    </form>
+@else<span class="ui-muted">—</span>@endif</td>
 </tr>
 @empty
-<tr data-ui-empty-static><td colspan="7" class="ui-empty"><strong>Belum ada penerimaan barang.</strong>Tekan "Catat penerimaan" untuk mencatat barang masuk pertama.</td></tr>
+<tr data-ui-empty-static><td colspan="8" class="ui-empty"><strong>Belum ada penerimaan barang.</strong>Tekan "Catat penerimaan" untuk mencatat barang masuk pertama.</td></tr>
 @endforelse
 </tbody>
 </table>
@@ -166,11 +195,8 @@
 <div class="rc-row">
     <div class="field">
         <label class="sr" data-label>Barang</label>
-        <select data-name="product_id" required>
+        <select data-name="product_id" required data-pick-placeholder="Cari nama atau SKU barang">
             <option value="">— pilih barang —</option>
-            @foreach ($products as $product)
-                <option value="{{ $product->id }}" data-suppliers="{{ collect($productSupplierLinks[$product->id] ?? [])->where('is_active', true)->pluck('supplier_id')->implode(',') }}" data-primary-supplier="{{ collect($productSupplierLinks[$product->id] ?? [])->firstWhere('is_primary', true)?->supplier_id }}">{{ $product->name }} · {{ $product->unit }}</option>
-            @endforeach
         </select>
     </div>
     <div class="field">
@@ -179,7 +205,7 @@
     </div>
     <div class="field">
         <label class="sr" data-label>HPP satuan</label>
-        <input data-name="unit_cost" type="text" inputmode="decimal" maxlength="30" placeholder="HPP satuan" required>
+        <input data-name="unit_cost" type="text" data-money data-money-scale="4" inputmode="decimal" maxlength="30" placeholder="HPP satuan" required>
     </div>
     <output class="rc-value" data-line-total>Rp 0</output>
     <button type="button" class="secondary rc-remove" data-remove aria-label="Hapus baris barang">×</button>
@@ -226,11 +252,11 @@
 <div class="row" style="margin-top:8px">
     <div class="field">
         <label for="trip-fuel">BBM</label>
-        <input id="trip-fuel" name="fuel_cost" value="0" inputmode="decimal" maxlength="30">
+        <input id="trip-fuel" name="fuel_cost" value="0" data-money inputmode="decimal" maxlength="30">
     </div>
     <div class="field">
         <label for="trip-allowance">Uang jalan</label>
-        <input id="trip-allowance" name="allowance" value="0" inputmode="decimal" maxlength="30">
+        <input id="trip-allowance" name="allowance" value="0" data-money inputmode="decimal" maxlength="30">
     </div>
     <div class="field">
         <label for="trip-method">Pembayaran</label>
@@ -247,46 +273,17 @@
 </section>
 @endif
 
-<section class="card" aria-labelledby="supplier-pay-heading">
-<h2 id="supplier-pay-heading">Pengajuan pembayaran supplier</h2>
-@php $payables = collect($invoices)->filter(fn ($i) => ($i->direction ?? '') === 'payable' && ($i->status ?? '') === 'open')->values()->all(); @endphp
-@if (count($payables) === 0)
-    <p class="note">Tidak ada tagihan supplier terbuka.</p>
-@else
-    @foreach ($payables as $invoice)
-    <form class="v2-json-form" action="{{ route('v2.payments.store', $invoice->id) }}">
-        <p>{{ $invoice->number }} · nilai {{ $invoice->amount }} · terbayar {{ $invoice->paid }}</p>
-        <div class="row">
-            <div class="field">
-                <label for="pay-amt-{{ $invoice->id }}">Nominal cicilan</label>
-                <input id="pay-amt-{{ $invoice->id }}" name="amount" required inputmode="decimal" maxlength="30">
-            </div>
-            <div class="field">
-                <label for="pay-method-{{ $invoice->id }}">Metode</label>
-                <select id="pay-method-{{ $invoice->id }}" name="method">
-                    <option value="cash">Tunai</option>
-                    <option value="transfer">Transfer</option>
-                </select>
-            </div>
-        </div>
-        <input type="hidden" name="idempotency_key" data-fresh-key>
-        <button type="submit">Ajukan pembayaran</button>
-        <p data-error class="err" tabindex="-1" hidden></p>
-    </form>
-    @endforeach
-@endif
-</section>
-
 @if ($role === 'admin')
 <section class="card" aria-labelledby="reject-heading">
 <h2 id="reject-heading">Tolak pengajuan / transfer</h2>
 @php $waitingPayments = collect($payments)->filter(fn ($p) => in_array(($p->status ?? ''), ['pending', 'proposed'], true))->values()->all(); @endphp
+<div data-live-list>
 @if (count($waitingPayments) === 0)
     <p class="note">Tidak ada pengajuan menunggu.</p>
 @else
     @foreach ($waitingPayments as $payment)
     <form class="v2-json-form" action="{{ route('v2.payments.reject', $payment->id) }}">
-        <p>Pembayaran #{{ $payment->id }} · {{ $payment->amount }}</p>
+        <p><strong>{{ \App\Services\V2\Money::display($payment->amount) }}</strong> · {{ ($payment->invoice_direction ?? '') === 'payable' ? 'Bayar ke' : 'Dari' }} {{ $payment->party_name ?? 'Pelanggan umum' }} · {{ $payment->invoice_number }} · {{ $payment->method === 'cash' ? 'Tunai' : 'Transfer' }}@if($payment->requester_name) · diajukan {{ $payment->requester_name }}@endif</p>
         <div class="field">
             <label for="reject-{{ $payment->id }}">Alasan penolakan</label>
             <input id="reject-{{ $payment->id }}" name="reason" required minlength="5" maxlength="1000">
@@ -296,6 +293,7 @@
     </form>
     @endforeach
 @endif
+</div>
 </section>
 @endif
 
@@ -305,6 +303,8 @@ const csrfMeta = document.querySelector('meta[name="csrf-token"]');
 const csrf = csrfMeta ? csrfMeta.content : '';
 const key = () => (window.crypto && typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
 document.querySelectorAll('[data-fresh-key]').forEach(e => { e.value = key(); });
+// Isi baru dari uiLive (baris/daftar yang diganti) juga mendapat kunci transaksi baru.
+window.uiLive?.onPatch(root => root.querySelectorAll('[data-fresh-key]').forEach(e => { if (!e.value) { e.value = key(); } }));
 
 async function send(form, url, data, multipart = false, btn = null, lockOnSuccess = false) {
     if (!form || form.dataset.busy || !form.reportValidity()) { return null; }
@@ -337,6 +337,7 @@ async function send(form, url, data, multipart = false, btn = null, lockOnSucces
         saved = true;
         return result;
     } catch (e) {
+        form._lastError = e;
         window.v2FormFeedback.summary(form, e.message, e.errors);
         return null;
     } finally {
@@ -348,11 +349,14 @@ async function send(form, url, data, multipart = false, btn = null, lockOnSucces
     }
 }
 
-document.querySelectorAll('.v2-json-form').forEach(f => f.addEventListener('submit', async e => {
+// Penangan dipasang di dokumen (bukan per form) agar form baru dari uiLive langsung berfungsi.
+document.addEventListener('submit', async e => {
+    const f = e.target.closest?.('.v2-json-form');
+    if (!f) { return; }
     e.preventDefault();
     if (!f.reportValidity()) { return; }
-    if (await send(f, f.action, Object.fromEntries(new FormData(f)), false, null, true)) { location.reload(); }
-}));
+    if (await send(f, f.action, Object.fromEntries(new FormData(f)), false, null, true)) { await window.uiLive.saved(f); }
+});
 
 // === Master Entity V2 Handlers ===
 const masterPayload = form => {
@@ -363,7 +367,9 @@ const masterPayload = form => {
     }
     return data;
 };
-document.querySelectorAll('[data-driver-master]').forEach(form => {
+const driverMaster = form => {
+    if (form.dataset.driverReady) { return; }
+    form.dataset.driverReady = '1';
     const sync = () => {
         const internal = form.elements.kind.value === 'internal';
         const employee = form.elements.employee_id;
@@ -375,8 +381,11 @@ document.querySelectorAll('[data-driver-master]').forEach(form => {
     };
     // Jenis sopir berupa tombol pilihan (radio): dengarkan perubahan di tingkat form.
     form.addEventListener('change', e => { if (e.target.name === 'kind' || e.target.name === 'employee_id') sync(); });
+    form.addEventListener('reset', () => setTimeout(sync));
     sync();
-});
+};
+document.querySelectorAll('[data-driver-master]').forEach(driverMaster);
+window.uiLive?.onPatch(root => root.querySelectorAll('[data-driver-master]').forEach(driverMaster));
 // 1. Create master records
 document.querySelectorAll('form.master-create-form').forEach(form => {
     form.addEventListener('submit', async e => {
@@ -387,13 +396,15 @@ document.querySelectorAll('form.master-create-form').forEach(form => {
         const ok = form.querySelector('[data-ok]');
         if (ok) { ok.hidden = true; ok.textContent = ''; }
         const res = await send(form, form.action, masterPayload(form), false, null, true);
-        if (res) { window.uiMotion?.markSaved(form); location.reload(); }
+        if (res) { window.uiMotion?.markSaved(form); await window.uiLive.saved(form); }
     });
 });
 
 // 2. Edit & Archive master records (PUT / PATCH)
-document.querySelectorAll('form[data-master-form]').forEach(form => {
-    form.addEventListener('submit', async e => {
+document.addEventListener('submit', async e => {
+    const form = e.target.closest?.('form[data-master-form]');
+    if (!form) { return; }
+    {
         e.preventDefault();
         if (form.dataset.busy || !form.reportValidity()) return;
         const method = (form.dataset.method || 'POST').toUpperCase();
@@ -402,8 +413,8 @@ document.querySelectorAll('form[data-master-form]').forEach(form => {
         const statusEl = form.querySelector('.mr-msg') || form.querySelector('[data-error]');
         if (statusEl) { statusEl.textContent = ''; if (statusEl.hasAttribute('hidden')) statusEl.hidden = true; }
         const res = await send(form, form.action, data, false, null, true);
-        if (res) { window.uiMotion?.markSaved(form); location.reload(); }
-    });
+        if (res) { window.uiMotion?.markSaved(form); await window.uiLive.saved(form, {reset: false}); }
+    }
 });
 
 // 3. Excel Import with in-flight cancellation, localized preview table & manual commit
@@ -499,7 +510,7 @@ document.querySelectorAll('form.master-import-form').forEach(impForm => {
             commitBtn.disabled = true;
             const commitUrl = @json(url('/v2/import-batches')) + '/' + encodeURIComponent(currentBatchId) + '/commit';
             const r = await send(impForm, commitUrl, {}, false, commitBtn, true);
-            if (r) { location.reload(); } else { commitBtn.disabled = false; }
+            if (r) { resetImportState(); impForm.reset(); await window.uiLive.saved(impForm); } else { commitBtn.disabled = false; }
         });
     }
 });
@@ -580,23 +591,42 @@ if (receipt) {
     const box = document.querySelector('#receipt-items');
     const tpl = document.querySelector('#receipt-tpl');
     const labels = { product_id: 'Barang', quantity: 'Jumlah', unit_cost: 'HPP satuan' };
+    const productsUrl = @json(route('v2.suppliers.products', ['id' => 0]));
+    const count = value => Number(value).toLocaleString('id-ID', {maximumFractionDigits: 4});
+    const takenElsewhere = select => Array.from(box.querySelectorAll('[data-name=product_id]')).filter(other => other !== select).map(other => other.value).filter(Boolean);
+    // Pencarian barang dilakukan di server (nama atau SKU) hanya untuk barang yang tertaut ke supplier terpilih.
+    const searchProducts = select => async term => {
+        const supplier = receipt.elements.supplier_id.value;
+        const response = await fetch(productsUrl.replace(/\/0\//, '/' + supplier + '/') + '?q=' + encodeURIComponent(term.trim()), {credentials: 'same-origin', headers: {'Accept': 'application/json'}});
+        if (!response.ok) { throw new Error('gagal'); }
+        const data = await response.json();
+        const taken = takenElsewhere(select);
+        return {
+            total: data.total,
+            items: data.results.map(p => ({
+                value: String(p.id),
+                label: p.name + ' · ' + p.unit,
+                meta: p.sku + ' · stok ' + count(p.stock) + ' · HPP saat ini ' + rupiah(Number(p.cost) || 0),
+                cost: p.cost,
+                disabled: taken.includes(String(p.id))
+            }))
+        };
+    };
     const filterProducts = row => {
         const select = row.querySelector('[data-name=product_id]');
-        const supplier = receipt.elements.supplier_id.value;
-        for (const option of select.options) {
-            if (!option.value) continue;
-            const allowed = supplier !== '' && option.dataset.suppliers.split(',').includes(supplier);
-            option.disabled = !allowed;
-            option.hidden = !allowed;
-        }
-        if (select.selectedOptions[0]?.disabled) {
-            select.value = '';
-            select.dispatchEvent(new Event('change', {bubbles: true}));
-        }
-        select.disabled = !supplier;
+        select.disabled = !receipt.elements.supplier_id.value;
         select._uiPickSync?.();
     };
-    receipt.elements.supplier_id.addEventListener('change', () => Array.from(box.children).forEach(filterProducts));
+    const resetProducts = row => {
+        const select = row.querySelector('[data-name=product_id]');
+        Array.from(select.options).forEach(option => { if (option.value) { option.remove(); } });
+        select.value = '';
+        row.querySelector('[data-name=unit_cost]').placeholder = 'HPP satuan';
+        row.querySelector('[data-name=unit_cost]').removeAttribute('title');
+        select.dispatchEvent(new Event('change', {bubbles: true}));
+        filterProducts(row);
+    };
+    receipt.elements.supplier_id.addEventListener('change', () => Array.from(box.children).forEach(resetProducts));
     const renumber = () => Array.from(box.children).forEach((row, i) => {
         row.querySelectorAll('[data-name]').forEach(el => { el.setAttribute('aria-label', labels[el.dataset.name] + ' baris ' + (i + 1)); });
     });
@@ -607,7 +637,7 @@ if (receipt) {
         let total = 0, filled = 0;
         for (const row of box.children) {
             const qty = number(row.querySelector('[data-name=quantity]').value);
-            const cost = number(row.querySelector('[data-name=unit_cost]').value);
+            const cost = Number(row.querySelector('[data-name=unit_cost]').value) || 0;
             const line = qty * cost;
             row.querySelector('[data-line-total]').textContent = line > 0 ? rupiah(line) : '—';
             if (row.querySelector('[data-name=product_id]').value) { filled++; }
@@ -624,13 +654,87 @@ if (receipt) {
         box.append(node);
         filterProducts(node);
         renumber();
-        if (window.uiPick) { window.uiPick(node.querySelector('[data-name=product_id]')); }
+        const productSelect = node.querySelector('[data-name=product_id]');
+        if (window.uiPick) {
+            window.uiPick(productSelect, {
+                source: searchProducts(productSelect),
+                offText: 'Pilih supplier dulu',
+                emptyText: 'Barang harus ditautkan ke supplier ini di Master Produk.',
+                onPick: item => { const cost = node.querySelector('[data-name=unit_cost]'); cost.placeholder = rupiah(Number(item.cost) || 0); cost.title = 'HPP saat ini ' + cost.placeholder; node.dataset.label = item.label; node.dataset.meta = item.meta || ''; node.dataset.cost = item.cost ?? ''; }
+            });
+        }
         recalc();
         if (focus) { (node.querySelector('.ui-pick-input') || node.querySelector('select')).focus(); }
     };
     receipt.dataset.key = key();
     addRow(false);
     document.querySelector('#receipt-add').addEventListener('click', () => addRow(true));
+    // Tinjau sebelum simpan: ringkasan per barang + perkiraan HPP baru (rata-rata bergerak, hanya tampilan; server menghitung ulang).
+    // Harga yang jauh dari HPP saat ini (di bawah setengah atau di atas dua kali) ditandai supaya salah ketik nol terlihat.
+    const review = receipt.querySelector('#receipt-review');
+    // Bagian isian disembunyikan selama tinjau (inline !important karena aturan tema memaksa display pada .row).
+    const editParts = hide => Array.from(receipt.children).filter(el => el !== review && !el.matches('[data-error],[data-ok]')).forEach(el => hide ? el.style.setProperty('display', 'none', 'important') : el.style.removeProperty('display'));
+    const showReview = () => {
+        const list = review.querySelector('[data-review-list]');
+        list.replaceChildren();
+        let total = 0, flagged = 0;
+        for (const row of box.children) {
+            const select = row.querySelector('[data-name=product_id]');
+            if (!select.value) { continue; }
+            const qty = number(row.querySelector('[data-name=quantity]').value);
+            const cost = Number(row.querySelector('[data-name=unit_cost]').value) || 0;
+            const before = Number(row.dataset.cost);
+            const stock = Number((row.dataset.meta || '').match(/stok ([\d.,]+)/)?.[1]?.replace(/\./g, '').replace(',', '.'));
+            const line = qty * cost; total += line;
+            const odd = before > 0 && (cost < before / 2 || cost > before * 2);
+            if (odd) { flagged++; }
+            const li = document.createElement('li');
+            if (odd) { li.className = 'is-odd'; }
+            const name = document.createElement('strong'); name.textContent = row.dataset.label || select.selectedOptions[0]?.textContent || 'Barang';
+            const calc = document.createElement('span'); calc.textContent = count(qty) + ' × ' + rupiah(cost) + ' = ' + rupiah(line);
+            li.append(name, calc);
+            if (before > 0) {
+                const hpp = document.createElement('small');
+                const after = Number.isFinite(stock) && stock + qty > 0 ? (stock * before + qty * cost) / (stock + qty) : cost;
+                hpp.textContent = 'HPP ' + rupiah(before) + ' → ' + rupiah(after) + (odd ? ' · Harga jauh berbeda dari HPP saat ini, periksa lagi.' : '');
+                li.append(hpp);
+            }
+            list.append(li);
+        }
+        review.querySelector('[data-review-supplier]').textContent = receipt.elements.supplier_id.selectedOptions[0]?.textContent.trim() || '—';
+        const date = receipt.elements.receipt_date.value;
+        const nota = receipt.elements.supplier_invoice_number.value.trim();
+        review.querySelector('[data-review-nota]').textContent = nota;
+        review.querySelector('[data-review-nota-row]').hidden = nota === '';
+        review.querySelector('[data-review-date]').textContent = date ? new Date(date + 'T00:00').toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'}) : '—';
+        review.querySelector('[data-review-total]').textContent = rupiah(total);
+        review.classList.toggle('has-odd', flagged > 0);
+        review.hidden = false;
+        receipt.classList.add('is-reviewing');
+        // Pesan (mis. peringatan nota ganda) tampil tepat di atas tombol konfirmasi.
+        review.querySelector('.rc-review-actions').before(receipt.querySelector(':scope > [data-error]') || review.querySelector('[data-error]'));
+        editParts(true);
+        review.querySelector('#receipt-review-heading').focus();
+    };
+    // Penjaga entri dobel: nota supplier sudah pernah dicatat; simpan berikutnya = konfirmasi. Direset bila supplier/nota diganti.
+    const resetDuplicate = () => {
+        delete receipt.dataset.confirmDuplicate;
+        receipt.classList.remove('is-duplicate-warning');
+        const btn = review.querySelector('button[type=submit]');
+        if (btn?.dataset.label) { btn.textContent = btn.dataset.label; }
+    };
+    receipt.elements.supplier_invoice_number.addEventListener('input', resetDuplicate);
+    receipt.elements.supplier_id.addEventListener('change', resetDuplicate);
+    const hideReview = focus => {
+        review.hidden = true;
+        receipt.classList.remove('is-reviewing');
+        const moved = review.querySelector('[data-error]');
+        if (moved) { review.after(moved); }
+        editParts(false);
+        if (focus) { box.querySelector('.ui-pick-input, select, input')?.focus(); }
+    };
+    review.querySelector('[data-review-back]').addEventListener('click', () => hideReview(true));
+    receipt.closest('dialog')?.addEventListener('close', () => hideReview(false));
     receipt.addEventListener('submit', async e => {
         e.preventDefault();
         if (receipt.dataset.busy || !receipt.reportValidity()) { return; }
@@ -644,13 +748,28 @@ if (receipt) {
         if (items.some(x => !x.product_id)) { fail('Setiap baris harus memilih barang.'); return; }
         if (items.some(x => !x.quantity || !x.unit_cost)) { fail('Jumlah dan HPP satuan wajib diisi untuk setiap barang.'); return; }
         if (new Set(items.map(x => x.product_id)).size !== items.length) { fail('Barang yang sama tidak boleh muncul dua kali dalam satu penerimaan.'); return; }
+        if (!receipt.classList.contains('is-reviewing')) { showReview(); return; }
         const payload = {
             supplier_id: receipt.elements.supplier_id.value,
             receipt_date: receipt.elements.receipt_date.value,
+            supplier_invoice_number: receipt.elements.supplier_invoice_number.value.trim() || null,
+            confirm_duplicate: receipt.dataset.confirmDuplicate === '1',
             items: items,
             idempotency_key: receipt.dataset.key
         };
-        if (await send(receipt, @json(route('v2.receipts.store')), payload, false, null, true)) { location.reload(); }
+        receipt._lastError = null;
+        if (await send(receipt, @json(route('v2.receipts.store')), payload, false, null, true)) {
+            hideReview(false);
+            resetDuplicate();
+            receipt.dataset.key = key();
+            box.replaceChildren();
+            addRow(false);
+            await window.uiLive.saved(receipt);
+            Array.from(box.children).forEach(filterProducts);
+            recalc();
+        } else if (receipt._lastError?.errors?.duplicate_receipt) {
+            window.uiConfirmDuplicate?.(receipt, 'Ya, tetap simpan');
+        }
     });
 }
 
@@ -662,7 +781,7 @@ if (trip) {
         if (trip.dataset.busy || !trip.reportValidity()) { return; }
         const d = Object.fromEntries(new FormData(trip));
         d.idempotency_key = trip.dataset.key;
-        if (await send(trip, @json(route('v2.trips.store')), d, false, null, true)) { location.reload(); }
+        if (await send(trip, @json(route('v2.trips.store')), d, false, null, true)) { trip.dataset.key = key(); await window.uiLive.saved(trip); }
     });
 }
 })();

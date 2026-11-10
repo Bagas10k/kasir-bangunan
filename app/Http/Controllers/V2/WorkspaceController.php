@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\V2;
 
 use App\Http\Controllers\Controller;
+use App\Services\V2\AdminSummary;
 use App\Services\V2\CustomerLookup;
 use App\Services\V2\DeliveryTrips;
 use App\Services\V2\MasterData;
@@ -38,7 +39,10 @@ class WorkspaceController extends Controller
             ->when($role !== 'admin', fn ($q) => $q->where('s.user_id', $request->user()->id))
             ->orderByDesc('s.id')->limit(30)->get(['s.*', 'u.name as user_name']);
         $invoices = DB::table('v2_invoices as i')->leftJoin('v2_parties as p', 'p.id', '=', 'i.party_id')
-            ->orderByDesc('i.id')->limit(100)->get(['i.*', 'p.name as party_name']);
+            ->orderByDesc('i.id')->limit(100)->select(['i.*', 'p.name as party_name'])
+            // Pembayaran terakhir (bukan ditolak) saat halaman dibuat: penjaga entri dobel di form bayar.
+            ->selectSub(fn ($q) => $q->from('v2_payments')->whereColumn('v2_payments.invoice_id', 'i.id')->where('v2_payments.status', '<>', 'rejected')->selectRaw('coalesce(max(v2_payments.id), 0)'), 'last_payment_id')
+            ->get();
         $payments = DB::table('v2_payments as pm')
             ->leftJoin('v2_invoices as i', 'i.id', '=', 'pm.invoice_id')
             ->leftJoin('v2_parties as p', 'p.id', '=', 'i.party_id')
@@ -64,7 +68,15 @@ class WorkspaceController extends Controller
             ->join('v2_parties', 'v2_parties.id', '=', 'v2_product_suppliers.supplier_id')
             ->orderBy('v2_parties.name')->get(['v2_product_suppliers.*', 'v2_parties.name', 'v2_parties.is_active'])->groupBy('product_id') : collect();
         $transportDeliveries = $role === 'admin' ? DB::table('v2_deliveries')->orderByDesc('id')->get() : collect();
-        $receiptHistory = $role === 'admin' ? DB::table('inventory_receipts')->orderByDesc('receipt_date')->orderByDesc('id')->limit(50)->get() : collect();
+        $receiptHistory = $role === 'admin' ? DB::table('inventory_receipts')->leftJoin('users as void_user', 'void_user.id', '=', 'inventory_receipts.voided_by')
+            ->orderByDesc('inventory_receipts.receipt_date')->orderByDesc('inventory_receipts.id')->limit(50)
+            ->get(['inventory_receipts.*', 'void_user.name as voided_by_name']) : collect();
+        // Penerimaan yang masih boleh dibatalkan: tagihan supplier belum punya pembayaran/pengajuan. Mutasi stok sesudahnya diperiksa server saat membatalkan.
+        $voidableReceipts = $receiptHistory->isEmpty() ? collect() : DB::table('v2_invoices')
+            ->whereIn('receipt_id', $receiptHistory->whereNull('voided_at')->pluck('id'))
+            ->where('direction', 'payable')->where('paid', 0)->whereNull('voided_at')
+            ->whereNotExists(fn ($q) => $q->from('v2_payments')->whereColumn('v2_payments.invoice_id', 'v2_invoices.id')->where('v2_payments.status', '<>', 'rejected'))
+            ->pluck('receipt_id')->flip();
         // Rincian barang per penerimaan untuk tabel Riwayat (baca saja; satu kueri untuk 50 nota terakhir).
         $receiptItems = $receiptHistory->isEmpty() ? collect() : DB::table('inventory_receipt_items')
             ->join('products', 'products.id', '=', 'inventory_receipt_items.product_id')
@@ -104,7 +116,7 @@ class WorkspaceController extends Controller
         $daily = app(ReportsDocuments::class)->daily($request->user()->id, $date);
         $metrics = app(MonitorMetrics::class)->snapshot(now()->toDateString(), $role === 'admin', $request->user()->id);
         // Ringkasan admin (Pengawasan): kas laci shift terbuka, saldo bank buku besar, piutang lewat tempo, stok yang perlu dipantau.
-        $adminSummary = $role === 'admin' ? app(\App\Services\V2\AdminSummary::class)->snapshot(now()->toDateString()) : null;
+        $adminSummary = $role === 'admin' ? app(AdminSummary::class)->snapshot(now()->toDateString()) : null;
         $driverAdvances = $role === 'admin' ? DB::table('v2_driver_advances')->where('status', 'open')->orderByDesc('id')->get() : collect();
 
         foreach (['sale_search', 'sale_method', 'start_date', 'end_date', 'history_per_page', 'history_page'] as $param) {
@@ -186,7 +198,7 @@ class WorkspaceController extends Controller
             ->appends($request->query())
             ->fragment('kasir');
 
-        return view('v2.workspace', compact('adminSummary', 'role', 'shifts', 'invoices', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters'));
+        return view('v2.workspace', compact('adminSummary', 'role', 'shifts', 'invoices', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'voidableReceipts', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters'));
     }
 
     public function saveRelation(Request $request, string $kind): JsonResponse
@@ -287,9 +299,14 @@ class WorkspaceController extends Controller
 
     public function collect(Request $request, int $id): JsonResponse
     {
-        $data = $request->validate(['amount' => ['required', 'string', 'max:30'], 'method' => ['required', Rule::in(['cash', 'transfer'])], 'idempotency_key' => ['required', 'string', 'min:8', 'max:100'], 'reference' => ['nullable', 'string', 'max:255']]);
+        $data = $request->validate(['amount' => ['required', 'string', 'max:30'], 'method' => ['required', Rule::in(['cash', 'transfer'])], 'idempotency_key' => ['required', 'string', 'min:8', 'max:100'], 'reference' => ['nullable', 'string', 'max:255'], 'seen_payment_id' => ['nullable', 'integer', 'min:0'], 'confirm_duplicate' => ['nullable', 'boolean']]);
 
-        return $this->run(fn () => ['id' => $this->operations->collect($request->user()->id, $id, $data['amount'], $data['method'], $data['idempotency_key'], $data['reference'] ?? null)]);
+        return $this->run(function () use ($request, $id, $data): array {
+            $seen = isset($data['seen_payment_id']) ? (int) $data['seen_payment_id'] : null;
+            $paymentId = $this->operations->collect($request->user()->id, $id, $data['amount'], $data['method'], $data['idempotency_key'], $data['reference'] ?? null, $seen, (bool) ($data['confirm_duplicate'] ?? false));
+
+            return ['id' => $paymentId, 'status' => (string) DB::table('v2_payments')->where('id', $paymentId)->value('status')];
+        });
     }
 
     public function approve(Request $request, int $id): JsonResponse
@@ -348,6 +365,22 @@ class WorkspaceController extends Controller
         $this->operations->requireRole($request->user()->id, ['admin']);
 
         return $this->run(fn () => app(SupplyTrips::class)->receive($request->user()->id, $request->all()));
+    }
+
+    /** Batalkan penerimaan yang salah input (admin, wajib alasan). */
+    public function voidReceipt(Request $request, int $id): JsonResponse
+    {
+        $this->operations->requireRole($request->user()->id, ['admin']);
+
+        return $this->run(fn () => app(SupplyTrips::class)->voidReceipt($request->user()->id, $id, $request->all()));
+    }
+
+    /** Pemilih barang di form penerimaan: barang yang tertaut ke supplier terpilih. */
+    public function supplierProducts(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+
+        return $this->run(fn () => app(SupplyTrips::class)->productsFor($request->user()->id, $id, (string) ($data['q'] ?? '')));
     }
 
     public function trip(Request $request): JsonResponse

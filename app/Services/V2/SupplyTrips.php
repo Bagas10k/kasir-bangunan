@@ -4,6 +4,7 @@ namespace App\Services\V2;
 
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
+use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -44,6 +45,8 @@ class SupplyTrips
         $date = $this->date($data['receipt_date'] ?? null, 'Tanggal penerimaan');
         $key = $this->key($data['idempotency_key'] ?? null);
         $notes = $this->text($data['notes'] ?? null, 'Catatan', 255);
+        $nota = $this->text($data['supplier_invoice_number'] ?? null, 'Nomor nota supplier', 64);
+        $confirmed = filter_var($data['confirm_duplicate'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         $raw = $data['items'] ?? null;
         if (! is_array($raw) || $raw === [] || count($raw) > 100) {
@@ -86,9 +89,9 @@ class SupplyTrips
                 'quantity' => (string) $row['quantity'],
                 'unit_cost' => (string) $row['unit_cost'],
             ], array_values($items)),
-        ]);
+        ] + ($nota !== null ? ['supplier_invoice_number' => $nota] : []));
 
-        return DB::transaction(function () use ($actor, $supplierId, $date, $key, $notes, $items, $hash) {
+        return DB::transaction(function () use ($actor, $supplierId, $date, $key, $notes, $items, $hash, $nota, $confirmed) {
             $this->lockActor($actor);
 
             $seen = $this->replay($actor, 'receive', $key, $hash);
@@ -99,6 +102,16 @@ class SupplyTrips
             $supplier = DB::table('v2_parties')->where('id', $supplierId)->lockForUpdate()->first();
             if (! $supplier || $supplier->kind !== 'supplier' || ! $supplier->is_active) {
                 $this->invalid('Supplier tidak ditemukan atau tidak aktif.');
+            }
+            // Penjaga entri dobel: nota supplier yang sama sudah tercatat (penerimaan yang dibatalkan tidak dihitung).
+            if ($nota !== null && ! $confirmed) {
+                $same = DB::table('inventory_receipts as r')->join('v2_invoices as i', 'i.receipt_id', '=', 'r.id')
+                    ->where('i.party_id', $supplierId)->whereNull('r.voided_at')
+                    ->whereRaw('lower(trim(r.supplier_invoice_number)) = ?', [mb_strtolower($nota)])
+                    ->orderByDesc('r.id')->first(['r.receipt_number', 'r.receipt_date', 'r.total_amount']);
+                if ($same) {
+                    throw ValidationException::withMessages(['duplicate_receipt' => 'Nota '.$nota.' dari '.$supplier->name.' sudah dicatat sebagai '.$same->receipt_number.' tanggal '.Carbon::parse($same->receipt_date)->locale('id')->translatedFormat('j M Y').' ('.Money::display($same->total_amount).'). Bila memang nota berbeda, tekan tombol Ya, tetap simpan.']);
+                }
             }
 
             $products = DB::table('products')
@@ -146,6 +159,7 @@ class SupplyTrips
                 'credit_account' => self::PAYABLE,
                 'receipt_date' => $date,
                 'supplier_name' => $supplier->name,
+                'supplier_invoice_number' => $nota,
                 'total_amount' => $this->str($total),
                 'notes' => $notes,
                 'journal_entry_id' => null,
@@ -164,6 +178,7 @@ class SupplyTrips
                     'product_id' => $row['product_id'],
                     'quantity' => (string) $row['quantity'],
                     'unit_cost' => (string) $row['unit_cost'],
+                    'cost_before' => (string) $products[$row['product_id']]->cost_price,
                     'subtotal' => $this->str($row['subtotal']),
                     'created_at' => $now,
                     'updated_at' => $now,
@@ -369,6 +384,153 @@ class SupplyTrips
         } catch (QueryException $e) {
             $this->invalid('Kunci idempotensi perjalanan sudah dipakai.');
         }
+    }
+
+    /**
+     * Barang yang boleh diterima dari satu supplier, untuk pemilih barang di form penerimaan.
+     * Dicari di server (nama atau SKU) agar halaman tidak memuat seluruh katalog.
+     *
+     * @return array{total:int, results:list<array{id:int, sku:string, name:string, unit:string, stock:string, cost:string}>}
+     */
+    public function productsFor(int $actor, int $supplierId, string $term = '', int $limit = 30): array
+    {
+        $this->requireAdmin($actor);
+
+        $query = DB::table('v2_product_suppliers')
+            ->join('products', 'products.id', '=', 'v2_product_suppliers.product_id')
+            ->join('v2_parties', 'v2_parties.id', '=', 'v2_product_suppliers.supplier_id')
+            ->where('v2_product_suppliers.supplier_id', $supplierId)
+            ->where('v2_parties.kind', 'supplier')
+            ->where('v2_parties.is_active', true)
+            ->where('products.is_active', true);
+
+        $term = trim($term);
+        if ($term !== '') {
+            $query->where(fn ($match) => $match->where('products.name', 'like', '%'.$term.'%')->orWhere('products.sku', 'like', '%'.$term.'%'));
+        }
+
+        $total = (clone $query)->count();
+        $rows = $query->orderBy('products.name')->limit(max(1, min($limit, 50)))
+            ->get(['products.id', 'products.sku', 'products.name', 'products.unit', 'products.stock_quantity', 'products.cost_price']);
+
+        return [
+            'total' => $total,
+            'results' => $rows->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'sku' => (string) $row->sku,
+                'name' => (string) $row->name,
+                'unit' => (string) $row->unit,
+                'stock' => (string) $row->stock_quantity,
+                'cost' => (string) $row->cost_price,
+            ])->all(),
+        ];
+    }
+
+    /**
+     * Batalkan penerimaan yang salah input: stok dan HPP kembali ke sebelum penerimaan, jurnal balik
+     * DR 2101 / CR 1301, tagihan supplier ditutup. Baris asli tidak dihapus (jejak audit).
+     * Hanya admin, wajib alasan, dan hanya bila tagihannya belum punya pembayaran apa pun
+     * serta barangnya belum punya mutasi stok sesudah penerimaan ini. Idempoten per (actor, 'receipt_void', key).
+     *
+     * @return array{receipt_id:int, status:string}
+     */
+    public function voidReceipt(int $actor, int $receiptId, array $input): array
+    {
+        $this->requireAdmin($actor);
+        $key = $this->key($input['idempotency_key'] ?? null);
+        $reason = $this->text($input['reason'] ?? null, 'Alasan pembatalan', 255);
+        if ($reason === null || mb_strlen($reason) < 5) {
+            $this->invalid('Tulis alasan pembatalan (minimal 5 karakter).');
+        }
+        $hash = $this->hash('receipt_void', $actor, ['receipt_id' => $receiptId, 'reason' => $reason]);
+
+        return DB::transaction(function () use ($actor, $receiptId, $key, $reason, $hash) {
+            $this->lockActor($actor);
+            $seen = $this->replay($actor, 'receipt_void', $key, $hash);
+            if ($seen !== null) {
+                return $seen;
+            }
+
+            $receipt = DB::table('inventory_receipts')->where('id', $receiptId)->lockForUpdate()->first();
+            if (! $receipt) {
+                abort(404);
+            }
+            if ($receipt->voided_at !== null) {
+                $this->invalid('Penerimaan '.$receipt->receipt_number.' sudah dibatalkan.');
+            }
+            $invoice = DB::table('v2_invoices')->where('receipt_id', $receiptId)->where('direction', 'payable')->lockForUpdate()->first();
+            if (! $invoice) {
+                $this->invalid('Hanya penerimaan barang dari form Penerimaan yang bisa dibatalkan di sini.');
+            }
+            if (BigDecimal::of((string) $invoice->paid)->isPositive() || DB::table('v2_payments')->where('invoice_id', $invoice->id)->where('status', '<>', 'rejected')->exists()) {
+                $this->invalid('Tagihan supplier penerimaan ini sudah punya pembayaran atau pengajuan pembayaran. Tolak atau selesaikan pembayarannya dulu.');
+            }
+
+            $items = DB::table('inventory_receipt_items')->where('inventory_receipt_id', $receiptId)->orderBy('product_id')->get();
+            $products = DB::table('products')->whereIn('id', $items->pluck('product_id'))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $now = now();
+
+            foreach ($items as $item) {
+                $product = $products[$item->product_id];
+                $own = DB::table('stock_movements')->where('reference_type', 'v2_receipt')->where('reference_id', $receiptId)->where('product_id', $item->product_id)->value('id');
+                if (! $own || DB::table('stock_movements')->where('product_id', $item->product_id)->where('id', '>', $own)->exists()) {
+                    $this->invalid($product->name.' sudah punya transaksi stok sesudah penerimaan ini, jadi stok dan HPP tidak bisa dikembalikan dengan tepat.');
+                }
+
+                $quantity = Money::value((string) $item->quantity, 4);
+                $stock = Money::value((string) $product->stock_quantity, 4);
+                $restored = $stock->minus($quantity)->toScale(4, RoundingMode::HalfUp);
+                if ($restored->isNegative()) {
+                    $this->invalid('Stok '.$product->name.' kurang dari jumlah penerimaan ini.');
+                }
+                if ($item->cost_before !== null) {
+                    $cost = Money::value((string) $item->cost_before, 4)->toScale(4, RoundingMode::HalfUp);
+                } elseif ($restored->isZero()) {
+                    $cost = Money::value((string) $product->cost_price, 4)->toScale(4, RoundingMode::HalfUp);
+                } else {
+                    // Penerimaan lama tanpa cost_before: hitung balik rata-rata bergerak.
+                    $cost = $stock->multipliedBy((string) $product->cost_price)
+                        ->minus($quantity->multipliedBy((string) $item->unit_cost))
+                        ->dividedBy($restored, 4, RoundingMode::HalfUp);
+                }
+
+                DB::table('products')->where('id', $item->product_id)->update([
+                    'stock_quantity' => (string) $restored,
+                    'cost_price' => (string) $cost,
+                    'updated_at' => $now,
+                ]);
+                DB::table('stock_movements')->insert([
+                    'product_id' => $item->product_id,
+                    'reference_type' => 'v2_receipt_void',
+                    'reference_id' => $receiptId,
+                    'quantity_delta' => (string) $quantity->negated()->toScale(4),
+                    'balance_after' => (string) $restored,
+                    'notes' => mb_substr('Batal '.$receipt->receipt_number.': '.$reason, 0, 255),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+
+            $total = $this->str(Money::value((string) $receipt->total_amount));
+            $journalId = Ledger::post('v2_receipt_void', $receiptId, mb_substr('Batal penerimaan '.$receipt->receipt_number.': '.$reason, 0, 255), [
+                ['account_code' => self::PAYABLE, 'debit' => $total, 'credit' => '0.00'],
+                ['account_code' => self::INVENTORY, 'debit' => '0.00', 'credit' => $total],
+            ], $now->toDateString());
+
+            DB::table('inventory_receipts')->where('id', $receiptId)->update([
+                'voided_at' => $now, 'voided_by' => $actor, 'void_reason' => $reason,
+                'void_journal_entry_id' => $journalId, 'updated_at' => $now,
+            ]);
+            // Tagihan ditutup: sisa nol dan ditandai batal; nilai asli tetap di inventory_receipts.total_amount.
+            DB::table('v2_invoices')->where('id', $invoice->id)->update([
+                'amount' => '0.00', 'status' => 'paid', 'voided_at' => $now, 'updated_at' => $now,
+            ]);
+
+            $result = ['receipt_id' => $receiptId, 'status' => 'void'];
+            $this->remember($actor, 'receipt_void', $key, $hash, $result);
+
+            return $result;
+        });
     }
 
     private function requireAdmin(int $actor): void

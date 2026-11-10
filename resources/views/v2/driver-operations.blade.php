@@ -42,7 +42,7 @@
     <label>Sopir terdaftar<select name="driver_id" required>@include('v2.driver-options')</select></label>
     <label>Tujuan<input name="destination" maxlength="150" required></label>
     <p class="note">Surat jalan mengisi tujuan dan penugasan yang sudah tercatat. Bila belum ditugaskan, pilih mobil dan sopir; pilihan disimpan bersama surat jalan.</p>
-    <label>Tanggal<input type="date" name="date" value="{{ now()->toDateString() }}" required></label><label>Uang muka<input name="amount" inputmode="decimal" required></label><label>Sumber<select name="method"><option value="cash">Kas shift admin</option><option value="transfer">Bank</option></select></label><button>Bayarkan uang muka</button><p class="err" data-error hidden></p>
+    <label>Tanggal<input type="date" name="date" value="{{ now()->toDateString() }}" required></label><label>Uang muka<input name="amount" data-money inputmode="decimal" required></label><label>Sumber<select name="method"><option value="cash">Kas shift admin</option><option value="transfer">Bank</option></select></label><button>Bayarkan uang muka</button><p class="err" data-error hidden></p>
 </form>
 <h3 class="ui-subhead">Uang muka yang belum direalisasi</h3>
 <div class="ui-table-wrap scroll" tabindex="0" role="region" aria-label="Uang muka sopir terbuka">
@@ -56,7 +56,7 @@
 <td data-label="Sopir" class="ui-primary">{{ $advance->driver_name }}</td>
 <td data-label="Tujuan">{{ $advance->destination ?: '—' }}</td>
 <td data-label="Uang muka" class="ui-num">{{ \App\Services\V2\Money::display($advance->amount) }}</td>
-<td class="ui-actions"><form class="driver-form" action="{{ route('v2.driver-advances.settle',$advance->id) }}" data-key data-settlement><h3 class="sr">Realisasi uang muka {{ $advance->driver_name }} ({{ \App\Services\V2\Money::display($advance->amount) }})</h3><label>BBM aktual<input name="fuel_cost" inputmode="decimal" value="0" required></label><label>Uang jalan aktual<input name="allowance" inputmode="decimal" value="0" required></label><label>Pengembalian sisa<select name="refund_method"><option value="cash">Kas shift admin</option><option value="transfer">Bank</option></select></label><label><input type="checkbox" name="refund_received"> Saya memastikan sisa uang sudah diterima kembali (wajib bila ada sisa)</label><button>Posting realisasi</button><p class="err" data-error hidden></p></form></td>
+<td class="ui-actions"><form class="driver-form" action="{{ route('v2.driver-advances.settle',$advance->id) }}" data-key data-settlement data-popup-title="Realisasi uang muka" data-advance="{{ $advance->amount }}"><h3 class="sr">Realisasi uang muka {{ $advance->driver_name }} ({{ \App\Services\V2\Money::display($advance->amount) }})</h3><label>BBM aktual<input name="fuel_cost" data-money inputmode="decimal" value="0" required></label><label>Uang jalan aktual<input name="allowance" data-money inputmode="decimal" value="0" required></label><label>Pengembalian sisa<select name="refund_method"><option value="cash">Kas shift admin</option><option value="transfer">Bank</option></select></label><label><input type="checkbox" name="refund_received"> Saya memastikan sisa uang sudah diterima kembali (wajib bila ada sisa)</label><p class="note dv-calc" data-settle-calc aria-live="polite"></p><button>Simpan realisasi</button><p class="err" data-error hidden></p></form></td>
 </tr>
 @empty
 <tr data-ui-empty-static><td colspan="5" class="ui-empty"><strong>Tidak ada uang muka terbuka.</strong>Uang muka yang dibayarkan ke sopir akan muncul di sini sampai direalisasi.</td></tr>
@@ -68,6 +68,21 @@
 @endif
 <script>
 document.querySelectorAll('[data-selected-driver]').forEach(select => { select.value = select.dataset.selectedDriver || ''; });
+// Realisasi: sisa yang harus dikembalikan sopir dihitung saat mengetik (hanya tampilan; server menghitung ulang).
+const settleCalc = form => {
+    const out = form.querySelector('[data-settle-calc]');
+    if (!out) { return; }
+    const advance = Number(form.dataset.advance) || 0;
+    const spent = (Number(form.elements.fuel_cost.value) || 0) + (Number(form.elements.allowance.value) || 0);
+    const rp = v => 'Rp ' + Math.round(v).toLocaleString('id-ID');
+    out.textContent = spent > advance
+        ? 'Biaya ' + rp(spent) + ' melebihi uang muka ' + rp(advance) + '. Belum didukung di formulir ini.'
+        : 'Uang muka ' + rp(advance) + ' − biaya ' + rp(spent) + ' = sisa dikembalikan sopir ' + rp(advance - spent) + '.';
+    out.classList.toggle('is-warn', spent > advance);
+};
+document.addEventListener('input', e => { const form = e.target.closest?.('[data-settlement]'); if (form) { settleCalc(form); } });
+document.querySelectorAll('[data-settlement]').forEach(settleCalc);
+window.uiLive?.onPatch(root => root.querySelectorAll('[data-settlement]').forEach(settleCalc));
 document.querySelectorAll('[data-transport-form]').forEach(form => {
     const delivery = form.elements.delivery_id;
     const sync = () => {
@@ -90,5 +105,5 @@ document.querySelectorAll('[data-transport-form]').forEach(form => {
     delivery.addEventListener('change', sync);
     sync();
 });
-(()=>{for(const f of document.querySelectorAll('.driver-form')){const key=crypto.randomUUID();f.addEventListener('submit',async e=>{e.preventDefault();if(f.dataset.busy||!f.reportValidity())return;f.dataset.busy='1';const b=f.querySelector('button'),error=f.querySelector('[data-error]');b.disabled=true;error.hidden=true;const payload=Object.fromEntries(new FormData(f));if(f.hasAttribute('data-key'))payload.idempotency_key=key;if(f.hasAttribute('data-settlement'))payload.refund_received=f.elements.refund_received.checked;try{const r=await fetch(f.action,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw Error(Object.values(d.errors||{}).flat().join(' ')||d.message||'Gagal menyimpan');location.reload();}catch(e){error.textContent=e.message;error.hidden=false;}finally{delete f.dataset.busy;b.disabled=false;}})}})();
+(()=>{const keys=new WeakMap();/* ditangani di dokumen: form di baris baru dari uiLive ikut berfungsi */document.addEventListener('submit',async e=>{const f=e.target.closest?.('.driver-form');if(!f)return;if(!keys.has(f))keys.set(f,crypto.randomUUID());const key=keys.get(f);e.preventDefault();if(f.dataset.busy||!f.reportValidity())return;f.dataset.busy='1';const b=f.querySelector('button'),error=f.querySelector('[data-error]');b.disabled=true;error.hidden=true;const payload=Object.fromEntries(new FormData(f));if(f.hasAttribute('data-key'))payload.idempotency_key=key;if(f.hasAttribute('data-settlement'))payload.refund_received=f.elements.refund_received.checked;try{const r=await fetch(f.action,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw Error(Object.values(d.errors||{}).flat().join(' ')||d.message||'Gagal menyimpan');keys.delete(f);delete f.dataset.busy;b.disabled=false;await window.uiLive.saved(f);}catch(e){error.textContent=e.message;error.hidden=false;}finally{delete f.dataset.busy;b.disabled=false;}});})();
 </script>

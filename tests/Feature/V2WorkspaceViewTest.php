@@ -146,7 +146,9 @@ class V2WorkspaceViewTest extends TestCase
                     ->assertSee('name="supplier_ids[]"', false)
                     ->assertSee('name="unit_id"', false)
                     ->assertSee('name="category_id"', false)
-                    ->assertSee('data-suppliers="'.$supplier.'"', false)
+                    ->assertSee('data-pick-placeholder="Cari nama atau SKU barang"', false)
+                    ->assertSee(str_replace('/', '\/', route('v2.suppliers.products', ['id' => 0])), false)
+                    ->assertDontSee('data-suppliers=', false)
                     ->assertSee('data-driver="'.$driver.'"', false)
                     ->assertSee('Sopir Sintetis Beta');
                 $response->assertSee('class="form-approve"', false)->assertDontSee('id="master-kind"', false);
