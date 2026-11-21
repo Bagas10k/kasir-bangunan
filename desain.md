@@ -193,10 +193,10 @@ Berkas: `resources/views/v2/ui-live.blade.php` (dimuat di `<head>` sebelum skrip
 
 ## 20. Penerimaan: tinjau sebelum simpan dan pembatalan
 
-- Form Catat barang masuk: tombol utama **Periksa penerimaan**. Ringkasan tampil di popup yang sama (bagian isian disembunyikan): supplier, tanggal, daftar barang (jumlah × harga = nilai, HPP lama → baru), total utang besar hijau, tombol Ubah lagi dan Ya, simpan penerimaan (44px). Fokus pindah ke judul ringkasan.
+- Form Catat barang masuk: tombol utama **Periksa penerimaan**. Ringkasan tampil di popup yang sama (bagian isian disembunyikan): supplier, tanggal, daftar barang (jumlah × harga = nilai, HPP lama → baru), total utang besar hijau, tombol Ubah lagi dan Simpan draf penerimaan (44px). Fokus pindah ke judul ringkasan.
 - Harga di bawah ½ atau di atas 2× HPP saat ini: baris berlatar kuning muda dengan garis kiri kuning tua dan teks peringatan cokelat; tidak memblokir simpan.
 - HP: baris ringkasan bertumpuk (nama, hitungan, HPP), tombol berbagi lebar.
-- Riwayat: kolom Aksi berisi Batalkan penerimaan (popup: alasan wajib, penjelasan akibatnya). Baris batal: lencana merah Dibatalkan + waktu · admin · alasan, angka dicoret abu.
+- Penerimaan final terkunci (bagian 26); pembatalan hanya pada draf. Baris yang sudah dibatalkan sebelum aturan baru tetap menampilkan lencana merah Dibatalkan + waktu · admin · alasan, angka dicoret abu.
 
 ## 21. Kolom nominal uang
 
@@ -241,3 +241,30 @@ Aturan: elemen yang **tidak punya asal** masuk dengan animasi; elemen yang **pun
 - **Bagian yang muncul** di dalam popup atau kotak galat/sukses di form (`hidden` dilepas): pudar-turun 220 ms (`reveal`). Baris tabel, daftar pilihan, kalender, dan panel punya animasinya sendiri dan dikecualikan.
 - **Judul halaman** di kepala pudar-naik saat pindah menu; warna grup aktif di rail bertransisi.
 - Uji gerak: ukur posisi/tinggi tiap frame (`requestAnimationFrame`) lalu periksa rangkaian screenshot; angka transform saja bukan bukti.
+
+### 25.1 Popup bayar supplier: tiga sumber dana
+
+- Kolom **Jumlah dibayar** tetap selebar baris; kolom **Sumber dana** diletakkan satu baris penuh di bawahnya (`.collect-source`) berisi tiga segmen: Kas Utama, Bank Utama, Laci shift. Jangan menaruhnya di separuh baris: tiga label tidak muat dan teks terlipat di 1440 maupun 390.
+- Petunjuk di bawah form menyebut bedanya: Kas Utama dan Bank Utama memakai saldo toko dan tidak mengubah laci; Laci shift memakai uang laci yang sedang terbuka.
+- Daftar pembayaran memakai judul kolom **Sumber dana** dengan label Kas Utama, Bank Utama, Laci shift (bukan lagi "Metode").
+
+## 26. Penerimaan: draf dan konfirmasi final
+
+- Daftar Draf penerimaan terpisah dari Riwayat penerimaan final. Badge Draf menjelaskan "Belum masuk stok/utang"; draf batal tetap terlihat dengan alasan.
+- Form penerimaan mempertahankan tinjau dalam popup yang sama, tetapi tombol akhir menjadi "Simpan draf penerimaan"; petunjuk tidak boleh mengklaim stok/utang sudah berubah saat draf disimpan.
+- Konfirmasi dari baris draf memakai popup bersama, rincian barang/total, peringatan dokumen akan dikunci, checkbox pemeriksaan wajib, dan tombol "Konfirmasi dan kunci". Tidak menambahkan konfirmasi native browser.
+- Penerimaan final menampilkan badge Dikonfirmasi dan teks Terkunci, tanpa tombol Batalkan penerimaan. Pembatalan hanya pada draf dan meminta alasan.
+- Gerak memakai dialog/morph bersama yang sudah ada; pembaruan daftar lewat uiLive. Layout dan target sentuh diperiksa di 1440/390.
+## 27. Rekap otomatis saat menutup shift
+
+- Popup Tutup shift memuat kartu rekap (read-only) sebelum kolom "Uang fisik di laci": Penjualan (nota, total, tunai/transfer/kredit) dan Laci (kas awal, masuk, keluar, seharusnya di laci), serta peringatan bila ada pengajuan tunai yang belum disetujui.
+- Saat admin mengetik hasil hitung, muncul baris status: hijau "Cocok dengan perkiraan Rp …" atau kuning "Selisih lebih/kurang Rp …". Angka dihitung dalam sen (BigInt), bukan float.
+- Penutupan mengirim fingerprint rekap; server menolak bila rekap sudah berubah sejak popup dibuka (meminta tutup ulang), tidak menimpa data.
+- Rekap memakai endpoint GET read-only `/v2/shifts/{id}/closing-summary`; layout dan target sentuh diperiksa di 1440/390.
+
+## 28. Shift toko sinkron admin dan kasir
+
+- Status shift di kepala Ringkasan penjualan dan header membaca shift toko yang sama. Kasir tidak melihat form buka/tutup; hanya admin yang mengelola. Identitas pembuka ditampilkan sebagai "Dibuka oleh", bukan dianggap kasir pelaku semua nota.
+- Status "Menunggu admin membuka shift toko", "Shift toko #… aktif", dan kegagalan pemeriksaan diperbarui dari endpoint kecil saat tab terlihat atau kembali fokus. Perubahan status tidak memuat ulang halaman, tidak mengosongkan keranjang, dan tidak mengganti nilai uang. Checkout ditahan ketika shift belum aktif atau status tidak dapat diperiksa.
+- Pada ponsel, judul Ringkasan penjualan, status shift, dan segmen periode disusun tiga baris penuh. Pesan shift panjang tidak boleh mempersempit judul hingga terpotong per huruf; permukaan status memiliki target sentuh minimal 44px.
+- Ringkasan laci diberi label "Laci toko bersama". Ringkasan penjualan, grafik dan produk terlaris di dashboard POS memakai data seluruh toko yang sama untuk admin/kasir pada periode yang sama; riwayat serta laporan per petugas tetap sesuai hak akses. Admin menutup dengan rekap seluruh petugas pada shift yang sama. Semua dialog tetap memakai perilaku/gerak bersama dan pemutakhiran uiLive.

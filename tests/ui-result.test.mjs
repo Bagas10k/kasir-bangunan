@@ -84,5 +84,20 @@ test('the original response is returned untouched to the caller', async () => {
     const res = await f.window.fetch('/v2/receipts', { method: 'POST' });
     assert.equal(res.ok, true);
     await tick();
-    assert.match(f.saved().detail, /RCV-000045/);
+    assert.match(f.saved().detail, /Belum mengubah stok/);
+});
+
+test('receipt draft save, update, confirm and cancel describe the correct effects', async () => {
+    const f = setup([{ ok: true, body: { status: 'draft' } }, { ok: true, body: { status: 'draft' } }, { ok: true, body: { status: 'confirmed' } }, { ok: true, body: { status: 'cancelled' } }]);
+    for (const [url, title, detail] of [
+        ['/v2/receipts', 'Draf penerimaan disimpan', /Belum mengubah stok/],
+        ['/v2/receipt-drafts/7', 'Draf penerimaan diperbarui', /Belum mengubah stok/],
+        ['/v2/receipt-drafts/7/confirm', 'Penerimaan dikonfirmasi', /terkunci/],
+        ['/v2/receipt-drafts/8/cancel', 'Draf penerimaan dibatalkan', /tidak berubah/],
+    ]) {
+        await f.window.fetch(url, { method: 'POST' });
+        await tick();
+        assert.equal(f.saved().title, title);
+        assert.match(f.saved().detail, detail);
+    }
 });

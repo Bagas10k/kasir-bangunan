@@ -79,7 +79,7 @@
 
 <section class="card" aria-labelledby="receipt-heading">
 <h2 id="receipt-heading">Penerimaan barang berutang</h2>
-<p class="note">Satu penerimaan menambah stok dan menambah tagihan supplier satu kali. Satu penerimaan boleh berisi beberapa barang.</p>
+<p class="note">Simpan sebagai draf dahulu. Stok, HPP, dan utang supplier baru berubah saat penerimaan dikonfirmasi dan dikunci.</p>
 <p class="note">Pilih supplier dahulu. Barang yang tersedia mengikuti relasi pada Master Produk.</p>
 <form id="receipt-form" novalidate>
 <div class="row">
@@ -114,16 +114,17 @@
 <p class="rc-submit"><button type="submit">Periksa penerimaan</button></p>
 <div class="rc-review" id="receipt-review" data-popup-skip hidden>
     <h3 id="receipt-review-heading" tabindex="-1">Periksa sebelum simpan</h3>
-    <p class="note">Pastikan jumlah dan harga sesuai nota supplier. Setelah disimpan, stok, HPP, dan utang supplier langsung berubah.</p>
+    <p class="note">Pastikan jumlah dan harga sesuai nota supplier. Simpan draf belum mengubah stok, HPP, atau utang. Konfirmasi dilakukan terpisah dari daftar draf.</p>
     <dl class="rc-review-meta"><div><dt>Supplier</dt><dd data-review-supplier></dd></div><div><dt>Tanggal terima</dt><dd data-review-date></dd></div><div data-review-nota-row><dt>No. nota supplier</dt><dd data-review-nota></dd></div></dl>
     <ul class="rc-review-list" data-review-list></ul>
     <p class="rc-review-total"><span>Total utang ke supplier</span><strong data-review-total></strong></p>
-    <p class="rc-review-actions"><button type="button" class="secondary" data-review-back>Ubah lagi</button><button type="submit">Ya, simpan penerimaan</button></p>
+    <p class="rc-review-actions"><button type="button" class="secondary" data-review-back>Ubah lagi</button><button type="submit">Simpan draf penerimaan</button></p>
 </div>
 <p data-error class="err" tabindex="-1" hidden></p>
 <p data-ok class="ok" hidden></p>
 </form>
 </section>
+@include('v2.receipt-drafts')
 <section class="card" id="receipt-history" aria-labelledby="h-receipt-history">
 <h2 id="h-receipt-history">Riwayat penerimaan</h2>
 <p class="note">Total nilai halaman ini: <strong data-receipt-page-total data-live-skip>{{ \App\Services\V2\Money::display('0') }}</strong></p>
@@ -161,19 +162,10 @@
 <td data-label="Qty" class="ui-num rh-lines">@forelse($lines as $line)<span>{{ $qty($line->quantity) }} <small>{{ $line->product_unit }}</small></span>@empty<span>—</span>@endforelse</td>
 <td data-label="HPP satuan" class="ui-num rh-lines">@forelse($lines as $line)<span>{{ \App\Services\V2\Money::display($line->unit_cost) }}</span>@empty<span>—</span>@endforelse</td>
 <td data-label="Total" class="ui-num rh-total"><strong>{{ \App\Services\V2\Money::display($receipt->total_amount) }}</strong></td>
-<td data-label="Aksi" class="ui-actions">@if(! $voided && isset($voidableReceipts[$receipt->id]))
-    <form class="v2-json-form rh-void-form" action="{{ route('v2.receipts.void', $receipt->id) }}">
-        <h3 class="sr">{{ $receipt->receipt_number }} · {{ $receipt->supplier_name }} · {{ \App\Services\V2\Money::display($receipt->total_amount) }}</h3>
-        <p class="note">Stok dan HPP barang kembali seperti sebelum penerimaan ini, dan tagihan supplier-nya ditutup. Catatan asli tetap tersimpan dengan tanda Dibatalkan. Setelah itu catat ulang penerimaan yang benar.</p>
-        <div class="field">
-            <label for="void-reason-{{ $receipt->id }}">Alasan pembatalan</label>
-            <input id="void-reason-{{ $receipt->id }}" name="reason" required minlength="5" maxlength="255" placeholder="Contoh: harga satuan salah ketik">
-        </div>
-        <input type="hidden" name="idempotency_key" data-fresh-key>
-        <button type="submit" class="secondary">Batalkan penerimaan</button>
-        <p data-error class="err" tabindex="-1" hidden></p>
-    </form>
-@else<span class="ui-muted">—</span>@endif</td>
+<td data-label="Aksi" class="ui-actions">@if ($voided)<span class="ui-muted">Dibatalkan sebelumnya</span>@else<span class="ui-badge ui-badge--ok">Dikonfirmasi</span><span class="ui-sub">Terkunci · tidak dapat dibatalkan biasa</span>
+@php $finalAudit = ($receiptFinalAudit ?? collect())->get($receipt->id); @endphp
+@if ($finalAudit)<span class="ui-sub">{{ $finalAudit->confirmed_by_name }} · {{ \Carbon\Carbon::parse($finalAudit->confirmed_at)->format('d/m/Y H:i') }}</span>@endif
+@endif</td>
 </tr>
 @empty
 <tr data-ui-empty-static><td colspan="8" class="ui-empty"><strong>Belum ada penerimaan barang.</strong>Tekan "Catat penerimaan" untuk mencatat barang masuk pertama.</td></tr>
@@ -283,7 +275,7 @@
 @else
     @foreach ($waitingPayments as $payment)
     <form class="v2-json-form" action="{{ route('v2.payments.reject', $payment->id) }}">
-        <p><strong>{{ \App\Services\V2\Money::display($payment->amount) }}</strong> · {{ ($payment->invoice_direction ?? '') === 'payable' ? 'Bayar ke' : 'Dari' }} {{ $payment->party_name ?? 'Pelanggan umum' }} · {{ $payment->invoice_number }} · {{ $payment->method === 'cash' ? 'Tunai' : 'Transfer' }}@if($payment->requester_name) · diajukan {{ $payment->requester_name }}@endif</p>
+        <p><strong>{{ \App\Services\V2\Money::display($payment->amount) }}</strong> · {{ ($payment->invoice_direction ?? '') === 'payable' ? 'Bayar ke' : 'Dari' }} {{ $payment->party_name ?? 'Pelanggan umum' }} · {{ $payment->invoice_number }} · {{ ['main' => 'Kas Utama', 'cash' => 'Laci shift', 'transfer' => 'Bank Utama'][$payment->method] ?? $payment->method }}@if($payment->requester_name) · diajukan {{ $payment->requester_name }}@endif</p>
         <div class="field">
             <label for="reject-{{ $payment->id }}">Alasan penolakan</label>
             <input id="reject-{{ $payment->id }}" name="reason" required minlength="5" maxlength="1000">
@@ -355,7 +347,13 @@ document.addEventListener('submit', async e => {
     if (!f) { return; }
     e.preventDefault();
     if (!f.reportValidity()) { return; }
-    if (await send(f, f.action, Object.fromEntries(new FormData(f)), false, null, true)) { await window.uiLive.saved(f); }
+    const payload = Object.fromEntries(new FormData(f));
+    if (f.matches('.receipt-confirm-form')) payload.confirm_duplicate = f.dataset.confirmDuplicate === '1';
+    f._lastError = null;
+    if (await send(f, f.action, payload, false, null, true)) { await window.uiLive.saved(f); }
+    else if (f.matches('.receipt-confirm-form') && f._lastError?.errors?.duplicate_receipt) {
+        window.uiConfirmDuplicate?.(f, 'Ya, tetap konfirmasi');
+    }
 });
 
 // === Master Entity V2 Handlers ===
@@ -665,6 +663,7 @@ if (receipt) {
         }
         recalc();
         if (focus) { (node.querySelector('.ui-pick-input') || node.querySelector('select')).focus(); }
+        return node;
     };
     receipt.dataset.key = key();
     addRow(false);
@@ -735,6 +734,42 @@ if (receipt) {
     };
     review.querySelector('[data-review-back]').addEventListener('click', () => hideReview(true));
     receipt.closest('dialog')?.addEventListener('close', () => hideReview(false));
+    const draftUpdateUrl = @json(route('v2.receipt-drafts.update', ['id' => 0]));
+    const resetDraft = () => {
+        delete receipt.dataset.draftId; delete receipt.dataset.draftVersion; delete receipt.dataset.draftNotes;
+        receipt.dataset.key = key();
+        hideReview(false); resetDuplicate(); receipt.reset();
+        box.replaceChildren(); addRow(false); recalc();
+    };
+    document.addEventListener('click', event => {
+        if (event.target.closest('[data-receipt-new]')) { resetDraft(); return; }
+        const trigger = event.target.closest('[data-receipt-edit]');
+        if (!trigger || receipt.dataset.busy) return;
+        const draft = JSON.parse(trigger.dataset.receiptEdit);
+        resetDraft();
+        receipt.dataset.draftId = draft.id; receipt.dataset.draftVersion = draft.version;
+        receipt.dataset.draftNotes = draft.notes || '';
+        const supplier = receipt.elements.supplier_id;
+        if (![...supplier.options].some(o => o.value === String(draft.supplier_id))) supplier.add(new Option(draft.supplier_name, draft.supplier_id));
+        supplier.value = String(draft.supplier_id); supplier.dispatchEvent(new Event('change', {bubbles:true}));
+        receipt.elements.receipt_date.value = draft.receipt_date;
+        receipt.elements.receipt_date.dispatchEvent(new Event('change', {bubbles:true}));
+        receipt.elements.supplier_invoice_number.value = draft.supplier_invoice_number || '';
+        box.replaceChildren();
+        for (const item of draft.items) {
+            const row = addRow(false), select = row.querySelector('[data-name=product_id]');
+            select.add(new Option(item.name + ' · ' + item.unit, String(item.product_id), true, true));
+            select.dispatchEvent(new Event('change', {bubbles:true})); select._uiPickSync?.();
+            row.querySelector('[data-name=quantity]').value = item.quantity;
+            row.querySelector('[data-name=unit_cost]').value = item.unit_cost;
+            row.dataset.label = item.name; row.dataset.cost = item.current_cost;
+            row.dataset.meta = 'stok ' + count(item.stock);
+        }
+        recalc();
+        const dialog = receipt.closest('dialog');
+        if (dialog && !dialog.open) { dialog._openerTrigger = trigger; dialog.showModal(); }
+        receipt.elements.supplier_invoice_number.focus();
+    });
     receipt.addEventListener('submit', async e => {
         e.preventDefault();
         if (receipt.dataset.busy || !receipt.reportValidity()) { return; }
@@ -755,12 +790,16 @@ if (receipt) {
             supplier_invoice_number: receipt.elements.supplier_invoice_number.value.trim() || null,
             confirm_duplicate: receipt.dataset.confirmDuplicate === '1',
             items: items,
-            idempotency_key: receipt.dataset.key
+            idempotency_key: receipt.dataset.key,
+            version: receipt.dataset.draftVersion || null,
+            notes: receipt.dataset.draftNotes || null
         };
         receipt._lastError = null;
-        if (await send(receipt, @json(route('v2.receipts.store')), payload, false, null, true)) {
+        const url = receipt.dataset.draftId ? draftUpdateUrl.replace(/\/0$/, '/' + receipt.dataset.draftId) : @json(route('v2.receipts.store'));
+        if (await send(receipt, url, payload, false, null, true)) {
             hideReview(false);
             resetDuplicate();
+            delete receipt.dataset.draftId; delete receipt.dataset.draftVersion; delete receipt.dataset.draftNotes;
             receipt.dataset.key = key();
             box.replaceChildren();
             addRow(false);

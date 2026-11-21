@@ -66,7 +66,7 @@ class SubpathRoutingTest extends TestCase
         $content = $response->getContent();
 
         $this->assertTrue(
-            str_contains($content, 'action="' . $expectedAction . '"'),
+            str_contains($content, 'action="'.$expectedAction.'"'),
             'Login form action must point to subpath login route'
         );
     }
@@ -130,9 +130,9 @@ class SubpathRoutingTest extends TestCase
 
         // Simulate upstream receiving intended '/' or root before subpath was resolved
         $response = $this->withSession([
-                '_token' => $this->csrfToken,
-                'url.intended' => '/',
-            ])
+            '_token' => $this->csrfToken,
+            'url.intended' => '/',
+        ])
             ->withServerVariables([
                 'SCRIPT_NAME' => '/kasir-bangunan/index.php',
                 'SCRIPT_FILENAME' => base_path('public/index.php'),
@@ -160,9 +160,9 @@ class SubpathRoutingTest extends TestCase
         ]);
 
         $response = $this->withSession([
-                '_token' => $this->csrfToken,
-                'url.intended' => 'https://example.test/',
-            ])
+            '_token' => $this->csrfToken,
+            'url.intended' => 'https://example.test/',
+        ])
             ->withServerVariables([
                 'SCRIPT_NAME' => '/kasir-bangunan/index.php',
                 'SCRIPT_FILENAME' => base_path('public/index.php'),
@@ -206,7 +206,7 @@ class SubpathRoutingTest extends TestCase
                 'SCRIPT_FILENAME' => base_path('public/index.php'),
             ])->post(route('login'), [
                 '_token' => $this->csrfToken,
-                'email' => 'invalid-email-format',
+                'email' => '',
                 'password' => '',
             ]);
 
@@ -224,7 +224,7 @@ class SubpathRoutingTest extends TestCase
     {
         $email = 'throttled.user@example.test';
         $ip = '127.0.0.1';
-        $throttleKey = mb_strtolower($email) . '|' . $ip;
+        $throttleKey = mb_strtolower($email).'|'.$ip;
 
         // Exhaust the 5 attempts
         for ($i = 0; $i < 5; $i++) {

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\V2\Ledger;
+use App\Services\V2\Operations;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -86,11 +87,7 @@ class V2OperationalRelationsTest extends TestCase
     private function delivery(User $owner): int
     {
         $sequence = ++$this->sequence;
-        $shiftId = (int) DB::table('v2_shifts')->insertGetId([
-            'user_id' => $owner->id, 'open_user_id' => $owner->id, 'source' => 'admin',
-            'opening_cash' => '1000.00', 'status' => 'open', 'opened_at' => now(),
-            'created_at' => now(), 'updated_at' => now(),
-        ]);
+        $shiftId = app(Operations::class)->openShift($this->storeShiftAdmin()->id, '1000.00', 'admin');
         $saleId = (int) DB::table('v2_sales')->insertGetId([
             'number' => 'SYN-SALE-'.$sequence, 'user_id' => $owner->id, 'shift_id' => $shiftId,
             'subtotal' => '0.00', 'total' => '0.00', 'request_hash' => str_repeat('a', 64),

@@ -14,7 +14,7 @@ class ChartOfAccountsSeeder extends Seeder
     {
         return [
             // 1. Aset (Assets) - Normal Debit
-            ['account_code' => '1101', 'account_name' => 'Kas Toko (Tunai)', 'account_type' => 'asset', 'normal_balance' => 'debit'],
+            ['account_code' => '1101', 'account_name' => 'Kas Utama (Tunai)', 'account_type' => 'asset', 'normal_balance' => 'debit'],
             ['account_code' => '1102', 'account_name' => 'Rekening Bank', 'account_type' => 'asset', 'normal_balance' => 'debit'],
             ['account_code' => '1103', 'account_name' => 'Piutang Usaha (Pelanggan/Kontraktor)', 'account_type' => 'asset', 'normal_balance' => 'debit'],
             ['account_code' => '1301', 'account_name' => 'Persediaan Material Bangunan', 'account_type' => 'asset', 'normal_balance' => 'debit'],

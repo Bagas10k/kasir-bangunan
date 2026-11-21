@@ -31,9 +31,9 @@
             <p class="pd-sub" id="pd-sub">{{ $posDashboard[$initial]['sub_label'] ?? '' }}</p>
         </div>
         <div class="pd-controls">
-            <div class="pos-shift-notice" data-pos-shift-state="{{ $ownOpenShift ? 'open' : 'closed' }}" role="note" aria-label="Status shift kasir">
-                <strong>{{ $ownOpenShift ? 'Shift aktif' : 'Shift belum dibuka' }}</strong>
-                <a class="pos-shift-action" href="#shift" data-task-link="shift"><span>{{ $ownOpenShift ? 'Lihat shift' : 'Buka shift' }}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+            <div class="pos-shift-notice" id="store-shift-state" data-live-skip data-pos-shift-state="{{ $activeStoreShift ? 'open' : 'closed' }}" data-store-shift-id="{{ $activeStoreShift->id ?? '' }}" data-status-url="{{ route('v2.shifts.active') }}" data-manage-shift="{{ $isAdminView ? '1' : '0' }}" role="status" aria-live="polite" aria-label="Status shift toko">
+                <strong>{{ $activeStoreShift ? 'Shift toko #'.$activeStoreShift->id.' aktif' : ($isAdminView ? 'Shift toko belum dibuka' : 'Menunggu admin membuka shift toko') }}</strong>
+                <a class="pos-shift-action" href="#shift" data-task-link="shift"><span>{{ $activeStoreShift || !$isAdminView ? 'Lihat shift' : 'Buka shift toko' }}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
             </div>
             <div class="pd-seg" id="sales-period-control" role="group" aria-label="Pilih rentang waktu">
                 @foreach ($periodButtons as $key => $text)

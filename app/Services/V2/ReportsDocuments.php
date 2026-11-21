@@ -29,14 +29,13 @@ use Illuminate\Validation\ValidationException;
  *
  * Hari bisnis = tanggal shift dibuka (`v2_shifts.opened_at`); penjualan dan kas
  * dihitung dari shift tersebut. Bank posted mengikuti tanggal jurnal verifikasi; pending mengikuti tanggal pengajuan.
- * Kasir hanya melihat shift/penjualan/pembayaran miliknya; admin melihat semua.
+ * Kasir melihat penjualan/pembayaran miliknya; laci shift bersama mencakup seluruh kasir.
+ * Shift pribadi historis tetap dibatasi ke pemiliknya; admin melihat semua.
  * Tidak ada pagination/limit: seluruh baris dijumlahkan.
  */
 final class ReportsDocuments
 {
-    public function __construct(private readonly Operations $operations)
-    {
-    }
+    public function __construct(private readonly Operations $operations) {}
 
     public function daily(int $actor, string $date): array
     {
@@ -46,8 +45,8 @@ final class ReportsDocuments
 
         $shiftQuery = DB::table('v2_shifts')
             ->whereDate('opened_at', $date)
-            ->when($own, fn ($q) => $q->where('user_id', $actor));
-        $shifts = $shiftQuery->get(['id', 'opening_cash', 'expected_cash', 'counted_cash', 'difference', 'status']);
+            ->when($own, fn ($q) => $q->where(fn ($visible) => $visible->where('is_shared', true)->orWhere('user_id', $actor)));
+        $shifts = $shiftQuery->get(['id', 'opening_cash', 'expected_cash', 'counted_cash', 'difference', 'status', 'is_shared']);
         $shiftIds = $shifts->pluck('id')->map(fn ($id) => (int) $id)->all();
 
         $sales = $shiftIds === []
@@ -127,8 +126,12 @@ final class ReportsDocuments
             ->where('v2_payments.method', 'transfer')
             ->leftJoin('journal_entries', 'journal_entries.id', '=', 'v2_payments.journal_entry_id')
             ->where(function ($q) use ($date) {
-                $q->where(function ($posted) use ($date) { $posted->where('v2_payments.status', 'posted')->whereDate('journal_entries.transaction_date', $date); })
-                  ->orWhere(function ($pending) use ($date) { $pending->whereIn('v2_payments.status', ['pending','proposed'])->whereDate('v2_payments.created_at', $date); });
+                $q->where(function ($posted) use ($date) {
+                    $posted->where('v2_payments.status', 'posted')->whereDate('journal_entries.transaction_date', $date);
+                })
+                    ->orWhere(function ($pending) use ($date) {
+                        $pending->whereIn('v2_payments.status', ['pending', 'proposed'])->whereDate('v2_payments.created_at', $date);
+                    });
             })
             ->when($own, fn ($q) => $q->where('v2_payments.requested_by', $actor))
             ->get(['v2_payments.amount', 'v2_payments.status']);
@@ -145,6 +148,7 @@ final class ReportsDocuments
             'date' => $date,
             'currency' => 'IDR',
             'scope' => $own ? 'own' : 'all',
+            'cash_scope' => $shifts->contains(fn ($shift) => (bool) $shift->is_shared) ? 'store' : ($own ? 'own' : 'all'),
             'revenue' => [
                 'goods_gross' => $this->str($gross),
                 'discount' => $this->str($discount),
@@ -180,14 +184,11 @@ final class ReportsDocuments
             $this->fail('Jenis dokumen harus "receipt" atau "delivery".');
         }
 
-        $role = $this->operations->role($actor);
+        $this->operations->requireRole($actor, ['admin', 'cashier']);
 
         $sale = DB::table('v2_sales')->where('id', $saleId)->first();
         if (! $sale) {
             $this->fail('Penjualan tidak ditemukan.');
-        }
-        if ($role !== 'admin' && (int) $sale->user_id !== $actor) {
-            abort(403);
         }
 
         $items = DB::table('v2_sale_items')

@@ -15,14 +15,14 @@
     $monitoringHeads = [
         'tagihan' => ['Ringkasan tagihan', 'Piutang pelanggan dan utang ke supplier yang belum lunas', $m['awaiting']['count'] > 0 ? [$m['awaiting']['count'].' transfer menunggu verifikasi', 'ok'] : null],
         'pengiriman' => ['Ringkasan pengiriman', 'Status surat jalan saat ini', $m['deliveries']['unassigned'] > 0 ? [$m['deliveries']['unassigned'].' surat jalan belum ada mobil', 'warn'] : null],
-        'shift' => ['Ringkasan kas', 'Shift kasir dan selisih kas bulan ini', $m['shifts']['review'] > 0 ? [$m['shifts']['review'].' shift perlu diperiksa', 'warn'] : null],
+        'shift' => ['Ringkasan kas', 'Shift toko dan selisih kas bulan ini', $m['shifts']['review'] > 0 ? [$m['shifts']['review'].' shift perlu diperiksa', 'warn'] : null],
         'laporan' => ['Ringkasan harian', 'Tunai, transfer terverifikasi, dan transfer menunggu dipisahkan', null],
         'penerimaan' => ['Ringkasan penerimaan', 'Barang masuk bulan ini: pembelian dan stok awal', ['Khusus admin', 'ok']],
     ];
 
     $monitoringPages = [
         'shift' => [
-            ['Shift terbuka', $m['shifts']['open'], $isAdmin ? 'seluruh kasir' : 'milik Anda', 'hero', 'status:open'],
+            ['Shift terbuka', $m['shifts']['open'], 'shift toko bersama; riwayat pribadi tetap terpisah', 'hero', 'status:open'],
             ['Perlu diperiksa', $m['shifts']['review'], $m['shifts']['review'] > 0 ? 'selisih menunggu pemeriksaan' : 'tidak ada', $attention($m['shifts']['review']), 'status:review'],
             ['Selisih kas bulan ini', $rp($m['shifts']['difference_month']), 'jumlah dari shift yang sudah ditutup', $differenceTone],
         ],
@@ -40,7 +40,7 @@
         ])),
         'laporan' => [
             ['Penjualan '.$reportLabel, $rp($daily['revenue']['total_sales'] ?? '0'), (int) ($daily['sales_count'] ?? 0).' transaksi', 'hero'],
-            ['Uang tunai seharusnya di laci', $rp($daily['cash']['expected'] ?? '0'), $dailyOk ? 'kas awal + masuk - keluar' : '', null],
+            ['Uang tunai seharusnya di laci', $rp($daily['cash']['expected'] ?? '0'), $dailyOk ? (($daily['cash_scope'] ?? '') === 'store' ? 'laci toko bersama: kas awal + masuk - keluar' : 'kas awal + masuk - keluar') : '', null],
             ['Transfer menunggu verifikasi', $rp($daily['bank']['pending'] ?? '0'), 'belum masuk bank', $attention($daily['bank']['pending'] ?? '0')],
         ],
     ];

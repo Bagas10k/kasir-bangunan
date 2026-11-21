@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\V2\DeliveryTrips;
 use App\Services\V2\Ledger;
+use App\Services\V2\Operations;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -72,11 +73,9 @@ class V2DeliveryTripsTest extends TestCase
 
     private function shift(User $user, string $opening = '1000.00'): int
     {
-        return (int) DB::table('v2_shifts')->insertGetId([
-            'user_id' => $user->id, 'open_user_id' => $user->id, 'source' => 'admin',
-            'opening_cash' => $opening, 'status' => 'open', 'opened_at' => now(),
-            'created_at' => now(), 'updated_at' => now(),
-        ]);
+        $shiftId = DB::table('v2_shifts')->where('is_shared', true)->where('status', 'open')->value('id');
+
+        return $shiftId !== null ? (int) $shiftId : app(Operations::class)->openShift($this->storeShiftAdmin()->id, $opening, 'admin');
     }
 
     private function fund(string $account, string $amount): void

@@ -49,9 +49,10 @@
     $isAdmin = ($role ?? '') === 'admin';
     $openShifts = [];
     foreach ($shifts as $s) { if (($s->status ?? '') === 'open') { $openShifts[] = $s; } }
-    $ownOpenShift = collect($shifts)->first(fn ($s) => ($s->status ?? '') === 'open' && (int)$s->user_id === (int)auth()->id());
+    $activeStoreShift = $activeStoreShift ?? null;
     $statusLabel = ['open'=>'Terbuka','closed'=>'Ditutup','review'=>'Perlu diperiksa','unpaid'=>'Belum lunas','partial'=>'Dibayar sebagian','paid'=>'Lunas','posted'=>'Terverifikasi','pending'=>'Menunggu verifikasi','proposed'=>'Diajukan','prepared'=>'Disiapkan','sent'=>'Dikirim','received'=>'Diterima','rejected'=>'Ditolak'];
     $methodLabel = ['cash'=>'Tunai','transfer'=>'Transfer','credit'=>'Kredit'];
+    $sourceLabel = ['main'=>'Kas Utama','transfer'=>'Bank Utama','cash'=>'Laci shift'];
     $sourceLabel = ['admin'=>'Dari admin','carry'=>'Sisa shift','both'=>'Admin + sisa shift'];
     $deliveryBySale = [];
     foreach ($deliveries as $d) { $deliveryBySale[(int) ($d->sale_id ?? 0)] = $d; }
@@ -87,10 +88,11 @@
         <div class="stack">
 
             <section class="card" aria-labelledby="h-shift">
-                <h2 id="h-shift">Shift</h2>
-                <p class="note">Buka shift mengunci kas awal. Tutup shift membandingkan uang fisik dengan perkiraan server.</p>
+                <h2 id="h-shift">Shift toko</h2>
+                <p class="note">Admin membuka dan menutup satu shift toko. Semua kasir memakai shift yang sama; nama kasir tetap tercatat di transaksi. Uang laci direkap bersama.</p>
 
-                <form id="form-open" action="{{ route('v2.shifts.open') }}" novalidate>
+                @if($isAdmin)
+                <form id="form-open" action="{{ route('v2.shifts.open') }}" data-popup-title="Buka shift toko" novalidate>
                     <fieldset style="border:0;padding:0;margin:0">
                         <legend class="sr">Buka shift</legend>
                         <div class="row">
@@ -111,7 +113,7 @@
                                 <select id="open-carry" name="carry_from">
                                     <option value="">Tidak membawa sisa</option>
                                     @foreach ($shifts as $s)
-                                        @if (($s->status ?? '') === 'closed' && (int) $s->user_id === (int) auth()->id())
+                                        @if (($s->status ?? '') === 'closed' && (($s->is_shared ?? false) || (int) $s->user_id === (int) auth()->id()))
                                             <option value="{{ $s->id }}">#{{ $s->id }} · terkunci {{ $rp($s->counted_cash ?? null) }}</option>
                                         @endif
                                     @endforeach
@@ -119,23 +121,26 @@
                             </div>
                         </div>
                         <p class="note" id="shift-money-help">Kas awal adalah total uang di laci. Titik ribuan muncul sendiri saat mengetik, misalnya 100.000; desimal pakai koma. Sisa shift hanya dapat dibawa sekali, paling banyak sebesar uang fisik yang ditutup.</p>
-                        <p><button type="submit">Buka shift</button></p>
+                        <p><button type="submit">Buka shift toko</button></p>
                         <p class="err" data-error tabindex="-1" hidden></p>
                         <p class="ok" data-ok hidden></p>
                     </fieldset>
                 </form>
+                @else
+                <p class="note">Pembukaan, penghitungan uang fisik, dan penutupan shift dilakukan admin. Kasir tidak perlu membuka shift sendiri.</p>
+                @endif
 
                 <h3 class="ui-subhead">Riwayat shift</h3>
-                <x-ui.toolbar search="Cari nomor atau nama kasir" label="Cari shift" :chips="['Semua' => 'all', 'Terbuka' => 'status:open', 'Perlu diperiksa' => 'status:review', 'Ditutup' => 'status:closed']"/>
+                <x-ui.toolbar search="Cari nomor atau pembuka shift" label="Cari shift" :chips="['Semua' => 'all', 'Terbuka' => 'status:open', 'Perlu diperiksa' => 'status:review', 'Ditutup' => 'status:closed']"/>
                 <div class="ui-table-wrap scroll" data-ui-table tabindex="0" role="region" aria-label="Riwayat shift">
                     <table class="ui-table">
-                        <caption class="sr">Riwayat shift kasir</caption>
-                        <thead><tr><th scope="col">Shift</th><th scope="col">Kasir</th><th scope="col">Dibuka</th><th scope="col" class="ui-num">Kas awal</th><th scope="col" class="ui-num">Perkiraan</th><th scope="col" class="ui-num">Uang fisik</th><th scope="col" class="ui-num">Selisih</th><th scope="col">Status</th><th scope="col" class="ui-actions">Aksi</th></tr></thead>
+                        <caption class="sr">Riwayat shift toko dan shift pribadi historis</caption>
+                        <thead><tr><th scope="col">Shift</th><th scope="col">Dibuka oleh</th><th scope="col">Dibuka</th><th scope="col" class="ui-num">Kas awal</th><th scope="col" class="ui-num">Perkiraan</th><th scope="col" class="ui-num">Uang fisik</th><th scope="col" class="ui-num">Selisih</th><th scope="col">Status</th><th scope="col" class="ui-actions">Aksi</th></tr></thead>
                         <tbody>
                         @forelse ($shifts as $s)
                             <tr data-status="{{ $s->status ?? '' }}">
-                                <td class="ui-primary ui-nowrap" data-label="Shift">#{{ $s->id }}<span class="ui-sub">{{ $sourceLabel[$s->source ?? ''] ?? '' }}</span></td>
-                                <td data-label="Kasir">{{ $s->user_name ?? '—' }}</td>
+                                <td class="ui-primary ui-nowrap" data-label="Shift">#{{ $s->id }}<span class="ui-sub">{{ ($s->is_shared ?? false) ? 'Shift toko' : 'Shift pribadi lama' }} · {{ $sourceLabel[$s->source ?? ''] ?? '' }}</span></td>
+                                <td data-label="Dibuka oleh">{{ $s->user_name ?? '—' }}</td>
                                 <td data-label="Dibuka" class="ui-nowrap">{{ $when($s->opened_at ?? null) }}</td>
                                 <td data-label="Kas awal" class="ui-num">{{ $rp($s->opening_cash ?? null) }}</td>
                                 <td data-label="Perkiraan" class="ui-num">{{ $rp($s->expected_cash ?? null) }}</td>
@@ -143,14 +148,16 @@
                                 <td data-label="Selisih" class="ui-num @if(($s->difference ?? null) !== null && (float) $s->difference !== 0.0) ui-neg @endif">{{ ($s->difference ?? null) === null ? '—' : $rp($s->difference) }}</td>
                                 <td data-label="Status"><x-ui.status :status="$s->status ?? ''"/></td>
                                 <td class="ui-actions">
-                                @if (($s->status ?? '') === 'open')
+                                @if ($isAdmin && ($s->status ?? '') === 'open')
                                     <form class="form-close" action="{{ route('v2.shifts.close', ['id' => $s->id]) }}" data-shift="{{ $s->id }}" novalidate>
                                         <h3 class="sr">Tutup shift #{{ $s->id }}</h3>
+                                        <div class="close-recap" data-close-recap hidden></div>
                                         <div class="row">
                                             <div class="field">
                                                 <label for="counted-{{ $s->id }}">Uang fisik dihitung (shift #{{ $s->id }})</label>
                                                 <input id="counted-{{ $s->id }}" name="counted" type="text" data-money inputmode="decimal" autocomplete="off" maxlength="30" pattern="[0-9]+([.][0-9]{1,2})?" aria-describedby="counted-help-{{ $s->id }}" required>
-                                                <p class="note" id="counted-help-{{ $s->id }}">Isi uang fisik yang dihitung, bukan saldo perkiraan. Contoh 100.000 (titik ribuan muncul sendiri). Selisih akan masuk pemeriksaan Admin.</p>
+                                                <p class="note" id="counted-help-{{ $s->id }}">Angka otomatis di atas menunjukkan yang seharusnya ada di laci. Hitung uang fisik, lalu isi hasilnya di sini untuk dibandingkan.</p>
+                                                <p class="close-match" data-close-match hidden></p>
                                             </div>
                                             <div class="field" style="flex:0 0 auto">
                                                 <button type="submit" class="secondary">Tutup shift</button>
@@ -165,7 +172,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr data-ui-empty-static><td colspan="9" class="ui-empty"><strong>Belum ada shift.</strong>Tekan "Buka shift" di atas untuk memulai shift pertama.</td></tr>
+                            <tr data-ui-empty-static><td colspan="9" class="ui-empty"><strong>Belum ada shift.</strong>{{ $isAdmin ? 'Tekan Buka shift toko untuk memulai.' : 'Menunggu admin membuka shift toko.' }}</td></tr>
                         @endforelse
                         </tbody>
                     </table>
@@ -203,8 +210,8 @@
                                         $payHint = ! $payable
                                             ? 'Tunai langsung tercatat dan masuk laci shift. Transfer menunggu verifikasi admin.'
                                             : ($role === 'admin'
-                                                ? 'Langsung tercatat dan mengurangi utang. Tunai keluar dari laci shift Anda; transfer dari rekening bank.'
-                                                : 'Diajukan ke admin. Utang berkurang setelah admin menyetujui.');
+                                                ? 'Pilih sumber dana. Kas Utama dan Bank Utama memakai saldo toko dan tidak mengubah laci shift; Laci shift memakai uang laci shift yang sedang terbuka.'
+                                                : 'Diajukan ke admin. Kas Utama dan Bank Utama tidak mengubah laci shift; Laci shift memakai uang laci Anda. Utang berkurang setelah disetujui.');
                                     @endphp
                                     <form class="form-collect" action="{{ route('v2.payments.store', ['id' => $inv->id]) }}" data-invoice="{{ $inv->id }}" data-direction="{{ $inv->direction }}" data-hint="{{ $payHint }}" novalidate>
                                         <h3 class="sr">{{ $payLabel }} {{ $inv->number ?? $inv->id }}</h3>
@@ -213,14 +220,26 @@
                                                 <label for="amt-{{ $inv->id }}">Jumlah (invoice {{ $inv->number ?? $inv->id }})</label>
                                                 <input id="amt-{{ $inv->id }}" name="amount" type="text" data-money inputmode="decimal" autocomplete="off" maxlength="30" required>
                                             </div>
-                                            <div class="field">
-                                                <label for="meth-{{ $inv->id }}">Metode</label>
+                                            @unless ($payable)
+                                                <div class="field">
+                                                    <label for="meth-{{ $inv->id }}">Metode</label>
+                                                    <select id="meth-{{ $inv->id }}" name="method">
+                                                        <option value="cash">Tunai</option>
+                                                        <option value="transfer">Transfer</option>
+                                                    </select>
+                                                </div>
+                                            @endunless
+                                        </div>
+                                        @if ($payable)
+                                            <div class="field collect-source">
+                                                <label for="meth-{{ $inv->id }}">Sumber dana</label>
                                                 <select id="meth-{{ $inv->id }}" name="method">
-                                                    <option value="cash">Tunai</option>
-                                                    <option value="transfer">Transfer</option>
+                                                    <option value="main">Kas Utama</option>
+                                                    <option value="transfer">Bank Utama</option>
+                                                    <option value="cash">Laci shift</option>
                                                 </select>
                                             </div>
-                                        </div>
+                                        @endif
                                         <div class="field" style="margin-top:8px">
                                             <label for="ref-{{ $inv->id }}">Referensi (opsional)</label>
                                             <input id="ref-{{ $inv->id }}" name="reference" type="text" maxlength="255" autocomplete="off">
@@ -258,14 +277,14 @@
                 <div class="ui-table-wrap scroll" data-ui-table tabindex="0" role="region" aria-label="Daftar pembayaran">
                     <table class="ui-table">
                         <caption class="sr">Daftar pembayaran yang diajukan</caption>
-                        <thead><tr><th scope="col">Tanggal</th><th scope="col">Tagihan</th><th scope="col">Nama</th><th scope="col">Metode</th><th scope="col" class="ui-num">Jumlah</th><th scope="col">Pengaju</th><th scope="col">Status</th><th scope="col" class="ui-actions">Aksi</th></tr></thead>
+                        <thead><tr><th scope="col">Tanggal</th><th scope="col">Tagihan</th><th scope="col">Nama</th><th scope="col">Sumber dana</th><th scope="col" class="ui-num">Jumlah</th><th scope="col">Pengaju</th><th scope="col">Status</th><th scope="col" class="ui-actions">Aksi</th></tr></thead>
                         <tbody>
                         @forelse ($payments as $pm)
                             <tr data-status="{{ $pm->status ?? '' }}">
                                 <td data-label="Tanggal" class="ui-nowrap">{{ $when($pm->created_at ?? null) }}</td>
                                 <td data-label="Tagihan" class="ui-primary ui-nowrap">{{ $pm->invoice_number ?? ('#'.($pm->invoice_id ?? '')) }}<span class="ui-sub">{{ ($pm->invoice_direction ?? '') === 'payable' ? 'Utang supplier' : 'Piutang pelanggan' }}</span></td>
                                 <td data-label="Nama">{{ $pm->party_name ?? '—' }}</td>
-                                <td data-label="Metode">{{ $methodLabel[$pm->method ?? ''] ?? '—' }}</td>
+                                <td data-label="Sumber dana">{{ $sourceLabel[$pm->method ?? ''] ?? '—' }}</td>
                                 <td data-label="Jumlah" class="ui-num">{{ $rp($pm->amount ?? null) }}</td>
                                 <td data-label="Pengaju">{{ $pm->requester_name ?? '—' }}</td>
                                 <td data-label="Status"><x-ui.status :status="$pm->status ?? ''"/></td>
@@ -322,7 +341,7 @@
         @if (! is_array($daily))
             <x-ui.empty title="Laporan belum tersedia" hint="Pilih tanggal lalu tekan Tampilkan laporan."/>
         @else
-            <p class="ui-status-line">Mencakup {{ ($daily['scope'] ?? 'own') === 'all' ? 'semua kasir' : 'shift milik Anda' }} · {{ (int) ($daily['sales_count'] ?? 0) }} penjualan · {{ (int) ($daily['shifts']['count'] ?? 0) }} shift ({{ (int) ($daily['shifts']['open'] ?? 0) }} terbuka, {{ (int) ($daily['shifts']['closed'] ?? 0) }} ditutup, {{ (int) ($daily['shifts']['review'] ?? 0) }} perlu diperiksa).</p>
+            <p class="ui-status-line">Mencakup {{ ($daily['scope'] ?? 'own') === 'all' ? 'semua kasir' : 'penjualan Anda dan laci toko bersama' }} · {{ (int) ($daily['sales_count'] ?? 0) }} penjualan · {{ (int) ($daily['shifts']['count'] ?? 0) }} shift ({{ (int) ($daily['shifts']['open'] ?? 0) }} terbuka, {{ (int) ($daily['shifts']['closed'] ?? 0) }} ditutup, {{ (int) ($daily['shifts']['review'] ?? 0) }} perlu diperiksa).</p>
             <div class="ui-report-grid">
                 <section class="ui-report-card" aria-labelledby="rep-cash">
                     <h3 id="rep-cash">Uang tunai di laci</h3>
@@ -494,7 +513,7 @@
         var form = ev.target.closest && ev.target.closest('.form-close');
         if (!form) { return; }
         ev.preventDefault();
-        post(form, form.action, { counted: val(form, 'counted') }, true).then(function (data) { if (data) { liveSaved(form); } });
+        post(form, form.action, { counted: val(form, 'counted'), fingerprint: form._fingerprint || null }, true).then(function (data) { if (data) { liveSaved(form); } });
     });
 
     // ---- checkout ----
@@ -669,6 +688,88 @@
     });
 })();
 </script>
+<script>
+(() => {
+    'use strict';
+    // Rekap tutup shift: ambil angka otomatis saat dialog dibuka, lalu bandingkan dengan uang fisik yang diketik.
+    const summaryUrl = @json(route('v2.shifts.closing-summary', ['id' => '__ID__']));
+    const cents = value => { const [i, f = ''] = String(value ?? '0').split('.'); return BigInt(i || '0') * 100n + BigInt((f + '00').slice(0, 2)); };
+    const fmt = value => { let c = cents(value); const neg = c < 0n; if (neg) c = -c; const i = (c / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); const f = (c % 100n).toString().padStart(2, '0'); return (neg ? '-' : '') + 'Rp ' + (f === '00' ? i : i + ',' + f); };
+    // fmtCents memformat nilai yang sudah dalam satuan sen (BigInt), tanpa mengalikan 100 lagi.
+    const fmtCents = c => { const neg = c < 0n; if (neg) c = -c; const i = (c / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); const f = (c % 100n).toString().padStart(2, '0'); return (neg ? '-' : '') + 'Rp ' + (f === '00' ? i : i + ',' + f); };
+    const dlRow = (label, value, strong) => { const div = document.createElement('div'); const dt = document.createElement('dt'); dt.textContent = label; const dd = document.createElement('dd'); dd.textContent = value; if (strong) div.className = 'is-total'; div.append(dt, dd); return div; };
+
+    function loadRecap(form) {
+        const id = form.dataset.shift;
+        delete form._fingerprint; delete form._expected;
+        if (form.dataset.recapLoading) return;
+        form.dataset.recapLoading = '1';
+        const box = form.querySelector('[data-close-recap]');
+        box.hidden = false;
+        box.textContent = 'Memuat rekap transaksi…';
+        fetch(summaryUrl.replace('__ID__', id), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+            .then(response => { if (!response.ok) throw new Error('HTTP ' + response.status); return response.json(); })
+            .then(data => { renderRecap(form, data); })
+            .catch(() => { box.textContent = 'Rekap gagal dimuat. Tetap bisa menutup shift.'; })
+            .finally(() => { delete form.dataset.recapLoading; });
+    }
+
+    function renderRecap(form, data) {
+        const box = form.querySelector('[data-close-recap]');
+        box.replaceChildren();
+        form._fingerprint = data.fingerprint;
+        form._expected = data.cash.expected;
+
+        const sales = document.createElement('dl');
+        sales.className = 'recap-sales';
+        sales.append(
+            dlRow('Penjualan (' + data.sales.count + ' nota)', fmt(data.sales.total)),
+            dlRow('— tunai', fmt(data.sales.cash)),
+            dlRow('— transfer', fmt(data.sales.transfer)),
+            dlRow('— kredit', fmt(data.sales.credit)),
+        );
+
+        const cash = document.createElement('dl');
+        cash.className = 'recap-cash';
+        cash.append(
+            dlRow('Kas awal', fmt(data.cash.opening)),
+            dlRow('Masuk laci', fmt(data.cash.in)),
+            dlRow('Keluar laci', fmt(data.cash.out)),
+            dlRow('Seharusnya di laci', fmt(data.cash.expected), true),
+        );
+
+        box.append(sales, cash);
+        if (data.pending_drawer_payments > 0) {
+            const pending = document.createElement('p');
+            pending.className = 'recap-pending';
+            pending.textContent = 'Ada ' + data.pending_drawer_payments + ' pengajuan tunai dari laci ini yang belum disetujui admin.';
+            box.append(pending);
+        }
+
+        const counted = form.elements.counted;
+        const match = form.querySelector('[data-close-match]');
+        const recalc = () => {
+            const raw = counted.value;
+            if (!raw) { match.hidden = true; return; }
+            match.hidden = false;
+            const diff = cents(raw) - cents(form._expected);
+            if (diff === 0n) { match.className = 'close-match ok'; match.textContent = 'Cocok dengan perkiraan ' + fmt(form._expected) + '.'; }
+            else { match.className = 'close-match warn'; match.textContent = 'Selisih ' + (diff > 0n ? 'lebih ' : 'kurang ') + fmtCents(diff < 0n ? -diff : diff) + ' dari perkiraan.'; }
+        };
+        counted.addEventListener('input', recalc);
+        recalc();
+    }
+
+    new MutationObserver(mutations => {
+        for (const mutation of mutations) {
+            const dialog = mutation.target;
+            if (dialog.tagName !== 'DIALOG' || mutation.attributeName !== 'open' || !dialog.open) continue;
+            const form = dialog.querySelector('.form-close');
+            if (form) loadRecap(form);
+        }
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['open'] });
+})();
+</script>
 @include('v2.master-insights')
 @include('v2.ui-sidebar-js')
 @include('v2.ui-workspace')
@@ -683,5 +784,7 @@
 @include('v2.ui-motion')
 @include('v2.ui-forms')
 @include('v2.ui-result')
+@include('v2.store-shift-script')
+@include('v2.sales-history-script')
 </body>
 </html>

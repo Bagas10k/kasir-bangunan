@@ -1,0 +1,779 @@
+{
+  "title": "Kasir V2 — Penjualan dan lifecycle shift sampai rekap penutupan (berbasis kode)",
+  "steps": [
+    {
+      "id": "KS01",
+      "label": "Masuk Kasir V2 dan pembatasan peran",
+      "actor": "Admin/kasir aktif",
+      "before": "GET / (pos.index) dalam grup auth; ketika config v2.enabled aktif, PosController::index menyerahkan request ke WorkspaceController::index. GET /v2 mengarah ke pos.index saat V2 aktif.",
+      "after": "Operations::role mensyaratkan users.is_active dan v2_user_roles admin/cashier; selain itu 403. Workspace menampilkan shift/penjualan kasir sendiri, admin lintas kasir. Cutover membuat rute legacy selain root hanya arsip GET admin; bukan jalur checkout V2.",
+      "evidence": [
+        "app/Http/Controllers/PosController.php:15-19",
+        "app/Services/V2/Operations.php:34-48",
+        "app/Http/Middleware/V2Cutover.php:17-28"
+      ],
+      "tables": {
+        "users": "R",
+        "v2_user_roles": "R",
+        "v2_shifts": "R",
+        "v2_sales": "R"
+      }
+    },
+    {
+      "id": "KS02",
+      "label": "Buka shift dengan modal admin, carry, atau gabungan",
+      "actor": "Admin/kasir untuk shift sendiri",
+      "before": "POST /v2/shifts membawa cash string, source admin|carry|both, carry_from nullable. Role server wajib admin/cashier; modal tidak negatif; aktor tidak boleh masih memiliki shift open.",
+      "after": "Transaksi mengunci shift asal bila carry; asal wajib closed, milik aktor, counted_cash tersedia/tidak negatif dan belum pernah dibawa. carry paling banyak uang hitung asal; both wajib modal melebihi seluruh uang hitung asal serta kedua komponen positif. Insert v2_shifts open, open_user_id=aktor, opening_cash/carry_amount/admin_amount dan carried_from_id. Tidak ada jurnal modal atau mutasi laci pada openShift; sumber admin adalah label sumber, bukan persetujuan admin.",
+      "evidence": [
+        "app/Services/V2/Operations.php:51-65",
+        "app/Services/V2/Operations.php:92-109",
+        "app/Services/V2/Operations.php:113-125"
+      ],
+      "tables": {
+        "users": "R",
+        "v2_user_roles": "R",
+        "v2_shifts": "R,C"
+      }
+    },
+    {
+      "id": "KS03",
+      "label": "Susun keranjang, pembayaran, lalu tinjau sebelum konfirmasi",
+      "actor": "Admin/kasir",
+      "before": "Form Kasir beraksi ke route v2.sales.store (POST /v2/sales). Pilih produk/jumlah, pelanggan, harga retail/contractor, diskon item/nota, ongkir, metode cash|transfer|credit, nominal, DP dan pickup|delivery; delivery membawa destination.",
+      "after": "Dialog pembayaran lalu tinjau tetap belum menyimpan. Konfirmasi final menetapkan __finalConfirmed dan requestSubmit; handler membentuk payload dan kunci idempotensi. Respons sukses menampilkan nomor/status/kembalian, tautan nota, mengganti kunci dan mengosongkan item; event v2:sale-saved mengubah dialog menjadi hasil. Validasi UI bukan pengganti server.",
+      "evidence": [
+        "resources/views/v2/pos-cashier.blade.php:17-30",
+        "resources/views/v2/pos-cashier-script.blade.php:155-167",
+        "resources/views/v2/workspace.blade.php:581-598"
+      ],
+      "tables": {}
+    },
+    {
+      "id": "KS04",
+      "label": "Validasi server, kunci shift, dan cegah checkout ganda",
+      "actor": "Server atas admin/kasir",
+      "before": "POST /v2/sales divalidasi WorkspaceController::checkout: 1–100 item, string nominal, enum, kunci 8–100 karakter dan tujuan delivery. Operations memeriksa pelanggan aktif (wajib transfer/kredit), metode, fulfillment dan diskon.",
+      "after": "Di dalam satu transaksi, openShiftFor mengunci shift open milik aktor SEBELUM mencari replay. Kunci lama hanya dapat diulang aktor sama dengan request_hash sama; berbeda aktor 403 atau isi berbeda ditolak. Replay mengembalikan transaksi lama tanpa menulis lagi; sesudah shift ditutup replay tetap dapat gagal karena syarat shift open diperiksa lebih dulu. Produk duplikat/tidak ditemukan/arsip, jumlah tidak positif dan stok kurang ditolak.",
+      "evidence": [
+        "app/Http/Controllers/V2/WorkspaceController.php:297-314",
+        "app/Services/V2/Operations.php:323-338",
+        "app/Services/V2/Operations.php:962-973"
+      ],
+      "tables": {
+        "users": "R",
+        "v2_user_roles": "R",
+        "v2_shifts": "R",
+        "v2_parties": "R",
+        "v2_sales": "R",
+        "products": "R",
+        "v2_invoices": "R",
+        "v2_deliveries": "R"
+      }
+    },
+    {
+      "id": "KS05",
+      "label": "Posting nota, stok, HPP, piutang dan pendapatan secara atomik",
+      "actor": "Server",
+      "before": "Checkout baru yang lolos validasi; products dikunci urut id. Harga dibaca server dari selling_price atau contractor_price (fallback eceran), bukan harga kiriman klien. Qty skala 4, uang skala 2; HPP snapshot cost_price. Total = barang setelah diskon item − diskon nota + ongkir, wajib positif.",
+      "after": "Dalam transaksi checkout yang sama dibuat INV v2_sales dan snapshot v2_sale_items, stok products berkurang dan stock_movements reference_type=v2_sale negatif. Semua metode membuat AR v2_invoices dengan amount total dan paid sesuai cabang pembayaran; invoice paid jika lunas, selain itu open. Ledger v2_sale: DR1103 total; CR4101 barang net bila positif; CR4102 ongkir bila positif; DR5101/CR1301 HPP bila positif. Akun aktif dan jurnal seimbang wajib; kegagalan membatalkan keseluruhan checkout. Pilihan cash/transfer/credit berikut adalah alternatif dalam transaksi ini, bukan transaksi serial.",
+      "evidence": [
+        "app/Services/V2/Operations.php:502-516",
+        "app/Services/V2/Operations.php:519-532",
+        "app/Services/V2/Operations.php:534-548"
+      ],
+      "tables": {
+        "products": "R,U",
+        "stock_movements": "C",
+        "v2_sales": "C,U",
+        "v2_sale_items": "C",
+        "v2_invoices": "C,U",
+        "chart_of_accounts": "R",
+        "journal_entries": "C",
+        "journal_entry_lines": "C"
+      }
+    },
+    {
+      "id": "KS06",
+      "label": "Cabang tunai: lunas, kembalian, dan masuk laci",
+      "actor": "Admin/kasir; server posting otomatis",
+      "before": "Alternatif payment_method=cash pada POST /v2/sales. paid_amount wajib dan tendered tidak boleh kurang dari total; pelanggan umum boleh tanpa customer_id.",
+      "after": "paid=total, change=tendered−total, status sale paid dan invoice paid. Buat pembayaran cash posted/approved_by aktor; jurnal DR1101/CR1103 sebesar total, bukan uang diserahkan. Mutasi laci in kind sale reference v2_sale sebesar paid neto, sehingga kembalian tidak dihitung sebagai penerimaan tambahan. Nota/stok/HPP/pendapatan tetap melalui posting bersama KS05.",
+      "evidence": [
+        "app/Services/V2/Operations.php:424-433",
+        "app/Services/V2/Operations.php:550-567",
+        "app/Services/V2/Operations.php:566-582"
+      ],
+      "tables": {
+        "v2_sales": "C",
+        "v2_invoices": "C",
+        "v2_payments": "C,U",
+        "v2_shift_movements": "C",
+        "chart_of_accounts": "R",
+        "journal_entries": "C",
+        "journal_entry_lines": "C"
+      }
+    },
+    {
+      "id": "KS07",
+      "label": "Cabang transfer: tagihan terbuka dan verifikasi tertunda",
+      "actor": "Admin/kasir menginput; admin memverifikasi terpisah",
+      "before": "Alternatif payment_method=transfer, customer_id aktif wajib; paid_amount hanya boleh nol atau persis total.",
+      "after": "paid tetap nol sehingga sale unpaid dan AR open. Jika tendered positif dibuat payment transfer pending, shift_id null, approved_by/journal_entry_id null; belum menambah bank, belum mengurangi AR dan tidak ada mutasi laci. Jika nominal nol, tidak dibuat payment sama sekali. Stok/HPP/pendapatan tetap diposting saat checkout, tidak menunggu verifikasi transfer; lanjut KS11 hanya jika payment pending benar-benar ada.",
+      "evidence": [
+        "app/Services/V2/Operations.php:435-443",
+        "app/Services/V2/Operations.php:583-598",
+        "app/Services/V2/Operations.php:996-1002"
+      ],
+      "tables": {
+        "v2_sales": "C",
+        "v2_invoices": "C",
+        "v2_payments": "C"
+      }
+    },
+    {
+      "id": "KS08",
+      "label": "Cabang kredit: tanpa DP, DP tunai, atau DP transfer",
+      "actor": "Admin/kasir",
+      "before": "Alternatif payment_method=credit dengan pelanggan aktif. DP tidak negatif/tidak melebihi total; bila DP positif deposit_method wajib cash|transfer.",
+      "after": "Tanpa DP: paid nol, sale unpaid, AR open, tanpa payment. DP cash: paid langsung sebesar DP, payment cash posted DR1101/CR1103 dan mutasi laci in kind collection reference v2_payment; sale partial atau paid bila DP=total, AR open/paid mengikuti. DP transfer: paid tetap nol; buat transfer pending hanya sebesar DP, tanpa bank/laci/penurunan AR sebelum verifikasi KS11. Label metode sale tetap credit; rekap menggolongkan total nota kredit, bukan memecah DP menjadi omzet tunai.",
+      "evidence": [
+        "app/Services/V2/Operations.php:444-460",
+        "app/Services/V2/Operations.php:566-582",
+        "app/Services/V2/Operations.php:583-598"
+      ],
+      "tables": {
+        "v2_sales": "C",
+        "v2_invoices": "C",
+        "v2_payments": "C,U",
+        "v2_shift_movements": "C",
+        "chart_of_accounts": "R",
+        "journal_entries": "C",
+        "journal_entry_lines": "C"
+      }
+    },
+    {
+      "id": "KS09",
+      "label": "Pilihan kirim membuat surat jalan prepared, bukan otomatis dispatch",
+      "actor": "Admin/kasir; operasi pengiriman downstream terpisah",
+      "before": "Pada checkout yang sama, fulfillment=delivery wajib destination; pickup tidak memerlukan dokumen kirim. Ini pilihan terpisah dari tiga metode pembayaran, bukan kelanjutan khusus kredit/transfer.",
+      "after": "Buat v2_deliveries terkait sale_id, nomor SJ, destination, status prepared; pickup tidak membuat delivery. Checkout mengembalikan sale_id, invoice_id, total, paid, change, status dan delivery_number. Surat jalan diserahkan ke alur downstream POST /v2/deliveries/{id}/dispatch, tidak dibuktikan sebagai prasyarat tutup shift atau otomatis terkirim/lunas. Controller checkout tidak memasukkan vehicle_id/driver_name ke data tervalidasi meski service memiliki opsi tersebut.",
+      "evidence": [
+        "app/Services/V2/Operations.php:601-615",
+        "app/Services/V2/Operations.php:617-627",
+        "routes/v2.php:16-19"
+      ],
+      "tables": {
+        "v2_deliveries": "C,U",
+        "v2_sales": "R"
+      }
+    },
+    {
+      "id": "KS10",
+      "label": "Lanjutan piutang: penerimaan cash atau pengajuan transfer",
+      "actor": "Admin/kasir",
+      "before": "Untuk AR yang belum lunas dari sale terkait: POST /v2/invoices/{id}/payments membawa amount, method cash|transfer, idempotency_key, reference opsional, seen_payment_id dan confirm_duplicate opsional. Role admin/cashier; invoice dikunci, nominal positif tidak melebihi sisa; method main ditolak untuk AR. Replay dicek aktor/hash; penanda pembayaran lebih baru meminta konfirmasi bila disediakan.",
+      "after": "Transfer membuat payment pending shift_id null tanpa mengubah AR/sale/laci hingga KS11. Cash wajib shift open milik penerima saat ini: payment posted, DR1101/CR1103, mutasi in collection pada shift penerimaan, invoice.paid bertambah dan sale partial/paid. Shift penerimaan bisa berbeda dari shift checkout; jangan menghubungkan penerimaan ini ke rekap shift penjualan lama tanpa kecocokan shift_id mutasi.",
+      "evidence": [
+        "app/Services/V2/Operations.php:668-680",
+        "app/Services/V2/Operations.php:713-730",
+        "app/Services/V2/Operations.php:748-764"
+      ],
+      "tables": {
+        "v2_user_roles": "R",
+        "users": "R",
+        "v2_invoices": "R,U",
+        "v2_payments": "R,C,U",
+        "v2_shifts": "R",
+        "v2_sales": "U",
+        "v2_shift_movements": "C",
+        "chart_of_accounts": "R",
+        "journal_entries": "C",
+        "journal_entry_lines": "C"
+      }
+    },
+    {
+      "id": "KS11",
+      "label": "Verifikasi atau tolak transfer pada invoice penjualan",
+      "actor": "Admin aktif",
+      "before": "POST /v2/payments/{id}/approve untuk payment pending terkait AR; POST /v2/payments/{id}/reject membawa reason 5–1000 karakter. Ini dua alternatif terhadap payment yang sama, bukan tahap approve lalu reject.",
+      "after": "Approve mengunci invoice/payment, posted replay tanpa menulis, status lain selain pending/proposed ditolak; nominal positif dan tidak melebihi sisa. Untuk receivable hanya transfer: jurnal DR1102/CR1103, payment posted + approved_by/journal_entry_id, invoice.paid bertambah dan sale diperbarui partial/paid. Tidak ada mutasi laci. Reject hanya pending/proposed: payment rejected beserta alasan/resolved_by/at; invoice, sale, stok dan jurnal penjualan tidak dibalik. Pending transfer tidak harus selesai sebelum shift ditutup karena shift_id null.",
+      "evidence": [
+        "app/Services/V2/Operations.php:811-819",
+        "app/Services/V2/Operations.php:828-842",
+        "app/Services/V2/Operations.php:261-271"
+      ],
+      "tables": {
+        "users": "R",
+        "v2_user_roles": "R",
+        "v2_payments": "R,U",
+        "v2_invoices": "R,U",
+        "v2_sales": "U",
+        "chart_of_accounts": "R",
+        "journal_entries": "C",
+        "journal_entry_lines": "C"
+      }
+    },
+    {
+      "id": "KS12",
+      "label": "Ambil rekap penutupan dari shift yang masih open",
+      "actor": "Admin atau kasir pemilik shift",
+      "before": "Dialog Tutup shift memanggil GET /v2/shifts/{id}/closing-summary. ShiftClosingSummary::build memastikan peran aktif, mengunci shift; id tidak ada 404, kasir bukan pemilik 403, status bukan open ditolak validasi. Admin boleh melihat shift orang lain.",
+      "after": "Read-only: hitung jumlah/total nota v2_sales.shift_id dan kelompok payment_method cash/transfer/credit, terlepas lunas/menunggu. Hitung laci dari opening_cash + seluruh movement in − movement out; rincian sale/collection/other in dan supplier/other out. Hanya payment method cash status proposed shift_id yang sama dihitung sebagai pending_drawer_payments; transfer pending bukan pending laci dan jumlah pending bukan pengurang expected. Kembalikan scope shift serta fingerprint, tidak menulis jurnal atau saldo bank/Kas Utama.",
+      "evidence": [
+        "app/Services/V2/ShiftClosingSummary.php:19-36",
+        "app/Services/V2/ShiftClosingSummary.php:42-54",
+        "app/Services/V2/ShiftClosingSummary.php:83-99"
+      ],
+      "tables": {
+        "users": "R",
+        "v2_user_roles": "R",
+        "v2_shifts": "R",
+        "v2_sales": "R",
+        "v2_shift_movements": "R",
+        "v2_payments": "R"
+      }
+    },
+    {
+      "id": "KS13",
+      "label": "Bandingkan uang fisik dengan perkiraan laci",
+      "actor": "Kasir pemilik atau admin",
+      "before": "Rekap berhasil dimuat ke form tutup shift; UI menyimpan fingerprint dan cash.expected. Pengguna menghitung uang fisik nyata dan mengisi counted; angka otomatis bukan uang fisik yang diisikan otomatis.",
+      "after": "UI menampilkan total nota per metode dan kas awal/masuk/keluar/seharusnya; pending tunai diperlihatkan sebagai peringatan. BigInt menghitung sen: counted−expected; tampil Cocok, Selisih lebih atau kurang. Ini hanya perbandingan klien, keputusan akhir tetap closeShift. Saat form dikirim POST /v2/shifts/{id}/close membawa counted dan fingerprint atau null; UI tetap mengizinkan tutup ketika fetch rekap gagal.",
+      "evidence": [
+        "resources/views/v2/workspace.blade.php:713-725",
+        "resources/views/v2/workspace.blade.php:745-755",
+        "resources/views/v2/workspace.blade.php:508-512"
+      ],
+      "tables": {}
+    },
+    {
+      "id": "KS14",
+      "label": "Periksa rekap kedaluwarsa di bawah kunci shift",
+      "actor": "Server",
+      "before": "POST /v2/shifts/{id}/close: counted wajib string/tidak negatif; fingerprint nullable ukuran 64 dan bila ada wajib hex kecil 64 karakter. Role server admin/cashier; shift harus ada/open dan kasir harus pemilik (admin boleh lintas kasir).",
+      "after": "closeShift mengunci shift lalu membandingkan hash jika fingerprint diberikan. Hash memuat status/modal, mutasi laci berurutan, id/metode/total sale, dan id pengajuan cash proposed pada shift. Perubahan snapshot menghasilkan penolakan “Rekap sudah berubah ... tutup ulang” tanpa menutup. Fingerprint opsional, jadi klien tanpa token atau fetch gagal tidak mendapat penjaga snapshot ini; closeShift tetap menghitung expected terbaru sendiri.",
+      "evidence": [
+        "app/Services/V2/Operations.php:132-140",
+        "app/Services/V2/Operations.php:143-155",
+        "app/Services/V2/Operations.php:193-207"
+      ],
+      "tables": {
+        "v2_shifts": "R",
+        "v2_sales": "R",
+        "v2_shift_movements": "R",
+        "v2_payments": "R",
+        "v2_user_roles": "R",
+        "users": "R"
+      }
+    },
+    {
+      "id": "KS15",
+      "label": "Tutup shift: cocok menjadi closed, selisih menjadi review",
+      "actor": "Admin atau kasir pemilik shift",
+      "before": "Shift masih open dan lolos KS14, counted uang fisik nonnegatif. Tidak terdapat guard yang mewajibkan semua cash proposed/transfer pending diselesaikan dulu.",
+      "after": "Server menjumlah v2_shift_movements pada shift: expected=opening_cash+in−out; difference=counted−expected. Nol -> closed, selain nol -> review. Simpan expected_cash, counted_cash, difference, status, closed_at, hapus open_user_id; hasil JSON mengembalikan expected/counted/difference/status. Tidak ada jurnal selisih, pemindahan kas, pembalikan sale atau perubahan payment pada closeShift. Review bukan open, sehingga tidak dapat menjadi shift jual aktif ataupun asal carry sebelum diresolusi.",
+      "evidence": [
+        "app/Services/V2/Operations.php:158-171",
+        "app/Services/V2/Operations.php:173-188",
+        "app/Services/V2/Operations.php:78-86"
+      ],
+      "tables": {
+        "v2_shifts": "R,U",
+        "v2_shift_movements": "R"
+      }
+    },
+    {
+      "id": "KS16",
+      "label": "Resolusi selisih oleh admin dan carry ke shift berikutnya",
+      "actor": "Admin aktif; kasir membuka shift berikutnya sendiri",
+      "before": "Shift review tampil pada Pemeriksaan selisih shift. POST /v2/shifts/{id}/resolve membawa reason 5–1000 karakter; Operations::resolveShift mewajibkan admin, trim alasan dan kunci baris shift.",
+      "after": "Review -> closed dengan reviewed_by, reviewed_at dan review_note; expected/count/difference historis tidak diganti dan tidak ada jurnal koreksi otomatis. Pemanggilan ulang closed oleh admin dan alasan identik no-op; status lain/closed dengan alasan lain ditolak. Setelah closed, kasir pemilik dapat memakai counted_cash sebagai sumber carry/both pada pembukaan baru KS02 dengan penjaga sekali pakai; bukan otomatis dipindahkan ketika resolve.",
+      "evidence": [
+        "app/Services/V2/Operations.php:211-228",
+        "app/Services/V2/Operations.php:231-237",
+        "resources/views/v2/sprint2.blade.php:58-72"
+      ],
+      "tables": {
+        "users": "R",
+        "v2_user_roles": "R",
+        "v2_shifts": "R,U"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "to": "KS02",
+      "label": "Aktor berwenang membuka shift sendiri",
+      "from": "KS01"
+    },
+    {
+      "to": "KS04",
+      "label": "Shift open milik aktor menjadi prasyarat checkout",
+      "from": "KS02"
+    },
+    {
+      "to": "KS04",
+      "label": "Konfirmasi final mengirim POST sales",
+      "from": "KS03"
+    },
+    {
+      "to": "KS05",
+      "label": "Checkout baru, bukan replay, lolos guard",
+      "from": "KS04"
+    },
+    {
+      "to": "KS06",
+      "label": "Alternatif cash dalam transaksi checkout yang sama",
+      "from": "KS05"
+    },
+    {
+      "to": "KS07",
+      "label": "Alternatif transfer dalam transaksi checkout yang sama",
+      "from": "KS05"
+    },
+    {
+      "to": "KS08",
+      "label": "Alternatif credit dalam transaksi checkout yang sama",
+      "from": "KS05"
+    },
+    {
+      "to": "KS09",
+      "label": "Independen metode bayar: fulfillment delivery pada sale yang sama",
+      "from": "KS05"
+    },
+    {
+      "to": "KS11",
+      "label": "Hanya tendered positif menghasilkan payment pending untuk diverifikasi/ditolak",
+      "from": "KS07"
+    },
+    {
+      "to": "KS11",
+      "label": "Hanya DP transfer positif menghasilkan payment pending",
+      "from": "KS08"
+    },
+    {
+      "to": "KS10",
+      "label": "AR sale masih terbuka dapat ditagih kemudian",
+      "from": "KS07"
+    },
+    {
+      "to": "KS10",
+      "label": "Sisa AR kredit dapat ditagih kemudian",
+      "from": "KS08"
+    },
+    {
+      "to": "KS11",
+      "label": "Alternatif pembayaran lanjutan transfer menunggu admin",
+      "from": "KS10"
+    },
+    {
+      "to": "KS12",
+      "label": "Shift open boleh direkap meskipun belum ada penjualan",
+      "from": "KS02"
+    },
+    {
+      "to": "KS12",
+      "label": "Penjualan masuk kelompok rekap melalui sale.shift_id yang sama",
+      "from": "KS05"
+    },
+    {
+      "to": "KS12",
+      "label": "Penerimaan neto cash masuk laci melalui movement.shift_id yang sama",
+      "from": "KS06"
+    },
+    {
+      "to": "KS12",
+      "label": "DP cash menambah collection pada shift checkout yang sama",
+      "from": "KS08"
+    },
+    {
+      "to": "KS12",
+      "label": "Hanya collection cash pada shift penerimaan yang sama menambah laci rekap",
+      "from": "KS10"
+    },
+    {
+      "to": "KS13",
+      "label": "Respons rekap mengisi expected dan fingerprint form",
+      "from": "KS12"
+    },
+    {
+      "to": "KS14",
+      "label": "Counted dan token opsional dikirim ke close",
+      "from": "KS13"
+    },
+    {
+      "to": "KS12",
+      "label": "Jika stale: muat ulang rekap shift yang sama sebelum kirim kembali",
+      "from": "KS14"
+    },
+    {
+      "to": "KS15",
+      "label": "Lolos snapshot opsional dan guard shift open",
+      "from": "KS14"
+    },
+    {
+      "to": "KS16",
+      "label": "Hanya difference nonnol: review membutuhkan resolusi admin",
+      "from": "KS15"
+    },
+    {
+      "to": "KS02",
+      "label": "Jika closed dan milik aktor: dapat menjadi asal carry sekali",
+      "from": "KS15"
+    },
+    {
+      "to": "KS02",
+      "label": "Setelah resolved closed: dapat menjadi asal carry sekali",
+      "from": "KS16"
+    }
+  ],
+  "unknowns": [
+    "Cakupan hanya V2 Kasir, AR penjualan sebagai dampak/lajutan langsung, dan lifecycle shift beserta rekap. Bukti berasal dari working tree saat inspeksi, termasuk perubahan lokal yang belum committed; bukan spesifikasi desain.",
+    "Inspeksi statis saja: tidak menjalankan aplikasi, Artisan, tes, browser atau query database; tidak membaca .env, data bisnis ataupun rahasia. Tidak menyertifikasi konfigurasi v2.enabled aktif, migrasi terpasang, saldo runtime, izin aktual atau konkurensi nyata.",
+    "Rekap ini per shift, bukan tutup buku/periode akuntansi, bukan omzet harian atau kas fisik gabungan seluruh toko. Total nota cash/transfer/credit bukan jumlah penerimaan bank/laci dan tidak memisahkan DP ke kelompok omzet lain.",
+    "Pembayaran supplier dan operasi kas lain di luar scope dapat memengaruhi movement laci atau daftar cash proposed; paket hanya membaca dampaknya pada rekap. Pending cash proposed tidak diblokir oleh closeShift; keberhasilan posting sumber laci setelah shift tidak open harus ditelusuri terpisah di postPayable.",
+    "Token rekap opsional; UI secara eksplisit mengizinkan menutup meski fetch rekap gagal. Fingerprint bukan bukti fisik uang dan bukan versi semua field invoice/payment: hash memakai field snapshot yang disebutkan di KS14.",
+    "Carry tidak menghapus/mengurangi counted_cash historis shift asal dan openShift tidak memposting jurnal modal. Validitas pembatasan balapan/idempotensi bergantung pula pada skema/mesin database; tidak diuji runtime dalam tugas ini.",
+    "Delivery hanya pointer prepared dan endpoint dispatch; proses dispatch/terima barang, penagihan penuh lintas modul, retur/void, penutupan periode, laporan keuangan serta isi cetak nota tidak ditelusuri di paket ini.",
+    "Controller checkout menerima daftar field tervalidasi tanpa vehicle_id/driver_name walaupun service mendukungnya; jangan menganggap UI checkout mengirim assignment kendaraan/sopir. Tidak mengubah kode untuk menutup keterbatasan tersebut."
+  ],
+  "proofs": [
+    {
+      "step_id": "KS01",
+      "path": "app/Http/Controllers/PosController.php",
+      "start": 15,
+      "end": 19,
+      "label": "Cutover halaman POS"
+    },
+    {
+      "step_id": "KS01",
+      "path": "app/Services/V2/Operations.php",
+      "start": 34,
+      "end": 48,
+      "label": "Peran harus aktif dan berwenang"
+    },
+    {
+      "step_id": "KS01",
+      "path": "app/Http/Middleware/V2Cutover.php",
+      "start": 17,
+      "end": 28,
+      "label": "Pagar arsip legacy"
+    },
+    {
+      "step_id": "KS02",
+      "path": "app/Services/V2/Operations.php",
+      "start": 51,
+      "end": 65,
+      "label": "Sumber dan nominal modal"
+    },
+    {
+      "step_id": "KS02",
+      "path": "app/Services/V2/Operations.php",
+      "start": 92,
+      "end": 109,
+      "label": "Batas carry dan satu kali penggunaan"
+    },
+    {
+      "step_id": "KS02",
+      "path": "app/Services/V2/Operations.php",
+      "start": 113,
+      "end": 125,
+      "label": "Simpan shift terbuka"
+    },
+    {
+      "step_id": "KS03",
+      "path": "resources/views/v2/pos-cashier.blade.php",
+      "start": 17,
+      "end": 30,
+      "label": "Target form checkout V2"
+    },
+    {
+      "step_id": "KS03",
+      "path": "resources/views/v2/pos-cashier-script.blade.php",
+      "start": 155,
+      "end": 167,
+      "label": "Tinjau, konfirmasi, dan hasil"
+    },
+    {
+      "step_id": "KS03",
+      "path": "resources/views/v2/workspace.blade.php",
+      "start": 581,
+      "end": 598,
+      "label": "Payload penjualan"
+    },
+    {
+      "step_id": "KS04",
+      "path": "app/Http/Controllers/V2/WorkspaceController.php",
+      "start": 297,
+      "end": 314,
+      "label": "Validasi kontrak endpoint checkout"
+    },
+    {
+      "step_id": "KS04",
+      "path": "app/Services/V2/Operations.php",
+      "start": 323,
+      "end": 338,
+      "label": "Kunci shift sebelum pemeriksaan replay"
+    },
+    {
+      "step_id": "KS04",
+      "path": "app/Services/V2/Operations.php",
+      "start": 962,
+      "end": 973,
+      "label": "Shift open wajib milik aktor"
+    },
+    {
+      "step_id": "KS05",
+      "path": "app/Services/V2/Operations.php",
+      "start": 502,
+      "end": 516,
+      "label": "Kurangi stok dan catat mutasi penjualan"
+    },
+    {
+      "step_id": "KS05",
+      "path": "app/Services/V2/Operations.php",
+      "start": 519,
+      "end": 532,
+      "label": "Buat AR untuk semua metode"
+    },
+    {
+      "step_id": "KS05",
+      "path": "app/Services/V2/Operations.php",
+      "start": 534,
+      "end": 548,
+      "label": "Jurnal pendapatan dan HPP"
+    },
+    {
+      "step_id": "KS06",
+      "path": "app/Services/V2/Operations.php",
+      "start": 424,
+      "end": 433,
+      "label": "Uang tunai cukup dan kembalian"
+    },
+    {
+      "step_id": "KS06",
+      "path": "app/Services/V2/Operations.php",
+      "start": 550,
+      "end": 567,
+      "label": "Pembayaran tunai langsung posted"
+    },
+    {
+      "step_id": "KS06",
+      "path": "app/Services/V2/Operations.php",
+      "start": 566,
+      "end": 582,
+      "label": "Jurnal kas/piutang dan mutasi laci neto"
+    },
+    {
+      "step_id": "KS07",
+      "path": "app/Services/V2/Operations.php",
+      "start": 435,
+      "end": 443,
+      "label": "Transfer nol atau total, belum diakui paid"
+    },
+    {
+      "step_id": "KS07",
+      "path": "app/Services/V2/Operations.php",
+      "start": 583,
+      "end": 598,
+      "label": "Transfer pending tanpa shift/jurnal"
+    },
+    {
+      "step_id": "KS07",
+      "path": "app/Services/V2/Operations.php",
+      "start": 996,
+      "end": 1002,
+      "label": "Status sale unpaid/partial/paid"
+    },
+    {
+      "step_id": "KS08",
+      "path": "app/Services/V2/Operations.php",
+      "start": 444,
+      "end": 460,
+      "label": "Validasi DP dan nilai paid kredit"
+    },
+    {
+      "step_id": "KS08",
+      "path": "app/Services/V2/Operations.php",
+      "start": 566,
+      "end": 582,
+      "label": "DP tunai sebagai collection laci"
+    },
+    {
+      "step_id": "KS08",
+      "path": "app/Services/V2/Operations.php",
+      "start": 583,
+      "end": 598,
+      "label": "DP transfer tetap pending"
+    },
+    {
+      "step_id": "KS09",
+      "path": "app/Services/V2/Operations.php",
+      "start": 601,
+      "end": 615,
+      "label": "Surat jalan hanya disiapkan untuk delivery"
+    },
+    {
+      "step_id": "KS09",
+      "path": "app/Services/V2/Operations.php",
+      "start": 617,
+      "end": 627,
+      "label": "Hasil transaksi"
+    },
+    {
+      "step_id": "KS09",
+      "path": "routes/v2.php",
+      "start": 16,
+      "end": 19,
+      "label": "Pointer endpoint dokumen/dispatch downstream"
+    },
+    {
+      "step_id": "KS10",
+      "path": "app/Services/V2/Operations.php",
+      "start": 668,
+      "end": 680,
+      "label": "Pagar AR, entri dobel dan sisa tagihan"
+    },
+    {
+      "step_id": "KS10",
+      "path": "app/Services/V2/Operations.php",
+      "start": 713,
+      "end": 730,
+      "label": "Transfer lanjutan tetap pending"
+    },
+    {
+      "step_id": "KS10",
+      "path": "app/Services/V2/Operations.php",
+      "start": 748,
+      "end": 764,
+      "label": "Jurnal dan mutasi collection tunai"
+    },
+    {
+      "step_id": "KS11",
+      "path": "app/Services/V2/Operations.php",
+      "start": 811,
+      "end": 819,
+      "label": "Transfer terverifikasi membukukan bank dan AR"
+    },
+    {
+      "step_id": "KS11",
+      "path": "app/Services/V2/Operations.php",
+      "start": 828,
+      "end": 842,
+      "label": "Posting payment dan pembaruan invoice/sale"
+    },
+    {
+      "step_id": "KS11",
+      "path": "app/Services/V2/Operations.php",
+      "start": 261,
+      "end": 271,
+      "label": "Penolakan hanya mengubah payment"
+    },
+    {
+      "step_id": "KS12",
+      "path": "app/Services/V2/ShiftClosingSummary.php",
+      "start": 19,
+      "end": 36,
+      "label": "Otorisasi rekap dan sumber penjualan shift"
+    },
+    {
+      "step_id": "KS12",
+      "path": "app/Services/V2/ShiftClosingSummary.php",
+      "start": 42,
+      "end": 54,
+      "label": "Kelompok total menurut metode, bukan uang diterima"
+    },
+    {
+      "step_id": "KS12",
+      "path": "app/Services/V2/ShiftClosingSummary.php",
+      "start": 83,
+      "end": 99,
+      "label": "Expected, pending cash dan fingerprint"
+    },
+    {
+      "step_id": "KS13",
+      "path": "resources/views/v2/workspace.blade.php",
+      "start": 713,
+      "end": 725,
+      "label": "Simpan fingerprint/expected dan rincian penjualan"
+    },
+    {
+      "step_id": "KS13",
+      "path": "resources/views/v2/workspace.blade.php",
+      "start": 745,
+      "end": 755,
+      "label": "Banding uang fisik menggunakan sen BigInt"
+    },
+    {
+      "step_id": "KS13",
+      "path": "resources/views/v2/workspace.blade.php",
+      "start": 508,
+      "end": 512,
+      "label": "Payload penutupan shift"
+    },
+    {
+      "step_id": "KS14",
+      "path": "app/Services/V2/Operations.php",
+      "start": 132,
+      "end": 140,
+      "label": "Nominal dan token opsional"
+    },
+    {
+      "step_id": "KS14",
+      "path": "app/Services/V2/Operations.php",
+      "start": 143,
+      "end": 155,
+      "label": "Kunci, kepemilikan dan stale guard"
+    },
+    {
+      "step_id": "KS14",
+      "path": "app/Services/V2/Operations.php",
+      "start": 193,
+      "end": 207,
+      "label": "Isi fingerprint penutupan"
+    },
+    {
+      "step_id": "KS15",
+      "path": "app/Services/V2/Operations.php",
+      "start": 158,
+      "end": 171,
+      "label": "Hitung expected dan status hasil"
+    },
+    {
+      "step_id": "KS15",
+      "path": "app/Services/V2/Operations.php",
+      "start": 173,
+      "end": 188,
+      "label": "Simpan penutupan dan kembalikan hasil"
+    },
+    {
+      "step_id": "KS15",
+      "path": "app/Services/V2/Operations.php",
+      "start": 78,
+      "end": 86,
+      "label": "Carry hanya dari shift closed dengan uang hitung"
+    },
+    {
+      "step_id": "KS16",
+      "path": "app/Services/V2/Operations.php",
+      "start": 211,
+      "end": 228,
+      "label": "Admin, alasan dan replay resolusi"
+    },
+    {
+      "step_id": "KS16",
+      "path": "app/Services/V2/Operations.php",
+      "start": 231,
+      "end": 237,
+      "label": "Hanya status dan audit review diperbarui"
+    },
+    {
+      "step_id": "KS16",
+      "path": "resources/views/v2/sprint2.blade.php",
+      "start": 58,
+      "end": 72,
+      "label": "UI pemeriksaan selisih dan endpoint resolve"
+    }
+  ]
+}

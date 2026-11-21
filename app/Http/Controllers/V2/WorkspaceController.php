@@ -14,11 +14,14 @@ use App\Services\V2\MonitorMetrics;
 use App\Services\V2\OpeningBalances;
 use App\Services\V2\Operations;
 use App\Services\V2\PosDashboard;
+use App\Services\V2\ReceiptDrafts;
 use App\Services\V2\ReportsDocuments;
+use App\Services\V2\ShiftClosingSummary;
 use App\Services\V2\SupplyTrips;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use RuntimeException;
@@ -36,8 +39,9 @@ class WorkspaceController extends Controller
         }
 
         $shifts = DB::table('v2_shifts as s')->leftJoin('users as u', 'u.id', '=', 's.user_id')
-            ->when($role !== 'admin', fn ($q) => $q->where('s.user_id', $request->user()->id))
+            ->when($role !== 'admin', fn ($q) => $q->where(fn ($visible) => $visible->where('s.is_shared', true)->orWhere('s.user_id', $request->user()->id)))
             ->orderByDesc('s.id')->limit(30)->get(['s.*', 'u.name as user_name']);
+        $activeStoreShift = $this->operations->activeStoreShift();
         $invoices = DB::table('v2_invoices as i')->leftJoin('v2_parties as p', 'p.id', '=', 'i.party_id')
             ->orderByDesc('i.id')->limit(100)->select(['i.*', 'p.name as party_name'])
             // Pembayaran terakhir (bukan ditolak) saat halaman dibuat: penjaga entri dobel di form bayar.
@@ -71,12 +75,24 @@ class WorkspaceController extends Controller
         $receiptHistory = $role === 'admin' ? DB::table('inventory_receipts')->leftJoin('users as void_user', 'void_user.id', '=', 'inventory_receipts.voided_by')
             ->orderByDesc('inventory_receipts.receipt_date')->orderByDesc('inventory_receipts.id')->limit(50)
             ->get(['inventory_receipts.*', 'void_user.name as voided_by_name']) : collect();
-        // Penerimaan yang masih boleh dibatalkan: tagihan supplier belum punya pembayaran/pengajuan. Mutasi stok sesudahnya diperiksa server saat membatalkan.
-        $voidableReceipts = $receiptHistory->isEmpty() ? collect() : DB::table('v2_invoices')
-            ->whereIn('receipt_id', $receiptHistory->whereNull('voided_at')->pluck('id'))
-            ->where('direction', 'payable')->where('paid', 0)->whereNull('voided_at')
-            ->whereNotExists(fn ($q) => $q->from('v2_payments')->whereColumn('v2_payments.invoice_id', 'v2_invoices.id')->where('v2_payments.status', '<>', 'rejected'))
-            ->pluck('receipt_id')->flip();
+        // Dokumen yang sudah diposting selalu final. Draf disimpan terpisah dan belum masuk stok/utang.
+        $receiptDrafts = $role === 'admin' && Schema::hasTable('v2_receipt_drafts')
+            ? DB::table('v2_receipt_drafts as d')->join('v2_parties as p', 'p.id', '=', 'd.supplier_id')
+                ->leftJoin('users as u', 'u.id', '=', 'd.created_by')
+                ->whereIn('d.status', ['draft', 'cancelled'])->orderByDesc('d.id')->limit(50)
+                ->get(['d.*', 'p.name as supplier_name', 'u.name as author_name'])
+            : collect();
+        foreach ($receiptDrafts as $draft) {
+            $draft->items = json_decode($draft->items, true, 512, JSON_THROW_ON_ERROR);
+        }
+        $draftProducts = $receiptDrafts->isEmpty() ? collect() : DB::table('products')
+            ->whereIn('id', $receiptDrafts->flatMap(fn ($draft) => array_column($draft->items, 'product_id'))->unique())
+            ->get(['id', 'name', 'sku', 'unit', 'cost_price', 'stock_quantity'])->keyBy('id');
+        $receiptFinalAudit = $role === 'admin' && Schema::hasTable('v2_receipt_drafts')
+            ? DB::table('v2_receipt_drafts as d')->leftJoin('users as u', 'u.id', '=', 'd.confirmed_by')
+                ->whereIn('d.receipt_id', $receiptHistory->pluck('id'))->where('d.status', 'confirmed')
+                ->get(['d.receipt_id', 'd.confirmed_at', 'u.name as confirmed_by_name'])->keyBy('receipt_id')
+            : collect();
         // Rincian barang per penerimaan untuk tabel Riwayat (baca saja; satu kueri untuk 50 nota terakhir).
         $receiptItems = $receiptHistory->isEmpty() ? collect() : DB::table('inventory_receipt_items')
             ->join('products', 'products.id', '=', 'inventory_receipt_items.product_id')
@@ -110,7 +126,7 @@ class WorkspaceController extends Controller
             ? $insights->vehicles(collect($allMasterRecords['vehicle'] ?? [])->pluck('id')->map(fn ($id): int => (int) $id)->all())
             : [];
         // Dashboard kasir dihitung di layanan (cursor + BigDecimal), bukan di Blade.
-        $posDashboard = app(PosDashboard::class)->build($role === 'admin' ? null : (int) $request->user()->id);
+        $posDashboard = app(PosDashboard::class)->build(null);
         $date = $request->query('date', now()->toDateString());
         abort_unless(is_string($date), 422);
         $daily = app(ReportsDocuments::class)->daily($request->user()->id, $date);
@@ -119,7 +135,26 @@ class WorkspaceController extends Controller
         $adminSummary = $role === 'admin' ? app(AdminSummary::class)->snapshot(now()->toDateString()) : null;
         $driverAdvances = $role === 'admin' ? DB::table('v2_driver_advances')->where('status', 'open')->orderByDesc('id')->get() : collect();
 
-        foreach (['sale_search', 'sale_method', 'start_date', 'end_date', 'history_per_page', 'history_page'] as $param) {
+        ['historySales' => $historySales, 'historyFilters' => $historyFilters, 'historyShifts' => $historyShifts] = $this->historyData($request);
+
+        return view('v2.workspace', compact('activeStoreShift', 'adminSummary', 'role', 'shifts', 'invoices', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'receiptDrafts', 'draftProducts', 'receiptFinalAudit', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters', 'historyShifts'));
+    }
+
+    public function history(Request $request): JsonResponse
+    {
+        $this->operations->requireRole($request->user()->id, ['admin', 'cashier']);
+        $data = $this->historyData($request);
+
+        return response()->json([
+            'html' => view('v2.sales-history-results', $data)->render(),
+            'filters' => $data['historyFilters'],
+            'shifts' => $data['historyShifts'],
+        ])->header('Cache-Control', 'private, no-store');
+    }
+
+    private function historyData(Request $request): array
+    {
+        foreach (['sale_search', 'sale_method', 'start_date', 'end_date', 'history_per_page', 'history_page', 'history_shift'] as $param) {
             if ($request->has($param) && is_array($request->query($param))) {
                 abort(422);
             }
@@ -157,7 +192,24 @@ class WorkspaceController extends Controller
         abort_unless(filter_var($rawPage, FILTER_VALIDATE_INT) !== false && (int) $rawPage >= 1, 422);
         $historyPage = (int) $rawPage;
 
+        $historyShift = $request->query('history_shift', $startDate !== null || $endDate !== null ? 'all' : 'active');
+        abort_unless(is_string($historyShift), 422);
+        if (! in_array($historyShift, ['active', 'all'], true)) {
+            abort_unless(preg_match('/^[1-9][0-9]*$/', $historyShift) && filter_var($historyShift, FILTER_VALIDATE_INT) !== false, 422);
+            abort_unless(DB::table('v2_shifts')->where('id', $historyShift)->exists(), 422);
+        }
+        $historyShiftsQuery = DB::table('v2_shifts')->orderByDesc('id')->limit(30);
+        $historyShiftRows = $historyShiftsQuery->get(['id', 'opened_at', 'status']);
+        if (! in_array($historyShift, ['active', 'all'], true) && ! $historyShiftRows->contains('id', (int) $historyShift)) {
+            $historyShiftRows->push(DB::table('v2_shifts')->where('id', $historyShift)->first(['id', 'opened_at', 'status']));
+        }
+        $historyShifts = $historyShiftRows->sortByDesc('id')->map(fn ($shift): array => [
+            'id' => (int) $shift->id,
+            'label' => '#'.$shift->id.' · '.substr((string) $shift->opened_at, 0, 10).' · '.(['open' => 'Terbuka', 'closed' => 'Ditutup', 'review' => 'Perlu diperiksa'][$shift->status] ?? $shift->status),
+        ])->values()->all();
+
         $historyFilters = [
+            'history_shift' => $historyShift,
             'sale_search' => $saleSearch,
             'sale_method' => $saleMethod,
             'start_date' => $startDate ?? '',
@@ -172,9 +224,15 @@ class WorkspaceController extends Controller
             ->limit(1);
 
         $historyQuery = DB::table('v2_sales')
-            ->select('v2_sales.*')
-            ->selectSub($hasDeliverySub, 'has_delivery')
-            ->when($role !== 'admin', fn ($q) => $q->where('v2_sales.user_id', $request->user()->id));
+            ->join('users', 'users.id', '=', 'v2_sales.user_id')
+            ->select(['v2_sales.*', 'users.name as user_name'])
+            ->selectSub($hasDeliverySub, 'has_delivery');
+
+        if ($historyShift === 'active') {
+            $historyQuery->where('v2_sales.shift_id', $this->operations->activeStoreShift()?->id ?? 0);
+        } elseif ($historyShift !== 'all') {
+            $historyQuery->where('v2_sales.shift_id', (int) $historyShift);
+        }
 
         if ($saleSearch !== '') {
             $historyQuery->where('v2_sales.number', 'like', '%'.$saleSearch.'%');
@@ -195,10 +253,11 @@ class WorkspaceController extends Controller
         $historySales = $historyQuery
             ->orderByDesc('v2_sales.id')
             ->paginate($historyPerPage, ['*'], 'history_page', $historyPage)
-            ->appends($request->query())
+            ->withPath(route(config('v2.enabled') ? 'pos.index' : 'v2.index'))
+            ->appends($historyFilters)
             ->fragment('kasir');
 
-        return view('v2.workspace', compact('adminSummary', 'role', 'shifts', 'invoices', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'voidableReceipts', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters'));
+        return compact('historySales', 'historyFilters', 'historyShifts');
     }
 
     public function saveRelation(Request $request, string $kind): JsonResponse
@@ -264,11 +323,29 @@ class WorkspaceController extends Controller
         return $this->run(fn () => ['id' => $this->operations->openShift($request->user()->id, $data['cash'], $data['source'], $data['carry_from'] ?? null)]);
     }
 
+    public function activeShift(Request $request): JsonResponse
+    {
+        $this->operations->requireRole($request->user()->id, ['admin', 'cashier']);
+        $shift = $this->operations->activeStoreShift();
+
+        return response()->json(['shift' => $shift ? [
+            'id' => (int) $shift->id,
+            'opened_at' => (string) $shift->opened_at,
+            'opened_by' => (string) DB::table('users')->where('id', $shift->user_id)->value('name'),
+        ] : null])->header('Cache-Control', 'private, no-store');
+    }
+
     public function closeShift(Request $request, int $id): JsonResponse
     {
-        $data = $request->validate(['counted' => ['required', 'string', 'max:30']]);
+        $data = $request->validate(['counted' => ['required', 'string', 'max:30'], 'fingerprint' => ['nullable', 'string', 'size:64']]);
 
-        return $this->run(fn () => $this->operations->closeShift($request->user()->id, $id, $data['counted']));
+        return $this->run(fn () => $this->operations->closeShift($request->user()->id, $id, $data['counted'], $data['fingerprint'] ?? null));
+    }
+
+    /** Rekap otomatis sebelum menutup shift: rincian penjualan dan perkiraan uang laci. */
+    public function closingSummary(Request $request, int $id): JsonResponse
+    {
+        return $this->run(fn () => app(ShiftClosingSummary::class)->build($request->user()->id, $id));
     }
 
     public function checkout(Request $request): JsonResponse
@@ -299,7 +376,7 @@ class WorkspaceController extends Controller
 
     public function collect(Request $request, int $id): JsonResponse
     {
-        $data = $request->validate(['amount' => ['required', 'string', 'max:30'], 'method' => ['required', Rule::in(['cash', 'transfer'])], 'idempotency_key' => ['required', 'string', 'min:8', 'max:100'], 'reference' => ['nullable', 'string', 'max:255'], 'seen_payment_id' => ['nullable', 'integer', 'min:0'], 'confirm_duplicate' => ['nullable', 'boolean']]);
+        $data = $request->validate(['amount' => ['required', 'string', 'max:30'], 'method' => ['required', Rule::in(['cash', 'transfer', 'main'])], 'idempotency_key' => ['required', 'string', 'min:8', 'max:100'], 'reference' => ['nullable', 'string', 'max:255'], 'seen_payment_id' => ['nullable', 'integer', 'min:0'], 'confirm_duplicate' => ['nullable', 'boolean']]);
 
         return $this->run(function () use ($request, $id, $data): array {
             $seen = isset($data['seen_payment_id']) ? (int) $data['seen_payment_id'] : null;
@@ -364,10 +441,28 @@ class WorkspaceController extends Controller
     {
         $this->operations->requireRole($request->user()->id, ['admin']);
 
-        return $this->run(fn () => app(SupplyTrips::class)->receive($request->user()->id, $request->all()));
+        return $this->run(fn () => app(ReceiptDrafts::class)->save($request->user()->id, $request->all()));
     }
 
-    /** Batalkan penerimaan yang salah input (admin, wajib alasan). */
+    public function updateReceiptDraft(Request $request, int $id): JsonResponse
+    {
+        return $this->run(fn () => app(ReceiptDrafts::class)->save($request->user()->id, $request->all(), $id));
+    }
+
+    public function confirmReceiptDraft(Request $request, int $id): JsonResponse
+    {
+        $this->operations->requireRole($request->user()->id, ['admin']);
+        $request->validate(['confirm_final' => ['required', 'accepted']]);
+
+        return $this->run(fn () => app(ReceiptDrafts::class)->confirm($request->user()->id, $id, $request->all()));
+    }
+
+    public function cancelReceiptDraft(Request $request, int $id): JsonResponse
+    {
+        return $this->run(fn () => app(ReceiptDrafts::class)->cancel($request->user()->id, $id, $request->all()));
+    }
+
+    /** Jalur lama tetap ditolak di server: penerimaan yang sudah diposting terkunci. */
     public function voidReceipt(Request $request, int $id): JsonResponse
     {
         $this->operations->requireRole($request->user()->id, ['admin']);

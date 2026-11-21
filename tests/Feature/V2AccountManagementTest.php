@@ -2,12 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\V2\AccountController;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -25,12 +23,12 @@ class V2AccountManagementTest extends TestCase
     public function test_inactive_login_and_existing_session_revocation(): void
     {
         $cashier = $this->createActor('cashier', false);
-        $this->post(route('login'), ['email'=>$cashier->email,'password'=>'password12345'])->assertSessionHasErrors('email');
+        $this->post(route('login'), ['email' => $cashier->email, 'password' => 'password12345'])->assertSessionHasErrors('email');
         $this->assertGuest();
-        DB::table('users')->where('id',$cashier->id)->update(['is_active'=>true]);
-        $this->post(route('login'), ['email'=>$cashier->email,'password'=>'password12345'])->assertRedirect(route('pos.index'));
+        DB::table('users')->where('id', $cashier->id)->update(['is_active' => true]);
+        $this->post(route('login'), ['email' => $cashier->email, 'password' => 'password12345'])->assertRedirect(route('pos.index'));
         $this->getJson(route('v2.accounts.index'))->assertForbidden();
-        DB::table('users')->where('id',$cashier->id)->update(['is_active'=>false]);
+        DB::table('users')->where('id', $cashier->id)->update(['is_active' => false]);
         $this->getJson(route('v2.index'))->assertUnauthorized();
         $this->assertGuest();
     }
@@ -39,17 +37,76 @@ class V2AccountManagementTest extends TestCase
     {
         $admin = $this->createActor('admin');
         $this->actingAs($admin)->getJson(route('v2.accounts.index'))->assertOk();
-        DB::table('users')->where('id',$admin->id)->increment('auth_version');
+        DB::table('users')->where('id', $admin->id)->increment('auth_version');
         $this->getJson(route('v2.accounts.index'))->assertUnauthorized();
         $this->assertGuest();
         $admin->refresh();
-        $this->actingAs($admin)->postJson(route('v2.accounts.store'), ['name'=>'Kasir Sintetis','email'=>'missing@example.invalid','role'=>'cashier','is_active'=>true])->assertUnprocessable()->assertJsonValidationErrors('password');
+        $this->actingAs($admin)->postJson(route('v2.accounts.store'), ['name' => 'Kasir Sintetis', 'email' => 'missing@example.invalid', 'role' => 'cashier', 'is_active' => true])->assertUnprocessable()->assertJsonValidationErrors('password');
+    }
+
+    public function test_admin_creates_username_only_cashier_without_fabricating_email(): void
+    {
+        $admin = $this->createActor();
+        $response = $this->actingAs($admin)->postJson(route('v2.accounts.store'), [
+            'name' => 'Kasir Sintetis Username', 'username' => ' Kasir01 ',
+            'password' => 'SyntheticUsernamePass123!', 'password_confirmation' => 'SyntheticUsernamePass123!',
+            'role' => 'cashier', 'is_active' => true,
+        ])->assertCreated()->assertJsonPath('username', 'kasir01')->assertJsonPath('email', null);
+
+        $user = User::findOrFail($response->json('id'));
+        $this->assertTrue(Hash::check('SyntheticUsernamePass123!', $user->password));
+        $this->assertNull($user->email);
+        $this->assertDatabaseHas('v2_user_roles', ['user_id' => $user->id, 'role' => 'cashier']);
+        $this->actingAs($admin)->getJson(route('v2.accounts.index'))->assertOk()
+            ->assertJsonFragment(['username' => 'kasir01', 'email' => null]);
+        $this->assertStringNotContainsString('SyntheticUsernamePass123!', $response->getContent());
+        $this->assertStringNotContainsString('kasir01', (string) DB::table('v2_account_audits')->latest('id')->value('changes'));
+    }
+
+    public function test_account_identifiers_are_validated_and_username_is_case_insensitive_unique(): void
+    {
+        $admin = $this->createActor();
+        $payload = ['name' => 'Kasir Sintetis', 'password' => 'SyntheticUsernamePass123!',
+            'password_confirmation' => 'SyntheticUsernamePass123!', 'role' => 'cashier', 'is_active' => true];
+        $this->actingAs($admin)->postJson(route('v2.accounts.store'), $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors(['username', 'email']);
+        foreach (['ab', 'nama kasir', 'kasir@example.invalid', 'admin'] as $invalid) {
+            $this->postJson(route('v2.accounts.store'), $payload + ['username' => $invalid])
+                ->assertUnprocessable()->assertJsonValidationErrors('username');
+        }
+        $this->postJson(route('v2.accounts.store'), $payload + ['username' => 'kasir01'])->assertCreated();
+        $this->postJson(route('v2.accounts.store'), $payload + ['username' => 'KASIR01'])
+            ->assertUnprocessable()->assertJsonValidationErrors('username');
+    }
+
+    public function test_username_update_revokes_sessions_and_legacy_update_keeps_username(): void
+    {
+        $admin = $this->createActor();
+        $target = $this->createActor('cashier');
+        $payload = ['name' => $target->name, 'email' => $target->email, 'role' => 'cashier', 'is_active' => true];
+        $this->actingAs($admin)->putJson(route('v2.accounts.update', $target->id), $payload + ['username' => 'kasir02'])
+            ->assertOk()->assertJsonPath('username', 'kasir02');
+        $this->assertEquals(2, $target->fresh()->auth_version);
+        $this->putJson(route('v2.accounts.update', $target->id), $payload)
+            ->assertOk()->assertJsonPath('username', 'kasir02');
+        $this->putJson(route('v2.accounts.update', $target->id), array_replace($payload, ['email' => null]))
+            ->assertOk()->assertJsonPath('email', null)->assertJsonPath('username', 'kasir02');
+        $this->putJson(route('v2.accounts.update', $target->id), array_replace($payload, ['email' => null, 'username' => null]))
+            ->assertUnprocessable()->assertJsonValidationErrors(['username', 'email']);
+    }
+
+    public function test_cashier_cannot_create_username_account_and_admin_can_view_username_form(): void
+    {
+        $cashier = $this->createActor('cashier');
+        $this->actingAs($cashier)->postJson(route('v2.accounts.store'), ['username' => 'kasir03'])->assertForbidden();
+        $admin = $this->createActor();
+        $this->actingAs($admin)->get(route('v2.index'))->assertOk()->assertSee('name="username"', false);
     }
 
     private function createActor(string $role = 'admin', bool $isActive = true): User
     {
         $user = User::factory()->create([
-            'email' => 'actor_' . uniqid() . '@example.invalid',
+            'email' => 'actor_'.uniqid().'@example.invalid',
             'password' => Hash::make('password12345'),
             'is_active' => $isActive,
             'auth_version' => 1,

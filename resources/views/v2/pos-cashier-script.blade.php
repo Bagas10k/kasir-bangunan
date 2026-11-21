@@ -91,7 +91,7 @@ function refresh(){
  document.querySelector('#display-total').textContent=valid?D.money(total):'Periksa isian';document.querySelector('#payment-modal-total').textContent=valid?D.money(total):'Periksa isian';
  if(form.elements.payment_method.value==='transfer'&&valid)paid.value=D.plain(total);
  let change=0n;try{const tender=D.scaled(paid.value||'0',2);if(form.elements.payment_method.value==='cash'&&tender>total)change=tender-total;}catch{}
- document.querySelector('#display-change').textContent=D.money(change);payButton.disabled=rows().length===0||!valid||saved;
+ document.querySelector('#display-change').textContent=D.money(change);payButton.disabled=rows().length===0||!valid||saved||document.getElementById('store-shift-state')?.dataset.posShiftState!=='open';
  document.querySelector('#deposit-field').hidden=form.elements.payment_method.value!=='credit';
  syncBuyerState();
  // Ringkasan keranjang untuk lapisan tampilan HP (pos-mobile): hanya dibaca, tidak memengaruhi total yang dikirim.
@@ -152,7 +152,7 @@ catPrev.addEventListener('click',()=>{if(catalogPage>1){catalogPage-=1;filter(tr
 catNext.addEventListener('click',()=>{catalogPage+=1;filter(true);});
 catPages.addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(b){catalogPage=Number(b.dataset.page);filter(true);}});
 search.addEventListener('input',filter);category.addEventListener('change',filter);stock.addEventListener('change',filter);document.querySelector('#catalog-reset').addEventListener('click',()=>{search.value='';category.value='';stock.value='all';filter();search.focus();});search.addEventListener('keydown',e=>{if(e.key==='Enter'){const button=document.querySelector('#products-tbody tr:not([hidden]) [data-add-product]');if(button){e.preventDefault();button.click();search.select();}}});
-function openPay(){if(!rows().length||!valid||saved)return;payment.showModal();refresh();showPaid();paidDisplay.focus({preventScroll:true});paidDisplay.select();}
+function openPay(){if(!rows().length||!valid||saved||document.getElementById('store-shift-state')?.dataset.posShiftState!=='open')return;payment.showModal();refresh();showPaid();paidDisplay.focus({preventScroll:true});paidDisplay.select();}
 function closePay(){if(submitting||form.dataset.busy)return;payment.close();payButton.focus({preventScroll:true});}
 function cancelReview(){if(submitting||form.dataset.busy)return;review.close();payment.showModal();document.querySelector('#review-payment').focus({preventScroll:true});}
 function trap(dialog,onEscape){dialog.addEventListener('cancel',e=>{e.preventDefault();onEscape();});dialog.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();onEscape();return;}if(e.key!=='Tab')return;const nodes=Array.from(dialog.querySelectorAll('button,input,select,textarea,summary,a[href]')).filter(el=>!el.disabled&&el.tabIndex>=0&&el.getBoundingClientRect().height);if(e.shiftKey&&document.activeElement===nodes[0]){e.preventDefault();nodes.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===nodes.at(-1)){e.preventDefault();nodes[0].focus();}});}
@@ -164,6 +164,7 @@ document.querySelector('#review-payment').addEventListener('click',()=>{refresh(
 let sold=[];const payTitle=payment.querySelector('.popup-heading h2').textContent;
 confirm.addEventListener('click',()=>{if(submitting||form.dataset.busy||saved)return;sold=rows().map(row=>({id:row.querySelector('[data-name=product_id]').value,qty:row.querySelector('[data-name=quantity]').value}));submitting=true;confirm.disabled=true;review.close();payment.showModal();for(const input of form.querySelectorAll('[inputmode=decimal]'))input.value=normalize(input.value);form.__finalConfirmed=true;form.requestSubmit(document.querySelector('#checkout-submit'));});
 const busy=new MutationObserver(()=>{if(!form.dataset.busy&&submitting&&!saved){submitting=false;confirm.disabled=false;}});busy.observe(form,{attributes:true,attributeFilter:['data-busy']});
+document.addEventListener('store-shift:changed',()=>{if(!submitting&&!saved)refresh();});
 form.addEventListener('v2:sale-saved',e=>{saved=true;submitting=false;try{localStorage.removeItem(cartKey);}catch{}payment.querySelector('.popup-heading h2').textContent='Transaksi Tersimpan — Periksa Sebelum Cetak';document.querySelector('#review-payment').hidden=true;payButton.disabled=true;document.querySelector('#cart-empty-row').hidden=false;document.querySelector('#cart-item-count').textContent='0 jenis item';const link=document.querySelector('#checkout-result a');if(link)link.focus({preventScroll:true});const next=document.createElement('button');next.type='button';next.textContent='Penjualan berikutnya';next.addEventListener('click',()=>{document.querySelector('dialog.ur-dialog[open]')?.close();window.kasirNextSale();});document.querySelector('#checkout-result').append(document.createElement('br'),next);});
 // Penjualan berikutnya tanpa memuat ulang: stok katalog dikurangi sesuai nota yang baru tersimpan (server sudah mengonfirmasi),
 // keranjang dan form dikosongkan, lalu ringkasan/riwayat diperbarui lewat uiLive.

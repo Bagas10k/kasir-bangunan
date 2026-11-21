@@ -393,13 +393,9 @@ class DeliveryTrips
 
     private function openShift(int $actor): object
     {
-        $shift = DB::table('v2_shifts')
-            ->where('user_id', $actor)
-            ->where('status', 'open')
-            ->lockForUpdate()
-            ->first();
+        $shift = app(Operations::class)->activeStoreShift(true);
         if (! $shift) {
-            $this->invalid('Transaksi tunai wajib memakai shift admin yang sedang terbuka.');
+            $this->invalid('Transaksi tunai wajib memakai shift toko yang dibuka admin.');
         }
 
         return $shift;

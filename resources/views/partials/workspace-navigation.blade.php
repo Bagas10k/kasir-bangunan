@@ -16,7 +16,7 @@
             'tagihan' => 'Tagihan',
             'pengiriman' => 'Pengiriman',
             'penerimaan' => 'Penerimaan barang',
-            'shift' => [$navigationAdmin ? 'Kas & laporan' : 'Shift & laporan saya', ['shift' => $navigationAdmin ? 'Shift kasir' : 'Shift saya', 'laporan' => $navigationAdmin ? 'Laporan harian' : 'Laporan saya']],
+            'shift' => [$navigationAdmin ? 'Kas & laporan' : 'Shift toko & laporan saya', ['shift' => 'Shift toko', 'laporan' => $navigationAdmin ? 'Laporan harian' : 'Laporan saya']],
         ]],
         'master' => ['Master data', 'M4 6c0-3.5 16-3.5 16 0v12c0 3.5-16 3.5-16 0zM4 6c0 3.5 16 3.5 16 0M4 12c0 3.5 16 3.5 16 0', [
             'master-product' => 'Produk',

@@ -143,7 +143,7 @@ class V2ReportsDocumentsTest extends TestCase
             'number' => 'INV-SYN-1', 'amount' => '200.00', 'paid' => '60.00', 'status' => 'open',
             'created_at' => '2026-10-30 11:00:00', 'updated_at' => '2026-10-30 11:00:00',
         ]);
-        $postedJournal = DB::table('journal_entries')->insertGetId(['reference_type'=>'v2_payment','reference_id'=>1,'description'=>'Pembayaran sintetis','transaction_date'=>'2026-10-31','created_at'=>now(),'updated_at'=>now()]);
+        $postedJournal = DB::table('journal_entries')->insertGetId(['reference_type' => 'v2_payment', 'reference_id' => 1, 'description' => 'Pembayaran sintetis', 'transaction_date' => '2026-10-31', 'created_at' => now(), 'updated_at' => now()]);
         foreach ([['100.00', 'pending', $cashierB->id], ['60.00', 'posted', $cashierB->id]] as $i => [$amount, $status, $user]) {
             DB::table('v2_payments')->insert([
                 'invoice_id' => $invoice, 'shift_id' => $shiftB, 'amount' => $amount, 'method' => 'transfer',
@@ -175,11 +175,11 @@ class V2ReportsDocumentsTest extends TestCase
         $this->assertSame(2, $report['shifts']['count']);
         $this->assertSame(1, $report['shifts']['open']);
         $this->assertSame(1, $report['shifts']['closed']);
-        $this->assertSame('0.00',$this->report()->daily($admin->id,'2026-10-30')['bank']['posted']);
-        $this->assertSame('60.00',$this->report()->daily($admin->id,'2026-10-31')['bank']['posted']);
+        $this->assertSame('0.00', $this->report()->daily($admin->id, '2026-10-30')['bank']['posted']);
+        $this->assertSame('60.00', $this->report()->daily($admin->id, '2026-10-31')['bank']['posted']);
     }
 
-    public function test_cashier_sees_only_own_shift_and_is_denied_other_documents(): void
+    public function test_cashier_daily_remains_own_but_shared_documents_are_readable(): void
     {
         $admin = $this->actor('admin');
         $cashierA = $this->actor('cashier');
@@ -219,9 +219,12 @@ class V2ReportsDocumentsTest extends TestCase
         $this->assertSame('0.00', $own['bank']['pending']);
         $this->assertSame(1, $own['shifts']['count']);
 
-        // Kasir A tidak boleh membaca nota kasir B; kasir B tidak boleh membaca nota A.
+        $this->assertSame($saleB, $this->report()->document($cashierA->id, $saleB)['sale']['id']);
+        $this->assertSame($saleA, $this->report()->document($cashierB->id, $saleA)['sale']['id']);
+        $unassigned = User::factory()->create();
+        $this->assertForbidden(fn () => $this->report()->document($unassigned->id, $saleA));
+        $cashierA->forceFill(['is_active' => false])->save();
         $this->assertForbidden(fn () => $this->report()->document($cashierA->id, $saleB));
-        $this->assertForbidden(fn () => $this->report()->document($cashierB->id, $saleA));
         $this->assertSame($saleB, $this->report()->document($admin->id, $saleB)['sale']['id']);
     }
 

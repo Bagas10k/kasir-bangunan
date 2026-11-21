@@ -166,6 +166,22 @@ html body form.is-duplicate-warning :is([data-error],#u#u){background:#FEF7E0 !i
 html body dialog :is(.popup-fill,#u#u){margin-top:8px;min-height:44px !important;height:44px;width:100%;font-variant-numeric:tabular-nums}
 /* HP: target sentuh minimal 44px untuk tombol tutup popup dan saran jenis mobil. */
 @media (max-width:720px){html body dialog :is(.popup-close,#u#u#u){min-width:44px !important;min-height:44px !important;width:44px !important;height:44px !important}html body dialog :is([data-suggest],#u#u#u){min-height:44px !important;height:44px !important}}
+/* Aksi draf: target sentuh 44px dan konfirmasi memakai tombol utama bersama. */
+html body #receipt-drafts .ui-actions :is(button,.popup-action,#u#u){min-height:44px !important;height:auto !important}
+/* Persetujuan final penerimaan: seluruh label menjadi target sentuh dan checkbox tetap terlihat. */
+html body dialog.input-dialog form.receipt-confirm-form .receipt-final-ack{display:flex !important;align-items:flex-start;gap:10px;min-height:44px;padding:10px 0;color:var(--ui-ink);font-size:var(--ui-t-label);font-weight:500;cursor:pointer}
+html body dialog.input-dialog form.receipt-confirm-form .receipt-final-ack input[type=checkbox]{width:20px !important;height:20px !important;min-width:20px !important;margin:2px 0 0 !important;flex:none;accent-color:var(--ui-green)}
+/* Rekap tutup shift: angka otomatis + hasil banding uang fisik. */
+html body dialog .close-recap{font-size:var(--ui-t-label);color:var(--ui-ink);padding:12px;border-radius:12px;background:#F1F6F2;margin:0 0 14px}
+html body dialog .close-recap dl{margin:0 0 8px}
+html body dialog .close-recap dl:last-child{margin-bottom:0}
+html body dialog .close-recap dl>div{display:flex;justify-content:space-between;gap:12px;padding:3px 0}
+html body dialog .close-recap dd{font-variant-numeric:tabular-nums;font-weight:600}
+html body dialog .close-recap .is-total{border-top:1px solid var(--ui-line,#E4EBE6);margin-top:4px;padding-top:6px;color:var(--ui-green,#14532D)}
+html body dialog .close-recap .recap-pending{background:#FEF7E0;color:#7A4B00;border-radius:8px;padding:7px 10px;margin:8px 0 0;font-weight:600}
+.close-match{font-weight:700;margin:8px 0 0;font-size:var(--ui-t-label)}
+.close-match.ok{color:var(--ui-green,#14532D)}
+.close-match.warn{color:#7A4B00}
 /* Riwayat: penerimaan yang dibatalkan tetap tampil, nilai dicoret. */
 tr.rh-void .rh-total strong,tr.rh-void .ui-num.rh-lines span{text-decoration:line-through;color:var(--ui-muted)}
 .rh-void-note{white-space:normal}

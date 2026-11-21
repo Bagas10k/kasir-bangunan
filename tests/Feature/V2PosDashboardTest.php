@@ -4,14 +4,17 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\V2\DemoData;
+use App\Services\V2\Operations;
 use App\Services\V2\PosDashboard;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
- * Dashboard kasir: angka dari layanan (BigDecimal), grafik dari data nyata, kasir hanya melihat penjualannya sendiri.
+ * Dashboard POS: angka toko yang sama untuk admin/kasir, dengan perhitungan BigDecimal.
  * Dengan V2_PREVIEW_DIR, HTML berisi data sintetis ditulis untuk pemeriksaan visual.
  */
 class V2PosDashboardTest extends TestCase
@@ -68,6 +71,7 @@ class V2PosDashboardTest extends TestCase
 
         $shift = DB::table('v2_shifts')->insertGetId([
             'user_id' => $admin->id, 'open_user_id' => $admin->id, 'opening_cash' => '0.00', 'status' => 'open', 'source' => 'admin',
+            'is_shared' => true, 'store_open_key' => 1,
             'opened_at' => now()->subDays(60), 'created_at' => now(), 'updated_at' => now(),
         ]);
 
@@ -116,7 +120,7 @@ class V2PosDashboardTest extends TestCase
         $this->assertSame(3, $all['7d']['transaction_count'], 'Tujuh hari = 2 nota hari ini + 1 kemarin.');
 
         $own = (new PosDashboard)->build($cashier->id, $now);
-        $this->assertSame('Rp 0,20', $own['today']['formatted_revenue'], 'Kasir hanya melihat penjualannya sendiri.');
+        $this->assertSame('Rp 0,20', $own['today']['formatted_revenue'], 'Filter petugas eksplisit tetap didukung layanan; dashboard POS memakai data toko.');
         $this->assertSame(1, $own['today']['transaction_count']);
     }
 
@@ -131,6 +135,33 @@ class V2PosDashboardTest extends TestCase
         }
     }
 
+    public function test_cashier_without_personal_sales_sees_the_same_store_dashboard_as_admin(): void
+    {
+        config(['v2.enabled' => true]);
+        $this->freezeTime();
+        $admin = $this->user('admin', 'Admin Sintetis Ringkasan');
+        $cashier = $this->user('cashier', 'Kasir Sintetis Ringkasan');
+        $shift = app(Operations::class)->openShift($admin->id, '0', 'admin');
+        $product = DB::table('products')->insertGetId(['sku' => 'SYN-DASH-SHARED', 'name' => 'Material Sintetis Ringkasan', 'unit' => 'unit', 'cost_price' => '500', 'selling_price' => '1000', 'stock_quantity' => '5', 'is_active' => true]);
+        $this->sale($admin, $shift, now(), '370000.00', [[$product, 'Material Sintetis Ringkasan', '1']]);
+
+        $adminData = $this->actingAs($admin)->get(route('pos.index'))->assertOk()->viewData('posDashboard');
+        $response = $this->actingAs($cashier)->get(route('pos.index'))->assertOk();
+        $cashierData = $response->viewData('posDashboard');
+        $this->assertSame('370000.00', $cashierData['today']['revenue']);
+        $this->assertSame($adminData, $cashierData, 'Periode, KPI, pembanding, grafik, dan produk terlaris berasal dari data toko yang sama.');
+        foreach (['today', '7d', '30d'] as $period) {
+            $this->assertSame('370000.00', $cashierData[$period]['revenue']);
+            $this->assertSame(1, $cashierData[$period]['transaction_count']);
+            $this->assertSame('Material Sintetis Ringkasan', $cashierData[$period]['top_products'][0]['name']);
+        }
+        preg_match('/<script id="pos-monitor-precomputed" type="application\/json">(.*?)<\/script>/s', $response->getContent(), $json);
+        $this->assertSame($adminData, json_decode($json[1], true, flags: JSON_THROW_ON_ERROR));
+        $this->assertSame(0, DB::table('v2_sales')->where('user_id', $cashier->id)->count());
+        $this->actingAs($cashier)->getJson(route('v2.accounts.index'))->assertForbidden();
+        $this->assertDatabaseHas('v2_sales', ['shift_id' => $shift, 'user_id' => $admin->id, 'total' => '370000.00']);
+    }
+
     public function test_empty_workspace_keeps_summary_chart_and_checkout_structure(): void
     {
         config(['v2.enabled' => true]);
@@ -143,7 +174,7 @@ class V2PosDashboardTest extends TestCase
         $this->assertStringContainsString('id="products-tbody"', $html);
         $this->assertStringContainsString('id="form-checkout"', $html);
         $this->assertStringContainsString('id="display-total"', $html);
-        $this->assertShiftInDashboardHeader($html, 'closed', 'Shift belum dibuka', 'Buka shift');
+        $this->assertShiftInDashboardHeader($html, 'closed', 'Shift toko belum dibuka', 'Buka shift toko');
         preg_match('/<form id="form-checkout".*?<\/form>/s', $html, $checkout);
         $this->assertStringNotContainsString('class="pos-shift-notice"', $checkout[0]);
         $this->assertStringContainsString('class="pos-shift-reminder"', $checkout[0]);
@@ -168,7 +199,8 @@ class V2PosDashboardTest extends TestCase
 
         $html = $this->actingAs($admin)->get(route('pos.index'))->assertOk()->getContent();
         $this->assertStringContainsString('id="pos-dashboard"', $html);
-        $this->assertShiftInDashboardHeader($html, 'open', 'Shift aktif', 'Lihat shift');
+        $shift = (int) DB::table('v2_shifts')->where('store_open_key', 1)->value('id');
+        $this->assertShiftInDashboardHeader($html, 'open', 'Shift toko #'.$shift.' aktif', 'Lihat shift');
         $this->assertStringNotContainsString('<p class="pos-shift-reminder">', $html);
         $this->assertSame(3, preg_match_all('/<div class="pd-pane" data-pane="/', $html), 'Tiga periode dirender sekaligus.');
         preg_match('/<script id="pos-monitor-precomputed" type="application\/json">(.*?)<\/script>/s', $html, $m);
@@ -179,7 +211,7 @@ class V2PosDashboardTest extends TestCase
         $this->assertStringContainsString('data-task-link="master-product"', $html);
 
         $cashierHtml = $this->actingAs($cashier)->get(route('pos.index'))->assertOk()->getContent();
-        $this->assertShiftInDashboardHeader($cashierHtml, 'closed', 'Shift belum dibuka', 'Buka shift');
+        $this->assertShiftInDashboardHeader($cashierHtml, 'open', 'Shift toko #'.$shift.' aktif', 'Lihat shift');
         $this->assertStringNotContainsString('data-task-link="master-product"', $cashierHtml, 'Kasir tidak punya Master produk.');
 
         $dir = getenv('V2_PREVIEW_DIR');
@@ -191,7 +223,7 @@ class V2PosDashboardTest extends TestCase
             file_put_contents($dir.'/pos-cashier.html', $cashierHtml);
             // Pratinjau harga kontraktor: dua produk pertama punya harga kontraktor (hanya DB :memory:, sesudah semua assert).
             foreach (DB::table('products')->orderBy('name')->limit(2)->get(['id', 'selling_price']) as $product) {
-                DB::table('products')->where('id', $product->id)->update(['contractor_price' => (string) \Brick\Math\BigDecimal::of((string) $product->selling_price)->multipliedBy('0.9')->toScale(2, \Brick\Math\RoundingMode::Down)]);
+                DB::table('products')->where('id', $product->id)->update(['contractor_price' => (string) BigDecimal::of((string) $product->selling_price)->multipliedBy('0.9')->toScale(2, RoundingMode::Down)]);
             }
             file_put_contents($dir.'/pos-contractor.html', $this->actingAs($admin)->get(route('pos.index'))->assertOk()->getContent());
         }
@@ -203,7 +235,8 @@ class V2PosDashboardTest extends TestCase
         $this->assertStringNotContainsString('class="pos-shift-notice"', $dashboard[1]);
         $this->assertStringContainsString('Ringkasan penjualan', $dashboard[2]);
         $this->assertMatchesRegularExpression('/<div class="pd-controls">\s*<div class="pos-shift-notice"/', $dashboard[2]);
-        $this->assertStringContainsString('data-pos-shift-state="'.$state.'" role="note" aria-label="Status shift kasir"', $dashboard[2]);
+        $this->assertStringContainsString('data-pos-shift-state="'.$state.'"', $dashboard[2]);
+        $this->assertStringContainsString('role="status" aria-live="polite" aria-label="Status shift toko"', $dashboard[2]);
         $this->assertStringContainsString('<strong>'.$status.'</strong>', $dashboard[2]);
         $this->assertStringContainsString('class="pos-shift-action" href="#shift" data-task-link="shift"><span>'.$action.'</span>', $dashboard[2]);
         $this->assertStringNotContainsString('pos-shift-copy', $dashboard[2]);
@@ -217,7 +250,7 @@ class V2PosDashboardTest extends TestCase
     {
         config(['v2.enabled' => true]);
         $admin = $this->user('admin', 'Admin Sintetis Skala');
-        $shift = DB::table('v2_shifts')->insertGetId(['user_id' => $admin->id, 'open_user_id' => $admin->id, 'opening_cash' => '0.00', 'status' => 'open', 'source' => 'admin', 'opened_at' => now()->subDays(60), 'created_at' => now(), 'updated_at' => now()]);
+        $shift = DB::table('v2_shifts')->insertGetId(['user_id' => $admin->id, 'open_user_id' => $admin->id, 'is_shared' => true, 'store_open_key' => 1, 'opening_cash' => '0.00', 'status' => 'open', 'source' => 'admin', 'opened_at' => now()->subDays(60), 'created_at' => now(), 'updated_at' => now()]);
 
         $products = [];
         for ($i = 1; $i <= 2500; $i++) {

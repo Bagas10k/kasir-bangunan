@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Services\V2\Operations;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -72,8 +71,8 @@ class V2HistoryFiltersTest extends TestCase
         ]);
 
         $ops = app(Operations::class);
-        $shift1 = $ops->openShift($cashier1->id, '100000', 'admin');
-        $shift2 = $ops->openShift($cashier2->id, '100000', 'admin');
+        $shift1 = $ops->openShift($admin->id, '100000', 'admin');
+        $shift2 = $shift1;
 
         return compact('cashier1', 'cashier2', 'admin', 'shift1', 'shift2', 'product');
     }
@@ -96,10 +95,76 @@ class V2HistoryFiltersTest extends TestCase
             'payment_method' => $method,
             'status' => 'paid',
             'fulfillment' => 'pickup',
-            'idempotency_key' => 'idem-' . $number,
+            'idempotency_key' => 'idem-'.$number,
             'created_at' => $createdAt,
             'updated_at' => $createdAt,
         ]);
+    }
+
+    public function test_shift_defaults_selection_dates_and_no_active_shift(): void
+    {
+        $data = $this->setupBaseData();
+        $old = DB::table('v2_shifts')->insertGetId([
+            'user_id' => $data['admin']->id, 'source' => 'admin', 'opening_cash' => 0,
+            'status' => 'closed', 'opened_at' => '2026-10-01 08:00:00',
+            'closed_at' => '2026-10-01 17:00:00', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->insertSale($data['admin']->id, $data['shift1'], 'SHARED-ADMIN', 'cash', '2026-10-15 12:00:00');
+        $this->insertSale($data['cashier2']->id, $old, 'OLDER-SALE', 'cash', '2026-10-01 23:59:59');
+
+        $active = $this->actingAs($data['cashier1'])->get(route('v2.index'))->assertOk();
+        $this->assertSame(1, $active->viewData('historySales')->total());
+        $this->assertSame('Admin Boss', $active->viewData('historySales')->items()[0]->user_name);
+        $this->assertSame('active', $active->viewData('historyFilters')['history_shift']);
+        $selected = $this->get(route('v2.index', ['history_shift' => (string) $old]))->assertOk();
+        $this->assertSame('OLDER-SALE', $selected->viewData('historySales')->items()[0]->number);
+        $dates = $this->get(route('v2.index', ['start_date' => '2026-10-01', 'end_date' => '2026-10-15']))->assertOk();
+        $this->assertSame(2, $dates->viewData('historySales')->total());
+        $this->assertSame('all', $dates->viewData('historyFilters')['history_shift']);
+        DB::table('v2_shifts')->where('id', $data['shift1'])->update(['status' => 'closed', 'store_open_key' => null]);
+        $this->assertSame(0, $this->get(route('v2.index'))->assertOk()->viewData('historySales')->total());
+    }
+
+    public function test_history_partial_contract_validation_and_permissions(): void
+    {
+        $this->getJson('/v2/sales/history')->assertUnauthorized();
+        $data = $this->setupBaseData();
+        $this->insertSale($data['admin']->id, $data['shift1'], 'PARTIAL-SALE', 'cash', '2026-10-15 12:00:00');
+        $response = $this->actingAs($data['cashier1'])->getJson('/v2/sales/history')->assertOk();
+        $this->assertSame(['html', 'filters', 'shifts'], array_keys($response->json()));
+        $response->assertJsonPath('filters.history_shift', 'active');
+        $this->assertStringContainsString('PARTIAL-SALE', $response->json('html'));
+        $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('private', $response->headers->get('Cache-Control'));
+        foreach ([['active'], 'bad', '0', '-1', '99999999'] as $invalid) {
+            $this->getJson('/v2/sales/history?'.http_build_query(['history_shift' => $invalid]))->assertUnprocessable();
+        }
+        $unassigned = User::factory()->create();
+        $this->actingAs($unassigned)->getJson('/v2/sales/history')->assertForbidden();
+        $data['cashier1']->forceFill(['is_active' => false])->save();
+        $this->actingAs($data['cashier1'])->getJson('/v2/sales/history')->assertUnauthorized();
+    }
+
+    public function test_selected_old_shift_remains_available_beyond_latest_options_and_uses_root_pagination(): void
+    {
+        $data = $this->setupBaseData();
+        $old = DB::table('v2_shifts')->insertGetId(['user_id' => $data['admin']->id, 'source' => 'admin', 'opening_cash' => 0, 'status' => 'closed', 'opened_at' => '2026-10-01 08:00:00', 'closed_at' => '2026-10-01 17:00:00', 'created_at' => now(), 'updated_at' => now()]);
+        for ($i = 0; $i < 31; $i++) {
+            DB::table('v2_shifts')->insert(['user_id' => $data['admin']->id, 'source' => 'admin', 'opening_cash' => 0, 'status' => 'closed', 'opened_at' => '2026-10-02 08:00:00', 'closed_at' => '2026-10-02 17:00:00', 'created_at' => now(), 'updated_at' => now()]);
+        }
+        for ($i = 0; $i < 12; $i++) {
+            $this->insertSale($data['admin']->id, $old, 'SYN-OLD-'.$i, 'cash', '2026-10-01 10:00:00');
+        }
+        $response = $this->actingAs($data['cashier1'])->getJson(route('v2.sales.history', ['history_shift' => (string) $old]))->assertOk();
+        $this->assertContains($old, array_column($response->json('shifts'), 'id'));
+        $this->assertSame(10, substr_count($response->json('html'), 'data-history-sale='));
+        preg_match('/href="([^"]*history_page=2[^"]*)"/', $response->json('html'), $link);
+        $url = html_entity_decode($link[1]);
+        $root = route(config('v2.enabled') ? 'pos.index' : 'v2.index');
+        $this->assertSame(parse_url($root, PHP_URL_PATH), parse_url($url, PHP_URL_PATH));
+        parse_str(parse_url($url, PHP_URL_QUERY), $query);
+        $this->assertSame((string) $old, $query['history_shift']);
+        $this->assertSame('kasir', parse_url($url, PHP_URL_FRAGMENT));
     }
 
     public function test_validation_guards_against_arrays_and_malformed_inputs(): void
@@ -138,7 +203,7 @@ class V2HistoryFiltersTest extends TestCase
         // Insert 35 sales for Cashier 1 spanning dates
         for ($i = 1; $i <= 35; $i++) {
             $num = sprintf('SL-C1-%03d', $i);
-            $day = str_pad((string)(($i % 28) + 1), 2, '0', STR_PAD_LEFT);
+            $day = str_pad((string) (($i % 28) + 1), 2, '0', STR_PAD_LEFT);
             $createdAt = "2026-10-{$day} 10:00:00";
             $method = $i % 2 === 0 ? 'cash' : 'transfer';
             $this->insertSale($cashier->id, $data['shift1'], $num, $method, $createdAt);
@@ -178,7 +243,7 @@ class V2HistoryFiltersTest extends TestCase
         $this->assertCount(30, $recentSales);
     }
 
-    public function test_role_scoping_cashier_excludes_other_cashier_admin_shows_all(): void
+    public function test_shared_history_includes_all_actors(): void
     {
         $data = $this->setupBaseData();
         $c1 = $data['cashier1'];
@@ -189,15 +254,15 @@ class V2HistoryFiltersTest extends TestCase
         $this->insertSale($c1->id, $data['shift1'], 'SL-C1-X2', 'cash', '2026-10-16 10:00:00');
         $this->insertSale($c2->id, $data['shift2'], 'SL-C2-Y1', 'transfer', '2026-10-15 11:00:00');
 
-        // Cashier 1 sees only their 2 sales
+        // Every POS actor sees the same shared history.
         $resC1 = $this->actingAs($c1)->get(route('v2.index'));
         $resC1->assertOk();
         $hC1 = $resC1->viewData('historySales');
-        $this->assertSame(2, $hC1->total());
+        $this->assertSame(3, $hC1->total());
         $numbersC1 = collect($hC1->items())->pluck('number')->all();
         $this->assertContains('SL-C1-X1', $numbersC1);
         $this->assertContains('SL-C1-X2', $numbersC1);
-        $this->assertNotContains('SL-C2-Y1', $numbersC1);
+        $this->assertContains('SL-C2-Y1', $numbersC1);
 
         // Admin sees all 3 sales
         $resAdmin = $this->actingAs($admin)->get(route('v2.index'));
@@ -274,8 +339,8 @@ class V2HistoryFiltersTest extends TestCase
         $res->assertOk();
         $items = collect($res->viewData('historySales')->items())->keyBy('id');
 
-        $this->assertTrue((bool)$items[$saleId1]->has_delivery);
-        $this->assertFalse((bool)$items[$saleId2]->has_delivery);
+        $this->assertTrue((bool) $items[$saleId1]->has_delivery);
+        $this->assertFalse((bool) $items[$saleId2]->has_delivery);
         $this->assertSame(2, $res->viewData('historySales')->total());
     }
 

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\V2\Ledger;
+use App\Services\V2\Operations;
 use App\Services\V2\SupplyTrips;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -96,11 +97,7 @@ class V2SupplyTripsTest extends TestCase
 
     private function openShift(int $adminId, string $opening = '500.00'): int
     {
-        return (int) DB::table('v2_shifts')->insertGetId([
-            'user_id' => $adminId, 'open_user_id' => $adminId, 'source' => 'admin',
-            'opening_cash' => $opening, 'status' => 'open', 'opened_at' => now(),
-            'created_at' => now(), 'updated_at' => now(),
-        ]);
+        return app(Operations::class)->openShift($adminId, $opening, 'admin');
     }
 
     private function fund(string $account, string $amount): void

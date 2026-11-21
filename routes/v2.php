@@ -26,6 +26,9 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::post('/import-batches/{id}/commit', [WorkspaceController::class, 'importCommit'])->whereNumber('id')->name('imports.commit');
     Route::get('/suppliers/{id}/products', [WorkspaceController::class, 'supplierProducts'])->whereNumber('id')->name('suppliers.products');
     Route::post('/receipts', [WorkspaceController::class, 'receive'])->name('receipts.store');
+    Route::post('/receipt-drafts/{id}', [WorkspaceController::class, 'updateReceiptDraft'])->whereNumber('id')->name('receipt-drafts.update');
+    Route::post('/receipt-drafts/{id}/confirm', [WorkspaceController::class, 'confirmReceiptDraft'])->whereNumber('id')->name('receipt-drafts.confirm');
+    Route::post('/receipt-drafts/{id}/cancel', [WorkspaceController::class, 'cancelReceiptDraft'])->whereNumber('id')->name('receipt-drafts.cancel');
     Route::post('/receipts/{id}/void', [WorkspaceController::class, 'voidReceipt'])->whereNumber('id')->name('receipts.void');
     Route::post('/trips', [WorkspaceController::class, 'trip'])->name('trips.store');
     Route::put('/master/{kind}/{id}', [WorkspaceController::class, 'updateMaster'])->whereNumber('id')->name('master.update');
@@ -34,9 +37,12 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::get('/master/{kind}', [WorkspaceController::class, 'master'])->name('master');
     Route::post('/master/{kind}', [WorkspaceController::class, 'saveMaster'])->name('master.store');
     Route::post('/shifts', [WorkspaceController::class, 'openShift'])->name('shifts.open');
+    Route::get('/shifts/active', [WorkspaceController::class, 'activeShift'])->name('shifts.active');
     Route::post('/shifts/{id}/close', [WorkspaceController::class, 'closeShift'])->whereNumber('id')->name('shifts.close');
+    Route::get('/shifts/{id}/closing-summary', [WorkspaceController::class, 'closingSummary'])->whereNumber('id')->name('shifts.closing-summary');
     Route::get('/customers/search', [WorkspaceController::class, 'searchCustomers'])->name('customers.search');
     Route::post('/customers/resolve', [WorkspaceController::class, 'resolveCustomer'])->name('customers.resolve');
+    Route::get('/sales/history', [WorkspaceController::class, 'history'])->name('sales.history');
     Route::post('/sales', [WorkspaceController::class, 'checkout'])->name('sales.store');
     Route::post('/invoices/{id}/payments', [WorkspaceController::class, 'collect'])->whereNumber('id')->name('payments.store');
     Route::post('/payments/{id}/approve', [WorkspaceController::class, 'approve'])->whereNumber('id')->name('payments.approve');

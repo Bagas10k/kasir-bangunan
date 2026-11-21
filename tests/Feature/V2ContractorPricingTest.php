@@ -71,7 +71,7 @@ class V2ContractorPricingTest extends TestCase
     {
         $this->accounts();
         $cashier = $this->actor('cashier');
-        app(Operations::class)->openShift($cashier->id, '0.00', 'admin');
+        app(Operations::class)->openShift($this->storeShiftAdmin()->id, '0.00', 'admin');
         $withPrice = $this->product('100.00', '90.50');
         $without = $this->product('70.00', null);
 
@@ -94,7 +94,7 @@ class V2ContractorPricingTest extends TestCase
     {
         $this->accounts();
         $cashier = $this->actor('cashier');
-        app(Operations::class)->openShift($cashier->id, '0.00', 'admin');
+        app(Operations::class)->openShift($this->storeShiftAdmin()->id, '0.00', 'admin');
         $product = $this->product('100.00', '80.00');
 
         $contractorSale = $this->sell($cashier, [$product], ['customer_id' => $this->customer('contractor')]);

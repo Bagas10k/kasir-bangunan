@@ -55,12 +55,11 @@ class V2WorkspaceViewTest extends TestCase
         $unit = DB::table('product_options')->insertGetId(['type' => 'unit', 'name' => 'unit', 'is_active' => true]);
         DB::table('products')->where('id', $product)->update(['unit_id' => $unit, 'category_id' => DB::table('product_options')->where('type', 'category')->where('name', 'Umum')->value('id')]);
         $ops = app(Operations::class);
-        $ops->openShift($cashier->id, '100', 'admin');
+        $ops->openShift($admin->id, '100', 'admin');
         $sale = $ops->checkout($cashier->id, ['items' => [['product_id' => $product, 'quantity' => '1']], 'delivery_fee' => '15', 'payment_method' => 'transfer', 'paid_amount' => '115', 'customer_id' => $customer, 'fulfillment' => 'delivery', 'destination' => 'Zona Sintetis A', 'idempotency_key' => 'synthetic-preview-sale-001']);
         DB::table('v2_deliveries')->where('sale_id', $sale['sale_id'])->update(['vehicle_id' => $vehicle, 'driver_id' => $driver, 'driver_name' => 'Karyawan Sintetis Alpha']);
         $otherCashier = User::factory()->create(['name' => 'Kasir Sintetis Gamma']);
         DB::table('v2_user_roles')->insert(['user_id' => $otherCashier->id, 'role' => 'cashier', 'created_at' => now(), 'updated_at' => now()]);
-        $ops->openShift($otherCashier->id, '100', 'admin');
         $ops->checkout($otherCashier->id, ['items' => [['product_id' => $product, 'quantity' => '2']], 'delivery_fee' => '0', 'payment_method' => 'cash', 'paid_amount' => '200', 'fulfillment' => 'pickup', 'idempotency_key' => 'synthetic-other-cashier-sale']);
         if (getenv('V2_PREVIEW_DIR') && getenv('V2_PREVIEW_DEMO')) {
             // Fixture pratinjau saja: tambahkan data contoh master agar tampilan form dan relasi terlihat penuh.
@@ -109,9 +108,9 @@ class V2WorkspaceViewTest extends TestCase
                 ->assertSee($sale['delivery_number']);
             preg_match('/<script id="pos-monitor-precomputed" type="application\/json">(.*?)<\/script>/s', $response->getContent(), $match);
             $monitor = json_decode(trim($match[1] ?? ''), true, flags: JSON_THROW_ON_ERROR);
-            $this->assertSame($role === 'admin' ? 'Rp 315' : 'Rp 115', $monitor['today']['formatted_revenue']);
-            $this->assertSame($role === 'admin' ? 2 : 1, $monitor['7d']['transaction_count']);
-            $this->assertSame($role === 'admin' ? '3' : '1', $monitor['7d']['top_products'][0]['formatted_qty']);
+            $this->assertSame('Rp 315', $monitor['today']['formatted_revenue']);
+            $this->assertSame(2, $monitor['7d']['transaction_count']);
+            $this->assertSame('3', $monitor['7d']['top_products'][0]['formatted_qty']);
             $this->assertStringNotContainsString('(float)', file_get_contents(resource_path('views/v2/pos-monitor.blade.php')));
             if ($role === 'admin') {
                 $response->assertSee('data-default-task="ringkasan"', false)
@@ -158,7 +157,7 @@ class V2WorkspaceViewTest extends TestCase
             } else {
                 $response->assertDontSee('class="form-approve"', false)
                     ->assertSee('data-default-task="kasir"', false)
-                    ->assertSee('Shift saya')
+                    ->assertSee('Shift toko')
                     ->assertSee('Laporan saya')
                     ->assertDontSee('id="admin-overview"', false)
                     ->assertDontSee('data-task="persetujuan"', false)

@@ -1,0 +1,766 @@
+{
+  "title": "Penerimaan supplier dan pembayaran invoice V2 — alur dari current working tree (analisis statis)",
+  "steps": [
+    {
+      "id": "RP01",
+      "label": "Buka tagihan dan penerimaan",
+      "actor": "Admin; kasir untuk tagihan/pembayaran",
+      "before": "GET /v2, autentikasi web dan sesi akun aktif; Operations::role hanya menerima admin/cashier aktif. Jika konfigurasi V2 aktif, endpoint ini mengalihkan ke pos.index, bukan langsung merender. Pemfilteran data dijelaskan untuk WorkspaceController::index saat dipanggil.",
+      "after": "Tagihan 100 terakhir dibaca tanpa pembatas pemilik; last_payment_id ialah pembayaran terakhir selain rejected. Pembayaran 50 terakhir dibatasi requested_by untuk kasir. Admin membaca 50 penerimaan final dan 50 draf draft/cancelled; final memiliki audit konfirmasi melalui receipt_id. Tidak mengubah data transaksi.",
+      "evidence": "app/Http/Controllers/V2/WorkspaceController.php:34",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "v2_invoices": "read",
+        "v2_payments": "read",
+        "v2_parties": "read",
+        "inventory_receipts": "read",
+        "inventory_receipt_items": "read",
+        "v2_receipt_drafts": "read",
+        "products": "read"
+      }
+    },
+    {
+      "id": "RP02",
+      "label": "Cari barang supplier",
+      "actor": "Admin",
+      "before": "GET /v2/suppliers/{id}/products; autentikasi, sesi aktif, role admin di service. q opsional string maksimal 100 karakter; supplier id numerik pada rute.",
+      "after": "Hanya relasi produk-supplier milik id tersebut, supplier aktif berjenis supplier dan produk aktif. Nama/SKU dicari dengan LIKE, hasil diurut nama, default 30 dibatasi 1..50; total dan results dikembalikan. Supplier tidak cocok menghasilkan daftar kosong, bukan penerimaan atau jurnal.",
+      "evidence": "app/Services/V2/SupplyTrips.php:395",
+      "tables": {
+        "v2_user_roles": "read",
+        "v2_product_suppliers": "read",
+        "v2_parties": "read",
+        "products": "read"
+      }
+    },
+    {
+      "id": "RP03",
+      "label": "Simpan draf baru",
+      "actor": "Admin",
+      "before": "POST /v2/receipts memanggil ReceiptDrafts::save, BUKAN SupplyTrips::receive langsung. Autentikasi, sesi aktif dan admin; supplier aktif, tanggal Y-m-d tidak di masa depan, nota opsional <=64, catatan <=255, 1..100 produk berbeda aktif tertaut supplier, jumlah positif dan harga >=0 dengan <=4 desimal; total positif. Kunci ASCII 1..100 karakter wajib.",
+      "after": "Transaksi mengunci user, menyimpan snapshot di v2_receipt_drafts status draft/version 1. Kunci per created_by dengan hash sama mengembalikan draf yang tersimpan; hash berbeda gagal validasi. Tidak membuat receipt final, utang, stok, HPP, kas/bank, atau jurnal. Validasi gagal membatalkan transaksi.",
+      "evidence": "app/Services/V2/ReceiptDrafts.php:16",
+      "tables": {
+        "v2_user_roles": "read",
+        "users": "read",
+        "v2_parties": "read",
+        "products": "read",
+        "v2_product_suppliers": "read",
+        "v2_receipt_drafts": "create,read"
+      }
+    },
+    {
+      "id": "RP04",
+      "label": "Ubah draf",
+      "actor": "Admin, tidak harus pembuat draf",
+      "before": "POST /v2/receipt-drafts/{id}; autentikasi/sesi aktif, role admin. Id draf harus ada, status draft dan version input harus sama persis setelah FILTER_VALIDATE_INT; snapshot penuh divalidasi ulang seperti draf baru.",
+      "after": "Mengunci user serta baris draf; memperbarui snapshot dan menaikkan version. Tidak mengubah request_hash/idempotency_key awal. Status cancelled/confirmed dan versi usang ditolak. Tidak ada efek ke stok, HPP, utang atau jurnal.",
+      "evidence": "app/Services/V2/ReceiptDrafts.php:39",
+      "tables": {
+        "v2_user_roles": "read",
+        "users": "read",
+        "v2_receipt_drafts": "read,update",
+        "v2_parties": "read",
+        "products": "read",
+        "v2_product_suppliers": "read"
+      }
+    },
+    {
+      "id": "RP05",
+      "label": "Batalkan draf",
+      "actor": "Admin, tidak harus pembuat draf",
+      "before": "POST /v2/receipt-drafts/{id}/cancel; autentikasi/sesi aktif dan admin. Draf harus ada, status draft dan version cocok; reason setelah trim sepanjang 5..255 karakter. Jika sudah cancelled, hasil lama dikembalikan sebelum cek versi/alasan.",
+      "after": "Status cancelled, version bertambah dan cancelled_by/cancelled_at/cancel_reason dicatat; draf tidak dihapus. Confirmed tidak dapat dibatalkan. Stok, HPP, receipt final, utang, kas/bank dan jurnal tidak berubah.",
+      "evidence": "app/Services/V2/ReceiptDrafts.php:76",
+      "tables": {
+        "v2_user_roles": "read",
+        "users": "read",
+        "v2_receipt_drafts": "read,update"
+      }
+    },
+    {
+      "id": "RP06",
+      "label": "Periksa konfirmasi dan nota ganda",
+      "actor": "Admin",
+      "before": "POST /v2/receipt-drafts/{id}/confirm; autentikasi/sesi aktif, admin, confirm_final wajib accepted. Id terkunci; confirmed mengembalikan receipt/invoice lama tanpa posting ulang; selain itu status draft dan version cocok. Payload posting berasal dari snapshot tersimpan, bukan item baru pada request.",
+      "after": "SupplyTrips::receive dipanggil dengan kunci draft-receipt-{id}. Nota opsional yang sama untuk supplier sama, lower/trim dan hanya receipt belum void, memicu duplicate_receipt bila confirm_duplicate tidak benar; transaksi gagal sehingga draf tetap draft. Kirim ulang konfirmasi khusus hanya melewati guard nota ganda, bukan guard lain. Replay v2_requests dengan hash sama mengembalikan hasil lama.",
+      "evidence": "app/Services/V2/ReceiptDrafts.php:49",
+      "tables": {
+        "v2_user_roles": "read",
+        "users": "read",
+        "v2_receipt_drafts": "read",
+        "v2_requests": "read",
+        "v2_parties": "read",
+        "inventory_receipts": "read",
+        "v2_invoices": "read"
+      }
+    },
+    {
+      "id": "RP07",
+      "label": "Posting penerimaan final",
+      "actor": "Admin melalui konfirmasi draf",
+      "before": "POST /v2/receipt-drafts/{id}/confirm melanjutkan draf yang sama setelah seluruh guard. SupplyTrips mengunci actor, supplier, produk dan relasi. Supplier/produk harus aktif, semua produk ada dan tertaut; tanggal mundur melewati stock_movements dengan tanggal lebih baru ditolak; total positif. Ledger wajib akun aktif dan jurnal seimbang.",
+      "after": "Dalam transaksi: receipt purchase bernomor RCV dan item dibuat; stok naik, HPP rata-rata tertimbang diperbarui, mutasi v2_receipt masuk. Ledger debit Persediaan/kredit Utang supplier memakai tanggal penerimaan; receipt ditautkan jurnal. Invoice payable AP terhubung receipt_id dibuat amount=total, paid=0,status=open; v2_requests menyimpan replay. Draf menjadi confirmed, version naik, receipt_id/confirmed_by/confirmed_at disimpan. Tidak ada kas/bank keluar. Kegagalan posting menggulung seluruh konfirmasi.",
+      "evidence": "app/Services/V2/SupplyTrips.php:156",
+      "tables": {
+        "v2_user_roles": "read",
+        "users": "read",
+        "v2_receipt_drafts": "read,update",
+        "v2_requests": "create,read",
+        "v2_parties": "read",
+        "products": "read,update",
+        "v2_product_suppliers": "read",
+        "stock_movements": "create,read",
+        "inventory_receipts": "create,update",
+        "inventory_receipt_items": "create",
+        "v2_invoices": "create,read",
+        "chart_of_accounts": "read",
+        "journal_entries": "create",
+        "journal_entry_lines": "create"
+      }
+    },
+    {
+      "id": "RP08",
+      "label": "Tolak void penerimaan final",
+      "actor": "Admin",
+      "before": "POST /v2/receipts/{id}/void; autentikasi/sesi aktif dan admin. Id merujuk inventory_receipts final, BUKAN id draf. Receipt tidak ditemukan menghasilkan 404.",
+      "after": "Receipt yang ada selalu gagal validasi: penerimaan sudah dikonfirmasi dan terkunci, gunakan koreksi/retur. Tidak ada reversal jurnal, pemulihan HPP/stok, pembatalan invoice, update voided_at, atau transisi kembali ke draft. Komentar lama sebelum method masih menjelaskan reversal, tetapi badan method tidak melaksanakannya.",
+      "evidence": "app/Services/V2/SupplyTrips.php:437",
+      "tables": {
+        "v2_user_roles": "read",
+        "users": "read",
+        "inventory_receipts": "read"
+      }
+    },
+    {
+      "id": "RP09",
+      "label": "Validasi pembayaran dan entri ganda",
+      "actor": "Admin atau kasir aktif",
+      "before": "POST /v2/invoices/{id}/payments; autentikasi/sesi aktif, role admin/cashier. amount string <=30, method cash/transfer/main, idempotency_key 8..100, reference opsional <=255, seen_payment_id opsional integer >=0, confirm_duplicate opsional boolean. Nilai uang skala 2 harus positif; invoice ada dan dikunci.",
+      "after": "Kunci pembayaran dicari global: pemohon harus actor sama (lainnya 403), hash invoice/amount/method/reference sama mengembalikan payment lama; isi berbeda ditolak. Arah invoice harus receivable/payable; main untuk receivable ditolak. Jika seen_payment_id ada dan tanpa confirm_duplicate, pembayaran id lebih baru selain rejected memicu duplicate_payment. Tanpa seen_payment_id guard dilewati. Nilai baru harus <= amount-paid dan sisa positif. Tidak ada pembatas kepemilikan invoice; cabang lanjutan bergantung direction/method/role.",
+      "evidence": "app/Services/V2/Operations.php:635",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "v2_invoices": "read",
+        "v2_payments": "read"
+      }
+    },
+    {
+      "id": "RP10",
+      "label": "Terima piutang tunai",
+      "actor": "Admin atau kasir aktif dengan shift sendiri terbuka",
+      "before": "POST /v2/invoices/{id}/payments; setelah validasi umum, invoice receivable dan method=cash. Shift actor berstatus open wajib ada dan dikunci; invoice bisa milik penjual lain karena collect tidak memfilter pemilik.",
+      "after": "Payment posted dengan shift_id sendiri dan approved_by actor dibuat; jurnal debit Kas/kredit Piutang, gerakan laci direction=in/kind=collection. paid invoice bertambah, status paid bila lunas atau open bila sebagian; bila sale_id ada, status penjualan dihitung paid/partial/unpaid. Gagal akun/jurnal atau validasi menggulung transaksi.",
+      "evidence": "app/Services/V2/Operations.php:731",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "v2_invoices": "read,update",
+        "v2_payments": "create,read,update",
+        "v2_shifts": "read",
+        "v2_shift_movements": "create",
+        "v2_sales": "update",
+        "chart_of_accounts": "read",
+        "journal_entries": "create",
+        "journal_entry_lines": "create"
+      }
+    },
+    {
+      "id": "RP11",
+      "label": "Catat transfer pelanggan menunggu",
+      "actor": "Admin atau kasir aktif",
+      "before": "POST /v2/invoices/{id}/payments; validasi umum, invoice receivable, method=transfer. Tidak memerlukan shift; main ditolak untuk piutang.",
+      "after": "Payment pending, shift_id/approved_by/journal_entry_id null. Belum menambah paid invoice, belum mengubah sale atau laci/bank/jurnal. Menunggu approve admin atau reject admin atas payment_id yang sama; meski pencatat admin, transfer piutang tetap pending.",
+      "evidence": "app/Services/V2/Operations.php:713",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "v2_invoices": "read",
+        "v2_payments": "create,read"
+      }
+    },
+    {
+      "id": "RP12",
+      "label": "Ajukan pembayaran supplier",
+      "actor": "Kasir aktif",
+      "before": "POST /v2/invoices/{id}/payments; validasi umum, invoice payable. Pilih main (Kas Utama), transfer (Bank Utama), atau cash (Laci shift). Cash memerlukan shift actor sendiri terbuka; main/transfer tidak wajib shift.",
+      "after": "Payment proposed disimpan dengan requested_by actor, approved_by/journal null. currentShiftId juga disimpan untuk main/transfer bila ada, tetapi tidak berarti laci dipakai. Kasir tidak memanggil postPayable; paid invoice, kas/bank, jurnal dan gerakan laci belum berubah. Saldo buku besar/laci baru diperiksa saat posting; pengajuan tidak mereservasi sisa utang.",
+      "evidence": "app/Services/V2/Operations.php:683",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "v2_invoices": "read",
+        "v2_payments": "create,read",
+        "v2_shifts": "read"
+      }
+    },
+    {
+      "id": "RP13",
+      "label": "Bayar supplier dari Kas Utama",
+      "actor": "Admin aktif",
+      "before": "POST /v2/invoices/{id}/payments; invoice payable, method=main dan validasi umum. Admin membuat proposed lalu langsung postPayable dalam transaksi sama; tidak memerlukan shift. Akun kas harus ada dan saldo debit-kredit setelah dikurangi pembayaran tidak boleh negatif; Ledger juga menuntut akun aktif.",
+      "after": "Payment menjadi posted dengan approved_by admin/journal_id. Jurnal debit Utang supplier/kredit Kas; invoice paid bertambah, status paid bila lunas atau open bila sebagian. Tidak mencatat mutasi laci meskipun shift_id kebetulan tersimpan. Kegagalan saldo/akun membatalkan insert dan posting.",
+      "evidence": "app/Services/V2/Operations.php:706",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "v2_invoices": "read,update",
+        "v2_payments": "create,read,update",
+        "v2_shifts": "read",
+        "chart_of_accounts": "read",
+        "journal_entries": "create",
+        "journal_entry_lines": "create,read"
+      }
+    },
+    {
+      "id": "RP14",
+      "label": "Bayar supplier dari laci",
+      "actor": "Admin aktif dengan shift sendiri terbuka",
+      "before": "POST /v2/invoices/{id}/payments; invoice payable, method=cash dan validasi umum. Shift pemohon harus ada/open/milik requested_by; uang laci opening_cash ditambah masuk dikurangi keluar harus cukup. Saldo buku besar akun kas juga harus cukup dan akun aktif untuk jurnal.",
+      "after": "Admin langsung memposting: debit Utang supplier/kredit Kas, payment posted, invoice paid bertambah/status open atau paid. Gerakan out/kind=supplier dibuat pada shift PEMOHON; bukan mengambil shift admin penyetuju lain. Kegagalan satu guard menggulung transaksi.",
+      "evidence": "app/Services/V2/Operations.php:870",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "v2_invoices": "read,update",
+        "v2_payments": "create,read,update",
+        "v2_shifts": "read",
+        "v2_shift_movements": "create,read",
+        "chart_of_accounts": "read",
+        "journal_entries": "create",
+        "journal_entry_lines": "create,read"
+      }
+    },
+    {
+      "id": "RP15",
+      "label": "Bayar supplier dari bank",
+      "actor": "Admin aktif",
+      "before": "POST /v2/invoices/{id}/payments; invoice payable, method=transfer dan validasi umum. Berbeda dari transfer piutang, admin langsung postPayable. Tidak wajib shift; saldo akun bank debit-kredit harus cukup dan akun aktif.",
+      "after": "Jurnal debit Utang supplier/kredit Bank, payment posted dengan approved_by admin/journal_id, paid invoice naik dan status open/paid. Tidak ada pending verifikasi kedua atau gerakan laci. Jika saldo/akun tidak cukup transaksi gagal seluruhnya.",
+      "evidence": "app/Services/V2/Operations.php:868",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "v2_invoices": "read,update",
+        "v2_payments": "create,read,update",
+        "v2_shifts": "read",
+        "chart_of_accounts": "read",
+        "journal_entries": "create",
+        "journal_entry_lines": "create,read"
+      }
+    },
+    {
+      "id": "RP16",
+      "label": "Setujui transfer piutang",
+      "actor": "Admin aktif",
+      "before": "POST /v2/payments/{id}/approve; payment harus ada, invoice terkait ada/dikunci lalu payment dikunci. Posted mengembalikan sukses tanpa posting lagi; selain pending/proposed ditolak. Nominal positif <= sisa invoice. Untuk receivable hanya method=transfer diizinkan.",
+      "after": "Jurnal debit Bank/kredit Piutang dibuat, payment menjadi posted, approved_by actor dan journal_id diisi. paid invoice bertambah/status open atau paid; sale_id terkait memperbarui status sale. Tidak memerlukan shift atau gerakan laci. Nominal yang sudah terlampaui pembayaran lain menggagalkan approve tanpa mengubah pending.",
+      "evidence": "app/Services/V2/Operations.php:780",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "v2_payments": "read,update",
+        "v2_invoices": "read,update",
+        "v2_sales": "update",
+        "chart_of_accounts": "read",
+        "journal_entries": "create",
+        "journal_entry_lines": "create"
+      }
+    },
+    {
+      "id": "RP17",
+      "label": "Setujui pengajuan supplier",
+      "actor": "Admin aktif; boleh menyetujui pengajuan sendiri",
+      "before": "POST /v2/payments/{id}/approve; payment payable pending/proposed, nominal positif <= sisa invoice dan kunci invoice/payment. Posted idempoten; rejected tidak dapat disetujui. Tidak ada guard pemohon harus berbeda dari penyetuju.",
+      "after": "Memanggil postPayable untuk payment_id/invoice_id yang sama: main memakai Kas Utama, transfer memakai Bank tanpa laci; cash memerlukan shift PEMOHON masih open/miliknya, uang laci cukup dan gerakan out supplier. Semua sumber memerlukan saldo akun cukup dan akun aktif. Payment posted, approved_by/journal_id terisi dan paid invoice/status diperbarui. Gagal guard mempertahankan pengajuan belum posted, bukan mengganti shift atau sumber otomatis.",
+      "evidence": "app/Services/V2/Operations.php:820",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "v2_payments": "read,update",
+        "v2_invoices": "read,update",
+        "v2_shifts": "read",
+        "v2_shift_movements": "create,read",
+        "chart_of_accounts": "read",
+        "journal_entries": "create",
+        "journal_entry_lines": "create,read"
+      }
+    },
+    {
+      "id": "RP18",
+      "label": "Tolak pembayaran menunggu",
+      "actor": "Admin aktif",
+      "before": "POST /v2/payments/{id}/reject; reason string panjang 5..1000 dan trim tetap 5..1000. Payment ada/dikunci dan status pending/proposed. Posted tidak boleh ditolak. Rejected hanya idempoten jika resolved_by actor sama dan resolution_note persis sama.",
+      "after": "Payment menjadi rejected dengan resolution_note/resolved_by/resolved_at. Tidak mengubah paid invoice, sale, stok, laci, saldo kas/bank atau jurnal karena pembayaran belum diposting. Reject ulang dengan actor/catatan berbeda gagal. Tidak ada pembukaan kembali atau reversal untuk posted di endpoint ini.",
+      "evidence": "app/Services/V2/Operations.php:241",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "v2_payments": "read,update"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "RP03",
+      "to": "RP04",
+      "label": "draft_id yang baru disimpan; ubah hanya status draft dan version sesuai"
+    },
+    {
+      "from": "RP03",
+      "to": "RP05",
+      "label": "draft_id sama; batalkan hanya selagi draft"
+    },
+    {
+      "from": "RP04",
+      "to": "RP04",
+      "label": "draft_id sama; ubah lagi memakai version terbaru"
+    },
+    {
+      "from": "RP04",
+      "to": "RP05",
+      "label": "draft_id sama masih draft; cancel dengan versi terbaru"
+    },
+    {
+      "from": "RP03",
+      "to": "RP06",
+      "label": "draft_id sama; konfirmasi snapshot tersimpan"
+    },
+    {
+      "from": "RP04",
+      "to": "RP06",
+      "label": "draft_id sama; konfirmasi versi hasil edit"
+    },
+    {
+      "from": "RP06",
+      "to": "RP06",
+      "label": "draft_id sama tetap draft setelah duplicate_receipt; kirim ulang confirm_duplicate"
+    },
+    {
+      "from": "RP06",
+      "to": "RP07",
+      "label": "draft_id sama; receive sukses lalu tautkan receipt_id dan status confirmed"
+    },
+    {
+      "from": "RP07",
+      "to": "RP08",
+      "label": "receipt_id hasil konfirmasi yang sama; percobaan void ditolak tanpa transisi final"
+    },
+    {
+      "from": "RP09",
+      "to": "RP10",
+      "label": "invoice_id sama dari request tervalidasi; pilih cabang direction/method/role yang cocok"
+    },
+    {
+      "from": "RP09",
+      "to": "RP11",
+      "label": "invoice_id sama dari request tervalidasi; pilih cabang direction/method/role yang cocok"
+    },
+    {
+      "from": "RP09",
+      "to": "RP12",
+      "label": "invoice_id sama dari request tervalidasi; pilih cabang direction/method/role yang cocok"
+    },
+    {
+      "from": "RP09",
+      "to": "RP13",
+      "label": "invoice_id sama dari request tervalidasi; pilih cabang direction/method/role yang cocok"
+    },
+    {
+      "from": "RP09",
+      "to": "RP14",
+      "label": "invoice_id sama dari request tervalidasi; pilih cabang direction/method/role yang cocok"
+    },
+    {
+      "from": "RP09",
+      "to": "RP15",
+      "label": "invoice_id sama dari request tervalidasi; pilih cabang direction/method/role yang cocok"
+    },
+    {
+      "from": "RP11",
+      "to": "RP16",
+      "label": "payment_id pending yang sama dan invoice_id yang sama; admin approve"
+    },
+    {
+      "from": "RP11",
+      "to": "RP18",
+      "label": "payment_id pending yang sama; admin reject"
+    },
+    {
+      "from": "RP12",
+      "to": "RP17",
+      "label": "payment_id proposed yang sama dan invoice_id yang sama; admin approve"
+    },
+    {
+      "from": "RP12",
+      "to": "RP18",
+      "label": "payment_id proposed yang sama; admin reject"
+    }
+  ],
+  "unknowns": [
+    "Analisis statis current working tree saja; tidak menjalankan aplikasi, artisan, tes, browser, membaca env, database atau rahasia. Keberadaan tabel/migrasi terpasang, akun COA aktif, saldo, sesi, locking lintas koneksi dan hasil runtime tidak diverifikasi.",
+    "Cakupan hanya penerimaan supplier V2 dan pembayaran invoice. Asal invoice receivable dari checkout/saldo awal serta proses shift/saldo awal tidak ditelusuri end-to-end; invoice yang sudah ada adalah input pembayaran. Ritase, pengiriman, uang muka, transaksi V1 dan laporan di luar cakupan.",
+    "Tidak ditemukan rute koreksi/retur penerimaan final dalam routes/v2.php yang dibaca; SupplyTrips::voidReceipt selalu menolak. Proses koreksi yang disebut pesan error bukan implementasi yang tersedia pada jalur ini. Tidak ada panah cancelled -> confirm atau final -> draft.",
+    "Ketidaksesuaian nama: POST /v2/receipts sekarang menyimpan draf, bukan receipt posted. PHPDoc sebelum SupplyTrips::voidReceipt masih menjanjikan pembatalan/reversal dan prasyarat stok; badan method 437..443 tidak menulis apa pun.",
+    "UI workspace.blade.php 55..56 menimpa sourceLabel sumber pembayaran dengan peta sumber shift; tampilan sumber pembayaran pada baris 283 dapat menjadi tanda kosong walau method tersimpan benar. Ini temuan statis, belum diamati di browser.",
+    "Draf edit tidak memperbarui request_hash awal (ReceiptDrafts.php 29..41). Replay create dengan kunci/hash awal mengembalikan keadaan draf saat ini, bukan snapshot awal; retry create memakai payload hasil edit dengan kunci lama akan gagal hash. Tidak disimpulkan sebagai perubahan kebijakan.",
+    "Guard duplicate_payment opsional: pemanggil tanpa seen_payment_id atau dengan confirm_duplicate melewatinya. Pending/proposed tidak menambah invoice.paid sehingga beberapa pengajuan dapat berjumlah lebih dari sisa; approve memeriksa ulang sisa dan bisa gagal. Ini bukan reservasi utang/piutang.",
+    "ReceiptDrafts::requireAdmin dan SupplyTrips::requireAdmin hanya membaca role, berbeda dari Operations::role yang juga memeriksa users.is_active. Jalur web memiliki EnsureActiveAccount (bootstrap/app.php 15, middleware 13..27); keamanan pemanggilan service di luar web tidak dibuktikan.",
+    "Pembatas kepemilikan berlaku pada daftar pembayaran kasir (WorkspaceController 53), tetapi daftar invoice dan collect tidak memfilter owner. Aktor tidak disimpulkan dari label menu. Pembayaran supplier cash menggunakan laci pemohon, bukan laci penyetuju; main dan transfer dapat menyimpan shift_id tanpa memakai laci.",
+    "Proofs ialah rentang kutipan langsung yang dapat dibaca builder, maksimal 18 baris/rentang dan 3 rentang/langkah. Bukti diprioritaskan pada guard serta writes; tidak semua baris validasi atau dependency ditampilkan. JSON tidak memuat salinan source, data operasional, atau nilai rahasia."
+  ],
+  "proofs": [
+    {
+      "step_id": "RP01",
+      "path": "app/Services/V2/Operations.php",
+      "start": 34,
+      "end": 49,
+      "label": "Peran aktif yang benar-benar diotorisasi"
+    },
+    {
+      "step_id": "RP01",
+      "path": "app/Http/Controllers/V2/WorkspaceController.php",
+      "start": 34,
+      "end": 48,
+      "label": "Redirect dan tagihan tanpa filter pemilik"
+    },
+    {
+      "step_id": "RP01",
+      "path": "app/Http/Controllers/V2/WorkspaceController.php",
+      "start": 74,
+      "end": 91,
+      "label": "Riwayat final dan draf dipisahkan"
+    },
+    {
+      "step_id": "RP02",
+      "path": "app/Http/Controllers/V2/WorkspaceController.php",
+      "start": 418,
+      "end": 423,
+      "label": "Rute pencarian ke service"
+    },
+    {
+      "step_id": "RP02",
+      "path": "app/Services/V2/SupplyTrips.php",
+      "start": 395,
+      "end": 410,
+      "label": "Akses admin dan produk aktif tertaut"
+    },
+    {
+      "step_id": "RP02",
+      "path": "app/Services/V2/SupplyTrips.php",
+      "start": 412,
+      "end": 425,
+      "label": "Jumlah hasil dan payload pilihan"
+    },
+    {
+      "step_id": "RP03",
+      "path": "app/Http/Controllers/V2/WorkspaceController.php",
+      "start": 384,
+      "end": 394,
+      "label": "Endpoint receipts menyimpan draf"
+    },
+    {
+      "step_id": "RP03",
+      "path": "app/Services/V2/ReceiptDrafts.php",
+      "start": 24,
+      "end": 41,
+      "label": "Idempotensi dan insert draf"
+    },
+    {
+      "step_id": "RP03",
+      "path": "app/Services/V2/ReceiptDrafts.php",
+      "start": 123,
+      "end": 140,
+      "label": "Produk aktif, relasi supplier dan nilai"
+    },
+    {
+      "step_id": "RP04",
+      "path": "app/Services/V2/ReceiptDrafts.php",
+      "start": 38,
+      "end": 44,
+      "label": "Update snapshot dan version"
+    },
+    {
+      "step_id": "RP04",
+      "path": "app/Services/V2/ReceiptDrafts.php",
+      "start": 174,
+      "end": 191,
+      "label": "Kunci draf dan guard status/versi"
+    },
+    {
+      "step_id": "RP04",
+      "path": "resources/views/v2/sprint2.blade.php",
+      "start": 787,
+      "end": 799,
+      "label": "UI mengirim snapshot/version ke endpoint draf"
+    },
+    {
+      "step_id": "RP05",
+      "path": "app/Services/V2/ReceiptDrafts.php",
+      "start": 76,
+      "end": 91,
+      "label": "Idempoten cancelled dan audit pembatalan"
+    },
+    {
+      "step_id": "RP05",
+      "path": "app/Services/V2/ReceiptDrafts.php",
+      "start": 184,
+      "end": 191,
+      "label": "Hanya draft dengan versi cocok"
+    },
+    {
+      "step_id": "RP06",
+      "path": "app/Http/Controllers/V2/WorkspaceController.php",
+      "start": 396,
+      "end": 401,
+      "label": "Persetujuan final wajib pada endpoint"
+    },
+    {
+      "step_id": "RP06",
+      "path": "app/Services/V2/ReceiptDrafts.php",
+      "start": 53,
+      "end": 68,
+      "label": "Replay confirmed dan snapshot tersimpan"
+    },
+    {
+      "step_id": "RP06",
+      "path": "app/Services/V2/SupplyTrips.php",
+      "start": 102,
+      "end": 115,
+      "label": "Guard nota supplier ganda pada konfirmasi"
+    },
+    {
+      "step_id": "RP07",
+      "path": "app/Services/V2/SupplyTrips.php",
+      "start": 187,
+      "end": 204,
+      "label": "Stok dan HPP tertimbang serta awal mutasi"
+    },
+    {
+      "step_id": "RP07",
+      "path": "app/Services/V2/SupplyTrips.php",
+      "start": 213,
+      "end": 230,
+      "label": "Jurnal penerimaan dan invoice payable terhubung"
+    },
+    {
+      "step_id": "RP07",
+      "path": "app/Services/V2/ReceiptDrafts.php",
+      "start": 59,
+      "end": 71,
+      "label": "Konfirmasi atomik dan audit draf"
+    },
+    {
+      "step_id": "RP08",
+      "path": "app/Http/Controllers/V2/WorkspaceController.php",
+      "start": 409,
+      "end": 414,
+      "label": "Endpoint lama dipertahankan tetapi ditolak"
+    },
+    {
+      "step_id": "RP08",
+      "path": "app/Services/V2/SupplyTrips.php",
+      "start": 437,
+      "end": 451,
+      "label": "Badan voidReceipt selalu menolak receipt yang ada"
+    },
+    {
+      "step_id": "RP09",
+      "path": "app/Http/Controllers/V2/WorkspaceController.php",
+      "start": 321,
+      "end": 329,
+      "label": "Validasi request pembayaran"
+    },
+    {
+      "step_id": "RP09",
+      "path": "app/Services/V2/Operations.php",
+      "start": 650,
+      "end": 667,
+      "label": "Kunci invoice dan replay pembayaran"
+    },
+    {
+      "step_id": "RP09",
+      "path": "app/Services/V2/Operations.php",
+      "start": 1055,
+      "end": 1066,
+      "label": "Guard perubahan pembayaran sejak form dibuka"
+    },
+    {
+      "step_id": "RP10",
+      "path": "app/Services/V2/Operations.php",
+      "start": 731,
+      "end": 748,
+      "label": "Shift dan payment posted tunai"
+    },
+    {
+      "step_id": "RP10",
+      "path": "app/Services/V2/Operations.php",
+      "start": 748,
+      "end": 764,
+      "label": "Jurnal kas dan uang laci masuk"
+    },
+    {
+      "step_id": "RP10",
+      "path": "app/Services/V2/Operations.php",
+      "start": 766,
+      "end": 774,
+      "label": "Saldo invoice dan status sale diperbarui"
+    },
+    {
+      "step_id": "RP11",
+      "path": "app/Services/V2/Operations.php",
+      "start": 668,
+      "end": 681,
+      "label": "Guard sumber dan sisa tagihan"
+    },
+    {
+      "step_id": "RP11",
+      "path": "app/Services/V2/Operations.php",
+      "start": 713,
+      "end": 729,
+      "label": "Transfer receivable selalu pending"
+    },
+    {
+      "step_id": "RP12",
+      "path": "app/Services/V2/Operations.php",
+      "start": 683,
+      "end": 700,
+      "label": "Sumber dana dan proposed"
+    },
+    {
+      "step_id": "RP12",
+      "path": "app/Services/V2/Operations.php",
+      "start": 700,
+      "end": 710,
+      "label": "Admin saja langsung posting setelah insert"
+    },
+    {
+      "step_id": "RP13",
+      "path": "app/Services/V2/Operations.php",
+      "start": 700,
+      "end": 710,
+      "label": "Admin collect langsung postPayable"
+    },
+    {
+      "step_id": "RP13",
+      "path": "app/Services/V2/Operations.php",
+      "start": 861,
+      "end": 870,
+      "label": "main memakai akun kas tanpa laci"
+    },
+    {
+      "step_id": "RP13",
+      "path": "app/Services/V2/Operations.php",
+      "start": 926,
+      "end": 937,
+      "label": "Saldo buku besar tidak boleh negatif"
+    },
+    {
+      "step_id": "RP14",
+      "path": "app/Services/V2/Operations.php",
+      "start": 870,
+      "end": 887,
+      "label": "Guard kepemilikan/saldo laci dan jurnal"
+    },
+    {
+      "step_id": "RP14",
+      "path": "app/Services/V2/Operations.php",
+      "start": 893,
+      "end": 910,
+      "label": "Gerakan supplier keluar di shift pemohon"
+    },
+    {
+      "step_id": "RP14",
+      "path": "app/Services/V2/Operations.php",
+      "start": 913,
+      "end": 923,
+      "label": "Payment posted dan invoice diperbarui"
+    },
+    {
+      "step_id": "RP15",
+      "path": "app/Services/V2/Operations.php",
+      "start": 861,
+      "end": 870,
+      "label": "Transfer memilih akun bank bukan laci"
+    },
+    {
+      "step_id": "RP15",
+      "path": "app/Services/V2/Operations.php",
+      "start": 883,
+      "end": 887,
+      "label": "Jurnal bayar supplier"
+    },
+    {
+      "step_id": "RP15",
+      "path": "app/Services/V2/Operations.php",
+      "start": 913,
+      "end": 930,
+      "label": "Finalisasi payment/invoice dan guard akun"
+    },
+    {
+      "step_id": "RP16",
+      "path": "app/Services/V2/Operations.php",
+      "start": 794,
+      "end": 809,
+      "label": "Status dan sisa diperiksa ulang"
+    },
+    {
+      "step_id": "RP16",
+      "path": "app/Services/V2/Operations.php",
+      "start": 811,
+      "end": 825,
+      "label": "Cabang verifikasi transfer receivable"
+    },
+    {
+      "step_id": "RP16",
+      "path": "app/Services/V2/Operations.php",
+      "start": 828,
+      "end": 842,
+      "label": "Payment invoice dan sale diperbarui"
+    },
+    {
+      "step_id": "RP17",
+      "path": "app/Services/V2/Operations.php",
+      "start": 794,
+      "end": 809,
+      "label": "Approve hanya status layak dan sisa cukup"
+    },
+    {
+      "step_id": "RP17",
+      "path": "app/Services/V2/Operations.php",
+      "start": 820,
+      "end": 825,
+      "label": "Approve payable menggunakan postPayable"
+    },
+    {
+      "step_id": "RP17",
+      "path": "app/Services/V2/Operations.php",
+      "start": 870,
+      "end": 887,
+      "label": "Laci pemohon, saldo akun dan jurnal saat approve"
+    },
+    {
+      "step_id": "RP18",
+      "path": "app/Http/Controllers/V2/WorkspaceController.php",
+      "start": 353,
+      "end": 360,
+      "label": "Input alasan penolakan"
+    },
+    {
+      "step_id": "RP18",
+      "path": "app/Services/V2/Operations.php",
+      "start": 241,
+      "end": 258,
+      "label": "Akses dan replay rejected"
+    },
+    {
+      "step_id": "RP18",
+      "path": "app/Services/V2/Operations.php",
+      "start": 259,
+      "end": 271,
+      "label": "Guard status dan audit penolakan"
+    }
+  ]
+}

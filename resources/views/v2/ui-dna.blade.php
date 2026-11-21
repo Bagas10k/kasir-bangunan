@@ -458,7 +458,7 @@ html body #panel-kasir .pos-history-full{margin:26px 0 0 !important;padding:18px
 html body #panel-kasir #h-sales{font-family:'Inter Kasir',sans-serif;font-size:18px;line-height:22px;font-weight:700;color:#102A1D;margin:0;padding:0 !important;border:0 !important}
 html body #panel-kasir #h-sales::after{display:none}
 html body #panel-kasir .pos-history-sub{margin:4px 0 0;font-size:13px;line-height:16px;color:#5F7468}
-html body #panel-kasir #history-filter-form{display:grid !important;grid-template-columns:minmax(0,300fr) minmax(0,200fr) minmax(0,352fr) minmax(0,130fr) auto;align-items:start;gap:12px;margin:10px 0 0;padding:0;border:0;background:transparent;box-shadow:none;position:static;overflow:visible}
+html body #panel-kasir #history-filter-form{display:grid !important;grid-template-columns:minmax(0,240fr) minmax(0,220fr) minmax(0,180fr) minmax(0,352fr) minmax(0,130fr) auto;align-items:start;gap:12px;margin:10px 0 0;padding:0;border:0;background:transparent;box-shadow:none;position:static;overflow:visible}
 html body #panel-kasir #history-filter-form .field{margin:0;min-width:0}
 html body #panel-kasir #history-filter-form label{display:block;margin:0 0 4px;font-size:13px;line-height:16px;font-weight:600;color:#3C4A42}
 html body #panel-kasir #history-filter-form :is(input.form-control,.select-trigger,.date-trigger,select.form-control){height:44px;min-height:44px;border:1px solid #DFE6E1;border-radius:8px;background:#fff;font-size:14px;color:#102A1D;box-shadow:none}
@@ -571,13 +571,13 @@ html body #panel-kasir #kasir .pd-top .pd-top-bar{display:none !important}
   html body #panel-kasir #kasir .pd-kpi:not(.pd-kpi--stock) .pd-long{display:none}
   html body #panel-kasir #kasir .pd-kpi:not(.pd-kpi--stock) .pd-short{display:inline}
   html body #panel-kasir #kasir .pd-kpi--stock .pd-short{display:none}
-  html body #panel-kasir #kasir .pd-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:12px;row-gap:14px;min-height:0;padding:16px 16px 0}
+  html body #panel-kasir #kasir .pd-head{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;column-gap:12px;row-gap:14px;min-height:0;padding:16px 16px 0}
   html body #panel-kasir #kasir .pd-controls{display:contents}
-  html body #panel-kasir #kasir .pd-head .pos-shift-notice{grid-column:2;grid-row:1;position:relative;height:36px;padding:0 12px 0 14px;gap:6px;border-radius:18px}
+  html body #panel-kasir #kasir .pd-head .pos-shift-notice{grid-column:1;grid-row:2;position:relative;min-height:44px;height:auto;padding:8px 12px 8px 14px;gap:6px;border-radius:18px}
   html body #panel-kasir #kasir .pd-head .pos-shift-action{position:static;min-height:0;height:auto;padding:0;border:0;background:transparent;color:#14532D}
   html body #panel-kasir #kasir .pd-head .pos-shift-action span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
   html body #panel-kasir #kasir .pd-head .pos-shift-action::after{content:'';position:absolute;inset:-4px 0}
-  html body #panel-kasir #kasir .pd-seg{grid-column:1/-1;grid-row:2;width:100%;height:44px}
+  html body #panel-kasir #kasir .pd-seg{grid-column:1/-1;grid-row:3;width:100%;height:44px}
   html body #panel-kasir #kasir .pd-seg button{flex:1 1 0;width:auto;height:36px;min-height:36px}
   html body #panel-kasir #kasir .pd-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:14px 16px 16px}
   html body #panel-kasir #kasir .pd-kpi.pd-kpi--stock{grid-column:1/-1}
@@ -645,17 +645,18 @@ html body #panel-kasir #kasir .pd-top .pd-top-bar{display:none !important}
 
   /* Riwayat: cari, rentang, metode + Terapkan; baris berupa daftar. */
   html body #panel-kasir .pos-history-full{padding:16px;margin-top:16px !important}
-  html body #panel-kasir #history-filter-form{grid-template-columns:minmax(0,1fr) auto !important;grid-template-areas:"search search" "date date" "method act";gap:10px;margin-top:14px}
+  html body #panel-kasir #history-filter-form{grid-template-columns:minmax(0,1fr) auto !important;grid-template-areas:"search search" "shift shift" "date date" "method act";gap:10px;margin-top:14px}
   html body #panel-kasir #history-filter-form label{position:absolute;width:1px;height:1px;margin:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
   html body #panel-kasir #history-filter-form .field:has(#sales-search){grid-area:search}
+  html body #panel-kasir #history-filter-form .field:has(#history-shift){grid-area:shift}
   html body #panel-kasir #history-filter-form .field:has(#sales-method){grid-area:method}
   html body #panel-kasir #history-filter-form .field-date-range{grid-area:date}
   html body #panel-kasir #history-filter-form .field:has(#sales-perpage){display:none}
   html body #panel-kasir #history-filter-form .sales-filter-actions{grid-area:act;grid-column:auto !important;margin:0 !important;gap:8px}
   html body #panel-kasir #history-filter-form .sales-filter-actions>button{width:auto !important;padding:0 20px !important}
   html body #panel-kasir #history-filter-form .sales-filter-actions>a{display:none}
-  html body #panel-kasir #history-filter-form:has(#sales-search:not([value=""]),#sales-start:not([value=""]),#sales-method option[selected]:not([value=""])) .sales-filter-actions>a{display:inline-flex;width:auto !important;padding:0 14px !important}
-  html body #panel-kasir .pos-history-full>.scroll{margin:14px 0 0 !important;padding:0;border:0 !important;overflow:visible !important}
+  html body #panel-kasir #history-filter-form[data-filtered="1"] .sales-filter-actions>a{display:inline-flex;width:auto !important;padding:0 14px !important}
+  html body #panel-kasir .pos-history-full #history-results>.scroll{margin:14px 0 0 !important;padding:0;border:0 !important;overflow:visible !important}
   html body #panel-kasir #history-table,html body #panel-kasir #history-table tbody,html body #panel-kasir #history-table thead{display:block !important;width:100% !important;min-width:0 !important}
   html body #panel-kasir #history-table thead{position:static !important;width:auto !important;height:auto !important;overflow:visible !important;clip:auto !important;clip-path:none !important;border-bottom:1px solid #E4EBE6}
   html body #panel-kasir #history-table tr{display:grid !important;grid-template-columns:auto minmax(0,1fr) auto 72px;grid-template-areas:"inv inv total status" "date method total doc";column-gap:10px;row-gap:4px;width:auto !important;margin:0 !important;padding:12px 0 !important;border:0 !important;border-bottom:1px solid #EEF2EF !important;border-radius:0 !important;background:transparent !important;box-shadow:none !important}
@@ -680,7 +681,7 @@ html body #panel-kasir #kasir .pd-top .pd-top-bar{display:none !important}
   html body #panel-kasir #history-table thead th:is(:nth-child(2),:nth-child(3),:nth-child(6)){display:none !important}
   html body #panel-kasir #history-table .ui-badge{min-width:64px;height:24px;padding:0 10px}
   html body #panel-kasir #history-table .doc-links{justify-content:center}
-  html body #panel-kasir #history-table .doc-links a{min-width:0;height:28px;padding:0 6px;border:0;background:transparent;text-decoration:underline;text-underline-offset:3px}
+  html body #panel-kasir #history-table .doc-links a{min-width:44px;min-height:44px;height:auto;padding:0 6px;border:0;background:transparent;text-decoration:underline;text-underline-offset:3px}
   html body #panel-kasir .pos-history-full .pagination{display:grid;gap:10px;margin-top:4px;padding-top:12px;border-top:1px solid #EEF2EF}
   html body #panel-kasir .pos-history-full .pagination-controls{display:flex;justify-content:space-between;flex-wrap:nowrap !important;width:100%}
   html body #panel-kasir .pos-history-full .pagination-controls>.page-btn{width:44px;min-width:44px;height:40px;min-height:40px;padding:0;font-size:0}

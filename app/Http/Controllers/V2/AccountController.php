@@ -4,13 +4,13 @@ namespace App\Http\Controllers\V2;
 
 use App\Http\Controllers\Controller;
 use App\Services\V2\Operations;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
 
 class AccountController extends Controller
@@ -22,7 +22,7 @@ class AccountController extends Controller
         $actorId = (int) $request->user()->id;
         $this->operations->requireRole($actorId, ['admin']);
 
-        if (!$request->user()->is_active) {
+        if (! $request->user()->is_active) {
             abort(403, 'Actor is inactive.');
         }
 
@@ -31,6 +31,7 @@ class AccountController extends Controller
             ->select([
                 'users.id',
                 'users.name',
+                'users.username',
                 'users.email',
                 'users.is_active',
                 'v2_user_roles.role',
@@ -42,14 +43,15 @@ class AccountController extends Controller
                 return [
                     'id' => (int) $row->id,
                     'name' => (string) $row->name,
-                    'email' => (string) $row->email,
+                    'username' => $row->username,
+                    'email' => $row->email,
                     'is_active' => (bool) $row->is_active,
                     'role' => $row->role,
                     'updated_at' => (string) $row->updated_at,
                 ];
             });
 
-        return response()->json(['accounts' => $accounts])->header('Cache-Control','private, no-store');
+        return response()->json(['accounts' => $accounts])->header('Cache-Control', 'private, no-store');
     }
 
     public function store(Request $request): JsonResponse
@@ -57,40 +59,41 @@ class AccountController extends Controller
         $actorId = (int) $request->user()->id;
         $this->operations->requireRole($actorId, ['admin']);
 
-        if (!$request->user()->is_active) {
+        if (! $request->user()->is_active) {
             abort(403, 'Actor is inactive.');
         }
 
+        $this->normalizeIdentifiers($request);
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'max:255', 'email'],
+            'username' => ['nullable', 'required_without:email', 'string', 'min:3', 'max:32', 'regex:/^[a-z0-9][a-z0-9._-]*$/', 'not_in:admin'],
+            'email' => ['nullable', 'required_without:username', 'string', 'max:255', 'email'],
             'password' => ['required', 'string', 'min:12', 'max:128', 'confirmed'],
             'role' => ['required', 'string', 'in:admin,cashier'],
             'is_active' => ['required', 'boolean'],
         ]);
 
-        $normalizedEmail = strtolower(trim($validated['email']));
+        $normalizedEmail = $validated['email'] ?? null;
+        $normalizedUsername = $validated['username'] ?? null;
 
         try {
-            return DB::transaction(function () use ($actorId, $validated, $normalizedEmail) {
+            return DB::transaction(function () use ($actorId, $validated, $normalizedEmail, $normalizedUsername) {
                 // Lock ALL v2_user_roles rows in stable user_id order BEFORE fetching actor/target
                 DB::table('v2_user_roles')->orderBy('user_id')->lockForUpdate()->get();
 
                 // Recheck actor own role row under transaction lock
                 $actor = DB::table('users')->where('id', $actorId)->lockForUpdate()->first();
                 $actorRole = DB::table('v2_user_roles')->where('user_id', $actorId)->value('role');
-                if (!$actor || !$actor->is_active || $actorRole !== 'admin') {
+                if (! $actor || ! $actor->is_active || $actorRole !== 'admin') {
                     abort(403, 'Forbidden.');
                 }
 
-                $existingEmail = DB::table('users')->where('email', $normalizedEmail)->exists();
-                if ($existingEmail) {
-                    throw ValidationException::withMessages(['email' => ['Email login sudah digunakan.']]);
-                }
+                $this->requireAvailableIdentifiers($normalizedUsername, $normalizedEmail);
 
                 $now = now();
                 $userId = DB::table('users')->insertGetId([
                     'name' => $validated['name'],
+                    'username' => $normalizedUsername,
                     'email' => $normalizedEmail,
                     'password' => Hash::make($validated['password']),
                     'is_active' => (bool) $validated['is_active'],
@@ -113,7 +116,7 @@ class AccountController extends Controller
                     'target_id' => $userId,
                     'action' => 'create',
                     'changes' => json_encode([
-                        'changed_fields' => ['name', 'email', 'role', 'is_active', 'password'],
+                        'changed_fields' => ['name', 'username', 'email', 'role', 'is_active', 'password'],
                         'role' => $validated['role'],
                         'is_active' => (bool) $validated['is_active'],
                     ]),
@@ -123,7 +126,8 @@ class AccountController extends Controller
                 $account = [
                     'id' => (int) $userId,
                     'name' => (string) $validated['name'],
-                    'email' => (string) $normalizedEmail,
+                    'username' => $normalizedUsername,
+                    'email' => $normalizedEmail,
                     'is_active' => (bool) $validated['is_active'],
                     'role' => (string) $validated['role'],
                     'updated_at' => (string) $now,
@@ -133,7 +137,8 @@ class AccountController extends Controller
             });
         } catch (QueryException $e) {
             if (str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'UNIQUE') || in_array((int) ($e->errorInfo[1] ?? 0), [1062, 2067], true)) {
-                throw ValidationException::withMessages(['email' => ['Email login sudah digunakan.']]);
+                $field = str_contains(strtolower($e->getMessage()), 'username') ? 'username' : 'email';
+                throw ValidationException::withMessages([$field => ['Username atau email login sudah digunakan.']]);
             }
             throw $e;
         }
@@ -144,37 +149,46 @@ class AccountController extends Controller
         $actorId = (int) $request->user()->id;
         $this->operations->requireRole($actorId, ['admin']);
 
-        if (!$request->user()->is_active) {
+        if (! $request->user()->is_active) {
             abort(403, 'Actor is inactive.');
         }
 
         $targetId = (int) $id;
 
+        $this->normalizeIdentifiers($request);
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'max:255', 'email'],
+            'username' => ['nullable', 'string', 'min:3', 'max:32', 'regex:/^[a-z0-9][a-z0-9._-]*$/', 'not_in:admin'],
+            'email' => ['nullable', 'string', 'max:255', 'email'],
             'role' => ['required', 'string', 'in:admin,cashier'],
             'is_active' => ['required', 'boolean'],
             'password' => ['nullable', 'string', 'min:12', 'max:128', 'confirmed'],
         ]);
 
-        $normalizedEmail = strtolower(trim($validated['email']));
-
         try {
-            return DB::transaction(function () use ($actorId, $targetId, $validated, $normalizedEmail) {
+            return DB::transaction(function () use ($actorId, $targetId, $validated) {
                 // Lock ALL v2_user_roles rows in stable user_id order BEFORE fetching actor/target
                 DB::table('v2_user_roles')->orderBy('user_id')->lockForUpdate()->get();
 
                 // Recheck actor own role row under transaction
                 $actor = DB::table('users')->where('id', $actorId)->lockForUpdate()->first();
                 $actorRole = DB::table('v2_user_roles')->where('user_id', $actorId)->value('role');
-                if (!$actor || !$actor->is_active || $actorRole !== 'admin') {
+                if (! $actor || ! $actor->is_active || $actorRole !== 'admin') {
                     abort(403, 'Forbidden.');
                 }
 
                 $target = DB::table('users')->where('id', $targetId)->lockForUpdate()->first();
-                if (!$target) {
+                if (! $target) {
                     abort(404, 'User not found.');
+                }
+
+                $normalizedUsername = array_key_exists('username', $validated) ? $validated['username'] : $target->username;
+                $normalizedEmail = array_key_exists('email', $validated) ? $validated['email'] : $target->email;
+                if ($normalizedUsername === null && $normalizedEmail === null) {
+                    throw ValidationException::withMessages([
+                        'username' => ['Isi username atau email login.'],
+                        'email' => ['Isi username atau email login.'],
+                    ]);
                 }
 
                 $targetRole = DB::table('v2_user_roles')->where('user_id', $targetId)->lockForUpdate()->value('role') ?? 'cashier';
@@ -184,7 +198,7 @@ class AccountController extends Controller
 
                 // Rule: Forbid self disable / demotion
                 if ($actorId === $targetId) {
-                    if ($newRole !== 'admin' || !$newIsActive) {
+                    if ($newRole !== 'admin' || ! $newIsActive) {
                         abort(422, 'Akun sendiri tidak dapat dinonaktifkan atau dilepas dari Admin.');
                     }
                 }
@@ -193,7 +207,7 @@ class AccountController extends Controller
                 $isTargetActiveAdmin = ($targetRole === 'admin' && (bool) $target->is_active);
                 $willTargetBeActiveAdmin = ($newRole === 'admin' && $newIsActive);
 
-                if ($isTargetActiveAdmin && !$willTargetBeActiveAdmin) {
+                if ($isTargetActiveAdmin && ! $willTargetBeActiveAdmin) {
                     $activeAdminCount = DB::table('v2_user_roles')
                         ->join('users', 'users.id', '=', 'v2_user_roles.user_id')
                         ->where('v2_user_roles.role', 'admin')
@@ -213,23 +227,20 @@ class AccountController extends Controller
 
                 if ($hasOpenShift) {
                     $isRoleChange = ($targetRole !== $newRole);
-                    $isDeactivation = ((bool) $target->is_active && !$newIsActive);
+                    $isDeactivation = ((bool) $target->is_active && ! $newIsActive);
                     if ($isRoleChange || $isDeactivation) {
                         abort(422, 'Tutup shift akun ini dahulu sebelum mengganti role atau menonaktifkannya.');
                     }
                 }
 
-                // Check duplicate email for other users
-                $emailTaken = DB::table('users')
-                    ->where('email', $normalizedEmail)
-                    ->where('id', '!=', $targetId)
-                    ->exists();
-                if ($emailTaken) {
-                    throw ValidationException::withMessages(['email' => ['Email login sudah digunakan.']]);
-                }
+                $this->requireAvailableIdentifiers($normalizedUsername, $normalizedEmail, $targetId);
 
                 // Track changes
                 $changedFields = [];
+                $usernameChanged = $target->username !== $normalizedUsername;
+                if ($usernameChanged) {
+                    $changedFields[] = 'username';
+                }
                 if ($target->name !== $validated['name']) {
                     $changedFields[] = 'name';
                 }
@@ -244,7 +255,7 @@ class AccountController extends Controller
                 if ($statusChanged) {
                     $changedFields[] = 'is_active';
                 }
-                $passwordChanged = !empty($validated['password']);
+                $passwordChanged = ! empty($validated['password']);
                 if ($passwordChanged) {
                     $changedFields[] = 'password';
                 }
@@ -252,6 +263,7 @@ class AccountController extends Controller
                 $now = now();
                 $userUpdates = [
                     'name' => $validated['name'],
+                    'username' => $normalizedUsername,
                     'email' => $normalizedEmail,
                     'is_active' => $newIsActive,
                     'updated_at' => $now,
@@ -262,7 +274,7 @@ class AccountController extends Controller
                 }
 
                 // On change role/status/password increment auth_version, rotate remember_token, delete sessions
-                if ($roleChanged || $statusChanged || $passwordChanged) {
+                if ($roleChanged || $statusChanged || $passwordChanged || $usernameChanged) {
                     $userUpdates['auth_version'] = (int) $target->auth_version + 1;
                     $userUpdates['remember_token'] = Str::random(60);
 
@@ -302,7 +314,8 @@ class AccountController extends Controller
                 $updated = [
                     'id' => $targetId,
                     'name' => (string) $validated['name'],
-                    'email' => (string) $normalizedEmail,
+                    'username' => $normalizedUsername,
+                    'email' => $normalizedEmail,
                     'is_active' => $newIsActive,
                     'role' => (string) $newRole,
                     'updated_at' => (string) $now,
@@ -312,9 +325,36 @@ class AccountController extends Controller
             });
         } catch (QueryException $e) {
             if (str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'UNIQUE') || in_array((int) ($e->errorInfo[1] ?? 0), [1062, 2067], true)) {
-                throw ValidationException::withMessages(['email' => ['Email login sudah digunakan.']]);
+                $field = str_contains(strtolower($e->getMessage()), 'username') ? 'username' : 'email';
+                throw ValidationException::withMessages([$field => ['Username atau email login sudah digunakan.']]);
             }
             throw $e;
+        }
+    }
+
+    private function normalizeIdentifiers(Request $request): void
+    {
+        foreach (['username', 'email'] as $field) {
+            $value = $request->input($field);
+            if (is_string($value)) {
+                $request->merge([$field => strtolower(trim($value)) ?: null]);
+            }
+        }
+    }
+
+    private function requireAvailableIdentifiers(?string $username, ?string $email, ?int $exceptId = null): void
+    {
+        foreach (['username' => $username, 'email' => $email] as $field => $value) {
+            if ($value === null) {
+                continue;
+            }
+            $query = DB::table('users')->where($field, $value);
+            if ($exceptId !== null) {
+                $query->where('id', '!=', $exceptId);
+            }
+            if ($query->exists()) {
+                throw ValidationException::withMessages([$field => [($field === 'username' ? 'Username' : 'Email login').' sudah digunakan.']]);
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class CoaManagementTest extends TestCase
@@ -41,7 +42,7 @@ class CoaManagementTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Bagan Akun (Chart of Accounts)');
         $response->assertSee('1101');
-        $response->assertSee('Kas Toko (Tunai)');
+        $response->assertSee('Kas Utama (Tunai)');
         $response->assertSee('4101');
         $response->assertSee('Pendapatan Penjualan Material');
 
@@ -242,7 +243,7 @@ class CoaManagementTest extends TestCase
     public function test_system_account_code_cannot_be_modified(): void
     {
         $acc = DB::table('chart_of_accounts')->where('account_code', '1101')->first();
-        if (!$acc) {
+        if (! $acc) {
             $this->actingAs($this->user)->get(route('coa.index'));
             $acc = DB::table('chart_of_accounts')->where('account_code', '1101')->first();
         }
@@ -266,7 +267,7 @@ class CoaManagementTest extends TestCase
     public function test_system_account_cannot_be_deleted(): void
     {
         $acc = DB::table('chart_of_accounts')->where('account_code', '1101')->first();
-        if (!$acc) {
+        if (! $acc) {
             $this->actingAs($this->user)->get(route('coa.index'));
             $acc = DB::table('chart_of_accounts')->where('account_code', '1101')->first();
         }
@@ -317,7 +318,7 @@ class CoaManagementTest extends TestCase
     public function test_coa_pagination_preserves_reverse_proxy_subpath(): void
     {
         config(['app.url' => 'https://example.test/kasir-bangunan']);
-        \Illuminate\Support\Facades\URL::forceRootUrl('https://example.test/kasir-bangunan');
+        URL::forceRootUrl('https://example.test/kasir-bangunan');
 
         $response = $this->actingAs($this->user)->get('https://example.test/coa');
 

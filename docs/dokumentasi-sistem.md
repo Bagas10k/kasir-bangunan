@@ -1,7 +1,7 @@
 ---
 judul: Dokumentasi Sistem Kasir Bangunan (tb01)
 versi_sistem: V2 (V2_ENABLED=true)
-terakhir_diperbarui: 2026-11-08
+terakhir_diperbarui: 2026-11-20
 sumber_kebenaran: kode di repositori ini (app/Services/V2, app/Http, routes, database/migrations)
 ---
 
@@ -27,7 +27,7 @@ Semua aturan di dokumen ini diambil dari kode yang berjalan, bukan dari rencana.
 3. Peran dan hak akses
 4. Memulai dari nol
 5. Alur harian dalam satu gambar
-6. Shift kasir dan laci kas
+6. Shift toko bersama dan laci kas
 7. Penjualan di Kasir
 8. Tagihan dan pembayaran
 9. Persetujuan dan penolakan pembayaran
@@ -53,7 +53,7 @@ Semua aturan di dokumen ini diambil dari kode yang berjalan, bukan dari rencana.
 Kasir Bangunan adalah aplikasi web (Laravel) untuk toko material bangunan. Satu aplikasi menangani:
 
 - penjualan di kasir (tunai, transfer, kredit) dengan harga eceran atau harga kontraktor;
-- shift kasir dan uang laci;
+- shift toko bersama dan uang laci;
 - piutang pelanggan dan utang supplier;
 - pengiriman barang dengan armada toko, sopir, uang muka sopir, dan biaya perjalanan;
 - penerimaan barang dari supplier (pembelian kredit);
@@ -81,7 +81,7 @@ Halaman Keuangan (Jurnal umum, Neraca, Laba rugi, Arus kas, Bagan akun) adalah h
 | Grup | Menu | Siapa |
 |---|---|---|
 | Pengawasan | Ringkasan, Persetujuan pembayaran, Akun login | Admin |
-| Operasional | Kasir (POS), Tagihan, Pengiriman, Kas & laporan (tab Shift kasir dan Laporan harian) | Admin dan kasir |
+| Operasional | Kasir (POS), Tagihan, Pengiriman, Kas & laporan (tab Shift toko dan Laporan harian) | Admin dan kasir |
 | Operasional | Penerimaan barang | Admin |
 | Master data | Produk, Supplier & pelanggan, Karyawan & sopir, Mobil, Satuan & kategori | Admin |
 | Keuangan | Jurnal umum, Neraca, Laba rugi, Arus kas, Bagan akun (COA) | Admin |
@@ -96,7 +96,7 @@ Untuk kasir, menu "Kas & laporan" bernama "Shift & laporan saya" dan hanya beris
 
 | Istilah | Arti |
 |---|---|
-| Shift | Masa kerja satu kasir, dari buka sampai tutup. Setiap penjualan dan uang tunai tercatat ke shift. |
+| Shift | Sesi operasional toko yang dibuka/ditutup admin dan dipakai bersama seluruh kasir. Setiap transaksi tetap mencatat petugasnya; laci direkap bersama. Shift pribadi lama tetap menjadi riwayat, bukan dipindahkan. |
 | Laci (kas laci) | Uang tunai fisik yang dipegang kasir selama shift. Dihitung dari modal awal ditambah uang masuk dikurangi uang keluar. |
 | Modal awal | Uang tunai di laci saat shift dibuka. |
 | Carry | Membawa uang hasil hitung shift sebelumnya sebagai modal shift berikutnya. |
@@ -123,8 +123,8 @@ Ada dua peran: **admin** dan **kasir** (`v2_user_roles`). Akun tanpa peran atau 
 
 | Kegiatan | Admin | Kasir |
 |---|---|---|
-| Buka dan tutup shift sendiri | Ya | Ya |
-| Tutup shift kasir lain | Ya | Tidak |
+| Buka dan tutup shift toko | Ya | Tidak |
+| Memakai shift toko aktif untuk transaksi | Ya | Ya |
 | Selesaikan pemeriksaan selisih shift | Ya | Tidak |
 | Menjual di kasir | Ya (perlu shift terbuka) | Ya (perlu shift terbuka) |
 | Membuat pelanggan baru dari kasir | Ya | Ya |
@@ -139,17 +139,30 @@ Ada dua peran: **admin** dan **kasir** (`v2_user_roles`). Akun tanpa peran atau 
 | Saldo awal pembukuan | Ya | Tidak |
 | Akun login (buat, ubah, nonaktifkan) | Ya | Tidak |
 | Laporan harian | Semua kasir | Hanya miliknya |
-| Ringkasan penjualan di Kasir | Semua kasir | Hanya miliknya |
+| Ringkasan penjualan di Kasir | Seluruh toko | Seluruh toko, sama untuk periode yang sama |
 | Keuangan (jurnal, neraca, laba rugi, arus kas, COA) | Baca saja | Tidak |
 | Cetak nota / surat jalan | Semua | Hanya penjualannya sendiri |
 
 Aturan tambahan untuk akun login (`AccountController`):
+- Login menerima username pendek (misalnya `kasir01`) atau email. Nama tampilan bukan identifier login.
+- Username unik, 3–32 karakter huruf/angka/titik/garis bawah/tanda hubung, diawali huruf/angka; disimpan huruf kecil. `Kasir01` dan `kasir01` adalah username yang sama. `admin` tetap alias khusus akun admin lama dan tidak bisa diberikan ke akun baru.
+- Akun wajib mempunyai minimal salah satu: username atau email. Akun username saja menyimpan email NULL, bukan email rekaan. Email lama dan password lama tidak diubah migrasi.
 - Kata sandi minimal 12 karakter.
 - Admin tidak bisa menonaktifkan dirinya sendiri atau melepas peran adminnya sendiri.
 - Admin aktif terakhir tidak boleh dinonaktifkan atau diturunkan.
 - Akun yang masih punya shift terbuka harus menutup shift dulu sebelum diganti perannya atau dinonaktifkan.
 - Setiap perubahan dicatat di `v2_account_audits`.
-- Mengubah akun menaikkan `auth_version`, sehingga sesi lama akun itu langsung berakhir.
+- Mengubah username, peran, status, atau password menaikkan `auth_version`, merotasi remember token, dan mengakhiri sesi lama akun itu. Mengubah nama tampilan saja tidak mengakhiri sesi.
+
+### 3.1 Membuat akses kasir dan mengganti password
+
+1. Login sebagai admin, buka **Pengawasan › Akun login › Tambah akun**.
+2. Isi **Nama tampilan**, misalnya Kasir Pagi, dan **Username login**, misalnya `kasir01`. Email boleh dikosongkan jika username sudah diisi; akun email lama tetap didukung.
+3. Pilih **Hak akses: Kasir**, **Status akun: Aktif**.
+4. Isi **Password baru** minimal 12 karakter dan **Ulangi password** dengan nilai yang sama; simpan. Password diisi langsung di aplikasi, tidak dicatat di panduan/log.
+5. Kasir masuk lewat halaman login yang sama dengan username tersebut dan password yang ditetapkan. Admin membuka shift toko; kasir otomatis memakai shift aktif itu sebelum menjual.
+6. Untuk reset password, admin memilih **Ubah akun**, mengisi password baru beserta konfirmasi, kemudian menyimpan. Password lama tidak dapat dilihat kembali karena hanya hash yang disimpan. Kosongkan kedua kolom password saat mengubah data lain agar password tetap.
+7. Untuk akun email lama yang ingin memakai username, pilih **Ubah akun** lalu isi username unik; email lama boleh dipertahankan. Perubahan username mengakhiri sesi akun itu dan memerlukan login ulang.
 
 ---
 
@@ -163,7 +176,7 @@ Urutan menyiapkan toko baru. Langkah 1 dan 2 dikerjakan pengembang di server; si
 2. Setelah itu akun login berikutnya cukup dibuat lewat menu **Pengawasan › Akun login**.
 3. **Isi master data** (admin): satuan dan kategori, supplier, produk (tautkan ke supplier), pelanggan, karyawan dan sopir, mobil. Bisa satu per satu atau impor Excel (bagian 12.7).
 4. **Posting saldo awal** (admin, sekali seumur instalasi): menu **Kas & laporan**, kartu "Saldo awal pembukuan". Isi kas, bank, stok awal per produk, piutang awal, utang awal (bagian 13). Saldo awal hanya bisa diposting selama belum ada jurnal, stok, atau tagihan apa pun.
-5. **Buka shift** dan mulai berjualan (bagian 6 dan 7).
+5. **Admin membuka shift toko**, kemudian kasir mulai berjualan memakai shift tersebut (bagian 6 dan 7).
 
 Penting: barang hanya bisa dijual bila stoknya cukup. Stok masuk lewat saldo awal atau penerimaan barang dari supplier.
 
@@ -174,7 +187,7 @@ Penting: barang hanya bisa dijual bila stoknya cukup. Stok masuk lewat saldo awa
 ```
  KASIR                                   ADMIN
  ─────                                   ─────
- Buka shift (modal awal) ───────────────┐
+ Gunakan shift toko aktif ◄───────────── Admin buka shift (modal awal)
         │                               │
  Jual di Kasir ──┬─ Tunai ──► uang masuk laci, piutang langsung lunas
                  ├─ Transfer ─► pembayaran "menunggu" ─────► Verifikasi transfer ─► masuk Bank
@@ -186,7 +199,7 @@ Penting: barang hanya bisa dijual bila stoknya cukup. Stok masuk lewat saldo awa
                           └─ Transfer ─► menunggu ─────────► Verifikasi transfer
  Ajukan bayar supplier ────────────────────────────────────► Setujui (pemohon tidak boleh menyetujui sendiri)
         │                                Penerimaan barang dari supplier ─► stok naik + utang supplier
- Tutup shift (hitung uang fisik)
+ Admin tutup shift (rekap otomatis seluruh kasir + hitung uang fisik)
         ├─ cocok ──► Selesai
         └─ selisih ─► Perlu diperiksa ──────────────────────► Selesaikan dengan alasan
                                          Laporan harian, Ringkasan, Jurnal, Neraca, Laba rugi, Arus kas
@@ -194,20 +207,26 @@ Penting: barang hanya bisa dijual bila stoknya cukup. Stok masuk lewat saldo awa
 
 ---
 
-## 6. Shift kasir dan laci kas
+## 6. Shift toko bersama dan laci kas
 
-Kode: `Operations::openShift`, `closeShift`, `resolveShift`. Menu: **Kas & laporan › Shift kasir**.
+Kode: `Operations::openShift`, `activeStoreShift`, `closeShift`, `resolveShift`, `ShiftClosingSummary`. Menu: **Kas & laporan › Shift toko** (kasir: **Shift toko & laporan saya**).
 
 ### 6.1 Membuka shift
 
-- Satu orang hanya boleh punya satu shift terbuka.
+- Hanya admin yang boleh membuka/menutup shift toko. Maksimal satu shift toko aktif untuk seluruh akun, dilindungi indeks unik `store_open_key` dan pemeriksaan server.
+- Kasir tidak membuka shift sendiri. Penjualan, penerimaan tunai dan pembayaran laci memakai ID shift toko aktif yang sama. `v2_sales.user_id`/pengaju pembayaran tetap petugas sebenarnya, bukan diganti menjadi admin pembuka.
+- Status di layar admin/kasir memakai sumber aktif yang sama (`GET /v2/shifts/active`, baca saja, no-store). Tab yang terlihat memeriksa setiap sekitar 5 detik dan saat kembali fokus. Perubahan status memperbarui data di tempat tanpa menghapus keranjang atau memuat ulang halaman. Jika status tidak dapat diperiksa, checkout ditahan dan keranjang tetap disimpan; server tetap memeriksa shift saat transaksi.
+- Jika belum dibuka, kasir melihat "Menunggu admin membuka shift toko". Setelah ditutup admin, transaksi baru tidak boleh masuk shift lama; perlu shift berikutnya dibuka admin.
+- `user_id` shift menyimpan pembuka; `closed_by` menyimpan admin penutup. `is_shared` membedakan shift toko dari shift pribadi historis.
+- Saat peningkatan versi, bila hanya ada satu shift terbuka dan pembukanya admin, ID itu dijadikan shift toko tanpa mengubah uang/transaksinya. Bila ada beberapa shift lama atau pembukanya kasir, tidak digabung otomatis: admin memeriksa dan menutup masing-masing dari riwayat, lalu membuka shift toko. Jangan reset data atau menganggap semua laci lama satu laci.
+- Rekap API menyebut `scope=store` untuk laci bersama dan `sales_scope=own/all` untuk rincian penjualan. Kasir hanya menerima rincian penjualan miliknya; admin menerima seluruh penjualan shift untuk penutupan. Saldo laci bersama tidak dibatasi per kasir.
 - Modal awal tidak boleh negatif dan boleh nol.
 - Sumber modal:
 
 | Sumber | Arti | Aturan |
 |---|---|---|
 | Dari admin (`admin`) | Modal diberikan admin | Tidak boleh memilih shift asal |
-| Sisa shift sebelumnya (`carry`) | Modal diambil dari uang hasil hitung shift sebelumnya | Wajib memilih shift asal milik sendiri yang sudah ditutup; modal tidak boleh melebihi uang hitung shift asal |
+| Sisa shift sebelumnya (`carry`) | Modal diambil dari uang hasil hitung shift sebelumnya | Wajib memilih shift toko bersama yang sudah ditutup (boleh pembuka admin berbeda), atau shift pribadi historis milik admin sendiri; modal tidak boleh melebihi uang hitung shift asal |
 | Admin + sisa shift (`both`) | Sebagian dari sisa shift, sisanya dari admin | Modal harus lebih besar dari uang hitung shift asal; seluruh uang hitung dibawa, sisanya dicatat sebagai modal dari admin |
 
 - Satu shift asal hanya bisa dibawa sekali.
@@ -221,18 +240,22 @@ Setiap gerakan uang tunai laci dicatat di `v2_shift_movements`:
 |---|---|---|
 | Masuk | `sale` | Penjualan tunai |
 | Masuk | `collection` | DP tunai penjualan kredit, atau pelunasan piutang secara tunai |
-| Masuk | `adjustment` | Sisa uang muka sopir dikembalikan tunai (masuk ke laci admin) |
+| Masuk | `adjustment` | Sisa uang muka sopir dikembalikan tunai (masuk ke laci toko aktif) |
 | Keluar | `supplier` | Pembayaran tunai ke supplier yang sudah disetujui |
-| Keluar | `adjustment` | Uang muka sopir tunai, biaya ritase tunai (dari laci admin) |
+| Keluar | `adjustment` | Uang muka sopir tunai, biaya ritase tunai (dari laci toko aktif) |
 
 **Uang seharusnya di laci = modal awal + semua uang masuk − semua uang keluar.**
 
 ### 6.3 Menutup shift
 
-1. Kasir menghitung uang fisik dan mengisi "uang hitung".
-2. Sistem menghitung uang seharusnya (rumus di atas) dan selisihnya.
-3. Selisih nol → status **Selesai** (`closed`). Selisih bukan nol → status **Perlu diperiksa** (`review`).
-4. Kasir hanya bisa menutup shift miliknya; admin bisa menutup shift siapa pun.
+1. Saat popup **Tutup shift** dibuka, sistem menampilkan **rekap otomatis** untuk shift itu (read-only, `ShiftClosingSummary`):
+   - Penjualan: jumlah nota, total, dan rincian tunai / transfer / kredit.
+   - Laci: kas awal, uang masuk, uang keluar, dan **seharusnya di laci** (rumus bagian 6.2).
+   - Jumlah pengajuan tunai dari laci ini yang masih menunggu persetujuan admin (tidak dikurangkan dari saldo, hanya peringatan).
+2. Admin menghitung uang fisik laci bersama lalu mengisi hasilnya. Sistem langsung membandingkan dan menampilkan **Cocok** atau **Selisih lebih/kurang Rp …**.
+3. Saat menutup, form mengirim **tanda rekap** (`fingerprint`). Bila transaksi laci, penjualan, atau pengajuan berubah sejak popup dibuka, server menolak dengan "tutup ulang untuk melihat angka terbaru", supaya yang dibandingkan selalu angka terkini.
+4. Selisih nol → status **Selesai** (`closed`). Selisih bukan nol → status **Perlu diperiksa** (`review`).
+5. Hanya admin yang bisa menutup. Rekap shift toko mencakup seluruh petugas yang bertransaksi pada ID shift yang sama; tidak hanya penjualan admin pembuka. Kasir dapat melihat riwayat bersama, tetapi tidak memiliki tombol/izin membuka atau menutup. Sesi laporan penjualan kasir tetap dibatasi miliknya; angka laci berlabel laci toko bersama.
 
 Contoh: modal 500.000, penjualan tunai 2.300.000, bayar supplier tunai 200.000. Seharusnya 500.000 + 2.300.000 − 200.000 = 2.600.000. Kasir menghitung 2.590.000. Selisih −10.000, shift masuk pemeriksaan.
 
@@ -263,7 +286,7 @@ Isi keranjang disimpan di browser, jadi tidak hilang bila halaman tertutup sebel
 
 Di HP dan tablet tegak, keranjang tampil sebagai bar di bawah layar yang membuka lembar atau laci; aturan dan perhitungannya sama.
 
-Syarat sebelum menyimpan: **kasir harus punya shift terbuka**, untuk metode apa pun.
+Syarat sebelum menyimpan: **shift toko sudah dibuka admin dan masih aktif**, untuk metode apa pun. Kasir memakai shift itu otomatis, tanpa membuka shift pribadi.
 
 ### 7.2 Harga eceran dan harga kontraktor
 
@@ -358,7 +381,7 @@ Setiap nota punya kunci unik dari browser. Bila tombol simpan tertekan dua kali 
 
 ### 7.9 Ringkasan penjualan di atas katalog
 
-Menampilkan penjualan, jumlah transaksi, rata-rata per nota, stok yang perlu perhatian, grafik penjualan, dan 10 produk terlaris untuk Hari ini, 7 hari, atau 30 hari. Setiap angka dibandingkan dengan periode sebelumnya. Admin melihat semua kasir; kasir hanya miliknya. Sumber: `PosDashboard` (hanya membaca).
+Menampilkan penjualan, jumlah transaksi, rata-rata per nota, stok yang perlu perhatian, grafik penjualan, dan 10 produk terlaris untuk Hari ini, 7 hari, atau 30 hari. Setiap angka dibandingkan dengan periode sebelumnya. Admin dan kasir memakai seluruh data toko yang sama, termasuk penjualan yang dibuat admin, bukan difilter berdasarkan akun yang sedang masuk. Kasir tanpa transaksi pribadi tetap melihat angka toko. Sumber: `PosDashboard` (hanya membaca). Pilihan periode disimpan per browser, bukan disinkronkan antar akun/perangkat; bandingkan periode yang sama. Ini tidak memperluas izin kelola akun, ubah master, persetujuan, cetak nota atau rincian riwayat/laporan per petugas.
 
 ---
 
@@ -385,13 +408,15 @@ Status tagihan: **Terbuka** (`open`) atau **Lunas** (`paid`). Sisa = nilai − s
 ### 8.3 Pembayaran utang supplier
 
 - Tombol di baris tagihan supplier: **Bayar ke supplier** (admin) atau **Ajukan pembayaran** (kasir).
-- **Admin**: pembayaran langsung tercatat (`posted`) dan mengurangi utang, dengan pemeriksaan yang sama seperti persetujuan (bagian 9.2): tunai keluar dari laci shift admin yang harus terbuka dan cukup; saldo Kas/Bank tidak boleh negatif; jurnal debit 2101, kredit 1101 atau 1102.
-- **Kasir**: dicatat sebagai **pengajuan** (`proposed`) tanpa jurnal dan baru mengurangi utang setelah admin menyetujui. Tunai mewajibkan shift kasir terbuka, karena uang akan keluar dari lacinya; transfer tidak perlu shift.
-- Nominal tidak boleh melebihi sisa tagihan.
+- **Sumber dana** yang dipilih di popup: **Kas Utama** (`main`, akun 1101), **Bank Utama** (`transfer`, akun 1102), atau **Laci shift** (`cash`, akun 1101 dengan uang laci shift yang sedang terbuka).
+- **Admin**: pembayaran langsung tercatat (`posted`) dan mengurangi utang. Kas Utama dan Bank Utama memakai saldo toko, tidak memerlukan shift, dan tidak mengubah hitungan laci. Laci shift memakai uang laci shift admin sendiri (harus terbuka dan cukup) dan mencatat uang keluar di laci itu.
+- **Kasir**: dicatat sebagai **pengajuan** (`proposed`) tanpa jurnal dan baru mengurangi utang setelah admin menyetujui. Sumber Laci shift memakai shift toko yang aktif saat pengajuan; Kas Utama dan Bank Utama tidak perlu shift. Pengajuan laci pada shift yang sudah ditutup tidak boleh dipindah diam-diam ke shift berikutnya; ajukan ulang.
+- Saldo akun 1101/1102 tidak boleh menjadi negatif; jurnal debit 2101, kredit 1101 atau 1102.
+- Nominal tidak boleh melebihi sisa tagihan. Kas Utama hanya untuk tagihan supplier, bukan pelunasan piutang pelanggan (piutang tetap Tunai/Transfer).
 
 ### 8.5 Penjaga entri dobel pembayaran
 
-- Form bayar membawa id pembayaran terakhir (bukan ditolak) saat halaman dibuat (`seen_payment_id`). Bila sebelum disimpan sudah ada pembayaran baru pada tagihan itu (mis. kasir dan admin mencatat uang yang sama), server menolak dengan pesan berisi nominal, metode, nama pencatat, dan jam, lalu tombol simpan berubah menjadi **Ya, tetap catat**. Simpan berikutnya dikirim dengan `confirm_duplicate` dan dicatat seperti biasa.
+- Form bayar membawa id pembayaran terakhir (bukan ditolak) saat halaman dibuat (`seen_payment_id`). Bila sebelum disimpan sudah ada pembayaran baru pada tagihan itu (mis. kasir dan admin mencatat uang yang sama), server menolak dengan pesan berisi nominal, sumber dana, nama pencatat, dan jam, lalu tombol simpan berubah menjadi **Ya, tetap catat**. Simpan berikutnya dikirim dengan `confirm_duplicate` dan dicatat seperti biasa.
 - Pemeriksaan berjalan di dalam kunci baris tagihan, jadi berlaku juga untuk simpan yang benar-benar bersamaan. Tagihan lunas tetap ditolak "Tagihan sudah lunas".
 - Pemanggil tanpa `seen_payment_id` tidak diperiksa. Klik dobel dengan kunci transaksi yang sama tetap dianggap satu pembayaran.
 
@@ -419,12 +444,13 @@ Kode: `Operations::approvePayment`, `rejectPayment`. Menu: **Pengawasan › Pers
 ### 9.2 Persetujuan pembayaran ke supplier
 
 - Pengajuan datang dari kasir. Pengajuan lama yang dibuat admin sebelum aturan bayar langsung juga bisa disetujui admin (larangan menyetujui pengajuan sendiri dihapus karena toko hanya punya satu admin).
-- Pembayaran tunai:
-  - shift pemohon harus masih terbuka;
-  - uang di laci pemohon harus cukup;
-  - uang keluar dicatat di laci pemohon.
+- Pembayaran dengan sumber **Laci shift** (`cash`):
+  - shift toko saat pengajuan harus masih terbuka (shift pribadi historis tetap memeriksa pemohon);
+  - uang di laci bersama harus cukup;
+  - uang keluar dicatat di shift pengajuan yang sama, identitas pengaju tetap tercatat.
+- Pembayaran dengan sumber **Kas Utama** (`main`) atau **Bank Utama** (`transfer`) tidak memakai shift dan tidak mengubah hitungan laci; yang berkurang hanya saldo akun 1101/1102 di buku besar.
 - Saldo akun yang dipakai (Kas atau Bank) di buku besar tidak boleh menjadi negatif.
-- Jurnal: debit 2101 Utang usaha, kredit 1101 Kas atau 1102 Bank.
+- Jurnal: debit 2101 Utang usaha, kredit 1101 Kas Utama atau 1102 Bank Utama.
 
 ### 9.3 Penolakan
 
@@ -459,7 +485,7 @@ Siap dikirim (prepared) ──Kirim──► Sedang dikirim (sent) ──Terima�
 Dipakai bila sopir dibekali uang sebelum berangkat.
 
 - Isi mobil, sopir, tujuan (atau tautkan ke surat jalan), tanggal, jumlah, dan metode (tunai/transfer).
-- Tunai: admin wajib punya shift terbuka dan laci admin harus cukup. Uang keluar dicatat di laci admin.
+- Tunai: shift toko harus terbuka dan laci bersama harus cukup. Uang keluar dicatat pada shift toko aktif, pelaku tetap admin.
 - Saldo Kas/Bank di buku besar tidak boleh menjadi negatif.
 - Jurnal: debit 1191 Uang muka sopir, kredit 1101 Kas atau 1102 Bank.
 - Status: **Terbuka** sampai diselesaikan.
@@ -470,7 +496,7 @@ Setelah sopir pulang:
 
 - Isi biaya BBM dan uang jalan yang sebenarnya.
 - Biaya aktual **tidak boleh melebihi** uang muka (lihat bagian 21).
-- Bila ada sisa, admin wajib mengonfirmasi sisa sudah diterima dan memilih masuk ke tunai atau transfer. Sisa tunai masuk ke laci admin, jadi admin perlu shift terbuka.
+- Bila ada sisa, admin wajib mengonfirmasi sisa sudah diterima dan memilih masuk ke tunai atau transfer. Sisa tunai masuk ke laci toko bersama, jadi shift toko harus terbuka.
 - Jurnal: debit 6101 Biaya perjalanan (biaya aktual), debit Kas/Bank (sisa), kredit 1191 Uang muka sopir (seluruh uang muka).
 
 Contoh: uang muka tunai 300.000. BBM 180.000 dan uang jalan 80.000 (total 260.000). Sisa 40.000 dikembalikan tunai.
@@ -486,7 +512,7 @@ Contoh: uang muka tunai 300.000. BBM 180.000 dan uang jalan 80.000 (total 260.00
 Dipakai bila biaya perjalanan dibayar tanpa uang muka.
 
 - Isi mobil, sopir, tanggal, tujuan (atau tautkan surat jalan), BBM, uang jalan, dan metode bayar. Total harus lebih dari nol.
-- Tunai: admin wajib punya shift terbuka dan laci admin cukup; uang keluar dicatat di laci admin.
+- Tunai: shift toko harus terbuka dan laci bersama cukup; uang keluar dicatat di shift toko aktif.
 - Jurnal: debit 6101 Biaya perjalanan, kredit Kas/Bank.
 
 ### 10.5 Aturan sopir dan mobil
@@ -500,47 +526,36 @@ Dipakai bila biaya perjalanan dibayar tanpa uang muka.
 
 ## 11. Penerimaan barang dari supplier
 
-Kode: `SupplyTrips::receive`, `SupplyTrips::voidReceipt`. Menu: **Operasional › Penerimaan barang** (admin).
+Kode: `ReceiptDrafts::save/confirm/cancel`, `SupplyTrips::receive`. Menu: **Operasional › Penerimaan barang** (admin).
 
-### 11.1 Aturan
+### 11.1 Draf penerimaan
 
-- Pilih supplier aktif, tanggal penerimaan, catatan, dan 1–100 baris barang (produk, jumlah, harga beli per satuan).
-- Barang dipilih lewat kolom **pencarian** (nama atau SKU), bukan daftar turun. Pencarian dilakukan di server dan hanya menampilkan barang aktif yang tertaut ke supplier terpilih (30 teratas, dengan keterangan "Menampilkan 30 dari N"). Setiap pilihan menampilkan SKU, stok, dan HPP saat ini. Barang yang sudah ada di baris lain tampak redup dan tidak bisa dipilih lagi. Mengganti supplier mengosongkan pilihan barang (jumlah dan harga tetap).
-- Setiap produk **harus sudah ditautkan ke supplier itu** di master Produk.
-- Satu produk hanya boleh satu baris.
-- Produk harus aktif.
-- Tanggal tidak boleh lebih awal dari mutasi stok terakhir produk itu (mencegah penerimaan mundur yang mengacaukan HPP).
-- Total harus lebih dari nol.
-- **No. nota supplier** (opsional, maks 64 karakter) disimpan di `inventory_receipts.supplier_invoice_number`. Bila nomor yang sama (tanpa membedakan huruf besar/kecil dan spasi tepi) sudah tercatat untuk supplier yang sama dan penerimaannya tidak dibatalkan, server menolak dengan pesan berisi nomor RCV, tanggal, dan nilainya; tombol berubah menjadi **Ya, tetap simpan** untuk konfirmasi. Supplier lain dengan nomor sama tidak diperiksa.
-- Sebelum disimpan, tombol **Periksa penerimaan** menampilkan ringkasan: supplier, tanggal, tiap barang (jumlah × harga = nilai), perkiraan HPP lama → baru, dan total utang. Harga yang di bawah setengah atau di atas dua kali HPP saat ini ditandai kuning ("Harga jauh berbeda dari HPP saat ini") supaya salah ketik nol terlihat. Baru tombol **Ya, simpan penerimaan** yang mengirim ke server. Perkiraan HPP di ringkasan hanya tampilan; server menghitung ulang.
+- Alur baru: **Draf → Dikonfirmasi (terkunci)**; draf juga bisa menjadi **Dibatalkan**. Hanya admin yang mengelola draf dan mengonfirmasi.
+- Pilih supplier aktif, tanggal penerimaan, No. nota supplier (opsional, maks 64 karakter), dan 1–100 baris barang (produk, jumlah, harga beli per satuan).
+- Barang dicari di server (nama/SKU) dan harus aktif serta tertaut ke supplier. Satu produk hanya boleh satu baris; jumlah harus positif, harga tidak negatif, total harus positif.
+- **Periksa penerimaan** menampilkan ringkasan supplier, tanggal, barang, jumlah × harga, perkiraan HPP, dan total. Harga di luar setengah–dua kali HPP saat ini ditandai kuning. Tombol **Simpan draf penerimaan** menyimpan draf, bukan memposting transaksi.
+- Draf disimpan di `v2_receipt_drafts`, terpisah dari penerimaan final. Draf **tidak mengubah stok, HPP, utang, kas, bank, jurnal, atau ringkasan penerimaan final**.
+- Daftar **Draf penerimaan** menyediakan **Ubah draf**, **Konfirmasi penerimaan**, dan **Batalkan draf** (alasan wajib). Draf dibatalkan tidak dihapus dan tidak mengubah pembukuan.
+- Versi draf diperiksa saat ubah/konfirmasi/batal. Bila admin lain sudah mengubahnya, muat ulang data dan periksa lagi; jangan menimpa atau mengonfirmasi isi lama.
 
-### 11.2 Yang terjadi
+### 11.2 Konfirmasi dan pembukuan
 
-1. Penerimaan `RCV-000001` dan rinciannya tersimpan.
-2. Stok produk bertambah dan dicatat di `stock_movements`.
-3. **HPP diperbarui dengan rata-rata tertimbang:**
-   HPP baru = (stok lama × HPP lama + jumlah masuk × harga beli) ÷ (stok lama + jumlah masuk)
-   Contoh: stok 20 sak @ 50.000, masuk 30 sak @ 55.000 → (1.000.000 + 1.650.000) ÷ 50 = **53.000**.
-4. Tagihan utang `AP-000001` dibuat sebesar total.
-5. Jurnal: debit 1301 Persediaan, kredit 2101 Utang usaha (tanggal = tanggal penerimaan).
-6. HPP produk sebelum penerimaan disimpan per baris (`inventory_receipt_items.cost_before`) untuk keperluan pembatalan.
+1. Admin membuka konfirmasi dari daftar draf, memeriksa supplier, tanggal, tiap barang dan harga, lalu mencentang pernyataan pemeriksaan dan menekan **Konfirmasi dan kunci**.
+2. Server membaca isi draf yang tersimpan (bukan rincian kiriman konfirmasi), memeriksa versi serta supplier/produk/relasi yang masih aktif. Tanggal tidak boleh mundur melewati mutasi stok berikutnya.
+3. Penjaga No. nota supplier diperiksa kembali saat konfirmasi: nomor yang sama untuk supplier yang sama (tanpa beda huruf dan spasi tepi) memerlukan konfirmasi khusus **Ya, tetap konfirmasi**. Penerimaan yang sudah dibatalkan sebelum aturan baru tidak dihitung.
+4. Dalam satu transaksi, server membuat `RCV-…` beserta rincian, menambah stok, memperbarui HPP rata-rata tertimbang, membuat tagihan `AP-…`, dan memposting jurnal debit 1301 Persediaan / kredit 2101 Utang usaha.
+   HPP baru = (stok lama × HPP lama + jumlah masuk × harga beli) ÷ (stok lama + jumlah masuk).
+5. Draf ditandai `confirmed`, ditautkan ke penerimaan final, serta disimpan siapa dan kapan yang mengonfirmasi. Pengulangan konfirmasi yang sama tidak menambah stok atau jurnal lagi. Kegagalan posting menggagalkan seluruh transaksi dan draf tetap belum dikonfirmasi.
+6. Pembayaran dilakukan terpisah melalui Tagihan (bagian 8.3). Draf belum punya tagihan, sehingga belum bisa dibayar.
 
-Pembayaran ke supplier dilakukan terpisah lewat Tagihan (bagian 8.3) dan disetujui admin (bagian 9.2).
+Riwayat penerimaan menampilkan 50 dokumen final terakhir dan total nilai per halaman. Simpan/perbarui/konfirmasi/batalkan draf memperbarui data di tempat tanpa muat ulang penuh.
 
-Riwayat penerimaan menampilkan 50 penerimaan terakhir per barang, lengkap dengan total nilai per halaman.
+### 11.3 Kunci final dan data lama
 
-### 11.3 Salah input: batalkan lalu catat ulang
-
-Penerimaan yang sudah disimpan tidak bisa diubah. Bila harga atau jumlahnya salah, admin membatalkannya lalu mencatat ulang yang benar.
-
-- Tombol **Batalkan penerimaan** ada di kolom Aksi riwayat. Hanya admin, dan wajib menulis alasan (minimal 5 karakter).
-- Syarat: tagihan supplier penerimaan itu belum punya pembayaran atau pengajuan pembayaran (yang ditolak tidak dihitung), dan barang-barangnya belum punya mutasi stok sesudah penerimaan itu (penjualan atau penerimaan lain). Bila sudah, server menolak dengan pesan yang menyebut alasannya. Tombol hanya tampil bila tagihan masih bersih; pemeriksaan mutasi stok dilakukan server saat membatalkan.
-- Yang terjadi:
-  1. Stok tiap barang dikurangi sebesar jumlah penerimaan (mutasi `v2_receipt_void`) dan HPP kembali ke nilai sebelum penerimaan (`cost_before`). Untuk penerimaan lama tanpa `cost_before`, HPP dihitung balik dari rata-rata tertimbang.
-  2. Jurnal balik: debit 2101 Utang usaha, kredit 1301 Persediaan, sebesar total, tanggal = hari pembatalan.
-  3. Tagihan `AP-…` ditutup: nilai menjadi 0, status lunas, ditandai `voided_at`. Nilai asli tetap di penerimaan.
-  4. Penerimaan tidak dihapus: ditandai `voided_at`, `voided_by`, `void_reason`, `void_journal_entry_id`. Riwayat menampilkan lencana **Dibatalkan** dengan waktu, nama admin, dan alasan; nilainya dicoret dan tidak ikut total halaman maupun ringkasan bulanan.
-- Idempoten per kunci; penerimaan yang sudah dibatalkan tidak bisa dibatalkan lagi.
+- Penerimaan yang sudah dikonfirmasi **tidak boleh diubah atau dibatalkan biasa**, termasuk bila belum dibayar dan stoknya belum dipakai. Tombol pembatalan final dihapus; endpoint pembatalan lama tetap menolak di server agar tidak bisa dilewati lewat kiriman manual.
+- Penerimaan lama yang sudah menambah stok/jurnal tetap dianggap **final**, bukan diubah menjadi draf. Tidak ada penghitungan ulang stok atau jurnal historis dalam migrasi ini.
+- Riwayat pembatalan yang sudah terjadi sebelum aturan baru tetap dipertahankan, lengkap dengan waktu/admin/alasan dan nilai dicoret; tidak ikut total aktif.
+- Salah input sebelum konfirmasi: **Ubah draf**. Setelah final, kesalahan memerlukan dokumen koreksi/retur, bukan membuka kunci atau menghapus penerimaan. **Alur koreksi/retur penerimaan final belum tersedia pada paket ini.**
 
 ---
 
@@ -653,7 +668,7 @@ Kode: `Ledger::post`.
 
 | Kode | Nama (versi `v2:prepare`) | Jenis | Saldo normal | Dipakai untuk |
 |---|---|---|---|---|
-| 1101 | Kas | Aset | Debit | Uang tunai toko, termasuk semua laci |
+| 1101 | Kas Utama (Tunai) | Aset | Debit | Uang tunai toko di luar bank: kas utama/brankas dan semua laci shift. Bank 1102 terpisah. |
 | 1102 | Bank | Aset | Debit | Rekening bank |
 | 1103 | Piutang usaha | Aset | Debit | Tagihan ke pelanggan |
 | 1191 | Uang muka sopir | Aset | Debit | Uang muka sopir yang belum diselesaikan |
@@ -677,8 +692,8 @@ Nama akun di database bisa berbeda dengan tabel ini (lihat bagian 21); kodenya y
 | Penjualan tunai / DP tunai / pelunasan piutang tunai | 1101 | 1103 | `v2_payment` |
 | Verifikasi transfer pelanggan | 1102 | 1103 | `v2_payment` |
 | Persetujuan bayar supplier | 2101 | 1101 atau 1102 | `v2_payment` |
-| Penerimaan barang | 1301 | 2101 | `v2_receipt` |
-| Pembatalan penerimaan | 2101 | 1301 | `v2_receipt_void` |
+| Konfirmasi penerimaan barang (bukan simpan draf) | 1301 | 2101 | `v2_receipt` |
+| Pembatalan penerimaan historis (jalur baru dinonaktifkan) | 2101 | 1301 | `v2_receipt_void` |
 | Uang muka sopir | 1191 | 1101 atau 1102 | `v2_driver_advance` |
 | Penyelesaian uang muka | 6101 biaya; 1101/1102 sisa | 1191 | `v2_driver_advance_settlement` |
 | Biaya ritase langsung | 6101 | 1101 atau 1102 | `v2_trip` |
@@ -791,7 +806,7 @@ Kode: `generateCashFlow`. Metode langsung, hanya dari jurnal yang menyentuh 1101
 |---|---|---|---|
 | Saldo awal | Diisi | Diisi | `v2_opening_balance` |
 | Penerimaan dari supplier | Bertambah | Rata-rata tertimbang | `v2_receipt` |
-| Pembatalan penerimaan | Berkurang | Kembali ke sebelum penerimaan | `v2_receipt_void` |
+| Pembatalan penerimaan historis (bukan draf) | Berkurang | Kembali ke sebelum penerimaan | `v2_receipt_void` |
 | Penjualan | Berkurang | Tetap | `v2_sale` |
 | Pengiriman | Tetap | Tetap | – |
 | Ubah master produk | Tidak bisa | Hanya bila belum ada stok/mutasi | – |
@@ -836,7 +851,7 @@ Angka `NNNNN` adalah nomor urut internal (ID), jadi tidak kembali ke 1 setiap ha
 
 ## 18. Keamanan dan keandalan
 
-- **Login**: maksimal 5 percobaan gagal per email dan IP, lalu harus menunggu. Akun nonaktif tidak bisa login.
+- **Login**: maksimal 5 percobaan gagal per username/email yang dinormalisasi dan IP, lalu harus menunggu. Akun nonaktif tidak bisa login.
 - **Sesi**: setiap permintaan memeriksa akun masih aktif dan `auth_version` belum berubah. Bila akun dinonaktifkan atau diubah, sesinya langsung berakhir.
 - **Peran**: setiap aksi memeriksa peran di server, bukan hanya menyembunyikan tombol.
 - **Arsip lama**: setelah V2 aktif, semua halaman lama hanya bisa dibaca admin (`V2Cutover`). Halaman `/demo-setup` dimatikan.
@@ -914,7 +929,7 @@ Daftar ini jujur tentang apa yang belum ditangani sistem. Butir bertanda **[cek 
 3. **Halaman Keuangan hanya bisa dibaca.** Setelah V2 aktif, menambah/mengubah akun di Bagan akun, jurnal penyesuaian, dan saldo awal lama di halaman Jurnal ditolak (403). Belum ada jalur V2 untuk menambah akun atau membuat jurnal penyesuaian.
 4. **Selisih kas shift tidak dijurnal.** Bila uang fisik kurang atau lebih, buku besar Kas tetap memakai angka seharusnya. Selisih hanya dicatat di shift dengan alasan dari admin.
 5. **Belum ada beban operasional di V2.** Listrik, gaji, perlengkapan, dan beban lain (6102–6199) hanya ada di halaman lama, yang sekarang hanya bisa dibaca.
-6. **Belum ada retur atau pembatalan nota penjualan.** Nota yang sudah disimpan tidak bisa dibatalkan atau dikembalikan lewat sistem. (Penerimaan barang sudah bisa dibatalkan, bagian 11.3.)
+6. **Belum ada retur atau pembatalan nota penjualan.** Nota yang sudah disimpan tidak bisa dibatalkan atau dikembalikan lewat sistem. Penerimaan final juga terkunci; koreksi/retur belum tersedia. Hanya draf penerimaan yang bisa diubah/dibatalkan (bagian 11.3).
 7. **Belum ada stok opname atau penyesuaian stok di V2.** Stok hanya berubah lewat saldo awal, penerimaan, dan penjualan.
 8. **Penjualan kredit tidak punya jatuh tempo.** "Lewat tempo" hanya bisa terjadi pada piutang dari saldo awal.
 9. **Biaya perjalanan melebihi uang muka belum didukung.** Selisih lebih harus dicatat terpisah, padahal jalur pengeluaran terpisah belum ada (lihat butir 5).
@@ -942,7 +957,13 @@ Daftar ini jujur tentang apa yang belum ditangani sistem. Butir bertanda **[cek 
 
 | Tanggal | Perubahan |
 |---|---|
+| 2026-11-20 | Koreksi ringkasan POS: admin/kasir memakai agregat seluruh toko untuk KPI, grafik, produk terlaris, dan pembanding semua periode. Pilihan periode tetap per browser; atribusi transaksi dan pembatasan aksi/rincian per petugas tidak berubah (bagian 7.9). |
+| 2026-11-20 | Shift toko bersama dibuka/ditutup admin, kasir otomatis memakai ID shift yang sama dengan identitas transaksi tetap terpisah. Status lintas sesi diperbarui ringan, tombol admin dibatasi server/UI, laci bersama berlabel jelas; riwayat lama tidak dipindah. Migrasi is_shared/store_open_key/closed_by (bagian 6). |
+| 2026-11-20 | Akun login mendukung username pendek unik tanpa wajib email; email lama dan alias admin tetap didukung. Form akun menambah username, pencarian/tabel menampilkan username, dan perubahan username mengakhiri sesi lama (bagian 3.1). Migrasi menambah users.username dan membuat email nullable, tanpa mengubah akun/password lama. |
+| 2026-11-16 | Penerimaan: simpan draf tanpa efek stok/utang, ubah/batal draf, konfirmasi terpisah dan kunci final di server; data lama tetap final. Koreksi/retur final belum tersedia (bagian 11). |
+| 2026-11-16 | Tutup shift menampilkan rekap otomatis (rincian penjualan dan perkiraan laci) sebelum kasir mengisi uang fisik; banding cocok/selisih langsung, dan penutupan menolak rekap yang sudah kedaluwarsa (bagian 6.3). |
 | 2026-11-08 | Dokumen pertama: seluruh alur V2 dari shift sampai laporan keuangan, termasuk harga kontraktor, tampilan HP/tablet, dan daftar batasan. |
+| 2026-11-10 | Pembayaran supplier memakai sumber dana Kas Utama (1101), Bank Utama (1102), atau Laci shift; akun 1101 diberi nama Kas Utama (Tunai) (bagian 8.3, 9.2, 14.1). Kas Utama dan Bank Utama tidak memakai shift dan tidak mengubah laci. |
 | 2026-11-08 | Penjualan: popup "Penjualan berhasil" setelah simpan (bagian 7.1 langkah 9). Tidak ada perubahan aturan atau angka. |
 | 2026-11-08 | Penerimaan barang: pemilih barang berupa pencarian server (nama/SKU) per supplier (bagian 11.1). Tidak ada perubahan aturan stok, HPP, atau jurnal. |
 | 2026-11-08 | Seluruh ruang kerja: setelah simpan (tambah/ubah/arsip master, penerimaan, shift, pembayaran, persetujuan, pengiriman, penjualan) halaman tidak lagi dimuat ulang; data diperbarui di tempat. Tidak ada perubahan aturan atau angka. |

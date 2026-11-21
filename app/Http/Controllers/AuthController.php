@@ -91,7 +91,7 @@ class AuthController extends Controller
                 <input type="hidden" name="_token" value="'.$escapedCsrf.'">
                 <div class="form-group">
                     <label for="email">Nama pengguna atau email</label>
-                    <input type="text" id="email" name="email" value="'.$oldIdentifier.'" placeholder="contoh: admin atau kasir@toko.com" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus'.$errorAttr.'>
+                    <input type="text" id="email" name="email" value="'.$oldIdentifier.'" placeholder="contoh: kasir01 atau kasir@toko.com" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus'.$errorAttr.'>
                 </div>
                 <div class="form-group">
                     <label for="password">Kata sandi</label>
@@ -125,7 +125,12 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
-        $throttleKey = Str::transliterate(Str::lower($request->input('email')).'|'.$request->ip());
+        $input = $request->input('email');
+        $identifier = is_string($input) ? Str::lower(trim($input)) : '';
+        if (is_string($input)) {
+            $request->merge(['email' => $identifier]);
+        }
+        $throttleKey = Str::transliterate($identifier.'|'.$request->ip());
 
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
@@ -139,12 +144,6 @@ class AuthController extends Controller
             'email' => 'required|string|max:255',
             'password' => 'required|string',
         ]);
-        $validator->after(function ($validator) use ($request) {
-            $identifier = (string) $request->input('email');
-            if ($identifier !== 'admin' && ! filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
-                $validator->errors()->add('email', 'Nama pengguna atau email tidak dikenal.');
-            }
-        });
 
         if ($validator->fails()) {
             return redirect()->route('login')
@@ -155,6 +154,8 @@ class AuthController extends Controller
         $credentials = $validator->validated();
         if ($credentials['email'] === 'admin') {
             $credentials['email'] = 'admin@kasirbangunan.test';
+        } elseif (! filter_var($credentials['email'], FILTER_VALIDATE_EMAIL)) {
+            $credentials = ['username' => $credentials['email'], 'password' => $credentials['password']];
         }
 
         $credentials['is_active'] = true;

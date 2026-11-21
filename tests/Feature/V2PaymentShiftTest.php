@@ -92,13 +92,48 @@ class V2PaymentShiftTest extends TestCase
         $this->fail('Akses ditolak diharapkan.');
     }
 
+    public function test_cashiers_share_one_drawer_but_keep_transaction_identity(): void
+    {
+        $admin = $this->actor('admin');
+        $otherAdmin = $this->actor('admin');
+        $firstCashier = $this->actor('cashier');
+        $secondCashier = $this->actor('cashier');
+        $this->accounts();
+        $product = $this->product();
+        $customer = $this->party('customer', 'SYN-C-SHARED-001');
+
+        $this->assertForbidden(fn () => $this->ops()->openShift($firstCashier->id, '100.00', 'admin'));
+        $this->assertDatabaseCount('v2_shifts', 0);
+        $shift = $this->ops()->openShift($admin->id, '100.00', 'admin');
+        $this->expectValidation(fn () => $this->ops()->openShift($otherAdmin->id, '100.00', 'admin'));
+        $this->assertDatabaseCount('v2_shifts', 1);
+
+        foreach ([$firstCashier, $secondCashier] as $cashier) {
+            $sale = $this->ops()->checkout($cashier->id, $this->creditPayload($product, $customer, '20.00', 'cash'));
+            $this->assertDatabaseHas('v2_sales', ['id' => $sale['sale_id'], 'shift_id' => $shift, 'user_id' => $cashier->id]);
+            $this->assertDatabaseHas('v2_payments', ['invoice_id' => $sale['invoice_id'], 'shift_id' => $shift, 'requested_by' => $cashier->id, 'amount' => '20.00', 'status' => 'posted']);
+        }
+        $this->assertDatabaseCount('v2_sales', 2);
+        $this->assertDatabaseCount('v2_payments', 2);
+        $this->assertEquals(40, DB::table('v2_shift_movements')->where('shift_id', $shift)->where('direction', 'in')->sum('amount'));
+        $this->assertEquals(8, DB::table('products')->where('id', $product)->value('stock_quantity'));
+        $this->assertForbidden(fn () => $this->ops()->closeShift($secondCashier->id, $shift, '140.00'));
+        $this->assertDatabaseHas('v2_shifts', ['id' => $shift, 'status' => 'open', 'store_open_key' => 1]);
+
+        $closed = $this->ops()->closeShift($otherAdmin->id, $shift, '140.00');
+        $this->assertSame('140.00', $closed['expected']);
+        $this->assertSame('0.00', $closed['difference']);
+        $this->assertSame('closed', $closed['status']);
+        $this->assertDatabaseHas('v2_shifts', ['id' => $shift, 'store_open_key' => null]);
+    }
+
     public function test_credit_deposit_needs_explicit_method_and_cash_dp_posts_on_drawer(): void
     {
         $cashier = $this->actor('cashier');
         $this->accounts();
         $product = $this->product();
         $customer = $this->party('customer', 'SYN-C-A-001');
-        $shift = $this->ops()->openShift($cashier->id, '100.00', 'admin');
+        $shift = $this->ops()->openShift($this->storeShiftAdmin()->id, '100.00', 'admin');
 
         $this->expectValidation(fn () => $this->ops()->checkout($cashier->id, $this->creditPayload($product, $customer, '20.00')));
         $this->assertDatabaseCount('v2_sales', 0);
@@ -108,6 +143,8 @@ class V2PaymentShiftTest extends TestCase
         $this->assertSame('posted', $payment->status);
         $this->assertSame('cash', $payment->method);
         $this->assertSame($shift, (int) $payment->shift_id);
+        $this->assertSame($cashier->id, (int) $payment->requested_by);
+        $this->assertDatabaseHas('v2_shifts', ['id' => $shift, 'user_id' => $this->storeShiftAdmin()->id, 'is_shared' => true]);
         $this->assertSame('20.00', $result['paid']);
         $this->assertSame('partial', $result['status']);
         $this->assertEquals(20, DB::table('v2_invoices')->where('id', $result['invoice_id'])->value('paid'));
@@ -121,7 +158,7 @@ class V2PaymentShiftTest extends TestCase
         $this->accounts();
         $product = $this->product();
         $customer = $this->party('customer', 'SYN-C-A-002');
-        $this->ops()->openShift($cashier->id, '100.00', 'admin');
+        $this->ops()->openShift($this->storeShiftAdmin()->id, '100.00', 'admin');
 
         $result = $this->ops()->checkout($cashier->id, $this->creditPayload($product, $customer, '20.00', 'transfer'));
         $payment = DB::table('v2_payments')->first();
@@ -146,7 +183,7 @@ class V2PaymentShiftTest extends TestCase
         $this->accounts();
         $product = $this->product();
         $customer = $this->party('customer', 'SYN-C-A-003');
-        $this->ops()->openShift($cashier->id, '100.00', 'admin');
+        $this->ops()->openShift($this->storeShiftAdmin()->id, '100.00', 'admin');
 
         $result = $this->ops()->checkout($cashier->id, $this->creditPayload($product, $customer, '0.00'));
         $this->assertSame('unpaid', $result['status']);
@@ -159,8 +196,8 @@ class V2PaymentShiftTest extends TestCase
         $cashier = $this->actor('cashier');
         $admin = $this->actor('admin');
         $this->accounts();
-        $shift = $this->ops()->openShift($cashier->id, '100.00', 'admin');
-        $this->ops()->closeShift($cashier->id, $shift, '90.00');
+        $shift = $this->ops()->openShift($this->storeShiftAdmin()->id, '100.00', 'admin');
+        $this->ops()->closeShift($this->storeShiftAdmin()->id, $shift, '90.00');
 
         $before = DB::table('v2_shifts')->where('id', $shift)->first();
         $this->assertSame('review', $before->status);
@@ -189,32 +226,33 @@ class V2PaymentShiftTest extends TestCase
 
     public function test_both_source_splits_carry_and_admin_amount_with_validation(): void
     {
-        $cashier = $this->actor('cashier');
+        $admin = $this->actor('admin');
+        $otherAdmin = $this->actor('admin');
         $this->accounts();
 
-        $prev1 = $this->ops()->openShift($cashier->id, '40.00', 'admin');
-        $this->ops()->closeShift($cashier->id, $prev1, '40.00');
+        $prev1 = $this->ops()->openShift($admin->id, '40.00', 'admin');
+        $this->ops()->closeShift($otherAdmin->id, $prev1, '40.00');
 
-        $bothId = $this->ops()->openShift($cashier->id, '100.00', 'both', $prev1);
+        $bothId = $this->ops()->openShift($otherAdmin->id, '100.00', 'both', $prev1);
         $both = DB::table('v2_shifts')->where('id', $bothId)->first();
         $this->assertEquals(100, $both->opening_cash);
         $this->assertEquals(40, $both->carry_amount);
         $this->assertEquals(60, $both->admin_amount);
-        $this->ops()->closeShift($cashier->id, $bothId, '100.00');
+        $this->ops()->closeShift($this->storeShiftAdmin()->id, $bothId, '100.00');
 
-        $prev2 = $this->ops()->openShift($cashier->id, '40.00', 'admin');
-        $this->ops()->closeShift($cashier->id, $prev2, '40.00');
+        $prev2 = $this->ops()->openShift($this->storeShiftAdmin()->id, '40.00', 'admin');
+        $this->ops()->closeShift($this->storeShiftAdmin()->id, $prev2, '40.00');
 
-        $this->expectValidation(fn () => $this->ops()->openShift($cashier->id, '30.00', 'both', $prev2));
-        $carryId = $this->ops()->openShift($cashier->id, '30.00', 'carry', $prev2);
+        $this->expectValidation(fn () => $this->ops()->openShift($this->storeShiftAdmin()->id, '30.00', 'both', $prev2));
+        $carryId = $this->ops()->openShift($this->storeShiftAdmin()->id, '30.00', 'carry', $prev2);
         $carry = DB::table('v2_shifts')->where('id', $carryId)->first();
         $this->assertEquals(30, $carry->carry_amount);
         $this->assertEquals(0, $carry->admin_amount);
-        $this->ops()->closeShift($cashier->id, $carryId, '30.00');
+        $this->ops()->closeShift($this->storeShiftAdmin()->id, $carryId, '30.00');
 
-        $this->expectValidation(fn () => $this->ops()->openShift($cashier->id, '50.00', 'both', $prev1));
-        $this->expectValidation(fn () => $this->ops()->openShift($cashier->id, '10.00', 'admin', $prev2));
-        $this->expectValidation(fn () => $this->ops()->openShift($cashier->id, '10.00', 'both'));
+        $this->expectValidation(fn () => $this->ops()->openShift($this->storeShiftAdmin()->id, '50.00', 'both', $prev1));
+        $this->expectValidation(fn () => $this->ops()->openShift($this->storeShiftAdmin()->id, '10.00', 'admin', $prev2));
+        $this->expectValidation(fn () => $this->ops()->openShift($this->storeShiftAdmin()->id, '10.00', 'both'));
         $this->assertDatabaseCount('v2_shifts', 4);
     }
 
@@ -229,11 +267,13 @@ class V2PaymentShiftTest extends TestCase
         $this->expectValidation(fn () => $this->ops()->collect($cashier->id, $invoiceId, '50.00', 'cash', 'synthetic-supplier-001'));
         $this->assertDatabaseCount('v2_payments', 0);
 
-        $shift = $this->ops()->openShift($cashier->id, '100.00', 'admin');
+        $shift = $this->ops()->openShift($this->storeShiftAdmin()->id, '100.00', 'admin');
         $paymentId = $this->ops()->collect($cashier->id, $invoiceId, '50.00', 'cash', 'synthetic-supplier-001');
         $payment = DB::table('v2_payments')->where('id', $paymentId)->first();
         $this->assertSame('proposed', $payment->status);
         $this->assertSame($shift, (int) $payment->shift_id);
+        $this->assertSame($cashier->id, (int) $payment->requested_by);
+        $this->assertDatabaseHas('v2_shifts', ['id' => $shift, 'user_id' => $this->storeShiftAdmin()->id, 'is_shared' => true]);
 
         $journals = DB::table('journal_entry_lines')->count();
         $this->assertForbidden(fn () => $this->ops()->rejectPayment($cashier->id, $paymentId, 'Harga salah input dari supplier'));

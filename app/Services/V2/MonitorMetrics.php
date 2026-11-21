@@ -40,7 +40,7 @@ final class MonitorMetrics
         $receipts = DB::table('inventory_receipts')->whereNull('voided_at')->whereBetween('receipt_date', [$monthStart, $monthEnd])->get(['total_amount', 'receipt_type']);
         [$receiptTotal, $receiptCount] = $this->sumRows($receipts, fn (object $row): BigDecimal => BigDecimal::of((string) $row->total_amount));
 
-        $shiftScope = fn () => DB::table('v2_shifts')->when(! $admin, fn ($q) => $q->where('user_id', $actor));
+        $shiftScope = fn () => DB::table('v2_shifts')->when(! $admin, fn ($q) => $q->where(fn ($visible) => $visible->where('is_shared', true)->orWhere('user_id', $actor)));
         $differences = $shiftScope()->whereIn('status', ['closed', 'review'])->whereBetween(DB::raw('date(closed_at)'), [$monthStart, $monthEnd])->get(['difference']);
         [$differenceTotal] = $this->sumRows($differences, fn (object $row): BigDecimal => BigDecimal::of((string) ($row->difference ?? '0')));
 

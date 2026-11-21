@@ -38,7 +38,7 @@
             <div class="pos-cart-section"><div class="cart-label"><strong>Keranjang Belanja</strong><span id="cart-item-count" data-live-skip>0 jenis item</span></div><div class="cart-table-scroll"><div class="cart-column-header"><span>Produk</span><span class="cart-column-quantity">Jumlah</span><span class="cart-column-subtotal">Subtotal</span><span class="sr-only">Aksi</span></div><div id="cart-empty-row" data-live-skip class="note cart-empty-message">Keranjang belanja kosong. Cari produk di katalog lalu pilih item untuk dimasukkan ke keranjang.</div><div id="items"></div></div></div>
             <button type="button" id="add-item" hidden>Tambah barang</button>
             <div class="summary-box"><div class="summary-row summary-total"><span>Total Belanja:</span><strong id="display-total" data-live-skip>Rp 0</strong></div><p class="note" id="cart-error" role="alert" hidden></p></div>
-            @if(!$ownOpenShift)<p class="pos-shift-reminder">Buka shift sebelum menyimpan penjualan.</p>@endif
+            <p class="pos-shift-reminder" id="store-shift-reminder" data-live-skip @if($activeStoreShift) hidden @endif>{{ $isAdmin ? 'Buka shift toko sebelum menyimpan penjualan.' : 'Menunggu admin membuka shift toko. Keranjang tetap tersimpan.' }}</p>
             <div class="pos-checkout-action"><button type="button" id="open-payment" class="btn-pill-submit">Checkout &amp; Pembayaran</button></div>
             <dialog id="payment-modal-overlay" class="input-dialog" aria-labelledby="payment-modal-title">
                 <div class="popup-heading"><h2 id="payment-modal-title">Pembayaran</h2><button type="button" class="popup-close secondary" data-close-payment aria-label="Tutup pembayaran">×</button></div>

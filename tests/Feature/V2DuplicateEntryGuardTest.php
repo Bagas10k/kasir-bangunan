@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\V2\Ledger;
 use App\Services\V2\Operations;
-use App\Services\V2\SupplyTrips;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -61,7 +60,6 @@ class V2DuplicateEntryGuardTest extends TestCase
         $invoice = $this->receivable();
         $ops = app(Operations::class);
         $ops->openShift($admin->id, '100000.00', 'admin');
-        $ops->openShift($cashier->id, '100000.00', 'admin');
 
         // Kasir mencatat cicilan; admin masih memakai form yang dibuka sebelumnya (belum ada pembayaran).
         $ops->collect($cashier->id, $invoice, '50000', 'cash', 'syn-dup-cashier-1');
@@ -112,11 +110,16 @@ class V2DuplicateEntryGuardTest extends TestCase
 
     private function receipt(User $admin, int $supplier, int $product, ?string $nota, bool $confirm = false)
     {
-        return $this->actingAs($admin)->postJson(route('v2.receipts.store'), array_filter([
+        $saved = $this->actingAs($admin)->postJson(route('v2.receipts.store'), array_filter([
             'supplier_id' => $supplier, 'receipt_date' => now()->toDateString(), 'idempotency_key' => 'syn-rcv-'.++$this->seq,
             'supplier_invoice_number' => $nota, 'confirm_duplicate' => $confirm ?: null,
             'items' => [['product_id' => $product, 'quantity' => '2', 'unit_cost' => '52000']],
         ], fn ($value) => $value !== null));
+        $saved->assertOk()->assertJsonPath('status', 'draft');
+
+        return $this->postJson(route('v2.receipt-drafts.confirm', $saved->json('draft_id')), [
+            'version' => $saved->json('version'), 'confirm_final' => true, 'confirm_duplicate' => $confirm,
+        ]);
     }
 
     public function test_same_supplier_invoice_number_twice_needs_confirmation(): void
@@ -130,7 +133,7 @@ class V2DuplicateEntryGuardTest extends TestCase
 
         $this->receipt($admin, $stock['supplier'], $stock['product'], ' nf-0042 ')
             ->assertStatus(422)
-            ->assertJsonPath('errors.duplicate_receipt.0', fn (string $m) => str_contains($m, 'RCV-'.str_pad((string) $first, 6, '0', STR_PAD_LEFT)));
+            ->assertJsonPath('errors.duplicate_receipt.0', fn (string $m) => str_contains($m, 'RCV-'.str_pad((string) $first, 6, '0', STR_PAD_LEFT)) && str_contains($m, 'Ya, tetap konfirmasi'));
         $this->assertSame(1, DB::table('inventory_receipts')->count());
 
         // Supplier lain dengan nomor sama dan penerimaan tanpa nomor: tidak diperiksa.
@@ -147,7 +150,8 @@ class V2DuplicateEntryGuardTest extends TestCase
         $this->books();
         $stock = $this->supplyStock();
         $first = $this->receipt($admin, $stock['supplier'], $stock['product'], 'NF-0099')->assertOk()->json('receipt_id');
-        app(SupplyTrips::class)->voidReceipt($admin->id, $first, ['reason' => 'Harga salah ketik', 'idempotency_key' => 'syn-void-dup']);
+        // Historical fixture only: new final receipts can no longer be voided.
+        DB::table('inventory_receipts')->where('id', $first)->update(['voided_at' => now(), 'voided_by' => $admin->id, 'void_reason' => 'Batal sebelum kebijakan kunci final']);
 
         $this->receipt($admin, $stock['supplier'], $stock['product'], 'NF-0099')->assertOk();
     }

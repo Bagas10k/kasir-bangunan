@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
- * Pembatalan penerimaan barang yang salah input: jurnal balik, stok dan HPP kembali, utang supplier ditutup.
- * Hanya admin, wajib alasan, dan hanya bila belum ada pembayaran maupun mutasi stok sesudahnya. Data sintetis, SQLite :memory:.
+ * Penerimaan yang sudah diposting adalah final: jalur pembatalan lama harus ditolak tanpa efek stok/jurnal.
+ * Riwayat pembatalan lama tetap dipertahankan. Data sintetis, SQLite :memory:.
  */
 class V2ReceiptVoidTest extends TestCase
 {
@@ -59,111 +59,60 @@ class V2ReceiptVoidTest extends TestCase
         ]);
     }
 
-    private function balance(string $code): string
-    {
-        $lines = DB::table('journal_entry_lines')->where('account_code', $code)->get(['debit', 'credit']);
-        $total = 0;
-        foreach ($lines as $line) {
-            $total += (float) $line->debit - (float) $line->credit;
-        }
-
-        return number_format($total, 2, '.', '');
-    }
-
-    public function test_admin_voids_a_mistyped_receipt_and_everything_returns_to_before(): void
-    {
-        $admin = $this->actor('admin');
-        $stock = $this->setUpStock();
-        // Salah ketik: 520.000 per sak, seharusnya 52.000.
-        $receipt = $this->receive($admin, $stock, '20', '520000');
-        $this->assertEquals(30, (float) DB::table('products')->where('id', $stock['product'])->value('stock_quantity'));
-
-        $this->actingAs($admin)->postJson(route('v2.receipts.void', ['id' => $receipt['receipt_id']]), [
-            'reason' => 'Harga satuan salah ketik', 'idempotency_key' => 'syn-void-1',
-        ])->assertOk()->assertJson(['receipt_id' => $receipt['receipt_id'], 'status' => 'void']);
-
-        $product = DB::table('products')->where('id', $stock['product'])->first();
-        $this->assertEquals(10, (float) $product->stock_quantity);
-        $this->assertEquals(50000, (float) $product->cost_price);
-        $this->assertSame('0.00', $this->balance('1301'));
-        $this->assertSame('0.00', $this->balance('2101'));
-
-        $row = DB::table('inventory_receipts')->where('id', $receipt['receipt_id'])->first();
-        $this->assertNotNull($row->voided_at);
-        $this->assertSame($admin->id, (int) $row->voided_by);
-        $this->assertSame('Harga satuan salah ketik', $row->void_reason);
-        $this->assertNotNull($row->void_journal_entry_id);
-
-        $invoice = DB::table('v2_invoices')->where('id', $receipt['invoice_id'])->first();
-        $this->assertNotNull($invoice->voided_at);
-        $this->assertEquals(0, (float) $invoice->amount - (float) $invoice->paid);
-        $this->assertSame('paid', $invoice->status);
-
-        $movement = DB::table('stock_movements')->where('reference_type', 'v2_receipt_void')->where('reference_id', $receipt['receipt_id'])->first();
-        $this->assertEquals(-20, (float) $movement->quantity_delta);
-
-        // Input ulang yang benar memakai HPP awal sebagai dasar rata-rata.
-        $this->receive($admin, $stock, '20', '52000');
-        $this->assertEquals(51333.3333, (float) DB::table('products')->where('id', $stock['product'])->value('cost_price'));
-
-        // Ulangi kunci yang sama: hasil sama, tidak membatalkan dua kali.
-        $this->actingAs($admin)->postJson(route('v2.receipts.void', ['id' => $receipt['receipt_id']]), [
-            'reason' => 'Harga satuan salah ketik', 'idempotency_key' => 'syn-void-1',
-        ])->assertOk();
-        $this->assertSame(1, DB::table('stock_movements')->where('reference_type', 'v2_receipt_void')->count());
-        // Kunci lain untuk penerimaan yang sudah batal ditolak.
-        $this->actingAs($admin)->postJson(route('v2.receipts.void', ['id' => $receipt['receipt_id']]), [
-            'reason' => 'Ulang', 'idempotency_key' => 'syn-void-2',
-        ])->assertStatus(422);
-    }
-
-    public function test_void_is_refused_after_a_payment_or_a_later_stock_movement(): void
-    {
-        $admin = $this->actor('admin');
-        $stock = $this->setUpStock();
-
-        $paid = $this->receive($admin, $stock, '5', '52000');
-        DB::table('v2_payments')->insert(['invoice_id' => $paid['invoice_id'], 'amount' => '1000.00', 'method' => 'transfer', 'status' => 'proposed', 'requested_by' => $admin->id, 'idempotency_key' => 'syn-pay-1', 'request_hash' => str_repeat('a', 64), 'created_at' => now(), 'updated_at' => now()]);
-        $this->actingAs($admin)->postJson(route('v2.receipts.void', ['id' => $paid['receipt_id']]), ['reason' => 'Coba batal', 'idempotency_key' => 'syn-void-3'])
-            ->assertStatus(422)->assertJsonFragment(['message' => 'Tagihan supplier penerimaan ini sudah punya pembayaran atau pengajuan pembayaran. Tolak atau selesaikan pembayarannya dulu.']);
-
-        $stock2 = $stock;
-        $first = $this->receive($admin, $stock2, '4', '52000');
-        $this->receive($admin, $stock2, '1', '52000');
-        $this->actingAs($admin)->postJson(route('v2.receipts.void', ['id' => $first['receipt_id']]), ['reason' => 'Coba batal', 'idempotency_key' => 'syn-void-4'])
-            ->assertStatus(422)->assertJsonFragment(['message' => 'Semen Sintetis sudah punya transaksi stok sesudah penerimaan ini, jadi stok dan HPP tidak bisa dikembalikan dengan tepat.']);
-
-        $this->assertSame(0, DB::table('inventory_receipts')->whereNotNull('voided_at')->count());
-    }
-
-    public function test_history_offers_void_only_while_unpaid_and_marks_voided_receipts(): void
-    {
-        $admin = $this->actor('admin');
-        $stock = $this->setUpStock();
-        $open = $this->receive($admin, $stock, '2', '52000');
-
-        $this->actingAs($admin)->get(route('v2.index'))->assertOk()
-            ->assertSee(route('v2.receipts.void', ['id' => $open['receipt_id']]), false)
-            ->assertSee('Periksa sebelum simpan');
-
-        $this->actingAs($admin)->postJson(route('v2.receipts.void', ['id' => $open['receipt_id']]), ['reason' => 'Jumlah salah ketik', 'idempotency_key' => 'syn-void-7'])->assertOk();
-
-        $this->actingAs($admin)->get(route('v2.index'))->assertOk()
-            ->assertDontSee(route('v2.receipts.void', ['id' => $open['receipt_id']]), false)
-            ->assertSee('Dibatalkan')
-            ->assertSee('Jumlah salah ketik');
-    }
-
-    public function test_only_admin_with_a_reason_may_void(): void
+    public function test_confirmed_receipt_cannot_be_voided_even_when_unpaid_and_unused(): void
     {
         $admin = $this->actor('admin');
         $stock = $this->setUpStock();
         $receipt = $this->receive($admin, $stock, '2', '52000');
+        $journalCount = DB::table('journal_entries')->count();
 
-        $this->actingAs($this->actor('cashier'))->postJson(route('v2.receipts.void', ['id' => $receipt['receipt_id']]), ['reason' => 'Salah input', 'idempotency_key' => 'syn-void-5'])
-            ->assertForbidden();
-        $this->actingAs($admin)->postJson(route('v2.receipts.void', ['id' => $receipt['receipt_id']]), ['reason' => 'abc', 'idempotency_key' => 'syn-void-6'])
-            ->assertStatus(422);
+        $this->actingAs($admin)->postJson(route('v2.receipts.void', ['id' => $receipt['receipt_id']]), [
+            'reason' => 'Harga salah ketik', 'idempotency_key' => 'syn-locked-void',
+        ])->assertUnprocessable()->assertJsonValidationErrors('supply');
+
+        $this->assertEquals(12, DB::table('products')->where('id', $stock['product'])->value('stock_quantity'));
+        $this->assertEquals(104000, DB::table('v2_invoices')->where('id', $receipt['invoice_id'])->value('amount'));
+        $this->assertNull(DB::table('inventory_receipts')->where('id', $receipt['receipt_id'])->value('voided_at'));
+        $this->assertSame($journalCount, DB::table('journal_entries')->count());
+        $this->assertDatabaseMissing('stock_movements', ['reference_type' => 'v2_receipt_void']);
+    }
+
+    public function test_final_receipts_remain_locked_after_payments_or_later_stock_movements(): void
+    {
+        $admin = $this->actor('admin');
+        $stock = $this->setUpStock();
+        $paid = $this->receive($admin, $stock, '5', '52000');
+        DB::table('v2_payments')->insert(['invoice_id' => $paid['invoice_id'], 'amount' => '1000.00', 'method' => 'transfer', 'status' => 'proposed', 'requested_by' => $admin->id, 'idempotency_key' => 'syn-pay-1', 'request_hash' => str_repeat('a', 64), 'created_at' => now(), 'updated_at' => now()]);
+        $this->receive($admin, $stock, '1', '52000');
+
+        $this->actingAs($admin)->postJson(route('v2.receipts.void', ['id' => $paid['receipt_id']]), ['reason' => 'Coba batal', 'idempotency_key' => 'syn-void-3'])
+            ->assertUnprocessable()->assertJsonPath('message', 'Penerimaan sudah dikonfirmasi dan terkunci. Pembatalan biasa tidak diizinkan; gunakan proses koreksi atau retur.');
+        $this->assertDatabaseCount('inventory_receipts', 2);
+        $this->assertDatabaseMissing('inventory_receipts', ['void_reason' => 'Coba batal']);
+    }
+
+    public function test_history_has_no_void_action_for_final_receipts_and_keeps_historical_void_audit(): void
+    {
+        $admin = $this->actor('admin');
+        $stock = $this->setUpStock();
+        $open = $this->receive($admin, $stock, '2', '52000');
+        $legacy = $this->receive($admin, $stock, '1', '52000');
+        // Historical fixture: an already-voided document predating the final-lock policy.
+        DB::table('inventory_receipts')->where('id', $legacy['receipt_id'])->update(['voided_at' => now(), 'voided_by' => $admin->id, 'void_reason' => 'Koreksi historis']);
+
+        $this->actingAs($admin)->get(route('v2.index'))->assertOk()
+            ->assertDontSee(route('v2.receipts.void', ['id' => $open['receipt_id']]), false)
+            ->assertSee('Dikonfirmasi')->assertSee('Terkunci')->assertSee('Dibatalkan')->assertSee('Koreksi historis');
+    }
+
+    public function test_cashiers_cannot_void_and_admins_cannot_bypass_final_lock(): void
+    {
+        $admin = $this->actor('admin');
+        $stock = $this->setUpStock();
+        $receipt = $this->receive($admin, $stock, '2', '52000');
+        $url = route('v2.receipts.void', ['id' => $receipt['receipt_id']]);
+        $this->actingAs($this->actor('cashier'))->postJson($url, ['reason' => 'Salah input', 'idempotency_key' => 'syn-void-5'])->assertForbidden();
+        $this->actingAs($admin)->postJson($url, ['reason' => 'abc', 'idempotency_key' => 'syn-void-6'])->assertUnprocessable();
         $this->assertNull(DB::table('inventory_receipts')->where('id', $receipt['receipt_id'])->value('voided_at'));
     }
 }

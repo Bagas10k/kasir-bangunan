@@ -50,7 +50,7 @@ class Operations
 
     public function openShift(int $actor, string $cash, string $source, ?int $carryFrom = null): int
     {
-        $this->requireRole($actor, ['admin', 'cashier']);
+        $this->requireRole($actor, ['admin']);
         if (! in_array($source, ['admin', 'carry', 'both'], true)) {
             $this->invalid('Sumber modal tidak valid.');
         }
@@ -67,8 +67,8 @@ class Operations
 
         try {
             return DB::transaction(function () use ($actor, $opening, $source, $carryFrom) {
-                if (DB::table('v2_shifts')->where('user_id', $actor)->where('status', 'open')->lockForUpdate()->exists()) {
-                    $this->invalid('Masih ada shift terbuka untuk kasir ini.');
+                if (DB::table('v2_shifts')->where('status', 'open')->lockForUpdate()->exists()) {
+                    $this->invalid('Masih ada shift terbuka; tutup shift tersebut sebelum membuka shift toko.');
                 }
 
                 $carry = Money::value('0');
@@ -79,7 +79,7 @@ class Operations
                     if (! $prev || $prev->status !== 'closed') {
                         $this->invalid('Shift asal harus sudah ditutup.');
                     }
-                    if ((int) $prev->user_id !== $actor) {
+                    if (! $prev->is_shared && (int) $prev->user_id !== $actor) {
                         abort(403);
                     }
                     if ($prev->counted_cash === null) {
@@ -112,6 +112,8 @@ class Operations
 
                 return DB::table('v2_shifts')->insertGetId([
                     'user_id' => $actor,
+                    'is_shared' => true,
+                    'store_open_key' => 1,
                     'open_user_id' => $actor,
                     'source' => $source,
                     'opening_cash' => $this->str($opening),
@@ -129,15 +131,18 @@ class Operations
         }
     }
 
-    public function closeShift(int $actor, int $shiftId, string $counted): array
+    public function closeShift(int $actor, int $shiftId, string $counted, ?string $fingerprint = null): array
     {
-        $this->requireRole($actor, ['admin', 'cashier']);
+        $this->requireRole($actor, ['admin']);
         $count = $this->amount($counted, 2, 'Uang hitung');
         if ($count->isNegative()) {
             $this->invalid('Uang hitung tidak boleh negatif.');
         }
+        if ($fingerprint !== null && ! preg_match('/^[a-f0-9]{64}$/', $fingerprint)) {
+            $this->invalid('Tanda rekap tidak valid.');
+        }
 
-        return DB::transaction(function () use ($actor, $shiftId, $count) {
+        return DB::transaction(function () use ($actor, $shiftId, $count, $fingerprint) {
             $shift = DB::table('v2_shifts')->where('id', $shiftId)->lockForUpdate()->first();
             if (! $shift) {
                 $this->invalid('Shift tidak ditemukan.');
@@ -147,6 +152,9 @@ class Operations
             }
             if ($this->role($actor) !== 'admin' && (int) $shift->user_id !== $actor) {
                 abort(403);
+            }
+            if ($fingerprint !== null && ! hash_equals($this->closingFingerprint($shiftId), $fingerprint)) {
+                $this->invalid('Rekap sudah berubah sejak popup dibuka; tutup ulang untuk melihat angka terbaru.');
             }
 
             $in = Money::value('0');
@@ -170,6 +178,8 @@ class Operations
                 'difference' => $this->str($difference),
                 'status' => $status,
                 'open_user_id' => null,
+                'store_open_key' => null,
+                'closed_by' => $actor,
                 'closed_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -181,6 +191,24 @@ class Operations
                 'status' => $status,
             ];
         });
+    }
+
+    /** Tanda rekap tutup shift: berubah bila kas awal, mutasi laci, penjualan, atau pengajuan tunai berubah. */
+    public function closingFingerprint(int $shiftId): string
+    {
+        $shift = DB::table('v2_shifts')->where('id', $shiftId)->first(['status', 'opening_cash']);
+        $movements = DB::table('v2_shift_movements')->where('shift_id', $shiftId)->orderBy('id')->get(['id', 'direction', 'kind', 'amount']);
+        $sales = DB::table('v2_sales')->where('shift_id', $shiftId)->orderBy('id')->get(['id', 'payment_method', 'total']);
+        $pending = DB::table('v2_payments')->where('shift_id', $shiftId)->where('method', 'cash')->where('status', 'proposed')->orderBy('id')->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        return hash('sha256', json_encode([
+            'shift' => $shiftId,
+            'status' => $shift->status ?? 'missing',
+            'opening' => $shift ? (string) Money::value((string) $shift->opening_cash, 2) : '0.00',
+            'movements' => $movements->map(fn ($m) => ['id' => (int) $m->id, 'direction' => $m->direction, 'kind' => $m->kind, 'amount' => (string) Money::value((string) $m->amount, 2)])->all(),
+            'sales' => $sales->map(fn ($s) => ['id' => (int) $s->id, 'method' => $s->payment_method, 'total' => (string) Money::value((string) $s->total, 2)])->all(),
+            'pending' => $pending,
+        ], JSON_UNESCAPED_SLASHES));
     }
 
     public function resolveShift(int $actor, int $shiftId, string $reason): void
@@ -611,7 +639,7 @@ class Operations
     public function collect(int $actor, int $invoiceId, string $amount, string $method, string $key, ?string $reference = null, ?int $seenPaymentId = null, bool $confirmed = false): int
     {
         $this->requireRole($actor, ['admin', 'cashier']);
-        if (! in_array($method, ['cash', 'transfer'], true)) {
+        if (! in_array($method, ['cash', 'transfer', 'main'], true)) {
             $this->invalid('Metode pembayaran tidak valid.');
         }
         $key = trim($key);
@@ -641,6 +669,9 @@ class Operations
             if (! in_array($invoice->direction, ['receivable', 'payable'], true)) {
                 $this->invalid('Arah tagihan tidak valid.');
             }
+            if ($invoice->direction === 'receivable' && $method === 'main') {
+                $this->invalid('Kas Utama hanya untuk pembayaran ke supplier.');
+            }
             if ($seenPaymentId !== null && ! $confirmed) {
                 $this->guardNewerPayments($invoiceId, $seenPaymentId);
             }
@@ -654,9 +685,10 @@ class Operations
             }
 
             if ($invoice->direction === 'payable') {
-                $shiftId = $this->currentShiftId($actor);
+                // Hanya pembayaran laci yang terikat pada shift toko saat pengajuan.
+                $shiftId = $method === 'cash' ? $this->currentShiftId($actor) : null;
                 if ($method === 'cash' && $shiftId === null) {
-                    $this->invalid('Shift kasir wajib terbuka untuk pembayaran tunai ke supplier.');
+                    $this->invalid('Shift toko belum dibuka admin.');
                 }
 
                 // Kasir mengajukan; admin membayar langsung tercatat (tunai dari laci shift-nya, transfer dari bank).
@@ -831,11 +863,17 @@ class Operations
             $this->invalid('Nominal melebihi sisa tagihan.');
         }
         $paymentId = (int) $payment->id;
-        $cash = $payment->method === 'cash';
-        $account = $cash ? self::CASH : self::BANK;
-        if ($cash) {
+        $source = (string) $payment->method;
+        if (! in_array($source, ['cash', 'main', 'transfer'], true)) {
+            $this->invalid('Sumber dana pembayaran tidak valid.');
+        }
+        // Laci shift memakai uang laci kasir; Kas Utama dan Bank Utama memakai saldo toko dan tidak mengubah laci.
+        $drawer = $source === 'cash';
+        $account = $source === 'transfer' ? self::BANK : self::CASH;
+        $label = $source === 'transfer' ? 'Bank Utama' : 'Kas Utama (Tunai)';
+        if ($drawer) {
             $drawer = DB::table('v2_shifts')->where('id', $payment->shift_id)->lockForUpdate()->first();
-            if (! $drawer || $drawer->status !== 'open' || (int) $drawer->user_id !== (int) $payment->requested_by) {
+            if (! $drawer || $drawer->status !== 'open' || ($drawer->is_shared ? (int) $drawer->store_open_key !== 1 : (int) $drawer->user_id !== (int) $payment->requested_by)) {
                 $this->invalid('Shift pengajuan tidak terbuka; ajukan ulang.');
             }
             $drawerBalance = Money::value((string) $drawer->opening_cash);
@@ -846,13 +884,13 @@ class Operations
                 $this->invalid('Uang tunai laci tidak cukup untuk pembayaran.');
             }
         }
-        $this->guardAccount($account, $amount->negated());
+        $this->guardAccount($account, $amount->negated(), $label);
         $entryId = Ledger::post('v2_payment', $paymentId, 'Pembayaran utang '.$invoice->number, [
             ['account_code' => self::AP, 'debit' => $this->str($amount), 'credit' => '0.00'],
             ['account_code' => $account, 'debit' => '0.00', 'credit' => $this->str($amount)],
         ]);
 
-        if ($cash) {
+        if ($drawer) {
             if ($payment->shift_id === null) {
                 $this->invalid('Pengajuan tunai tanpa shift; ajukan ulang.');
             }
@@ -860,7 +898,7 @@ class Operations
             if (! $shift || $shift->status !== 'open') {
                 $this->invalid('Shift pengajuan sudah ditutup; ajukan ulang.');
             }
-            if ((int) $shift->user_id !== (int) $payment->requested_by) {
+            if (! $shift->is_shared && (int) $shift->user_id !== (int) $payment->requested_by) {
                 $this->invalid('Shift pengajuan bukan milik pemohon.');
             }
             DB::table('v2_shift_movements')->insert([
@@ -889,7 +927,7 @@ class Operations
         ]);
     }
 
-    private function guardAccount(string $code, BigDecimal $delta): void
+    private function guardAccount(string $code, BigDecimal $delta, ?string $label = null): void
     {
         if (! DB::table('chart_of_accounts')->where('account_code', $code)->lockForUpdate()->exists()) {
             $this->invalid('Akun '.$code.' belum tersedia di bagan akun.');
@@ -899,7 +937,7 @@ class Operations
             $balance = $balance->plus((string) $line->debit)->minus((string) $line->credit);
         }
         if ($balance->plus($delta)->isNegative()) {
-            $this->invalid('Saldo akun '.$code.' tidak cukup untuk pembayaran keluar.');
+            $this->invalid('Saldo '.($label ?? 'akun '.$code).' tidak cukup untuk pembayaran keluar.');
         }
     }
 
@@ -925,15 +963,21 @@ class Operations
         ];
     }
 
-    private function openShiftFor(int $actor, bool $lock): object
+    public function activeStoreShift(bool $lock = false): ?object
     {
-        $query = DB::table('v2_shifts')->where('user_id', $actor)->where('status', 'open');
+        $query = DB::table('v2_shifts')->where('is_shared', true)->where('store_open_key', 1)->where('status', 'open');
         if ($lock) {
             $query->lockForUpdate();
         }
-        $shift = $query->first();
+
+        return $query->first();
+    }
+
+    private function openShiftFor(int $actor, bool $lock): object
+    {
+        $shift = $this->activeStoreShift($lock);
         if (! $shift) {
-            $this->invalid('Shift kasir belum dibuka.');
+            $this->invalid('Shift toko belum dibuka admin.');
         }
 
         return $shift;
@@ -941,7 +985,7 @@ class Operations
 
     private function currentShiftId(int $actor): ?int
     {
-        $id = DB::table('v2_shifts')->where('user_id', $actor)->where('status', 'open')->value('id');
+        $id = $this->activeStoreShift(true)?->id;
 
         return $id === null ? null : (int) $id;
     }
@@ -1027,9 +1071,15 @@ class Operations
             return;
         }
         $last = $newer->first();
-        $what = Money::display($last->amount).' ('.($last->method === 'cash' ? 'tunai' : 'transfer').($last->status === 'posted' ? '' : ', menunggu').')';
+        $what = Money::display($last->amount).' ('.$this->methodLabel((string) $last->method).($last->status === 'posted' ? '' : ', menunggu').')';
         $more = $newer->count() > 1 ? ' dan '.($newer->count() - 1).' pembayaran lain' : '';
         throw ValidationException::withMessages(['duplicate_payment' => 'Sejak form ini dibuka, '.($last->name ?? 'pengguna lain').' sudah mencatat pembayaran '.$what.' pukul '.Carbon::parse($last->created_at)->format('H:i').$more.'. Pastikan ini bukan uang yang sama. Bila memang pembayaran lain, tekan tombol Ya, tetap catat.']);
+    }
+
+    /** Nama sumber dana untuk pesan ke pengguna. */
+    private function methodLabel(string $method): string
+    {
+        return ['cash' => 'laci shift', 'main' => 'Kas Utama', 'transfer' => 'Bank Utama'][$method] ?? $method;
     }
 
     private function invalid(string $message): never
