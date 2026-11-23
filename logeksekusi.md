@@ -1477,3 +1477,11 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
 - Perbaikan setup permanen: `docker/init-storage.sh` baru (chown storage lalu exec CMD) dipasang di Dockerfile sebagai ENTRYPOINT. Image `release-edc62fd` dibangun dan dipasang; entrypoint kontainer terverifikasi `/usr/local/bin/init-storage.sh`, tulis log sebagai www-data OK.
 - Verifikasi: app healthy, worker running, image release-edc62fd; tanpa migrasi pending; origin login200, publik login200; data user2/produk8/penjualan1/jurnal4/shift1/invoice1 (user bertambah dari akun yang dibuat pengguna, bukan oleh perbaikan). Repo server `deploy-v2` di edc62fd; bundle/log build dihapus.
 - Tes: Node151/151; PHP621 kasus,612 lulus,8 dilewati,1 gagal yaitu flake jam `PosSalesDashboardTest` (suite berjalan sebelum pukul02:00 WIB).
+
+## 2026-11-24 — Infrastruktur deploy masuk repo (df18320)
+- Alasan: perbaikan entrypoint sebelumnya hanya ada di host `/srv/apps/tokobangunan01`, sehingga bisa hilang bila build dilakukan dari mesin lain atau folder di-reset.
+- Disalin dari server ke repo apa adanya: `Dockerfile` (dengan ENTRYPOINT `docker/init-storage.sh`), `docker-compose.yml`, `docker/init-storage.sh`, `docker/nginx/default.conf`, `docker/php/local.ini`. `docker-compose.release.json` dimasukkan `.gitignore` karena berisi tag image yang berubah tiap deploy.
+- Tidak ada rahasia di berkas yang di-commit: compose hanya membaca `${DB_ROOT_PASSWORD}`/`${DB_PASSWORD}` dari `.env`; tidak ada nilai kredensial.
+- Server direkonsiliasi: fetch origin, tiga berkas duplikat identik (compose, php local.ini, nginx default.conf) dan `docker/init-storage.sh` dibandingkan sha-per-baris lalu dihapus, Dockerfile lokal disamakan, lalu fast-forward `deploy-v2` ke df18320. Dockerfile hasil merge identik dengan yang dipakai build.
+- Verifikasi pasca-merge: kontainer tetap `release-edc62fd`, health healthy, entrypoint `/usr/local/bin/init-storage.sh`, login origin 200, `storage/logs` dapat ditulis www-data. Backup Dockerfile lama dan `public/build.old` dihapus.
+- Sisa berkas host yang belum di-versioning: `docker/Dockerfile` (varian tak terpakai), `docker/entrypoint.sh`, `manage.sh`, `scripts/*.sh`. Tidak diubah pada tugas ini.
