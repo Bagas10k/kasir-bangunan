@@ -3,13 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Services\V2\Operations;
+use App\Support\SafeLog;
 use Brick\Math\BigDecimal;
 use Database\Seeders\ChartOfAccountsSeeder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -161,7 +161,7 @@ class ChartOfAccountController extends Controller
         ]);
 
         if ($request->routeIs('v2.coa.*')) {
-            Log::info('coa.created', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $code]);
+            SafeLog::info('coa.created', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $code]);
             if ($request->expectsJson()) {
                 return response()->json(['message' => 'Akun '.$code.' berhasil ditambahkan.'], 201);
             }
@@ -219,7 +219,7 @@ class ChartOfAccountController extends Controller
             ]);
 
             if ($request->routeIs('v2.coa.*')) {
-                Log::info('coa.updated', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $newCode, 'is_active' => $newActive]);
+                SafeLog::info('coa.updated', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $newCode, 'is_active' => $newActive]);
                 if ($request->expectsJson()) {
                     return response()->json(['message' => 'Akun '.$newCode.' berhasil diperbarui.']);
                 }
@@ -239,7 +239,7 @@ class ChartOfAccountController extends Controller
                 return $this->failure($request, 'Akun inti sistem wajib tetap aktif karena dipakai transaksi otomatis.', 'is_active');
             }
             DB::table('chart_of_accounts')->where('id', $id)->update(['is_active' => false, 'updated_at' => now()]);
-            Log::info('coa.archived', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $account->account_code]);
+            SafeLog::info('coa.archived', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $account->account_code]);
 
             return $request->expectsJson()
                 ? response()->json(['message' => 'Akun '.$account->account_code.' diarsipkan; riwayat jurnal tetap tersimpan.'])

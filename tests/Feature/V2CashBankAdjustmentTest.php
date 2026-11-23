@@ -7,6 +7,7 @@ use App\Services\AccountBalanceService;
 use App\Services\V2\OpeningBalances;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class V2CashBankAdjustmentTest extends TestCase
@@ -203,6 +204,29 @@ class V2CashBankAdjustmentTest extends TestCase
             ->assertJsonMissingPath('password');
 
         $this->assertDatabaseCount('journal_entries', 1);
+    }
+
+    public function test_posting_survives_when_the_log_writer_fails(): void
+    {
+        $this->accounts();
+        $this->initialized();
+        $admin = $this->actor('admin');
+
+        Log::swap(new class
+        {
+            public function info($message = null, array $context = []): void
+            {
+                throw new \RuntimeException('media log tidak dapat ditulis');
+            }
+        });
+
+        $this->actingAs($admin)->postJson(route('v2.journals.adjustments.store'), $this->payload())
+            ->assertOk()
+            ->assertJsonPath('status', 'posted');
+
+        $this->assertSame('1000.00', (string) app(AccountBalanceService::class)->balance('1101'));
+        $this->assertDatabaseHas('journal_entries', ['reference_type' => 'adjustment']);
+        $this->assertSame((string) DB::table('journal_entry_lines')->sum('debit'), (string) DB::table('journal_entry_lines')->sum('credit'));
     }
 
     public function test_journal_page_uses_the_v2_write_path_and_limits_choices_to_cash_and_bank(): void

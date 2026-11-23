@@ -3,10 +3,10 @@
 namespace App\Services\V2;
 
 use App\Services\AccountBalanceService;
+use App\Support\SafeLog;
 use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -44,7 +44,7 @@ class CashBankAdjustments
             ]);
         }
 
-        return DB::transaction(function () use ($actor, $data, $code, $counterCode): array {
+        $result = DB::transaction(function () use ($actor, $data, $code, $counterCode): array {
             $this->assertBookkeepingStarted();
 
             $accounts = DB::table('chart_of_accounts')
@@ -108,16 +108,6 @@ class CashBankAdjustments
                 ]);
             }
 
-            Log::info('cash_bank_adjustment.posted', [
-                'actor_id' => $actor,
-                'journal_entry_id' => $journalId,
-                'account_code' => $code,
-                'counter_account_code' => $counterCode,
-                'previous_balance' => (string) $current,
-                'target_balance' => (string) $target,
-                'difference' => (string) $difference,
-            ]);
-
             return [
                 'status' => 'posted',
                 'journal_entry_id' => $journalId,
@@ -129,6 +119,19 @@ class CashBankAdjustments
                 'message' => 'Penyesuaian saldo tersimpan; jurnal seimbang dibuat tanpa mengubah saldo awal.',
             ];
         });
+
+        // Log sesudah commit dan tidak fatal: kegagalan menulis log tidak boleh membatalkan jurnal.
+        SafeLog::info('cash_bank_adjustment.posted', [
+            'actor_id' => $actor,
+            'journal_entry_id' => $result['journal_entry_id'],
+            'account_code' => $code,
+            'counter_account_code' => $counterCode,
+            'previous_balance' => $result['previous_balance'],
+            'target_balance' => $result['target_balance'],
+            'difference' => $result['difference'],
+        ]);
+
+        return $result;
     }
 
     private function confirmPassword(int $actor, string $password): void
