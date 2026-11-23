@@ -10,6 +10,7 @@
 <style id="ui-motion-kit">
 .ui-pill-ghost{position:absolute;z-index:0;pointer-events:none}
 .ui-pill-sliding>:not(.ui-pill-ghost){position:relative;z-index:1}
+.ui-surface-morph{position:fixed;z-index:var(--ui-morph-layer);pointer-events:none;box-sizing:border-box;overflow:hidden;margin:0;contain:layout paint}
 html body :is(.ui-pill-target,#u#u#u){background:transparent !important;box-shadow:none !important}
 </style>
 <script>
@@ -100,6 +101,41 @@ function morphBox(box,mutate,{duration=300}={}){
  const done=()=>{ghost.remove();box.style.overflow='';box.style.boxSizing='';};
  anim.addEventListener('finish',done);anim.addEventListener('cancel',done);
 }
+// Morph kulit permukaan saja; kontrol asli tetap pada ukuran akhir agar teks tidak terdistorsi.
+function morphFrom(surface,origin,{closing=false,onFinish=()=>{}}={}){
+ if(reduce()||!origin?.width||!origin?.height||!surface.animate)return null;
+ const duration=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-morph-duration'))||0;
+ if(!duration)return null;
+ const easing=getComputedStyle(document.documentElement).getPropertyValue('--ui-morph-easing').trim()||EASE;
+ const target=surface.getBoundingClientRect();if(!target.width||!target.height)return null;
+ const skin=getComputedStyle(surface.querySelector('section.card')||surface);
+ const ghost=document.createElement('div');ghost.className='ui-surface-morph';ghost.inert=true;ghost.setAttribute('aria-hidden','true');
+ ghost.style.background=skin.backgroundColor;document.body.append(ghost);
+ const destination={left:target.left+'px',top:target.top+'px',width:target.width+'px',height:target.height+'px',borderRadius:getComputedStyle(surface).borderRadius,backgroundColor:skin.backgroundColor};
+ const source={left:origin.left+'px',top:origin.top+'px',width:origin.width+'px',height:origin.height+'px',borderRadius:origin.borderRadius||skin.borderRadius,backgroundColor:origin.background||skin.backgroundColor};
+ const frames=closing?[
+   {...destination,opacity:0},
+   {...destination,opacity:1,offset:.25},
+   {...destination,opacity:1,offset:.4},
+   {...source,opacity:1}
+ ]:[
+   {...source,opacity:1},
+   {...destination,opacity:1,offset:.75},
+   {...destination,opacity:0}
+ ];
+ const shape=ghost.animate(frames,{duration,easing,fill:'both'});
+ const content=surface.animate(closing?[
+  {opacity:1},{opacity:1,offset:.25},{opacity:0,offset:.4},{opacity:0}
+ ]:[
+  {opacity:0},{opacity:0,offset:.5},{opacity:1,offset:.75},{opacity:1}
+ ],{duration,easing,fill:'both'});
+ const startTime=document.timeline?.currentTime;
+ if(startTime!=null){shape.startTime=startTime;content.startTime=startTime;}
+ let cleaned=false;
+ const cleanup=()=>{if(cleaned)return;cleaned=true;ghost.remove();content.cancel();};
+ shape.addEventListener('finish',()=>{onFinish();cleanup();});shape.addEventListener('cancel',cleanup);
+ return {cancel(){shape.cancel();cleanup();}};
+}
 // dismiss: keluar lebih cepat dari masuk (ease-in), baru disembunyikan. Mengembalikan animasi agar bisa dibatalkan.
 function dismiss(el,done,{duration=140}={}){
  if(reduce()||el.hidden||!el.getClientRects().length){done();return null;}
@@ -167,7 +203,7 @@ new MutationObserver(records=>{
 }).observe(document.documentElement,{subtree:true,attributes:true,attributeOldValue:true,attributeFilter:['hidden','open','aria-checked','aria-pressed','aria-selected','class']});
 // Judul halaman di kepala berganti dengan pudar-naik, bukan meloncat.
 function textIn(el){if(!el||reduce())return;el.animate([{opacity:0,transform:'translateY(4px)'},{opacity:1,transform:'none'}],{duration:220,easing:EASE});}
-window.uiMotion={enter,staggerRows,markSaved,restoreSaved,morphBox,dismiss,reveal,slidePill,textIn};
+window.uiMotion={enter,staggerRows,markSaved,restoreSaved,morphBox,morphFrom,dismiss,reveal,slidePill,textIn};
 // Halaman penuh tanpa panel workspace (mis. Keuangan dibuka langsung): isi main yang dianimasikan.
 const start=()=>{booting=false;enter(document.querySelector('.task-panel:not([hidden])')||document.querySelector('body[data-finance-page] main.main-content'));restoreSaved();};
 // setTimeout, bukan requestAnimationFrame: rAF tidak berjalan di tab latar sehingga sorotan bisa hilang.

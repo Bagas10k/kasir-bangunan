@@ -80,15 +80,18 @@ function syncForm(oldForm,newForm){
 }
 function syncNode(oldEl,newEl){
   if(oldEl.matches(OPAQUE))return;
+  if(newEl.hasAttribute('data-number-key')&&window.uiNumbers){window.uiNumbers.set(oldEl,newEl.textContent);return;}
+  if(newEl.hasAttribute('data-number-text')&&window.uiNumbers){window.uiNumbers.text(oldEl,newEl.textContent);return;}
   if(newEl.tagName==='TBODY'){swapBody(oldEl,newEl);return;}
   // Daftar form berulang (mis. tagihan supplier terbuka): isinya diganti utuh, penangan form dipasang di dokumen.
   if(newEl.hasAttribute('data-live-list')){oldEl.replaceChildren(...imported(newEl.childNodes));runHooks(oldEl);return;}
-  if(newEl.tagName==='FORM'){syncForm(oldEl,newEl);return;}
+   // Filter bersama memindahkan kontrol ke popover; cocokkan lewat ID/nama, bukan susunan anak aslinya.
+   if(newEl.tagName==='FORM'||oldEl.hasAttribute('data-filter-ready')){syncForm(oldEl,newEl);return;}
   if(newEl.tagName==='DIALOG'){for(const form of newEl.querySelectorAll('form[id],form[action]')){const old=form.id?oldEl.querySelector('#'+CSS.escape(form.id)):oldEl.querySelector('form[action="'+CSS.escape(form.getAttribute('action'))+'"]');if(old)syncForm(old,form);}return;}
   if(newEl.tagName==='SELECT'){syncSelect(oldEl,newEl);return;}
   if(newEl.matches('input,textarea'))return;
   syncAttrs(oldEl,newEl);
-  if(passive(oldEl)&&passive(newEl)){
+  if(passive(oldEl)&&passive(newEl)&&!newEl.querySelector('[data-number-key],[data-number-text]')){
     if(squash(oldEl.textContent)!==squash(newEl.textContent)||oldEl.childElementCount!==newEl.childElementCount)oldEl.replaceChildren(...imported(newEl.childNodes));
     return;
   }

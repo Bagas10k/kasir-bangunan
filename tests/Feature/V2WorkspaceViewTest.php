@@ -95,6 +95,8 @@ class V2WorkspaceViewTest extends TestCase
                 ->assertSee('id="workspace-sidebar"', false)
                 ->assertSee('data-menu-group="operasional"', false)
                 ->assertSee('data-task="shift"', false)
+                ->assertSee('data-task="persetujuan"', false)
+                ->assertSee('id="payment-verification"', false)
                 ->assertSee('data-monitoring-task="shift"', false)
                 ->assertSee('data-monitoring-task="tagihan"', false)
                 ->assertSee('data-monitoring-task="pengiriman"', false)
@@ -112,6 +114,8 @@ class V2WorkspaceViewTest extends TestCase
             $this->assertSame(2, $monitor['7d']['transaction_count']);
             $this->assertSame('3', $monitor['7d']['top_products'][0]['formatted_qty']);
             $this->assertStringNotContainsString('(float)', file_get_contents(resource_path('views/v2/pos-monitor.blade.php')));
+            preg_match('/<section\b[^>]*id="payment-verification"[^>]*>(.*?)<\/section>/s', $response->getContent(), $paymentPanel);
+            $this->assertSame($role === 'admin' ? 8 : 6, preg_match_all('/<th\b/', $paymentPanel[1] ?? ''));
             if ($role === 'admin') {
                 $response->assertSee('data-default-task="ringkasan"', false)
                     ->assertSee('id="admin-overview"', false)
@@ -127,7 +131,7 @@ class V2WorkspaceViewTest extends TestCase
                     ->assertDontSee('data-menu-group="akses"', false);
                 // Menu gabungan: setiap panel tetap bisa dicapai lewat tautan sidebar atau tab di dalam menu.
                 $this->assertEqualsCanonicalizing(
-                    ['ringkasan', 'persetujuan', 'akun', 'kasir', 'tagihan', 'pengiriman', 'penerimaan', 'shift', 'laporan', 'master-product', 'master-supplier', 'master-customer', 'master-employee', 'master-vehicle', 'master-unit', 'master-category', 'jurnal', 'neraca', 'laba-rugi', 'arus-kas', 'bagan-akun'],
+                    ['ringkasan', 'persetujuan', 'akun', 'kasir', 'riwayat-penjualan', 'tagihan', 'pengiriman', 'penerimaan', 'shift', 'laporan', 'master-product', 'master-supplier', 'master-customer', 'master-employee', 'master-vehicle', 'master-unit', 'master-category', 'jurnal', 'neraca', 'laba-rugi', 'arus-kas', 'bagan-akun'],
                     $this->reachableTasks($response->getContent())
                 );
                 // Supplier didahulukan karena pelanggan bersifat opsional saat penjualan.
@@ -146,6 +150,8 @@ class V2WorkspaceViewTest extends TestCase
                     ->assertSee('name="unit_id"', false)
                     ->assertSee('name="category_id"', false)
                     ->assertSee('data-pick-placeholder="Cari nama atau SKU barang"', false)
+                    ->assertSee('id="receipt-restock"', false)
+                    ->assertSee('data-url="'.route('v2.receipts.restock-products').'"', false)
                     ->assertSee(str_replace('/', '\/', route('v2.suppliers.products', ['id' => 0])), false)
                     ->assertDontSee('data-suppliers=', false)
                     ->assertSee('data-driver="'.$driver.'"', false)
@@ -157,10 +163,10 @@ class V2WorkspaceViewTest extends TestCase
             } else {
                 $response->assertDontSee('class="form-approve"', false)
                     ->assertSee('data-default-task="kasir"', false)
-                    ->assertSee('Shift toko')
+                    ->assertSee('Kas harian')
                     ->assertSee('Laporan saya')
                     ->assertDontSee('id="admin-overview"', false)
-                    ->assertDontSee('data-task="persetujuan"', false)
+                    ->assertSee('Status pembayaran')
                     ->assertDontSee('data-task="keuangan"', false)
                     ->assertDontSee('data-task="akun"', false);
                 $response->assertDontSee('data-menu-group="master"', false)
@@ -168,7 +174,7 @@ class V2WorkspaceViewTest extends TestCase
                     ->assertDontSee('data-monitoring-task="penerimaan"', false)
                     ->assertDontSee('data-menu-group="akses"', false)
                     ->assertDontSee('data-menu-group="pengawasan"', false);
-                $this->assertEqualsCanonicalizing(['kasir', 'tagihan', 'pengiriman', 'shift', 'laporan'], $this->reachableTasks($response->getContent()));
+                $this->assertEqualsCanonicalizing(['kasir', 'riwayat-penjualan', 'tagihan', 'persetujuan', 'pengiriman', 'shift', 'laporan'], $this->reachableTasks($response->getContent()));
                 $response->assertDontSee('data-remote=', false);
             }
             $response->assertSee('name="driver_id"', false)->assertDontSee('name="driver_name"', false);

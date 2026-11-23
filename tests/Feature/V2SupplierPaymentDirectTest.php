@@ -157,7 +157,7 @@ class V2SupplierPaymentDirectTest extends TestCase
         $this->books();
         $invoice = $this->payable();
 
-        $this->actingAs($admin)->get(route('v2.index'))->assertOk()
+        $this->actingAs($admin)->get(route('v2.index', ['invoice_direction' => 'payable']))->assertOk()
             ->assertSee('data-direction="payable"', false)
             ->assertSee(route('v2.payments.store', ['id' => $invoice]), false)
             ->assertSee('Bayar ke supplier')

@@ -98,7 +98,18 @@ body .task-panel>.ui-subtabs{width:auto!important}
 @media (prefers-reduced-motion:reduce){#workspace-sidebar.app-sidebar,body:has(#workspace-sidebar),.sidebar-edge,.rail-flyout{transition:none!important;animation:none!important}}
 /* Sidebar yang dikunci terbuka langsung lebar sejak gambar pertama, tanpa melompat. */
 @media (min-width:901px){
+  html body:has(#workspace-sidebar){transition:padding-left var(--ui-sidebar-duration) var(--ui-ease-out)}
+  html body #workspace-sidebar.app-sidebar{transition:width var(--ui-sidebar-duration) var(--ui-ease-out),min-width var(--ui-sidebar-duration) var(--ui-ease-out)}
+  html body #workspace-sidebar :is(.sidebar-nav,.sidebar-brand,.sidebar-footer){width:var(--side-open);min-width:var(--side-open);box-sizing:border-box;flex-shrink:0}
+  html body #workspace-sidebar :is(.sidebar-brand-text,.workspace-menu-group>summary>span,.sidebar-footer button span){white-space:nowrap;transition:opacity var(--ui-sidebar-text-duration) var(--ui-ease-out)}
+  html body #workspace-sidebar .sidebar-nav .workspace-submenu{display:flex !important;max-height:var(--side-submenu-height,none);overflow:hidden;opacity:1;visibility:visible;transition:max-height var(--ui-sidebar-duration) var(--ui-ease-out),opacity var(--ui-sidebar-text-duration) var(--ui-ease-out)}
+  html body #workspace-sidebar:not(.pinned) .sidebar-nav .workspace-submenu{display:flex !important;max-height:0;opacity:0;visibility:hidden;margin-block:0 !important;pointer-events:none}
+  html body .rail-flyout{width:var(--side-open);box-sizing:border-box}
+  html body .rail-flyout :is(.rail-flyout-title,a){flex-shrink:0;white-space:nowrap}
   html.pre-pinned body:has(#workspace-sidebar){padding-left:var(--side-open)!important;transition:none}
   html.pre-pinned body #workspace-sidebar.app-sidebar{width:var(--side-open)!important}
+}
+@media(prefers-reduced-motion:reduce){
+ html body #workspace-sidebar :is(.sidebar-brand-text,.workspace-menu-group>summary>span,.sidebar-footer button span,.sidebar-nav .workspace-submenu){transition:none !important}
 }
 </style>

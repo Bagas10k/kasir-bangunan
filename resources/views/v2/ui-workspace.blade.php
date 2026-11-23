@@ -6,13 +6,16 @@ const links=Array.from(navigation?.querySelectorAll('[data-task]')||[]);
 const host=document.querySelector('#task-panels');
 if(!host||!links.length)return;
 const groups={kasir:['#kasir','#h-sales'],tagihan:['#tagihan','#h-verify','#reject-heading'],pengiriman:['#pengiriman','#trip-heading','#uang-muka-sopir','#h-deliveries'],'master-product':['#master-section-product'],'master-customer':['#master-section-customer'],'master-supplier':['#master-section-supplier'],'master-employee':['#master-section-staff','#master-section-employee','#master-section-driver'],'master-vehicle':['#master-section-vehicle'],penerimaan:['#receipt-heading','#receipt-drafts','#receipt-history'],shift:['#h-shift','#review-heading','#opening-heading'],laporan:['#laporan']};
-const text={kasir:['Kasir','Pilih barang di katalog, lalu lanjutkan pembayaran.'],tagihan:['Tagihan & pembayaran','Piutang pelanggan, utang supplier, dan pemeriksaan pembayaran.'],pengiriman:['Pengiriman & sopir','Surat jalan, status pengiriman, dan biaya perjalanan.'],'master-product':['Produk','Katalog barang: satuan, kategori, harga jual, stok minimum, dan supplier.'],'master-customer':['Pelanggan','Opsional saat penjualan; kasir boleh mengetik nama pembeli langsung.'],'master-supplier':['Supplier','Pemasok barang. Tekan nama supplier untuk melihat produk dan riwayat transaksinya.'],'master-employee':['Karyawan & sopir','Satu daftar staf toko; kolom posisi menandai siapa yang bertugas sebagai sopir.'],'master-vehicle':['Mobil','Armada pengiriman. Tekan nomor polisi untuk melihat riwayat pemakaian dan sopirnya.'],penerimaan:['Penerimaan barang','Catat barang masuk dan tagihan supplier melalui formulir penerimaan.'],shift:['Kas & shift','Riwayat kas awal, uang fisik, dan pemeriksaan selisih.'],laporan:['Laporan harian','Tunai, transfer terverifikasi, dan transfer menunggu dipisahkan.']};
+const text={kasir:['Kasir','Pilih barang di katalog, lalu lanjutkan pembayaran.'],tagihan:['Tagihan & pembayaran','Piutang pelanggan, utang supplier, dan pemeriksaan pembayaran.'],pengiriman:['Pengiriman & sopir','Surat jalan, status pengiriman, dan biaya perjalanan.'],'master-product':['Produk','Katalog barang: satuan, kategori, harga jual, stok minimum, dan supplier.'],'master-customer':['Pelanggan','Opsional saat penjualan; kasir boleh mengetik nama pembeli langsung.'],'master-supplier':['Supplier','Pemasok barang. Tekan nama supplier untuk melihat produk dan riwayat transaksinya.'],'master-employee':['Karyawan & sopir','Satu daftar staf toko; kolom posisi menandai siapa yang bertugas sebagai sopir.'],'master-vehicle':['Mobil','Armada pengiriman. Tekan nomor polisi untuk melihat riwayat pemakaian dan sopirnya.'],penerimaan:['Penerimaan barang','Catat barang masuk dan tagihan supplier melalui formulir penerimaan.'],shift:['Kas harian','Satu catatan laci per tanggal, uang fisik, dan pemeriksaan selisih.'],laporan:['Laporan harian','Tunai, transfer terverifikasi, dan transfer menunggu dipisahkan.']};
 groups.akun=['#login-accounts'];text.akun=['Akun Login','Kelola akun Admin dan Kasir; terpisah dari master karyawan.'];
 const panels=new Map();
+groups.kasir=['#kasir'];
+groups['riwayat-penjualan']=['#h-sales'];
+text['riwayat-penjualan']=['Riwayat penjualan','Seluruh nota, piutang penjualan, pembayaran cicilan, dan cetak nota.'];
 groups['master-unit']=['#master-section-unit'];text['master-unit']=['Satuan','Satuan dipakai pada setiap produk; mengarsipkan tidak menghapus riwayat.'];
 groups['master-category']=['#master-section-category'];text['master-category']=['Kategori','Kelompok produk untuk mempermudah pencarian di kasir.'];
 groups.ringkasan=['#admin-overview'];text.ringkasan=['Ringkasan Admin','Pengawasan operasional seluruh kasir.'];
-groups.persetujuan=['#h-verify','#reject-heading'];text.persetujuan=['Persetujuan Pembayaran','Verifikasi transfer dan persetujuan pembayaran supplier.'];
+groups.persetujuan=['#h-verify','#reject-heading'];text.persetujuan=navigation.dataset.role==='admin'?['Verifikasi pembayaran','Periksa transfer pelanggan dan pengajuan pembayaran supplier.']:['Status pembayaran','Pantau pembayaran yang Anda ajukan dan hasil pemeriksaan admin.'];
 groups.tagihan=['#tagihan'];
 const defaultTask=navigation.dataset.defaultTask||'kasir';
 const financialEntry=navigation.querySelector('[data-menu-group="keuangan"] a');
@@ -21,6 +24,13 @@ if(location.hash==='#keuangan'&&financialEntry){location.hash='#'+financialEntry
 const remoteState=new Map();const remoteLast=new Map();
 const remoteCache=new Map();        // kunci -> {url, html, at}
 const remoteFetching=new Map();     // mencegah permintaan ganda untuk alamat yang sama
+const remoteVersions=new Map();
+document.addEventListener('ui-remote:changed',event=>{
+ const url=new URL(event.detail?.url||location.href,location.href);if(url.origin!==location.origin)return;
+ for(const link of links){if(!link.dataset.remote||new URL(link.dataset.remote,location.href).pathname!==url.pathname)continue;
+  const key=link.dataset.task;remoteVersions.set(key,(remoteVersions.get(key)||0)+1);remoteCache.delete(key);remoteFetching.delete(key);
+ }
+});
 const CACHE_FRESH_MS=20000;         // isi selama ini dianggap masih baru
 function partialUrl(url){const u=new URL(url,location.href);u.searchParams.set('partial','1');return u.toString();}
 // Halaman Keuangan lama (Bagan akun) memanggil openModal/closeModal/showLockInfo milik layouts.app, yang tidak dimuat workspace.
@@ -67,21 +77,28 @@ function stopRemote(key){
  if(stop){stop();remoteCleanup.delete(key);}
 }
 function remoteBusy(panel,message){
- panel.replaceChildren();
+  panel.replaceChildren();
+  panel.removeAttribute('aria-busy');
+  if(message==='Memuat halaman…'){
+   const skeleton=document.getElementById('workspace-skeleton-template');
+   if(skeleton){panel.setAttribute('aria-busy','true');panel.append(skeleton.content.cloneNode(true));return;}
+  }
  const box=document.createElement('p');box.className='ui-status-line';box.setAttribute('role','status');box.textContent=message;panel.append(box);
 }
 function fetchRemote(key,url){
  const pending=remoteFetching.get(key);
  if(pending&&pending.url===url)return pending.promise;
+ const version=remoteVersions.get(key)||0;
  const promise=fetch(partialUrl(url),{credentials:'same-origin',headers:{'X-Requested-With':'fetch'}})
   .then(response=>{if(!response.ok)throw new Error('HTTP '+response.status);return response.text();})
-  .then(html=>{remoteCache.set(key,{url,html,at:Date.now()});return html;})
+  .then(html=>{if((remoteVersions.get(key)||0)===version)remoteCache.set(key,{url,html,at:Date.now()});return html;})
   .finally(()=>{if(remoteFetching.get(key)?.promise===promise)remoteFetching.delete(key);});
  remoteFetching.set(key,{url,promise});
  return promise;
 }
 function paintRemote(key,url,html){
- const panel=panels.get(key);if(!panel)return;
+  const panel=panels.get(key);if(!panel)return;
+  panel.removeAttribute('aria-busy');
  stopRemote(key);
  const holder=document.createElement('div');holder.innerHTML=html;
  panel.replaceChildren(...holder.childNodes);
@@ -97,6 +114,7 @@ function remoteBusyWithUser(panel){
 }
 async function loadRemote(key,url,{force=false}={}){
  const panel=panels.get(key);if(!panel)return;
+ const version=remoteVersions.get(key)||0;
  if(!force&&remoteState.get(key)===url)return;
  const cached=remoteCache.get(key);
  const usable=cached&&cached.url===url;
@@ -105,13 +123,15 @@ async function loadRemote(key,url,{force=false}={}){
   if(Date.now()-cached.at<=CACHE_FRESH_MS&&!force)return; // masih baru, tidak perlu diambil lagi
   try{
    const html=await fetchRemote(key,url);
-   if(active===key&&html!==cached.html&&!remoteBusyWithUser(panel))paintRemote(key,url,html);
+   if((remoteVersions.get(key)||0)===version&&active===key&&html!==cached.html&&!remoteBusyWithUser(panel))paintRemote(key,url,html);
   }catch{}
   return;
  }
  remoteBusy(panel,'Memuat halaman…');
  try{
-  paintRemote(key,url,await fetchRemote(key,url));window.uiMotion?.enter(panel);
+   const html=await fetchRemote(key,url);
+   if((remoteVersions.get(key)||0)!==version)return;
+   paintRemote(key,url,html);window.uiMotion?.enter(panel);
  }catch(error){
   remoteBusy(panel,'Halaman tidak dapat dimuat di sini.');
   const link=document.createElement('a');link.className='ui-btn';link.href=url;link.textContent='Buka halaman penuh';panel.append(link);
@@ -161,7 +181,7 @@ for(const link of links){
  for(const key of keys){
   const panel=document.createElement('div');panel.id='panel-'+key;panel.className='task-panel';
   // Kelas lapis DNA (ui-dna bagian 18 dan 20): halaman Operasional dan Master.
-  if(key.startsWith('master-')||['tagihan','pengiriman','penerimaan','shift','laporan','persetujuan'].includes(key))panel.classList.add('ui-dna-ops');if(key.startsWith('master-'))panel.classList.add('ui-dna-master');
+  if(key.startsWith('master-')||['tagihan','riwayat-penjualan','pengiriman','penerimaan','shift','laporan','persetujuan'].includes(key))panel.classList.add('ui-dna-ops');if(key.startsWith('master-'))panel.classList.add('ui-dna-master');
   panel.setAttribute('role','region');panel.setAttribute('aria-labelledby',link.id);panel.tabIndex=0;
   if(tabs){
    const bar=document.createElement('div');bar.className='ui-subtabs';bar.setAttribute('role','tablist');bar.setAttribute('aria-label',link.textContent.trim());
@@ -302,10 +322,10 @@ function enhanceCollect(form,result){
  const summary=document.createElement('dl');summary.className='popup-summary';
  for(const [label,value,strong] of [['Total tagihan',cellText(row,'Total')],['Terbayar',cellText(row,'Terbayar')],['Sisa',rest,true]]){const d=document.createElement('div');if(strong)d.className='is-due';const t=document.createElement('dt');t.textContent=label;const v=document.createElement('dd');v.textContent=value||'—';d.append(t,v);summary.append(d);}
  const srHead=form.querySelector('h3.sr');if(srHead)srHead.after(summary);else form.prepend(summary);
- const amount=form.querySelector('input[name=amount]');const digits=rest.replace(/[^0-9]/g,'');
+  const amount=form.querySelector('input[name=amount]');const balance=row.dataset.remaining;
  if(amount){const l=form.querySelector('label[for="'+amount.id+'"]');if(l)l.textContent='Jumlah dibayar';
   // Nominal tidak diisi otomatis; tombol cepat mengisi sisa tagihan dengan satu klik.
-  if(digits&&digits!=='0'&&!form.querySelector('.popup-fill')){const fill=document.createElement('button');fill.type='button';fill.className='secondary popup-fill';fill.textContent='Lunasi '+rest;fill.addEventListener('click',()=>{amount.value=digits;amount.dispatchEvent(new Event('input',{bubbles:true}));amount.focus();});amount.closest('.field')?.append(fill);}}
+   if(balance&&/^\d+(\.\d{1,2})?$/.test(balance)&&!form.querySelector('.popup-fill')){const fill=document.createElement('button');fill.type='button';fill.className='secondary popup-fill';fill.textContent='Lunasi '+rest;fill.addEventListener('click',()=>{amount.value=balance;amount.dispatchEvent(new Event('input',{bubbles:true}));amount.focus();});amount.closest('.field')?.append(fill);}}
  const ref=form.querySelector('input[name=reference]');if(ref&&!ref.placeholder)ref.placeholder='No. transfer / catatan';
  segmentSelect(form.querySelector('select[name=method]'));
  const hint=document.createElement('p');hint.className='note popup-hint';hint.textContent=form.dataset.hint||'Pilih sumber dana pembayaran.';form.querySelector('.popup-submit')?.before(hint);
@@ -315,10 +335,23 @@ function popupForms(root){for(const form of root.querySelectorAll(root===documen
  if(form.id==='form-checkout'||form.closest('dialog')||(form.getAttribute('method')||'').toLowerCase()==='get')continue;
  if(!form.querySelector('input:not([type=hidden]),select,textarea'))continue;
  const submit=form.querySelector('button[type=submit],button:not([type])');const label=form.dataset.popupTitle||(form.id==='form-open'?'Buka shift':(submit?.textContent.trim()||'Isi formulir'));const contextEl=form.querySelector('h3,p:not([data-error]):not([data-ok])');const context=contextEl?.tagName==='H3'&&contextEl.textContent.trim()!==label?contextEl.textContent.trim():'';if(contextEl?.tagName==='H3'&&contextEl.textContent.trim()===label)contextEl.classList.add('sr');const result=popup(form,label,label);if(result&&context){const note=document.createElement('p');note.className='popup-sub';note.textContent=context;result.dialog.querySelector('.popup-titles').append(note);}
+ if(result&&form.id==='form-open'){result.button.dataset.cashDayOpen='1';result.button.hidden=form.dataset.openAllowed==='0';if(result.button.hidden)result.button.style.setProperty('display','none','important');}
  if(result&&form.matches('.form-collect'))enhanceCollect(form,result);
 }}
-popupForms(document);
+function invoiceDetails(root){
+ for(const dialog of root.querySelectorAll('[data-invoice-detail]')){
+  if(dialog.dataset.bound)continue;dialog.dataset.bound='1';
+  dialog.addEventListener('cancel',event=>{event.preventDefault();closeCustomDialog(dialog);});
+  dialog.addEventListener('click',event=>{
+   if(event.target!==dialog)return;
+   const rect=dialog.getBoundingClientRect();
+   if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)closeCustomDialog(dialog);
+  });
+ }
+}
+popupForms(document);invoiceDetails(document);
 window.uiLive?.onPatch(popupForms);
+document.addEventListener('ui-invoices:render',event=>{tuckKeys(event.detail.root);labelRows(event.detail.root);popupForms(event.detail.root);invoiceDetails(event.detail.root);});
 // List filter remains a GET, not a mutation; labels keep their stored enum values.
 const kinds={customer:'Pelanggan',supplier:'Supplier',employee:'Karyawan / staf',product:'Produk',vehicle:'Kendaraan'};
 for(const option of document.querySelectorAll('select[name=master_kind] option'))option.textContent=kinds[option.value]||option.textContent;

@@ -67,6 +67,17 @@ class V2FormSystemTest extends TestCase
         $this->assertNull(FormCatalog::nextCode('vehicle', ['B 1 X']));
     }
 
+    public function test_vehicle_type_is_a_dropdown_and_preserves_an_existing_custom_type(): void
+    {
+        $field = FormCatalog::field('vehicle_type');
+        $html = $this->blade('<x-ui.field :field="$field" id="vehicle-type" value="Armada sintetis lama"/>', ['field' => $field]);
+
+        $html->assertSee('<select id="vehicle-type" name="vehicle_type"', false)
+            ->assertSee('value="Pick-up"', false)
+            ->assertSee('value="Armada sintetis lama" selected', false)
+            ->assertDontSee('<datalist', false);
+    }
+
     public function test_rendered_master_dialogs_use_the_shared_field_templates(): void
     {
         $admin = $this->admin();
@@ -79,6 +90,12 @@ class V2FormSystemTest extends TestCase
         $this->assertStringContainsString('<input type="radio" name="kind" value="external"', $html);
         $this->assertMatchesRegularExpression('/<div class="uf-section"\s+data-product-suppliers\s*>/', $html);
         $this->assertStringNotContainsString('class="form-grid-2"', $html, 'Form master lama tidak boleh tersisa.');
+        foreach (['employee', 'driver'] as $kind) {
+            preg_match('/<section\b[^>]*id="master-section-'.$kind.'"[^>]*>/', $html, $host);
+            $this->assertStringContainsString('data-dialog-host', $host[0] ?? '');
+            $this->assertStringNotContainsString('class="card ', $host[0] ?? '');
+            $this->assertStringContainsString('id="popup-add-'.$kind.'"', $html);
+        }
         // Supplier produk dipilih lewat satu dropdown; yang sudah tertaut tampil sebagai keping, utama di depan.
         $this->assertStringContainsString('data-ui-multiref', $html);
         $this->assertStringNotContainsString('name="supplier_ids[]" value="" ', $html);

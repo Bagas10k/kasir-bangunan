@@ -52,7 +52,7 @@ test('shift close with a difference announces a warning with the amount', async 
     const f = setup([{ ok: true, body: { status: 'review', difference: '-10000.00' } }]);
     await f.window.fetch('/kasir-bangunan/v2/shifts/4/close', { method: 'POST' });
     await tick();
-    assert.equal(f.saved().title, 'Shift ditutup, ada selisih kas');
+    assert.equal(f.saved().title, 'Kas harian ditutup, ada selisih kas');
     assert.equal(f.saved().tone, 'warn');
     assert.match(f.saved().detail, /Rp -10\.000/);
 });

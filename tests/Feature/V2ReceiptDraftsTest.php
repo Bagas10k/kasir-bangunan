@@ -3,10 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\V2\Ledger;
+use App\Services\V2\Operations;
 use App\Services\V2\ReceiptDrafts;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
@@ -56,6 +59,68 @@ class V2ReceiptDraftsTest extends TestCase
             }
         }
         $this->assertDatabaseHas('v2_receipt_drafts', ['id' => $draft['draft_id'], 'version' => 2]);
+    }
+
+    public function test_supplier_freight_posts_expense_not_inventory_and_replays_once(): void
+    {
+        [$actor, $payload] = $this->fixture();
+        DB::table('chart_of_accounts')->insert(['account_code' => '6199', 'account_name' => 'Ongkir Uji Sintetis', 'account_type' => 'expense', 'normal_balance' => 'debit', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $payload += ['freight_amount' => '25', 'freight_method' => 'supplier', 'freight_account' => '6199'];
+        $service = app(ReceiptDrafts::class);
+        $draft = $service->save($actor, $payload);
+        $this->assertDatabaseCount('journal_entries', 0);
+        $result = $service->confirm($actor, $draft['draft_id'], ['version' => 1]);
+        $service->confirm($actor, $draft['draft_id'], ['version' => 1]);
+
+        $this->assertDatabaseHas('journal_entry_lines', ['account_code' => '1301', 'debit' => '250.31']);
+        $this->assertDatabaseHas('journal_entry_lines', ['account_code' => '6199', 'debit' => '25.00']);
+        $this->assertDatabaseHas('v2_invoices', ['id' => $result['invoice_id'], 'amount' => '275.31']);
+        $this->assertDatabaseCount('inventory_receipts', 1);
+        $this->assertDatabaseHas('products', ['id' => $payload['items'][0]['product_id'], 'cost_price' => '68.0250']);
+    }
+
+    #[TestWith(['bank', '1102'])]
+    #[TestWith(['cash', '1101'])]
+    public function test_separate_freight_reduces_funds_without_increasing_supplier_debt(string $method, string $account): void
+    {
+        [$actor, $payload] = $this->fixture();
+        foreach ([['1101', 'Kas', 'asset', 'debit'], ['1102', 'Bank', 'asset', 'debit'], ['3101', 'Modal', 'equity', 'credit'], ['6199', 'Beban uji', 'expense', 'debit']] as [$code, $name, $type, $normal]) {
+            DB::table('chart_of_accounts')->insertOrIgnore(['account_code' => $code, 'account_name' => $name, 'account_type' => $type, 'normal_balance' => $normal, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        if ($method === 'cash') {
+            app(Operations::class)->openShift($actor, '100', 'admin');
+        }
+        Ledger::post('synthetic-funding', 1, 'Dana sintetis', [['account_code' => $account, 'debit' => '100', 'credit' => '0'], ['account_code' => '3101', 'credit' => '100', 'debit' => '0']]);
+        $payload += ['freight_amount' => '25', 'freight_method' => $method, 'freight_account' => '6199'];
+        $service = app(ReceiptDrafts::class);
+        $draft = $service->save($actor, $payload);
+        $result = $service->confirm($actor, $draft['draft_id'], ['version' => 1]);
+        $service->confirm($actor, $draft['draft_id'], ['version' => 1]);
+        $this->assertDatabaseHas('v2_invoices', ['id' => $result['invoice_id'], 'amount' => '250.31']);
+        $this->assertDatabaseHas('journal_entry_lines', ['account_code' => $account, 'credit' => '25.00']);
+        $this->assertSame($method === 'cash' ? 1 : 0, DB::table('v2_shift_movements')->where('reference_type', 'v2_receipt_freight')->count());
+        $this->assertDatabaseHas('products', ['id' => $payload['items'][0]['product_id'], 'cost_price' => '68.0250']);
+    }
+
+    public function test_unfunded_freight_rolls_back_confirmation_and_keeps_the_draft(): void
+    {
+        [$actor, $payload] = $this->fixture();
+        foreach ([['1102', 'asset', 'debit'], ['6199', 'expense', 'debit']] as [$code, $type, $normal]) {
+            DB::table('chart_of_accounts')->insert(['account_code' => $code, 'account_name' => 'Akun sintetis '.$code, 'account_type' => $type, 'normal_balance' => $normal, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $payload += ['freight_amount' => '25', 'freight_method' => 'bank', 'freight_account' => '6199'];
+        $service = app(ReceiptDrafts::class);
+        $draft = $service->save($actor, $payload);
+        try {
+            $service->confirm($actor, $draft['draft_id'], ['version' => 1]);
+            $this->fail('Saldo bank kosong seharusnya ditolak.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('Saldo', $exception->getMessage());
+        }
+        $this->assertDatabaseCount('inventory_receipts', 0);
+        $this->assertDatabaseCount('journal_entries', 0);
+        $this->assertDatabaseHas('v2_receipt_drafts', ['id' => $draft['draft_id'], 'status' => 'draft', 'version' => 1]);
+        $this->assertDatabaseHas('products', ['id' => $payload['items'][0]['product_id'], 'stock_quantity' => '10']);
     }
 
     public function test_duplicate_nota_confirmation_rolls_back_and_can_be_explicitly_overridden(): void

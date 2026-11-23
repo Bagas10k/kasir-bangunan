@@ -6,20 +6,22 @@ import vm from 'node:vm';
 const file = new URL('../resources/views/v2/sales-history-script.blade.php', import.meta.url);
 const source = existsSync(file) ? readFileSync(file, 'utf8').replace(/^<script>\s*|\s*<\/script>\s*$/g, '') : '';
 function setup() {
-    const fields = Object.fromEntries(Object.entries({ sale_search: '', sale_method: '', start_date: '2026-11-20', end_date: '', history_per_page: '10', history_shift: 'active' }).map(([name, value]) => [name, { name, value, dispatchEvent() {} }]));
-    fields.history_shift.options = [];
-    fields.history_shift.replaceChildren = (...options) => { fields.history_shift.options = options; };
-    Object.defineProperty(fields.history_shift, 'selectedOptions', { get: () => fields.history_shift.options.filter(o => o.value === fields.history_shift.value) });
+    const fields = Object.fromEntries(Object.entries({ sale_search: '', sale_method: '', start_date: '2026-11-20', end_date: '', history_per_page: '10' }).map(([name, value]) => [name, { name, value, dispatchEvent() {} }]));
     const formListeners = {}, handlers = {}, documentHandlers = {}, button = { disabled: false };
     const attributes = new Map();
-    const form = { dataset: { historyUrl: '/v2/sales/history' }, elements: fields, reportValidity: () => true, addEventListener: (name, fn) => { formListeners[name] = fn; }, querySelector: () => button, querySelectorAll: () => [button] };
+    const appliedEvents = [];
+    const form = { dataset: { historyUrl: '/v2/sales/history' }, elements: fields, reportValidity: () => true, addEventListener: (name, fn) => { formListeners[name] = fn; }, dispatchEvent: event => { appliedEvents.push(event.type); }, querySelector: () => button, querySelectorAll: () => [button] };
     const results = { innerHTML: 'old results', setAttribute: (k, v) => attributes.set(k, v), removeAttribute: k => attributes.delete(k) };
     const error = { hidden: true, textContent: '', focus() {} };
-    const root = { dataset: {}, querySelector: s => s === '#history-filter-form' ? form : s === '#history-results' ? results : error, addEventListener: (name, fn) => { handlers[name] = fn; }, setAttribute: (k, v) => attributes.set(k, v), removeAttribute: k => attributes.delete(k) };
+    const root = { dataset: { historyToday: '2026-11-21' }, querySelector: s => s === '#history-filter-form' ? form : s === '#history-results' ? results : error, addEventListener: (name, fn) => { handlers[name] = fn; }, setAttribute: (k, v) => attributes.set(k, v), removeAttribute: k => attributes.delete(k) };
     const location = { href: 'http://example.test/?start_date=2026-11-20&sale_search=&date=2026-11-19#kasir', origin: 'http://example.test' };
     const history = { state: null, replaceState: (_s, _t, url) => { location.href = String(url); } };
     const requests = [];
-    let responder = async url => ({ ok: true, redirected: false, json: async () => ({ html: '<p>new results</p>', filters: Object.fromEntries(new URL(url).searchParams), shifts: [{ id: 7, label: '#7 · sintetis' }] }) });
+    let responder = async url => {
+        const filters = Object.fromEntries(new URL(url).searchParams);
+        if (!Object.hasOwn(filters, 'start_date') && !Object.hasOwn(filters, 'end_date')) Object.assign(filters, { start_date: '2026-11-21', end_date: '2026-11-21' });
+        return { ok: true, redirected: false, json: async () => ({ html: '<p>new results</p>', filters }) };
+    };
     const document = { getElementById: id => ({ 'sales-history': root, 'history-filter-form': form, 'history-results': results, 'history-error': error })[id], querySelector: () => root, createElement: () => ({ value: '', textContent: '' }), addEventListener: (name, fn) => { documentHandlers[name] = fn; } };
     const context = { window: { history, location }, document, location, history, URL, URLSearchParams, AbortController, Event, console, setTimeout, clearTimeout, FormData: class { constructor(f) { this.entries = Object.entries(f.elements).map(([key, field]) => [key, field.value]); } [Symbol.iterator]() { return this.entries[Symbol.iterator](); } }, fetch: (url, options) => { requests.push({ url: String(url), options }); return responder(String(url)); } };
     vm.runInNewContext(source, context);
@@ -31,7 +33,7 @@ function setup() {
         await handlers.click?.(event);
         return prevented;
     };
-    return { fields, form, results, error, root, button, location, requests, documentHandlers, submit, click, respond: fn => { responder = fn; } };
+    return { fields, form, results, error, root, button, location, requests, appliedEvents, documentHandlers, submit, click, respond: fn => { responder = fn; } };
 }
 
 test('apply filters uses a background GET, clean URL and only replaces history results', async () => {
@@ -47,9 +49,10 @@ test('apply filters uses a background GET, clean URL and only replaces history r
     assert.equal(app.location.href, 'http://example.test/?date=2026-11-19#kasir');
     assert.equal(app.fields.start_date.value, '2026-11-20');
     assert.equal(app.error.hidden, true);
+    assert.deepEqual(app.appliedEvents, ['ui-filter:applied']);
 });
 
-test('pagination uses applied filters and reset returns to the active shift without navigation', async () => {
+test('pagination uses applied filters and reset returns to today without navigation', async () => {
     const app = setup();
     app.fields.sale_search.value = 'INV-SYN';
     await app.submit();
@@ -61,9 +64,10 @@ test('pagination uses applied filters and reset returns to the active shift with
     assert.equal(await app.click({ modified: true }), false);
     assert.equal(app.requests.length, count);
     assert.equal(await app.click({ reset: true }), true);
-    assert.equal(app.fields.start_date.value, '');
+    assert.equal(app.fields.start_date.value, '2026-11-21');
+    assert.equal(app.fields.end_date.value, '2026-11-21');
     assert.equal(app.fields.sale_search.value, '');
-    assert.equal(new URL(app.requests.at(-1).url).searchParams.get('history_shift'), 'active');
+    assert.equal(new URL(app.requests.at(-1).url).searchParams.has('history_shift'), false);
     assert.equal(new URL(app.requests.at(-1).url).searchParams.has('history_page'), false);
 });
 
@@ -76,10 +80,52 @@ test('failed validation/network retains old results, input and usable controls',
     assert.equal(app.error.hidden, false);
     assert.match(app.error.textContent, /Rentang tanggal tidak sah/);
     assert.equal(app.button.disabled, false);
+    assert.deepEqual(app.appliedEvents, [], 'A failed request must not close the filter panel.');
     app.respond(async () => { throw new Error('offline'); });
     await app.submit();
     assert.equal(app.results.innerHTML, 'old results');
     assert.equal(app.button.disabled, false);
+});
+
+test('reset uses the server date after midnight rather than a stale page date', async () => {
+    const app = setup();
+    app.respond(async () => ({ ok: true, json: async () => ({ html: 'next day', filters: { sale_search: '', sale_method: '', start_date: '2026-11-22', end_date: '2026-11-22', history_per_page: 10, history_page: 1 } }) }));
+    await app.click({ reset: true });
+    assert.equal(new URL(app.requests.at(-1).url).searchParams.has('start_date'), false);
+    assert.equal(app.fields.start_date.value, '2026-11-22');
+    assert.equal(app.fields.end_date.value, '2026-11-22');
+    assert.equal(app.form.dataset.filtered, '0');
+    assert.equal(app.root.dataset.historyToday, '2026-11-22');
+});
+
+test('failed reset preserves draft filters and previous results', async () => {
+    const app = setup();
+    app.fields.sale_search.value = 'unsaved draft';
+    app.respond(async () => { throw Error('offline'); });
+    await app.click({ reset: true });
+    assert.equal(app.fields.sale_search.value, 'unsaved draft');
+    assert.equal(app.fields.start_date.value, '2026-11-20');
+    assert.equal(app.results.innerHTML, 'old results');
+});
+
+test('explicitly clearing dates stays distinct from the default today filter', async () => {
+    const app = setup();
+    app.fields.start_date.value = '';
+    await app.submit();
+    const params = new URL(app.requests.at(-1).url).searchParams;
+    assert.equal(params.get('start_date'), '');
+    assert.equal(params.get('end_date'), '');
+});
+
+test('HTTP failures show actionable messages without exposing server details', async () => {
+    for (const status of [422, 401, 500]) {
+        const app = setup();
+        app.respond(async () => ({ status, ok: false, redirected: false, json: async () => ({ message: 'internal server detail' }) }));
+        await app.submit();
+        assert.doesNotMatch(app.error.textContent, /internal server detail/);
+        assert.match(app.error.textContent, status === 422 ? /Periksa rentang tanggal/ : status === 401 ? /Masuk kembali/ : /Periksa koneksi/);
+        assert.equal(app.results.innerHTML, 'old results');
+    }
 });
 
 test('a late stale response cannot overwrite a newer filter result', async () => {
@@ -88,7 +134,7 @@ test('a late stale response cannot overwrite a newer filter result', async () =>
     const first = app.submit();
     app.fields.sale_search.value = 'latest';
     const second = app.submit();
-    const response = (html, url) => ({ ok: true, redirected: false, json: async () => ({ html, filters: Object.fromEntries(new URL(url).searchParams), shifts: [] }) });
+    const response = (html, url) => ({ ok: true, redirected: false, json: async () => ({ html, filters: Object.fromEntries(new URL(url).searchParams) }) });
     pending[1].resolve(response('latest results', pending[1].url));
     await second;
     pending[0].resolve(response('stale results', pending[0].url));

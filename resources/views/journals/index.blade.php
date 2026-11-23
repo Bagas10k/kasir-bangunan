@@ -4,6 +4,10 @@
 @section('content')
 @php
     $adjustmentAccounts = $adjustmentAccounts ?? collect();
+    $counterAccounts = $counterAccounts ?? $adjustmentAccounts;
+    $hasJournals = $hasJournals ?? false;
+    $v2Writes = config('v2.enabled');
+    $adjustmentAction = $v2Writes ? route('v2.journals.adjustments.store') : route('journals.adjustments.store');
     $sourceLabels = [
         'opening_balance' => 'Saldo Pembukaan',
         'sale' => 'Penjualan',
@@ -194,6 +198,8 @@
     <div class="alert alert-danger" role="alert">{{ $errors->first('opening_balance') }}</div>
 @endif
 
+<div data-journal-root data-refresh-url="{{ route('journals.index', request()->except('partial')) }}">
+<p class="note" data-journal-feedback role="status" aria-live="polite" tabindex="-1" hidden></p>
 <section class="balance-strip" aria-label="Ringkasan Kas dan Bank">
     <article class="balance-tile">
         <small>Saldo Akhir Kas Tunai</small>
@@ -208,7 +214,7 @@
     <article class="balance-tile">
         <small>Status Saldo Pembukaan</small>
         <strong>{{ $openingStatus === 'posted' ? 'Terkunci' : ($openingStatus === 'draft' ? 'Draf' : 'Belum diisi') }}</strong>
-        <span>{{ $openingStatus === 'posted' ? 'Koreksi melalui jurnal penyesuaian' : 'Dapat ditinjau sebelum Mulai Pembukuan' }}</span>
+        <span>{{ $openingStatus === 'posted' ? 'Koreksi melalui jurnal penyesuaian' : ($hasJournals ? 'Pembukuan sudah berjalan; koreksi lewat penyesuaian' : 'Dapat ditinjau sebelum Mulai Pembukuan') }}</span>
     </article>
 </section>
 
@@ -220,17 +226,19 @@
     <div class="adjustment-content">
     <h2 class="section-title">Jurnal Penyesuaian Saldo</h2>
     <p class="section-copy">Isi saldo tujuan. Selisihnya otomatis masuk ke akun lawan.</p>
-    <form method="POST" action="{{ route('journals.adjustments.store') }}">
+    <form id="adjustment-form" method="POST" action="{{ $adjustmentAction }}">
         @csrf
+        <p class="err" data-adjustment-error role="alert" tabindex="-1" hidden></p>
         <div class="adjustment-grid">
             <div class="form-group"><label for="adjustment-account">Akun yang disesuaikan</label><select class="form-control" id="adjustment-account" name="account_code" data-native-select required><option value="">Pilih akun</option>@foreach($adjustmentAccounts as $account)<option value="{{ $account->account_code }}" @selected(old('account_code') === $account->account_code)>{{ $account->account_code }} — {{ $account->account_name }} ({{ $account->normal_balance === 'credit' ? 'Kredit' : 'Debet' }})</option>@endforeach</select></div>
-            <div class="form-group"><label for="adjustment-target">Saldo tujuan (Rp)</label><input class="form-control" id="adjustment-target" name="target_balance" type="number" step="0.01" placeholder="0,00" value="{{ old('target_balance') }}" required aria-describedby="adjustment-help"></div>
-            <div class="form-group"><label for="adjustment-counter">Akun lawan</label><select class="form-control" id="adjustment-counter" name="counter_account_code" data-native-select required><option value="">Pilih akun lawan</option>@foreach($adjustmentAccounts as $account)<option value="{{ $account->account_code }}" @selected(old('counter_account_code') === $account->account_code)>{{ $account->account_code }} — {{ $account->account_name }}</option>@endforeach</select></div>
+            <div class="form-group"><label for="adjustment-target">Saldo tujuan (Rp)</label><input class="form-control" id="adjustment-target" name="target_balance" type="number" step="0.01" min="0" placeholder="0,00" value="{{ old('target_balance') }}" required aria-describedby="adjustment-help"></div>
+            <div class="form-group"><label for="adjustment-counter">Akun lawan</label><select class="form-control" id="adjustment-counter" name="counter_account_code" data-native-select required><option value="">Pilih akun lawan</option>@foreach($counterAccounts as $account)<option value="{{ $account->account_code }}" @selected(old('counter_account_code') === $account->account_code)>{{ $account->account_code }} — {{ $account->account_name }}</option>@endforeach</select></div>
             <div class="form-group"><label for="adjustment-date">Tanggal</label><input class="form-control" id="adjustment-date" type="date" name="transaction_date" value="{{ old('transaction_date', now()->toDateString()) }}" required></div>
-            <div class="form-group adjustment-wide"><label for="adjustment-description">Keterangan</label><input class="form-control" id="adjustment-description" name="description" maxlength="200" value="{{ old('description') }}" placeholder="Mis. saldo awal go-live" required></div>
+            <div class="form-group adjustment-wide"><label for="adjustment-description">Alasan koreksi</label><input class="form-control" id="adjustment-description" name="description" maxlength="200" value="{{ old('description') }}" placeholder="Mis. selisih hitung kas pagi" required></div>
         </div>
         <p class="adjustment-hint" id="adjustment-help">Saldo tujuan mengikuti sisi normal akun. Jurnal lama tetap tersimpan.</p>
-        @if($openingStatus !== 'posted')<p class="adjustment-hint">Posting pertama memulai pembukuan dan menggantikan draf saldo awal.</p>@endif
+        @if($v2Writes)<p class="adjustment-hint">Pada tahap ini hanya Kas (1101) dan Bank (1102) yang dapat disesuaikan. Saldo awal yang sudah diposting tidak diubah; selisih dicatat sebagai jurnal penyesuaian baru.</p>@endif
+        @if(!$v2Writes && $openingStatus !== 'posted')<p class="adjustment-hint">Posting pertama memulai pembukuan dan menggantikan draf saldo awal.</p>@endif
         @if($adjustmentAccounts->isEmpty())<p class="section-copy">Belum ada akun aktif. Siapkan dahulu melalui <a href="{{ route('coa.index') }}">Bagan Akun</a>.</p>@endif
         <div class="adjustment-confirm">
             <div class="form-group"><label for="adjustment-password">Password login untuk konfirmasi</label><input class="form-control" id="adjustment-password" name="password" type="password" autocomplete="current-password" placeholder="Masukkan password Anda" required></div>
@@ -274,7 +282,17 @@
         <h2 class="section-title">Saldo Pembukaan</h2>
         <p class="section-copy">Isi nilai Kas Tunai dan Bank pada tanggal mulai pembukuan. Sistem otomatis membuat lawan jurnal ke Ekuitas Saldo Awal agar Neraca tetap seimbang.</p>
 
-        @if($openingStatus !== 'posted')
+        @if($v2Writes)
+            @if($openingStatus !== 'posted')
+                @if($hasJournals)
+                    <div class="lock-note"><strong>Saldo awal belum tercatat, tetapi pembukuan sudah berjalan.</strong> Pembukaan baru tidak dapat diposting lagi. Gunakan panel <strong>Sesuaikan saldo</strong> di halaman ini untuk mengoreksi Kas atau Bank; jurnal lama tetap utuh.</div>
+                @else
+                    <div class="lock-note"><strong>Saldo awal belum diposting.</strong> Pembukaan hanya dilakukan sekali dari menu <a href="{{ route('v2.index') }}#shift">Kas harian → Saldo awal pembukuan</a>. Halaman ini tidak menyediakan pembukaan kedua; gunakan penyesuaian hanya untuk koreksi sesudahnya.</div>
+                @endif
+            @else
+                <div class="lock-note"><strong>Saldo awal telah diposting.</strong> Angka pembukaan tidak dapat diubah atau dihapus. Koreksi dilakukan melalui jurnal penyesuaian agar jejak audit tetap utuh.</div>
+            @endif
+        @elseif($openingStatus !== 'posted')
         <form method="POST" action="{{ route('journals.opening.save') }}">
             @csrf
             <div class="opening-form">
@@ -321,6 +339,7 @@
 </section>
 
  </details>
+</div>
 <section class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
         <div>
@@ -454,5 +473,8 @@
     });
 })();
 </script>
+@if($v2Writes)
+    @include('v2.journal-adjustment-script')
+@endif
 @include('v2.finance-dna')
 @endsection

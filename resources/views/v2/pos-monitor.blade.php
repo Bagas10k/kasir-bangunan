@@ -31,14 +31,26 @@
             <p class="pd-sub" id="pd-sub">{{ $posDashboard[$initial]['sub_label'] ?? '' }}</p>
         </div>
         <div class="pd-controls">
-            <div class="pos-shift-notice" id="store-shift-state" data-live-skip data-pos-shift-state="{{ $activeStoreShift ? 'open' : 'closed' }}" data-store-shift-id="{{ $activeStoreShift->id ?? '' }}" data-status-url="{{ route('v2.shifts.active') }}" data-manage-shift="{{ $isAdminView ? '1' : '0' }}" role="status" aria-live="polite" aria-label="Status shift toko">
-                <strong>{{ $activeStoreShift ? 'Shift toko #'.$activeStoreShift->id.' aktif' : ($isAdminView ? 'Shift toko belum dibuka' : 'Menunggu admin membuka shift toko') }}</strong>
-                <a class="pos-shift-action" href="#shift" data-task-link="shift"><span>{{ $activeStoreShift || !$isAdminView ? 'Lihat shift' : 'Buka shift toko' }}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+            <div class="pos-shift-notice" id="store-shift-state" data-live-skip data-pos-shift-state="{{ $activeStoreShift ? 'open' : 'closed' }}" data-store-shift-id="{{ $activeStoreShift->id ?? '' }}" data-today-status="{{ !empty($todayCashDay) ? substr((string) $todayCashDay->opened_at, 0, 10).':'.$todayCashDay->status : '' }}" data-status-url="{{ route('v2.shifts.active') }}" data-manage-shift="{{ $isAdminView ? '1' : '0' }}" role="status" aria-live="polite" aria-label="Status kas harian">
+                <strong>{{ $activeStoreShift ? 'Kas harian '.substr((string) $activeStoreShift->opened_at, 0, 10).' aktif' : (!empty($todayCashDay) ? 'Kas harian '.substr((string) $todayCashDay->opened_at, 0, 10).' sudah ditutup' : ($isAdminView ? 'Kas harian belum dibuka' : 'Menunggu admin membuka kas harian')) }}</strong>
+                <a class="pos-shift-action" href="#shift" data-task-link="shift"><span>{{ $activeStoreShift || !empty($todayCashDay) || !$isAdminView ? 'Lihat kas harian' : 'Buka kas harian' }}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
             </div>
             <div class="pd-seg" id="sales-period-control" role="group" aria-label="Pilih rentang waktu">
                 @foreach ($periodButtons as $key => $text)
                     <button type="button" data-period="{{ $key }}" aria-pressed="{{ $key === $initial ? 'true' : 'false' }}">{{ $text }}</button>
                 @endforeach
+            </div>
+            <div id="pd-custom">
+                <button type="button" id="pd-custom-trigger" aria-expanded="false" aria-controls="pd-custom-panel">Tanggal khusus</button>
+                <div id="pd-custom-panel" class="pd-custom-panel" role="region" aria-labelledby="pd-custom-title" hidden>
+                <div class="pd-custom-heading"><strong id="pd-custom-title">Rentang tanggal</strong><button type="button" id="pd-custom-close" aria-label="Tutup tanggal khusus">×</button></div>
+                <form id="pd-custom-form" action="{{ route('v2.sales.dashboard') }}">
+                    <div class="pd-date-field"><label for="pd-from">Dari</label><input type="date" id="pd-from" required max="{{ now()->toDateString() }}"></div>
+                    <div class="pd-date-field"><label for="pd-to">Sampai</label><input type="date" id="pd-to" required max="{{ now()->toDateString() }}"></div>
+                    <button type="submit">Terapkan</button>
+                    <p id="pd-custom-status" role="status" aria-live="polite">Maksimal 366 hari. Tidak mengubah tanggal menu lain.</p>
+                </form>
+                </div>
             </div>
         </div>
     </header>
@@ -50,23 +62,23 @@
                 <div class="pd-kpis">
                         <div class="pd-kpi pd-kpi--lead">
                             <span class="pd-kpi-label">Penjualan</span>
-                            <strong class="pd-kpi-value" @if ($key === $initial) id="sales-revenue" @endif>{{ $d['formatted_revenue'] }}</strong>
-                            <span class="pd-delta pd-delta--{{ $tone }}">{{ $deltaLabel }}</span>
+                            <strong class="pd-kpi-value" data-number-key="revenue" @if ($key === $initial) id="sales-revenue" @endif>{{ $d['formatted_revenue'] }}</strong>
+                            <span class="pd-delta pd-delta--{{ $tone }}" data-number-text="delta">{{ $deltaLabel }}</span>
                         </div>
                         <div class="pd-kpi">
                             <span class="pd-kpi-label">Transaksi</span>
-                            <strong class="pd-kpi-value">{{ number_format($d['transaction_count'], 0, ',', '.') }}</strong>
-                            <span class="pd-kpi-note">{{ number_format($d['previous_count'], 0, ',', '.') }} {{ $d['previous_label'] }}</span>
+                            <strong class="pd-kpi-value" data-number-key="transactions">{{ number_format($d['transaction_count'], 0, ',', '.') }}</strong>
+                            <span class="pd-kpi-note" data-number-text="previous-count">{{ number_format($d['previous_count'], 0, ',', '.') }} {{ $d['previous_label'] }}</span>
                         </div>
                         <div class="pd-kpi">
                             <span class="pd-kpi-label"><span class="pd-long">Rata-rata per nota</span><span class="pd-short">Rata-rata</span></span>
-                            <strong class="pd-kpi-value">{{ $d['formatted_average'] }}</strong>
-                            <span class="pd-kpi-note">dari {{ number_format($d['transaction_count'], 0, ',', '.') }} nota</span>
+                            <strong class="pd-kpi-value" data-number-key="average">{{ $d['formatted_average'] }}</strong>
+                            <span class="pd-kpi-note" data-number-text="average-count">dari {{ number_format($d['transaction_count'], 0, ',', '.') }} nota</span>
                         </div>
                         <div class="pd-kpi pd-kpi--stock @if ($stockOut->count() > 0) is-bad @elseif ($stockLow->count() > 0) is-warn @endif">
                             <span class="pd-kpi-label"><span class="pd-long">Stok perlu perhatian</span><span class="pd-short">Stok perhatian</span></span>
-                            <strong class="pd-kpi-value">{{ $stockOut->count() + $stockLow->count() }}</strong>
-                            <span class="pd-kpi-note">{{ $stockOut->count() }} habis · {{ $stockLow->count() }} menipis<span class="pd-long"> dari {{ number_format($stockTotal, 0, ',', '.') }} produk</span></span>
+                            <strong class="pd-kpi-value" data-number-key="stock">{{ $stockOut->count() + $stockLow->count() }}</strong>
+                            <span class="pd-kpi-note"><span data-number-text="stock-counts">{{ $stockOut->count() }} habis · {{ $stockLow->count() }} menipis</span><span class="pd-long" data-number-text="stock-total"> dari {{ number_format($stockTotal, 0, ',', '.') }} produk</span></span>
                             @if ($isAdminView && ($stockOut->count() + $stockLow->count()) > 0)
                                 <a class="pd-kpi-link" href="#master-product" data-task-link="master-product">Lihat stok</a>
                             @endif
@@ -78,7 +90,7 @@
                     $rangeLabel = $key === 'today' || count($bucketLabels) === 0 ? $d['sub_label'] : reset($bucketLabels).' – '.end($bucketLabels);
                 @endphp
                 <div class="pd-main">
-                    <div class="pd-card-head"><h3 class="pd-card-title">{{ $key === 'today' ? 'Penjualan per jam' : 'Penjualan harian' }}</h3><p class="pd-card-sub">{{ $rangeLabel }}</p></div>
+                    <div class="pd-card-head"><h3 class="pd-card-title">{{ ($d['hourly'] ?? ($key === 'today')) ? 'Penjualan per jam' : 'Penjualan per periode' }}</h3><p class="pd-card-sub">{{ $rangeLabel }}</p></div>
                     <figure class="pd-chart" @if ($key === $initial) id="sales-dashboard-card" @endif>
                         {{-- Pertahankan titik kait grafik; periode kosong hanya menampilkan keterangan, bukan batang semu. --}}
                         @php $emptyChart = $d['peak'] === null; @endphp
@@ -112,12 +124,12 @@
                     @if (count($d['top_products']) === 0)
                         <p class="pd-empty">Belum ada barang terjual.</p>
                     @else
-                        <ol class="pd-top" style="--pd-rows: {{ (int) ceil(count($d['top_products']) / 2) }}">
+                        <ol class="pd-top" style="--pd-rows: {{ min(5, count($d['top_products'])) }}; --pd-columns: {{ count($d['top_products']) > 5 ? 2 : 1 }}">
                             @foreach ($d['top_products'] as $i => $top)
                                 <li>
                                     <span class="pd-rank">{{ $i + 1 }}</span>
                                     <span class="pd-top-name" title="{{ $top['name'] }}">{{ $top['name'] }}</span>
-                                    <span class="pd-top-qty">{{ $top['formatted_qty'] }} {{ $top['unit'] }}</span>
+                                    <span class="pd-top-qty" data-number-text="top-{{ $top['name'] }}">{{ $top['formatted_qty'] }} {{ $top['unit'] }}</span>
                                     <i class="pd-top-bar" style="width: {{ $top['share'] }}%" aria-hidden="true"></i>
                                 </li>
                             @endforeach
@@ -126,6 +138,7 @@
                 </aside>
             </div>
         @endforeach
+        @include('v2.recent-sales')
     </div>
 </section>
 
@@ -133,21 +146,5 @@
 {!! json_encode($posDashboard, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}
 </script>
 
-<script>
-(()=>{
- const root=document.querySelector('#pos-dashboard');if(!root)return;
- const buttons=[...root.querySelectorAll('.pd-seg button')],panes=[...root.querySelectorAll('.pd-pane')],sub=root.querySelector('#pd-sub');
- const data=JSON.parse(document.querySelector('#pos-monitor-precomputed').textContent||'{}');
- function show(period){
-  for(const b of buttons)b.setAttribute('aria-pressed',String(b.dataset.period===period));
-  for(const p of panes)p.hidden=p.dataset.pane!==period;
-  if(sub&&data[period])sub.textContent=data[period].sub_label;
-  try{localStorage.setItem('pd-period',period);}catch{}
- }
- for(const b of buttons)b.addEventListener('click',()=>show(b.dataset.period));
- let saved=null;try{saved=localStorage.getItem('pd-period');}catch{}
- if(saved&&data[saved])show(saved);
- // Ringkasan selalu tampil (fitur lipat dihapus sesuai desain); bersihkan pilihan lipat lama.
- try{localStorage.removeItem('pd-folded');}catch{}
-})();
-</script>
+@include('v2.pos-period-script')
+@include('v2.pos-period-popover')

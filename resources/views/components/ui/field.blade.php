@@ -74,6 +74,17 @@ tambahkan templatnya di App\Support\V2\FormCatalog lalu panggil komponen ini.
 @else
 <label class="uf-label" for="{{ $id }}">{{ $field['label'] }}@if($required)<span class="uf-req" aria-hidden="true">*</span>@elseif($optional)<span class="uf-opt">Opsional</span>@endif</label>
 @switch($type)
+@case('select')
+<select id="{{ $id }}" name="{{ $name }}" @if($required) required @endif @if($hintId) aria-describedby="{{ $hintId }}" @endif>
+<option value="">Pilih {{ strtolower($field['label']) }}</option>
+@foreach($field['choices'] as $choice)
+<option value="{{ $choice }}" @selected($raw === $choice)>{{ $choice }}</option>
+@endforeach
+@if($raw !== '' && !in_array($raw, $field['choices'], true))
+<option value="{{ $raw }}" selected>{{ $raw }} (tersimpan)</option>
+@endif
+</select>
+@break
 @case('ref')
 <select id="{{ $id }}" name="{{ $name }}" @if($required) required @endif data-ref="{{ $field['source'] }}" @if($hintId) aria-describedby="{{ $hintId }}" @endif>
 <option value="">{{ $field['empty'] ?? 'Pilih '.strtolower($field['label']) }}</option>

@@ -2,11 +2,13 @@
 
 namespace App\Services\V2;
 
+use App\Support\V2\FormCatalog;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -47,6 +49,7 @@ class SupplyTrips
         $notes = $this->text($data['notes'] ?? null, 'Catatan', 255);
         $nota = $this->text($data['supplier_invoice_number'] ?? null, 'Nomor nota supplier', 64);
         $confirmed = filter_var($data['confirm_duplicate'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $freight = $this->freight($data);
 
         $raw = $data['items'] ?? null;
         if (! is_array($raw) || $raw === [] || count($raw) > 100) {
@@ -89,9 +92,9 @@ class SupplyTrips
                 'quantity' => (string) $row['quantity'],
                 'unit_cost' => (string) $row['unit_cost'],
             ], array_values($items)),
-        ] + ($nota !== null ? ['supplier_invoice_number' => $nota] : []));
+        ] + ($nota !== null ? ['supplier_invoice_number' => $nota] : []) + ($freight['freight_amount'] !== '0.00' ? $freight : []));
 
-        return DB::transaction(function () use ($actor, $supplierId, $date, $key, $notes, $items, $hash, $nota, $confirmed) {
+        return DB::transaction(function () use ($actor, $supplierId, $date, $key, $notes, $items, $hash, $nota, $confirmed, $freight) {
             $this->lockActor($actor);
 
             $seen = $this->replay($actor, 'receive', $key, $hash);
@@ -151,6 +154,27 @@ class SupplyTrips
             if (! $total->isPositive()) {
                 $this->invalid('Total penerimaan harus lebih dari nol.');
             }
+            $freightAmount = Money::value($freight['freight_amount']);
+            $payableTotal = $freight['freight_method'] === 'supplier' ? $total->plus($freightAmount) : $total;
+            Money::value($this->str($payableTotal));
+            $shift = null;
+            $freightCredit = $freight['freight_method'] === 'cash' ? self::CASH : self::BANK;
+            if ($freightAmount->isPositive() && $freight['freight_method'] !== 'supplier') {
+                if ($freight['freight_method'] === 'cash') {
+                    $shift = app(Operations::class)->activeStoreShift(true);
+                    if (! $shift || substr((string) $shift->opened_at, 0, 10) !== $date) {
+                        $this->invalid('Ongkir tunai wajib memakai kas harian aktif pada tanggal penerimaan.');
+                    }
+                    $drawer = Money::value((string) $shift->opening_cash);
+                    foreach (DB::table('v2_shift_movements')->where('shift_id', $shift->id)->get(['direction', 'amount']) as $movement) {
+                        $drawer = $movement->direction === 'in' ? $drawer->plus((string) $movement->amount) : $drawer->minus((string) $movement->amount);
+                    }
+                    if ($drawer->isLessThan($freightAmount)) {
+                        $this->invalid('Saldo laci kas tidak cukup untuk ongkir.');
+                    }
+                }
+                $this->guardAccount($freightCredit, $freightAmount);
+            }
 
             $now = now();
             $receiptId = (int) DB::table('inventory_receipts')->insertGetId([
@@ -165,7 +189,7 @@ class SupplyTrips
                 'journal_entry_id' => null,
                 'created_at' => $now,
                 'updated_at' => $now,
-            ]);
+            ] + (Schema::hasColumn('inventory_receipts', 'freight_amount') ? $freight : []));
 
             DB::table('inventory_receipts')->where('id', $receiptId)->update([
                 'receipt_number' => 'RCV-'.str_pad((string) $receiptId, 6, '0', STR_PAD_LEFT),
@@ -210,10 +234,25 @@ class SupplyTrips
                 ]);
             }
 
-            $journalId = Ledger::post('v2_receipt', $receiptId, 'Penerimaan barang '.$date.' dari '.$supplier->name, [
+            $lines = [
                 ['account_code' => self::INVENTORY, 'debit' => $this->str($total), 'credit' => '0.00'],
-                ['account_code' => self::PAYABLE, 'debit' => '0.00', 'credit' => $this->str($total)],
-            ], $date);
+                ['account_code' => self::PAYABLE, 'debit' => '0.00', 'credit' => $this->str($payableTotal)],
+            ];
+            if ($freightAmount->isPositive()) {
+                $lines[] = ['account_code' => $freight['freight_account'], 'debit' => $this->str($freightAmount), 'credit' => '0.00'];
+                if ($freight['freight_method'] !== 'supplier') {
+                    $lines[] = ['account_code' => $freightCredit, 'debit' => '0.00', 'credit' => $this->str($freightAmount)];
+                }
+            }
+            $journalId = Ledger::post('v2_receipt', $receiptId, 'Penerimaan barang '.$date.' dari '.$supplier->name, $lines, $date);
+            if ($shift !== null) {
+                DB::table('v2_shift_movements')->insert([
+                    'shift_id' => $shift->id, 'direction' => 'out', 'kind' => 'adjustment',
+                    'amount' => $this->str($freightAmount), 'reference_type' => 'v2_receipt_freight',
+                    'reference_id' => $receiptId, 'note' => 'Ongkir penerimaan '.$receiptId,
+                    'created_at' => $now, 'updated_at' => $now,
+                ]);
+            }
 
             DB::table('inventory_receipts')->where('id', $receiptId)->update([
                 'journal_entry_id' => $journalId,
@@ -226,7 +265,7 @@ class SupplyTrips
                 'sale_id' => null,
                 'receipt_id' => $receiptId,
                 'number' => 'AP-'.str_pad((string) $receiptId, 6, '0', STR_PAD_LEFT),
-                'amount' => $this->str($total),
+                'amount' => $this->str($payableTotal),
                 'paid' => '0.00',
                 'due_date' => null,
                 'status' => 'open',
@@ -407,7 +446,7 @@ class SupplyTrips
 
         $total = (clone $query)->count();
         $rows = $query->orderBy('products.name')->limit(max(1, min($limit, 50)))
-            ->get(['products.id', 'products.sku', 'products.name', 'products.unit', 'products.stock_quantity', 'products.cost_price']);
+            ->get(['products.id', 'products.sku', 'products.name', 'products.unit', 'products.stock_quantity', 'products.min_stock', 'products.cost_price']);
 
         return [
             'total' => $total,
@@ -417,9 +456,129 @@ class SupplyTrips
                 'name' => (string) $row->name,
                 'unit' => (string) $row->unit,
                 'stock' => (string) $row->stock_quantity,
+                'minimum' => (string) BigDecimal::of((string) $row->min_stock)->strippedOfTrailingZeros(),
+                'status' => BigDecimal::of((string) $row->stock_quantity)->isLessThanOrEqualTo(0) ? 'out'
+                    : (BigDecimal::of((string) $row->stock_quantity)->isLessThanOrEqualTo((string) $row->min_stock) ? 'low' : 'available'),
                 'cost' => (string) $row->cost_price,
             ])->all(),
         ];
+    }
+
+    /**
+     * @return array{total:int, page:int, last_page:int, counts:array{critical:int,out:int,low:int}, results:array<int,array<string,mixed>>}
+     */
+    public function restockProducts(int $actor, string $term = '', string $status = 'critical', ?int $supplierId = null, int $pageNumber = 1): array
+    {
+        $this->requireAdmin($actor);
+        $query = DB::table('products')->where('is_active', true)
+            ->where(fn ($stock) => $stock->where('stock_quantity', '<=', 0)->orWhereColumn('stock_quantity', '<=', 'min_stock'));
+        if (trim($term) !== '') {
+            $query->where(fn ($match) => $match->where('name', 'like', '%'.trim($term).'%')->orWhere('sku', 'like', '%'.trim($term).'%'));
+        }
+        if ($supplierId !== null) {
+            $query->whereExists(fn ($links) => $links->selectRaw('1')->from('v2_product_suppliers as links')
+                ->join('v2_parties as supplier', 'supplier.id', '=', 'links.supplier_id')
+                ->whereColumn('links.product_id', 'products.id')->where('links.supplier_id', $supplierId)
+                ->where('supplier.kind', 'supplier')->where('supplier.is_active', true));
+        }
+        $out = (clone $query)->where('stock_quantity', '<=', 0)->count();
+        $low = (clone $query)->where('stock_quantity', '>', 0)->count();
+        if ($status === 'out') {
+            $query->where('stock_quantity', '<=', 0);
+        } elseif ($status === 'low') {
+            $query->where('stock_quantity', '>', 0);
+        }
+        $total = match ($status) {
+            'out' => $out, 'low' => $low, default => $out + $low,
+        };
+        $pageNumber = max(1, min($pageNumber, (int) ceil($total / 20)));
+        $page = $query->orderByRaw('CASE WHEN stock_quantity <= 0 THEN 0 ELSE 1 END')
+            ->orderBy('name')->orderBy('id')->paginate(20, ['id', 'sku', 'name', 'unit', 'stock_quantity', 'min_stock', 'cost_price'], 'page', $pageNumber);
+        $suppliers = DB::table('v2_product_suppliers as links')
+            ->join('v2_parties as suppliers', 'suppliers.id', '=', 'links.supplier_id')
+            ->whereIn('links.product_id', $page->getCollection()->pluck('id'))
+            ->where('suppliers.kind', 'supplier')->where('suppliers.is_active', true)
+            ->orderBy('suppliers.name')->orderBy('suppliers.id')
+            ->get(['links.product_id', 'suppliers.id', 'suppliers.name'])->groupBy('product_id');
+
+        return [
+            'total' => $page->total(), 'page' => $page->currentPage(), 'last_page' => $page->lastPage(),
+            'counts' => ['critical' => $out + $low, 'out' => $out, 'low' => $low],
+            'results' => $page->getCollection()->map(fn ($row): array => [
+                'id' => (int) $row->id, 'sku' => $row->sku, 'name' => $row->name, 'unit' => $row->unit,
+                'stock' => (string) BigDecimal::of((string) $row->stock_quantity)->strippedOfTrailingZeros(),
+                'minimum' => (string) BigDecimal::of((string) $row->min_stock)->strippedOfTrailingZeros(),
+                'cost' => (string) $row->cost_price,
+                'status' => BigDecimal::of((string) $row->stock_quantity)->isLessThanOrEqualTo(0) ? 'out' : 'low',
+                'suppliers' => $suppliers->get($row->id, collect())->map(fn ($supplier): array => [
+                    'id' => (int) $supplier->id, 'name' => $supplier->name,
+                ])->values()->all(),
+            ])->all(),
+        ];
+    }
+
+    /**
+     * @param  array{product_id:int|string,supplier_id?:int|string|null,name?:string|null,notes?:string|null,confirmed:mixed,idempotency_key:string}  $data
+     * @return array{product_id:int,supplier:array{id:int,name:string,code:string},created:bool}
+     */
+    public function linkReceiptSupplier(int $actor, array $data): array
+    {
+        $this->requireAdmin($actor);
+        if (! filter_var($data['confirmed'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $this->invalid('Konfirmasi penghubungan supplier diperlukan.');
+        }
+        $productId = $this->id($data['product_id'] ?? null, 'Produk');
+        $supplierId = isset($data['supplier_id']) ? $this->id($data['supplier_id'], 'Supplier') : null;
+        $name = $this->text($data['name'] ?? null, 'Nama supplier', 255);
+        $notes = $this->text($data['notes'] ?? null, 'Catatan supplier', 255);
+        if (($supplierId === null && $name === null) || ($supplierId !== null && $name !== null)) {
+            $this->invalid('Pilih supplier yang ada atau isi nama supplier baru.');
+        }
+        $key = $this->key($data['idempotency_key'] ?? null);
+        $hash = $this->hash('receipt_supplier', $actor, ['product_id' => $productId, 'supplier_id' => $supplierId, 'name' => $name, 'notes' => $notes]);
+
+        try {
+            return DB::transaction(function () use ($actor, $productId, $supplierId, $name, $notes, $key, $hash): array {
+                $this->lockActor($actor);
+                if ($replay = $this->replay($actor, 'receipt_supplier', $key, $hash)) {
+                    return $replay;
+                }
+                $product = DB::table('products')->where('id', $productId)->lockForUpdate()->first();
+                if (! $product || ! $product->is_active) {
+                    $this->invalid('Produk tidak ditemukan atau tidak aktif.');
+                }
+                $created = false;
+                if ($supplierId === null) {
+                    if (DB::table('v2_parties')->where('kind', 'supplier')->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower($name)])->exists()) {
+                        $this->invalid('Nama supplier sudah terdaftar. Pilih supplier yang ada; supplier arsip tidak diaktifkan otomatis.');
+                    }
+                    $code = FormCatalog::nextCode('supplier', DB::table('v2_parties')->where('code', 'like', 'SUP-%')->pluck('code'));
+                    $supplierId = app(MasterData::class)->store($actor, 'supplier', ['code' => $code, 'name' => $name, 'notes' => $notes]);
+                    $created = true;
+                }
+                $supplier = DB::table('v2_parties')->where('id', $supplierId)->where('kind', 'supplier')->lockForUpdate()->first();
+                if (! $supplier || ! $supplier->is_active) {
+                    $this->invalid('Supplier tidak ditemukan atau tidak aktif.');
+                }
+                $links = DB::table('v2_product_suppliers')->where('product_id', $productId)->lockForUpdate()->get();
+                if (! $links->contains('supplier_id', $supplierId)) {
+                    DB::table('v2_product_suppliers')->insert([
+                        'product_id' => $productId, 'supplier_id' => $supplierId, 'is_primary' => $links->isEmpty(),
+                        'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                }
+                $result = [
+                    'product_id' => $productId,
+                    'supplier' => ['id' => (int) $supplier->id, 'name' => (string) $supplier->name, 'code' => (string) $supplier->code],
+                    'created' => $created,
+                ];
+                $this->remember($actor, 'receipt_supplier', $key, $hash, $result);
+
+                return $result;
+            }, 3);
+        } catch (QueryException $exception) {
+            $this->invalid('Gagal menyimpan supplier dan relasi barang. Tidak ada perubahan yang disimpan; periksa daftar supplier lalu coba lagi.');
+        }
     }
 
     /**
@@ -437,6 +596,32 @@ class SupplyTrips
         abort_unless($receipt, 404);
 
         $this->invalid('Penerimaan sudah dikonfirmasi dan terkunci. Pembatalan biasa tidak diizinkan; gunakan proses koreksi atau retur.');
+    }
+
+    /** @return array{freight_amount:string,freight_method:?string,freight_account:?string} */
+    public function freight(array $data): array
+    {
+        $amount = $this->amount($data['freight_amount'] ?? '0', 2, 'Ongkir');
+        if ($amount->isNegative()) {
+            $this->invalid('Ongkir tidak boleh negatif.');
+        }
+        if ($amount->isZero()) {
+            return ['freight_amount' => '0.00', 'freight_method' => null, 'freight_account' => null];
+        }
+        if (! Schema::hasColumn('v2_receipt_drafts', 'freight_amount') || ! Schema::hasColumn('inventory_receipts', 'freight_amount')) {
+            $this->invalid('Fitur ongkir belum diaktifkan. Migrasi ongkir perlu dijalankan admin terlebih dahulu.');
+        }
+        $method = $data['freight_method'] ?? null;
+        $account = $data['freight_account'] ?? null;
+        if (! in_array($method, ['supplier', 'cash', 'bank'], true)) {
+            $this->invalid('Pilih pembayaran ongkir: supplier, kas, atau bank.');
+        }
+        if (! is_string($account) || ! DB::table('chart_of_accounts')->where('account_code', $account)
+            ->where('account_type', 'expense')->where('normal_balance', 'debit')->where('is_active', true)->exists()) {
+            $this->invalid('Pilih akun beban ongkir yang aktif.');
+        }
+
+        return ['freight_amount' => $this->str($amount), 'freight_method' => $method, 'freight_account' => $account];
     }
 
     private function requireAdmin(int $actor): void

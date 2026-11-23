@@ -11,5 +11,19 @@
   --ui-t-caption:.8125rem;--ui-t-label:.875rem;--ui-t-table:.9375rem;--ui-t-body:1rem;
   --ui-h1:1.625rem;--ui-h2:1.25rem;
   --ui-radius:12px;--ui-tap:44px;--ui-row:52px;
+  --ui-space-tight:.25rem;--ui-space-control:.5rem;--ui-space-group:.75rem;--ui-space-section:1rem;--ui-space-panel:1.5rem;
+  --ui-weight-medium:600;--ui-weight-strong:700;--ui-leading-tight:1.35;--ui-leading-body:1.5;--ui-stroke:1px;
+  --ui-detail-column-min:12rem;--ui-detail-summary-min:8rem;
+  --ui-cart-width:34rem;--ui-cart-bar-width:32.5rem;--ui-cart-layer:120;
+  --ui-cart-backdrop:rgba(9,30,18,.55);
+  --ui-cart-list-min:6rem;
+  --ui-catalog-product-width:40%;--ui-catalog-detail-width:20%;
+  --ui-restock-list-max:22rem;
+  --ui-skeleton-duration:1.2s;--ui-skeleton-card-height:6rem;--ui-skeleton-opacity:.45;
+  --ui-loading-layer:200;--ui-loading-width:72rem;
+  --ui-catalog-quantity-width:4rem;--ui-morph-duration:300ms;--ui-morph-easing:ease-in-out;--ui-morph-layer:121;
+  --ui-sidebar-duration:260ms;--ui-sidebar-text-duration:180ms;
+  --ui-number-duration:var(--ui-morph-duration);
+  --ui-period-panel-width:28rem;
 }
 </style>

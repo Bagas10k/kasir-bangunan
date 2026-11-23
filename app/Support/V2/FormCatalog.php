@@ -29,7 +29,7 @@ final class FormCatalog
             'choices' => ['retail' => 'Harga eceran', 'contractor' => 'Harga kontraktor'], 'hint' => 'Pelanggan kontraktor otomatis dapat harga kontraktor di Kasir.'],
         'min_stock' => ['type' => 'qty', 'label' => 'Stok minimum', 'scale' => 4, 'default' => '0', 'unit_from' => 'unit_id', 'hint' => 'Ditandai menipis di bawah angka ini.'],
         'license_plate' => ['type' => 'plate', 'label' => 'Nomor polisi', 'max' => 32, 'required' => true, 'placeholder' => 'B 1234 XYZ', 'hint' => 'Huruf besar dan spasi diatur otomatis.'],
-        'vehicle_type' => ['type' => 'suggest', 'label' => 'Jenis mobil', 'max' => 32, 'placeholder' => 'Ketik atau pilih di bawah', 'suggest' => ['Pick-up', 'Truk engkel', 'Truk double', 'Dump truck']],
+        'vehicle_type' => ['type' => 'select', 'label' => 'Jenis mobil', 'max' => 32, 'choices' => ['Pick-up', 'Truk engkel', 'Truk double', 'Dump truck']],
         'driver_kind' => ['type' => 'segmented', 'label' => 'Jenis sopir', 'name' => 'kind', 'required' => true, 'default' => 'external',
             'choices' => ['external' => 'Sopir luar', 'internal' => 'Karyawan toko']],
         'employee' => ['type' => 'ref', 'label' => 'Karyawan', 'name' => 'employee_id', 'source' => 'employee', 'hint' => 'Nama sopir mengikuti data karyawan.'],

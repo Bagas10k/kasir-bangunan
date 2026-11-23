@@ -1,10 +1,29 @@
-<p class="note" data-history-scope>{{ ($historyFilters['history_shift'] ?? 'active') === 'active' ? 'Transaksi shift aktif · semua petugas' : (($historyFilters['history_shift'] ?? '') === 'all' ? 'Transaksi seluruh shift · semua petugas' : 'Transaksi shift #'.$historyFilters['history_shift'].' · semua petugas') }}</p>
+<p class="note" data-history-scope>Transaksi {{ $historyFilters['start_date'] !== '' && $historyFilters['start_date'] === $historyFilters['end_date'] ? \Illuminate\Support\Carbon::parse($historyFilters['start_date'])->locale('id')->translatedFormat('j M Y') : ($historyFilters['start_date'] !== '' || $historyFilters['end_date'] !== '' ? 'sesuai rentang tanggal' : 'seluruh tanggal') }} · semua petugas</p>
 @if($historySales->isEmpty())
-<p class="note" id="history-empty">Tidak ada transaksi yang sesuai filter. Jika shift belum aktif, pilih shift lama atau Semua shift.</p>
+<p class="note" id="history-empty">Belum ada transaksi pada tanggal ini.</p>
 @else
-<div class="scroll" tabindex="0" role="region" aria-label="Riwayat penjualan"><table id="history-table" class="ui-table"><caption class="sr">Transaksi sesuai shift dan filter, mencakup semua petugas</caption><thead><tr><th scope="col">Invoice / petugas</th><th scope="col">Tanggal</th><th scope="col">Metode</th><th scope="col" class="ui-num">Total</th><th scope="col">Status</th><th scope="col" class="ui-actions">Dokumen</th></tr></thead><tbody>
+<div class="scroll" tabindex="0" role="region" aria-label="Riwayat penjualan"><table id="history-table" class="ui-table"><caption class="sr">Transaksi sesuai tanggal dan filter, mencakup semua petugas</caption><thead><tr><th scope="col">Nomor nota</th><th scope="col">Pembeli</th><th scope="col">Pembayaran</th><th scope="col" class="ui-num">Total</th><th scope="col" class="ui-num">Sisa tagihan</th><th scope="col">Status</th><th scope="col" class="ui-actions">Dokumen</th></tr></thead><tbody>
 @foreach($historySales as $historySale)
-<tr data-history-sale="{{ $historySale->id }}"><td data-label="Invoice / petugas" class="ui-primary"><span class="sku-code">{{ $historySale->number }}</span><span class="ui-sub" data-history-actor>{{ $historySale->user_name ?? '—' }}</span></td><td data-label="Tanggal" class="ui-nowrap">{{ \Illuminate\Support\Carbon::parse($historySale->created_at)->locale('id')->translatedFormat('j M Y') }}</td><td data-label="Metode">{{ ['cash'=>'Tunai','transfer'=>'Transfer','credit'=>'Kredit'][$historySale->payment_method] ?? $historySale->payment_method }}</td><td data-label="Total" class="money ui-num">{{ \App\Services\V2\Money::display($historySale->total) }}</td><td data-label="Status"><x-ui.status :status="$historySale->status"/></td><td class="ui-actions"><span class="doc-links"><a href="{{ route('v2.documents',['id'=>$historySale->id,'kind'=>'receipt']) }}">Nota</a>@if($historySale->has_delivery)<a href="{{ route('v2.documents',['id'=>$historySale->id,'kind'=>'delivery']) }}">Surat jalan</a>@endif</span></td></tr>
+@php
+    $outstanding = $historySale->invoice_amount !== null ? \Brick\Math\BigDecimal::of((string) $historySale->invoice_amount)->minus((string) $historySale->invoice_paid) : \Brick\Math\BigDecimal::of($historySale->status === 'paid' ? '0' : (string) $historySale->total);
+    $settlement = $outstanding->isLessThanOrEqualTo(0) ? 'paid' : ($historySale->invoice_paid !== null && \Brick\Math\BigDecimal::of((string) $historySale->invoice_paid)->isPositive() ? 'partial' : $historySale->status);
+@endphp
+<tr data-history-sale="{{ $historySale->id }}">
+    <td data-label="Nomor nota" class="history-reference">
+        <strong class="history-number">{{ $historySale->number }}</strong>
+        <time class="ui-sub" datetime="{{ \Illuminate\Support\Carbon::parse($historySale->created_at)->toIso8601String() }}">{{ \Illuminate\Support\Carbon::parse($historySale->created_at)->locale('id')->translatedFormat('j M Y · H:i') }}</time>
+        <span class="sr" data-cash-day="{{ $historySale->cash_day ?? '' }}">{{ isset($historySale->cash_day) ? 'Kas harian '.$historySale->cash_day : 'Tanpa catatan laci' }}</span>
+    </td>
+    <td data-label="Pembeli" class="history-buyer">
+        <button type="button" class="secondary" data-sale-detail="{{ $historySale->id }}" aria-label="Detail nota {{ $historySale->number }} — {{ $historySale->customer_name ?? 'Pelanggan umum' }}">{{ $historySale->customer_name ?? 'Pelanggan umum' }}</button>
+        <span class="ui-sub" data-history-actor>Petugas: {{ $historySale->user_name ?? '—' }}</span>
+    </td>
+    <td data-label="Pembayaran">{{ ['cash'=>'Tunai','transfer'=>'Transfer','credit'=>'Kredit'][$historySale->payment_method] ?? $historySale->payment_method }}</td>
+    <td data-label="Total" class="money ui-num">{{ \App\Services\V2\Money::display($historySale->total) }}</td>
+    <td data-label="Sisa tagihan" class="ui-num">{{ \App\Services\V2\Money::display((string) $outstanding) }}</td>
+    <td data-label="Status"><x-ui.status :status="$settlement"/>@if($historySale->pending_count)<span class="ui-sub">Menunggu verifikasi</span>@endif</td>
+    <td data-label="Dokumen" class="ui-actions"><span class="doc-links"><a href="{{ route('v2.documents',['id'=>$historySale->id,'kind'=>'receipt']) }}">Lihat nota</a>@if($historySale->has_delivery)<a href="{{ route('v2.documents',['id'=>$historySale->id,'kind'=>'delivery']) }}">Surat jalan</a>@endif</span></td>
+</tr>
 @endforeach
 </tbody></table></div>
 @endif

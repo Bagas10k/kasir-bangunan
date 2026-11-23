@@ -2,6 +2,7 @@
 @extends(request()->boolean('partial') ? 'layouts.partial' : 'layouts.app')
 
 @php
+    $coaWritePrefix = config('v2.enabled') ? 'v2.coa' : 'coa';
     $typeLabels = ['asset' => 'Aset', 'liability' => 'Kewajiban', 'equity' => 'Ekuitas', 'revenue' => 'Pendapatan', 'expense' => 'Beban'];
     $formatMoney = function ($value): string {
         $decimal = \Brick\Math\BigDecimal::of((string) $value)->toScale(2, \Brick\Math\RoundingMode::HalfUp);
@@ -327,7 +328,8 @@
     #modal-coa .modal-footer { flex-wrap: wrap; }
 }
 </style>
-<div class="master-page coa-pos-theme">
+<div class="master-page coa-pos-theme" data-coa-root data-refresh-url="{{ route('coa.index', request()->except('partial')) }}">
+    <p class="note" data-coa-feedback role="status" aria-live="polite" tabindex="-1" hidden></p>
     <header class="card master-head">
         <div class="master-head-copy">
             <p class="master-eyebrow">Buku besar dan struktur akuntansi</p>
@@ -432,8 +434,16 @@
                                         data-id="{{ $acc->id }}" data-code="{{ $acc->account_code }}" data-name="{{ $acc->account_name }}"
                                         data-type="{{ $acc->account_type }}" data-balance="{{ $acc->normal_balance }}"
                                         data-system="{{ $acc->is_system ? '1' : '0' }}" data-active="{{ $acc->is_active ? '1' : '0' }}"
+                                        data-update-url="{{ route($coaWritePrefix.'.update', $acc->id) }}"
                                         onclick="editAccountBtn(this)">Ubah</button>
-                                    @if($acc->is_system || $acc->transaction_count > 0)
+                                    @if(config('v2.enabled'))
+                                        @if(!$acc->is_system && $acc->is_active)
+                                            <form method="POST" action="{{ route('v2.coa.archive', $acc->id) }}" data-coa-archive>
+                                                @csrf @method('PATCH')
+                                                <button type="submit" class="btn-action-delete">Arsipkan</button>
+                                            </form>
+                                        @endif
+                                    @elseif($acc->is_system || $acc->transaction_count > 0)
                                         <button type="button" class="btn-action-locked" onclick="showLockInfo('Hapus Terkunci', 'Akun inti atau akun yang sudah digunakan wajib dipertahankan agar histori jurnal tetap utuh. Akun non-sistem dapat diarsipkan melalui tombol Ubah.')">Terkunci</button>
                                     @else
                                         <form method="POST" action="{{ route('coa.destroy', $acc->id) }}" onsubmit="return confirm('Hapus akun ini dari Bagan Akun?');">
@@ -466,10 +476,11 @@
             </div>
             <button type="button" class="modal-close-btn" onclick="closeModal('modal-coa')" aria-label="Tutup dialog">&times;</button>
         </div>
-        <form id="coa-form" method="POST" action="{{ route('coa.store') }}" style="display:flex;flex-direction:column;flex:1;overflow:hidden;margin:0;">
+        <form id="coa-form" method="POST" action="{{ route($coaWritePrefix.'.store') }}" style="display:flex;flex-direction:column;flex:1;overflow:hidden;margin:0;">
             @csrf
             <input type="hidden" name="_method" id="form-method" value="POST">
             <div class="modal-body">
+                <p class="err" data-coa-error role="alert" tabindex="-1" hidden></p>
                 <div class="master-help" style="margin-bottom:14px;"><strong>Panduan:</strong> 1=Aset, 2=Kewajiban, 3=Ekuitas, 4/7=Pendapatan, 5/6/8=Beban. Klasifikasi akun yang sudah digunakan tidak dapat diubah.</div>
                 <div class="master-modal-grid">
                     <div class="form-group"><label for="account_code">Kode Akun</label><input class="form-control tabular-nums" id="account_code" name="account_code" value="{{ old('account_code') }}" required autocomplete="off"></div>
@@ -495,7 +506,10 @@ function autoSuggestBalance() {
     document.getElementById('normal_balance').value = (type === 'asset' || type === 'expense') ? 'debit' : 'credit';
 }
 function resetAccountForm() {
-    document.getElementById('coa-form').action = "{{ route('coa.store') }}";
+    document.getElementById('coa-form').action = "{{ route($coaWritePrefix.'.store') }}";
+    var error = document.querySelector('[data-coa-error]');
+    if (error) error.hidden = true;
+    window.v2FormFeedback?.clear(document.getElementById('coa-form'));
     document.getElementById('form-method').value = 'POST';
     document.getElementById('account_code').value = '';
     document.getElementById('account_code').readOnly = false;
@@ -512,7 +526,10 @@ function resetAccountForm() {
 function openNewAccount() { resetAccountForm(); openModal('modal-coa'); }
 function editAccountBtn(btn) {
     var isSystem = btn.dataset.system === '1';
-    document.getElementById('coa-form').action = "{{ url('/coa') }}/" + btn.dataset.id;
+    document.getElementById('coa-form').action = btn.dataset.updateUrl;
+    var error = document.querySelector('[data-coa-error]');
+    if (error) error.hidden = true;
+    window.v2FormFeedback?.clear(document.getElementById('coa-form'));
     document.getElementById('form-method').value = 'PUT';
     document.getElementById('account_code').value = btn.dataset.code;
     document.getElementById('account_code').readOnly = isSystem;
@@ -528,4 +545,7 @@ function editAccountBtn(btn) {
     openModal('modal-coa');
 }
 </script>
+@if(config('v2.enabled'))
+    @include('v2.coa-script')
+@endif
 @endsection

@@ -101,7 +101,45 @@ class V2HistoryFiltersTest extends TestCase
         ]);
     }
 
-    public function test_shift_defaults_selection_dates_and_no_active_shift(): void
+    public function test_default_history_is_today_across_drawer_records_and_remains_after_closing(): void
+    {
+        $this->travelTo(now()->setDate(2026, 11, 21)->setTime(12, 0));
+        $data = $this->setupBaseData();
+        $old = DB::table('v2_shifts')->insertGetId([
+            'user_id' => $data['admin']->id, 'source' => 'admin', 'opening_cash' => 0,
+            'status' => 'closed', 'opened_at' => '2026-11-21 07:00:00',
+            'closed_at' => '2026-11-21 08:00:00', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->insertSale($data['admin']->id, $data['shift1'], 'SYN-TODAY-ADMIN', 'cash', '2026-11-21 09:00:00');
+        $this->insertSale($data['cashier2']->id, $old, 'SYN-TODAY-LEGACY', 'cash', '2026-11-21 08:00:00');
+        $this->insertSale($data['admin']->id, $data['shift1'], 'SYN-YESTERDAY', 'cash', '2026-11-20 23:59:59');
+        $this->insertSale($data['admin']->id, $data['shift1'], 'SYN-TOMORROW', 'cash', '2026-11-22 00:00:00');
+
+        $response = $this->actingAs($data['cashier1'])->get(route('v2.index'))->assertOk();
+        $this->assertSame(2, $response->viewData('historySales')->total());
+        $this->assertSame('2026-11-21', $response->viewData('historyFilters')['start_date']);
+        $this->assertSame('2026-11-21', $response->viewData('historyFilters')['end_date']);
+        $response->assertDontSee('id="history-shift"', false)->assertDontSee('data-label="Kategori"', false);
+        $response->assertSee('Cari nota')->assertSee('Filter tambahan')->assertSee('Lihat nota');
+        $response->assertSee('data-cash-day="2026-11-21"', false);
+        DB::table('v2_shifts')->where('id', $data['shift1'])->update(['status' => 'closed', 'store_open_key' => null]);
+        $this->assertSame(2, $this->get(route('v2.index'))->assertOk()->viewData('historySales')->total());
+        $admin = $this->actingAs($data['admin'])->get(route('v2.index'))->assertOk();
+        $this->assertSame(collect($response->viewData('historySales')->items())->pluck('id')->all(), collect($admin->viewData('historySales')->items())->pluck('id')->all());
+    }
+
+    public function test_closed_daily_drawer_is_identified_without_an_open_action(): void
+    {
+        $this->travelTo(now()->setDate(2026, 11, 21)->setTime(17, 0));
+        $data = $this->setupBaseData();
+        app(Operations::class)->closeShift($data['admin']->id, $data['shift1'], '100000');
+        $this->actingAs($data['admin'])->getJson(route('v2.shifts.active'))->assertOk()
+            ->assertJsonPath('shift', null)->assertJsonPath('today.status', 'closed');
+        $this->get(route('v2.index'))->assertOk()->assertSee('Kas harian 2026-11-21 sudah ditutup')
+            ->assertSee('data-open-allowed="0"', false);
+    }
+
+    public function test_historical_date_is_shared_and_does_not_depend_on_a_shift_selector(): void
     {
         $data = $this->setupBaseData();
         $old = DB::table('v2_shifts')->insertGetId([
@@ -112,40 +150,39 @@ class V2HistoryFiltersTest extends TestCase
         $this->insertSale($data['admin']->id, $data['shift1'], 'SHARED-ADMIN', 'cash', '2026-10-15 12:00:00');
         $this->insertSale($data['cashier2']->id, $old, 'OLDER-SALE', 'cash', '2026-10-01 23:59:59');
 
-        $active = $this->actingAs($data['cashier1'])->get(route('v2.index'))->assertOk();
+        $active = $this->actingAs($data['cashier1'])->get(route('v2.index', ['start_date' => '2026-10-15', 'end_date' => '2026-10-15']))->assertOk();
         $this->assertSame(1, $active->viewData('historySales')->total());
         $this->assertSame('Admin Boss', $active->viewData('historySales')->items()[0]->user_name);
-        $this->assertSame('active', $active->viewData('historyFilters')['history_shift']);
-        $selected = $this->get(route('v2.index', ['history_shift' => (string) $old]))->assertOk();
+        $this->assertArrayNotHasKey('history_shift', $active->viewData('historyFilters'));
+        $selected = $this->get(route('v2.index', ['start_date' => '2026-10-01', 'end_date' => '2026-10-01']))->assertOk();
         $this->assertSame('OLDER-SALE', $selected->viewData('historySales')->items()[0]->number);
         $dates = $this->get(route('v2.index', ['start_date' => '2026-10-01', 'end_date' => '2026-10-15']))->assertOk();
         $this->assertSame(2, $dates->viewData('historySales')->total());
-        $this->assertSame('all', $dates->viewData('historyFilters')['history_shift']);
+        $this->assertSame('2026-10-01', $dates->viewData('historyFilters')['start_date']);
         DB::table('v2_shifts')->where('id', $data['shift1'])->update(['status' => 'closed', 'store_open_key' => null]);
-        $this->assertSame(0, $this->get(route('v2.index'))->assertOk()->viewData('historySales')->total());
+        $this->assertSame(2, $this->get(route('v2.index', ['start_date' => '2026-10-01', 'end_date' => '2026-10-15']))->assertOk()->viewData('historySales')->total());
     }
 
     public function test_history_partial_contract_validation_and_permissions(): void
     {
         $this->getJson('/v2/sales/history')->assertUnauthorized();
         $data = $this->setupBaseData();
-        $this->insertSale($data['admin']->id, $data['shift1'], 'PARTIAL-SALE', 'cash', '2026-10-15 12:00:00');
+        $this->insertSale($data['admin']->id, $data['shift1'], 'PARTIAL-SALE', 'cash', now()->toDateTimeString());
         $response = $this->actingAs($data['cashier1'])->getJson('/v2/sales/history')->assertOk();
-        $this->assertSame(['html', 'filters', 'shifts'], array_keys($response->json()));
-        $response->assertJsonPath('filters.history_shift', 'active');
+        $this->assertSame(['html', 'filters'], array_keys($response->json()));
+        $response->assertJsonPath('filters.start_date', now()->toDateString())->assertJsonPath('filters.end_date', now()->toDateString());
         $this->assertStringContainsString('PARTIAL-SALE', $response->json('html'));
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
         $this->assertStringContainsString('private', $response->headers->get('Cache-Control'));
-        foreach ([['active'], 'bad', '0', '-1', '99999999'] as $invalid) {
-            $this->getJson('/v2/sales/history?'.http_build_query(['history_shift' => $invalid]))->assertUnprocessable();
-        }
+        $this->getJson('/v2/sales/history?'.http_build_query(['history_shift' => ['active']]))->assertUnprocessable();
+        $this->getJson('/v2/sales/history?history_shift=99999999')->assertOk()->assertJsonPath('filters.start_date', now()->toDateString());
         $unassigned = User::factory()->create();
         $this->actingAs($unassigned)->getJson('/v2/sales/history')->assertForbidden();
         $data['cashier1']->forceFill(['is_active' => false])->save();
         $this->actingAs($data['cashier1'])->getJson('/v2/sales/history')->assertUnauthorized();
     }
 
-    public function test_selected_old_shift_remains_available_beyond_latest_options_and_uses_root_pagination(): void
+    public function test_older_date_remains_available_and_uses_root_pagination(): void
     {
         $data = $this->setupBaseData();
         $old = DB::table('v2_shifts')->insertGetId(['user_id' => $data['admin']->id, 'source' => 'admin', 'opening_cash' => 0, 'status' => 'closed', 'opened_at' => '2026-10-01 08:00:00', 'closed_at' => '2026-10-01 17:00:00', 'created_at' => now(), 'updated_at' => now()]);
@@ -155,16 +192,18 @@ class V2HistoryFiltersTest extends TestCase
         for ($i = 0; $i < 12; $i++) {
             $this->insertSale($data['admin']->id, $old, 'SYN-OLD-'.$i, 'cash', '2026-10-01 10:00:00');
         }
-        $response = $this->actingAs($data['cashier1'])->getJson(route('v2.sales.history', ['history_shift' => (string) $old]))->assertOk();
-        $this->assertContains($old, array_column($response->json('shifts'), 'id'));
+        $response = $this->actingAs($data['cashier1'])->getJson(route('v2.sales.history', ['start_date' => '2026-10-01', 'end_date' => '2026-10-01']))->assertOk();
+        $this->assertStringContainsString('data-cash-day="2026-10-01"', $response->json('html'));
         $this->assertSame(10, substr_count($response->json('html'), 'data-history-sale='));
         preg_match('/href="([^"]*history_page=2[^"]*)"/', $response->json('html'), $link);
         $url = html_entity_decode($link[1]);
         $root = route(config('v2.enabled') ? 'pos.index' : 'v2.index');
         $this->assertSame(parse_url($root, PHP_URL_PATH), parse_url($url, PHP_URL_PATH));
         parse_str(parse_url($url, PHP_URL_QUERY), $query);
-        $this->assertSame((string) $old, $query['history_shift']);
-        $this->assertSame('kasir', parse_url($url, PHP_URL_FRAGMENT));
+        $this->assertSame('2026-10-01', $query['start_date']);
+        $this->assertSame('2026-10-01', $query['end_date']);
+        $this->assertArrayNotHasKey('history_shift', $query);
+        $this->assertSame('riwayat-penjualan', parse_url($url, PHP_URL_FRAGMENT));
     }
 
     public function test_validation_guards_against_arrays_and_malformed_inputs(): void
@@ -209,7 +248,7 @@ class V2HistoryFiltersTest extends TestCase
             $this->insertSale($cashier->id, $data['shift1'], $num, $method, $createdAt);
         }
 
-        $res = $this->actingAs($cashier)->get(route('v2.index'));
+        $res = $this->actingAs($cashier)->get(route('v2.index', ['start_date' => '', 'end_date' => '']));
         $res->assertOk();
 
         /** @var LengthAwarePaginator $historySales */
@@ -219,11 +258,11 @@ class V2HistoryFiltersTest extends TestCase
         $this->assertSame(10, $historySales->perPage());
         $this->assertSame(10, $historySales->count());
         $this->assertSame(4, $historySales->lastPage());
-        $this->assertSame('kasir', $historySales->fragment());
-        $this->assertStringContainsString('#kasir', $historySales->url(1));
+        $this->assertSame('riwayat-penjualan', $historySales->fragment());
+        $this->assertStringContainsString('#riwayat-penjualan', $historySales->url(1));
 
         // Search the oldest sale (#001) which would be excluded if limited to 30 first
-        $searchRes = $this->actingAs($cashier)->get(route('v2.index', ['sale_search' => 'SL-C1-001']));
+        $searchRes = $this->actingAs($cashier)->get(route('v2.index', ['sale_search' => 'SL-C1-001', 'start_date' => '', 'end_date' => '']));
         $searchRes->assertOk();
         /** @var LengthAwarePaginator $searchedHistory */
         $searchedHistory = $searchRes->viewData('historySales');
@@ -231,7 +270,7 @@ class V2HistoryFiltersTest extends TestCase
         $this->assertSame('SL-C1-001', $searchedHistory->items()[0]->number);
 
         // Test custom history_per_page
-        $res25 = $this->actingAs($cashier)->get(route('v2.index', ['history_per_page' => '25']));
+        $res25 = $this->actingAs($cashier)->get(route('v2.index', ['history_per_page' => '25', 'start_date' => '', 'end_date' => '']));
         $res25->assertOk();
         $h25 = $res25->viewData('historySales');
         $this->assertSame(25, $h25->perPage());
@@ -255,7 +294,7 @@ class V2HistoryFiltersTest extends TestCase
         $this->insertSale($c2->id, $data['shift2'], 'SL-C2-Y1', 'transfer', '2026-10-15 11:00:00');
 
         // Every POS actor sees the same shared history.
-        $resC1 = $this->actingAs($c1)->get(route('v2.index'));
+        $resC1 = $this->actingAs($c1)->get(route('v2.index', ['start_date' => '', 'end_date' => '']));
         $resC1->assertOk();
         $hC1 = $resC1->viewData('historySales');
         $this->assertSame(3, $hC1->total());
@@ -265,7 +304,7 @@ class V2HistoryFiltersTest extends TestCase
         $this->assertContains('SL-C2-Y1', $numbersC1);
 
         // Admin sees all 3 sales
-        $resAdmin = $this->actingAs($admin)->get(route('v2.index'));
+        $resAdmin = $this->actingAs($admin)->get(route('v2.index', ['start_date' => '', 'end_date' => '']));
         $resAdmin->assertOk();
         $hAdmin = $resAdmin->viewData('historySales');
         $this->assertSame(3, $hAdmin->total());
@@ -286,7 +325,7 @@ class V2HistoryFiltersTest extends TestCase
         $this->insertSale($cashier->id, $data['shift1'], 'SL-FLT-004', 'cash', '2026-10-20 10:00:00');
 
         // Filter by method only
-        $resCash = $this->actingAs($cashier)->get(route('v2.index', ['sale_method' => 'cash']));
+        $resCash = $this->actingAs($cashier)->get(route('v2.index', ['sale_method' => 'cash', 'start_date' => '', 'end_date' => '']));
         $this->assertSame(2, $resCash->viewData('historySales')->total());
 
         // Filter by date range only
@@ -335,7 +374,7 @@ class V2HistoryFiltersTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $res = $this->actingAs($cashier)->get(route('v2.index'));
+        $res = $this->actingAs($cashier)->get(route('v2.index', ['start_date' => '', 'end_date' => '']));
         $res->assertOk();
         $items = collect($res->viewData('historySales')->items())->keyBy('id');
 
@@ -353,13 +392,13 @@ class V2HistoryFiltersTest extends TestCase
         $this->insertSale($cashier->id, $data['shift1'], 'SL-OTHER-99', 'cash', '2026-10-25 10:00:00');
 
         // Substring match
-        $res = $this->actingAs($cashier)->get(route('v2.index', ['sale_search' => 'TARGET']));
+        $res = $this->actingAs($cashier)->get(route('v2.index', ['sale_search' => 'TARGET', 'start_date' => '', 'end_date' => '']));
         $res->assertOk();
         $this->assertSame(1, $res->viewData('historySales')->total());
         $this->assertSame('SL-SUB-TARGET-01', $res->viewData('historySales')->items()[0]->number);
 
         // SQL injection probe safely parameterized without error
-        $resSql = $this->actingAs($cashier)->get(route('v2.index', ['sale_search' => "' OR '1'='1"]));
+        $resSql = $this->actingAs($cashier)->get(route('v2.index', ['sale_search' => "' OR '1'='1", 'start_date' => '', 'end_date' => '']));
         $resSql->assertOk();
         $this->assertSame(0, $resSql->viewData('historySales')->total());
     }

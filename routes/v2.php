@@ -1,12 +1,21 @@
 <?php
 
+use App\Http\Controllers\ChartOfAccountController;
 use App\Http\Controllers\V2\AccountController;
+use App\Http\Controllers\V2\CashBankAdjustmentController;
 use App\Http\Controllers\V2\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 // Fresh operational surface; legacy routes remain untouched until release gates pass.
 Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::get('/', [WorkspaceController::class, 'index'])->name('index');
+    Route::post('/chart-of-accounts', [ChartOfAccountController::class, 'store'])->middleware('throttle:30,1')->name('coa.store');
+    Route::put('/chart-of-accounts/{id}', [ChartOfAccountController::class, 'update'])->whereNumber('id')->middleware('throttle:30,1')->name('coa.update');
+    Route::patch('/chart-of-accounts/{id}/archive', [ChartOfAccountController::class, 'archive'])->whereNumber('id')->middleware('throttle:30,1')->name('coa.archive');
+    Route::post('/journals/adjustments', [CashBankAdjustmentController::class, 'store'])->middleware('throttle:30,1')->name('journals.adjustments.store');
+    Route::get('/invoices', [WorkspaceController::class, 'invoices'])->name('invoices.index');
+    Route::get('/sales/{id}/detail', [WorkspaceController::class, 'saleDetail'])->whereNumber('id')->name('sales.detail');
+    Route::get('/payments/{id}/proof', [WorkspaceController::class, 'paymentProof'])->whereNumber('id')->middleware('throttle:60,1')->name('payments.proof');
     Route::post('/relations/{kind}', [WorkspaceController::class, 'saveRelation'])->whereIn('kind', ['driver', 'unit', 'category'])->name('relations.store');
     Route::put('/relations/{kind}/{id}', [WorkspaceController::class, 'updateRelation'])->whereIn('kind', ['driver', 'unit', 'category'])->whereNumber('id')->name('relations.update');
     Route::patch('/relations/{kind}/{id}', [WorkspaceController::class, 'archiveRelation'])->whereIn('kind', ['driver', 'unit', 'category'])->whereNumber('id')->name('relations.archive');
@@ -25,6 +34,8 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::post('/imports/{kind}/preview', [WorkspaceController::class, 'importPreview'])->name('imports.preview');
     Route::post('/import-batches/{id}/commit', [WorkspaceController::class, 'importCommit'])->whereNumber('id')->name('imports.commit');
     Route::get('/suppliers/{id}/products', [WorkspaceController::class, 'supplierProducts'])->whereNumber('id')->name('suppliers.products');
+    Route::get('/receipts/restock-products', [WorkspaceController::class, 'restockProducts'])->name('receipts.restock-products');
+    Route::post('/receipts/product-supplier', [WorkspaceController::class, 'linkReceiptSupplier'])->middleware('throttle:30,1')->name('receipts.product-supplier');
     Route::post('/receipts', [WorkspaceController::class, 'receive'])->name('receipts.store');
     Route::post('/receipt-drafts/{id}', [WorkspaceController::class, 'updateReceiptDraft'])->whereNumber('id')->name('receipt-drafts.update');
     Route::post('/receipt-drafts/{id}/confirm', [WorkspaceController::class, 'confirmReceiptDraft'])->whereNumber('id')->name('receipt-drafts.confirm');
@@ -43,6 +54,7 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::get('/customers/search', [WorkspaceController::class, 'searchCustomers'])->name('customers.search');
     Route::post('/customers/resolve', [WorkspaceController::class, 'resolveCustomer'])->name('customers.resolve');
     Route::get('/sales/history', [WorkspaceController::class, 'history'])->name('sales.history');
+    Route::get('/sales/dashboard', [WorkspaceController::class, 'dashboardPeriod'])->name('sales.dashboard');
     Route::post('/sales', [WorkspaceController::class, 'checkout'])->name('sales.store');
     Route::post('/invoices/{id}/payments', [WorkspaceController::class, 'collect'])->whereNumber('id')->name('payments.store');
     Route::post('/payments/{id}/approve', [WorkspaceController::class, 'approve'])->whereNumber('id')->name('payments.approve');

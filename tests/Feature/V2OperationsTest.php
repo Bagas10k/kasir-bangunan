@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\V2\Operations;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class V2OperationsTest extends TestCase
@@ -85,6 +87,7 @@ class V2OperationsTest extends TestCase
 
     public function test_transfer_sale_is_receivable_until_admin_confirms_and_stock_only_once(): void
     {
+        Storage::fake('local');
         $cashier = $this->actor('cashier');
         $admin = $this->actor('admin');
         $product = $this->product();
@@ -95,6 +98,7 @@ class V2OperationsTest extends TestCase
         $data['paid_amount'] = '177.00';
         $data['fulfillment'] = 'delivery';
         $data['destination'] = 'Zona Sintetis A';
+        $data['transfer_proof'] = UploadedFile::fake()->image('synthetic-initial.png');
         $this->actingAs($cashier)->postJson(route('v2.sales.store'), $data)->assertOk();
         $payment = DB::table('v2_payments')->first();
         $invoice = DB::table('v2_invoices')->first();
@@ -129,6 +133,7 @@ class V2OperationsTest extends TestCase
 
     public function test_cash_and_transfer_installments_reduce_invoice_only_once(): void
     {
+        Storage::fake('local');
         $cashier = $this->actor('cashier');
         $admin = $this->actor('admin');
         $product = $this->product();
@@ -147,7 +152,7 @@ class V2OperationsTest extends TestCase
         $this->assertSame('partial', DB::table('v2_sales')->value('status'));
         $cash['amount'] = '51.00';
         $this->actingAs($cashier)->postJson($url, $cash)->assertUnprocessable();
-        $transfer = ['amount' => '127.00', 'method' => 'transfer', 'idempotency_key' => 'installment-bank-0001'];
+        $transfer = ['amount' => '127.00', 'method' => 'transfer', 'idempotency_key' => 'installment-bank-0001', 'transfer_proof' => UploadedFile::fake()->image('synthetic-installment.png')];
         $payment = $this->actingAs($cashier)->postJson($url, $transfer)->assertOk()->json('id');
         $this->assertEquals(50, DB::table('v2_invoices')->value('paid'));
         $this->actingAs($admin)->postJson(route('v2.payments.approve', $payment))->assertOk();
@@ -162,6 +167,7 @@ class V2OperationsTest extends TestCase
         $ops = app(Operations::class);
         $id = $ops->openShift($this->storeShiftAdmin()->id, '100', 'admin');
         $this->assertSame('closed', $ops->closeShift($this->storeShiftAdmin()->id, $id, '100')['status']);
+        $this->travelTo(now()->addDay());
         $next = $ops->openShift($this->storeShiftAdmin()->id, '100', 'carry', $id);
         $this->assertDatabaseCount('journal_entries', 0);
         $closed = $ops->closeShift($this->storeShiftAdmin()->id, $next, '99');
@@ -169,6 +175,7 @@ class V2OperationsTest extends TestCase
         $this->assertSame('-1.00', $closed['difference']);
         $this->assertDatabaseCount('journal_entries', 0);
         $this->actingAs($cashier)->postJson(route('v2.shifts.open'), ['cash' => '100', 'source' => 'carry', 'carry_from' => $id])->assertForbidden();
+        $this->travelTo(now()->addDay());
         $this->actingAs($this->storeShiftAdmin())->postJson(route('v2.shifts.open'), ['cash' => '100', 'source' => 'carry', 'carry_from' => $id])->assertUnprocessable();
     }
 

@@ -120,7 +120,11 @@ class AuthController extends Controller
 </body>
 </html>';
 
-        return response($html);
+        $loading = view('v2.ui-tokens')->render().view('v2.loading-styles')->render()
+            .'<div id="login-loading" hidden>'.view('v2.loading-skeleton')->render().'</div>'
+            .view('v2.login-loading-script')->render();
+
+        return response(str_replace('</body>', $loading.'</body>', $html));
     }
 
     public function login(Request $request)

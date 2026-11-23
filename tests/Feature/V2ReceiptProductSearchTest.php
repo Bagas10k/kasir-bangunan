@@ -99,6 +99,36 @@ class V2ReceiptProductSearchTest extends TestCase
         $this->assertCount(30, $page['results']);
     }
 
+    public function test_restock_list_shows_store_wide_critical_stock_without_a_supplier(): void
+    {
+        $admin = $this->actor('admin');
+        $low = $this->product('A Menipis Sintetis', 'SYN-LOW');
+        $out = $this->product('Z Habis Sintetis', 'SYN-OUT');
+        $zero = $this->product('Y Nol Sintetis', 'SYN-ZERO');
+        $this->product('Normal Sintetis', 'SYN-OK');
+        $inactive = $this->product('Arsip Sintetis', 'SYN-ARCH', false);
+        foreach ([$low => '1', $out => '0', $zero => '0', $inactive => '0'] as $id => $stock) {
+            DB::table('products')->where('id', $id)->update(['stock_quantity' => $stock]);
+        }
+        DB::table('products')->where('id', $zero)->update(['min_stock' => '0']);
+        $supplier = $this->supplier('Supplier Sintetis Restok');
+        $this->link($low, $supplier);
+
+        $response = $this->actingAs($admin)->getJson('/v2/receipts/restock-products')
+            ->assertOk()->assertJsonPath('total', 3)
+            ->assertJsonPath('counts', ['critical' => 3, 'out' => 2, 'low' => 1])
+            ->assertJsonPath('results.0.status', 'out')
+            ->assertJsonPath('results.2.status', 'low');
+
+        $this->assertSame([$zero, $out, $low], array_column($response->json('results'), 'id'));
+        $this->assertSame([], $response->json('results.0.suppliers'));
+        $this->assertSame([['id' => $supplier, 'name' => 'Supplier Sintetis Restok']], $response->json('results.2.suppliers'));
+        $this->assertSame('1', $response->json('results.2.minimum'));
+        $this->assertDatabaseCount('inventory_receipts', 0);
+        $this->assertDatabaseCount('v2_invoices', 0);
+        $this->assertDatabaseCount('stock_movements', 0);
+    }
+
     public function test_inactive_supplier_and_non_admin_roles_get_nothing(): void
     {
         $supplier = $this->supplier('PT Nonaktif', false);
@@ -108,5 +138,75 @@ class V2ReceiptProductSearchTest extends TestCase
             ->assertOk()->assertJson(['total' => 0, 'results' => []]);
 
         $this->actingAs($this->actor('cashier'))->getJson(route('v2.suppliers.products', ['id' => $supplier]))->assertForbidden();
+    }
+
+    public function test_restock_filters_search_and_supplier_without_duplicate_products(): void
+    {
+        $admin = $this->actor('admin');
+        $supplier = $this->supplier('Supplier A Sintetis');
+        $other = $this->supplier('Supplier B Sintetis');
+        $inactive = $this->supplier('Supplier Arsip Sintetis', false);
+        $low = $this->product('Semen Sintetis', 'SYN-REST-LOW');
+        $out = $this->product('Semen Habis Sintetis', 'SYN-REST-OUT');
+        $unlinked = $this->product('Barang Bebas Sintetis', 'SYN-REST-FREE');
+        foreach ([$low => '0.5', $out => '0', $unlinked => '0'] as $id => $stock) {
+            DB::table('products')->where('id', $id)->update(['stock_quantity' => $stock]);
+        }
+        $this->link($low, $supplier);
+        $this->link($low, $other);
+        $this->link($low, $inactive);
+        $this->link($out, $supplier);
+
+        $response = $this->actingAs($admin)->getJson(route('v2.receipts.restock-products', [
+            'supplier_id' => $supplier, 'status' => 'low', 'q' => 'SYN-REST',
+        ]))->assertOk()->assertJsonPath('total', 1)
+            ->assertJsonPath('counts', ['critical' => 2, 'out' => 1, 'low' => 1])
+            ->assertJsonPath('results.0.stock', '0.5');
+
+        $this->assertSame([$low], array_column($response->json('results'), 'id'));
+        $this->assertSame([$supplier, $other], array_column($response->json('results.0.suppliers'), 'id'));
+        $this->actingAs($admin)->getJson(route('v2.receipts.restock-products', ['status' => 'out', 'q' => 'Habis']))
+            ->assertOk()->assertJsonPath('total', 1)->assertJsonPath('results.0.id', $out);
+    }
+
+    public function test_restock_pagination_reaches_all_results_and_clamps_a_stale_page(): void
+    {
+        $admin = $this->actor('admin');
+        foreach (range(1, 35) as $n) {
+            $id = $this->product(sprintf('Barang Sintetis %02d', $n), 'SYN-PAGE-'.$n);
+            DB::table('products')->where('id', $id)->update(['stock_quantity' => '0']);
+        }
+        $first = $this->actingAs($admin)->getJson(route('v2.receipts.restock-products'))->assertOk()
+            ->assertJsonPath('total', 35)->assertJsonPath('last_page', 2)->json('results');
+        $second = $this->getJson(route('v2.receipts.restock-products', ['page' => 2]))->assertOk()->json('results');
+
+        $this->assertCount(20, $first);
+        $this->assertCount(15, $second);
+        $this->assertSame([], array_intersect(array_column($first, 'id'), array_column($second, 'id')));
+        $this->getJson(route('v2.receipts.restock-products', ['page' => 999]))->assertOk()->assertJsonPath('page', 2);
+    }
+
+    public function test_restock_requires_an_active_admin_and_valid_bounded_filters(): void
+    {
+        $url = route('v2.receipts.restock-products');
+        $this->getJson($url)->assertUnauthorized();
+        $this->actingAs($this->actor('cashier'))->getJson($url)->assertForbidden();
+        $admin = $this->actor('admin');
+        $this->actingAs($admin)->getJson($url.'?'.http_build_query([
+            'q' => str_repeat('x', 101), 'status' => 'all', 'page' => 0, 'supplier_id' => 999999,
+        ]))->assertUnprocessable()->assertJsonValidationErrors(['q', 'status', 'page', 'supplier_id']);
+        DB::table('users')->where('id', $admin->id)->update(['is_active' => false]);
+        $this->actingAs($admin->fresh())->getJson($url)->assertUnauthorized();
+    }
+
+    public function test_supplier_picker_includes_stock_status_and_minimum_without_widening_scope(): void
+    {
+        $supplier = $this->supplier('Supplier Pemilih Sintetis');
+        $id = $this->product('Barang Menipis Sintetis', 'SYN-PICK-LOW');
+        DB::table('products')->where('id', $id)->update(['stock_quantity' => '0.25']);
+        $this->link($id, $supplier);
+
+        $this->actingAs($this->actor('admin'))->getJson(route('v2.suppliers.products', ['id' => $supplier]))
+            ->assertOk()->assertJsonPath('results.0.status', 'low')->assertJsonPath('results.0.minimum', '1');
     }
 }

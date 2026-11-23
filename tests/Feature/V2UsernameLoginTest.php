@@ -97,6 +97,7 @@ class V2UsernameLoginTest extends TestCase
 
     public function test_login_form_shows_short_username_example(): void
     {
-        $this->get('/login')->assertOk()->assertSee('contoh: kasir01 atau kasir@toko.com');
+        $this->get('/login')->assertOk()->assertSee('contoh: kasir01 atau kasir@toko.com')
+            ->assertSee('id="login-loading"', false)->assertSee('data-skeleton', false);
     }
 }

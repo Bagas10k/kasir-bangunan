@@ -1339,6 +1339,7 @@
     @endif
 {{-- Keadaan sidebar dipasang sebelum gambar pertama supaya tidak melompat dari tertutup ke terbuka. --}}
 <script>try{localStorage.removeItem('v2-sidebar-pinned');}catch{}</script>
+    @include('partials.table-filter-styles')
 </head>
 <body @if(request()->routeIs('journals.*', 'reports.*', 'coa.*')) data-finance-page @endif>
     <div class="app-layout" @if(config('v2.enabled')) data-unified-shell @endif>

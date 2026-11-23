@@ -99,7 +99,7 @@
 @include('partials.monitoring-cards', ['monitoringTask' => 'master-'.$kind, 'monitoringTitle' => 'Ringkasan '.$noun, 'monitoringHead' => $monitorHead, 'monitoringCards' => $monitorCards])
 
 @endunless
-<section class="card master-entity-card @if($dialogsOnly) sr-section @endif" id="master-section-{{ $kind }}" aria-labelledby="heading-master-{{ $kind }}" data-master-kind="{{ $kind }}">
+<section class="@unless($dialogsOnly)card @endunless master-entity-card" id="master-section-{{ $kind }}" @if($dialogsOnly) data-dialog-host @else aria-labelledby="heading-master-{{ $kind }}" @endif data-master-kind="{{ $kind }}">
     @unless($dialogsOnly)
     <h2 id="heading-master-{{ $kind }}">Daftar {{ $noun }}</h2>
     <p class="note">{{ $subtitle }} Mengarsipkan tidak menghapus riwayat transaksi.</p>

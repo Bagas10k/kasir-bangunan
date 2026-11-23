@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\V2\Ledger;
 use App\Services\V2\Operations;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -46,6 +47,104 @@ class V2SharedStoreShiftTest extends TestCase
     private function invoice(string $direction): int
     {
         return DB::table('v2_invoices')->insertGetId(['direction' => $direction, 'number' => 'SYN-'.$direction, 'amount' => '100', 'paid' => '0', 'status' => 'open', 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    public function test_daily_drawer_cannot_reopen_after_closing_for_either_admin(): void
+    {
+        $this->freezeTime();
+        $admin = $this->actor('admin');
+        $other = $this->actor('admin');
+        $ops = app(Operations::class);
+        $id = $ops->openShift($admin->id, '100', 'admin');
+        $ops->closeShift($admin->id, $id, '100');
+        foreach ([$admin, $other] as $actor) {
+            $this->actingAs($actor)->postJson(route('v2.shifts.open'), ['cash' => '100', 'source' => 'admin'])->assertUnprocessable();
+        }
+        $this->assertDatabaseCount('v2_shifts', 1);
+        $this->assertDatabaseHas('v2_shifts', ['id' => $id, 'business_date' => now()->toDateString()]);
+        $this->travelTo(now()->addDay());
+        $next = $ops->openShift($other->id, '100', 'carry', $id);
+        $this->assertNotSame($id, $next);
+        $this->assertDatabaseHas('v2_shifts', ['id' => $next, 'business_date' => now()->toDateString(), 'carried_from_id' => $id]);
+    }
+
+    public function test_daily_date_migration_preserves_multiple_legacy_rows_without_backfill(): void
+    {
+        $this->freezeTime();
+        $migration = require database_path('migrations/2026_11_21_084833_add_business_date_to_v2_shifts.php');
+        $migration->down();
+        $admin = $this->actor('admin');
+        foreach (['closed', 'review'] as $status) {
+            DB::table('v2_shifts')->insert(['user_id' => $admin->id, 'source' => 'admin', 'opening_cash' => '17.25', 'admin_amount' => '17.25', 'status' => $status, 'opened_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $before = DB::table('v2_shifts')->orderBy('id')->get()->map(fn ($row): array => (array) $row)->all();
+        $migration->up();
+        $after = DB::table('v2_shifts')->orderBy('id')->get()->map(function ($row): array {
+            $this->assertNull($row->business_date);
+            $values = (array) $row;
+            unset($values['business_date']);
+
+            return $values;
+        })->all();
+        $this->assertSame($before, $after);
+        $this->actingAs($admin)->postJson(route('v2.shifts.open'), ['cash' => '0', 'source' => 'admin'])->assertUnprocessable();
+        $migration->down();
+        $migration->up();
+        $this->assertDatabaseCount('v2_shifts', 2);
+    }
+
+    public function test_daily_date_migration_refuses_to_remove_recorded_dates(): void
+    {
+        $this->freezeTime();
+        $admin = $this->actor('admin');
+        app(Operations::class)->openShift($admin->id, '100', 'admin');
+        $migration = require database_path('migrations/2026_11_21_084833_add_business_date_to_v2_shifts.php');
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Tanggal kas harian harus dipertahankan');
+        $migration->down();
+    }
+
+    public function test_daily_date_unique_key_rejects_a_duplicate_even_after_close(): void
+    {
+        $this->freezeTime();
+        $admin = $this->actor('admin');
+        $ops = app(Operations::class);
+        $id = $ops->openShift($admin->id, '100', 'admin');
+        $ops->closeShift($admin->id, $id, '100');
+        $this->expectException(QueryException::class);
+        DB::table('v2_shifts')->insert(['user_id' => $admin->id, 'source' => 'admin', 'opening_cash' => '0', 'status' => 'closed', 'business_date' => now()->toDateString(), 'opened_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    public function test_daily_drawer_in_review_cannot_reopen_on_same_date(): void
+    {
+        $this->freezeTime();
+        $admin = $this->actor('admin');
+        $ops = app(Operations::class);
+        $id = $ops->openShift($admin->id, '100', 'admin');
+        $this->assertSame('review', $ops->closeShift($admin->id, $id, '99')['status']);
+        $this->actingAs($admin)->postJson(route('v2.shifts.open'), ['cash' => '0', 'source' => 'admin'])->assertUnprocessable();
+        $this->assertDatabaseCount('v2_shifts', 1);
+    }
+
+    public function test_prior_day_active_drawer_is_not_reassigned_or_automatically_closed(): void
+    {
+        $this->freezeTime();
+        $admin = $this->actor('admin');
+        $id = app(Operations::class)->openShift($admin->id, '100', 'admin');
+        $date = now()->toDateString();
+        $this->travelTo(now()->addDay());
+        $this->actingAs($admin)->postJson(route('v2.shifts.open'), ['cash' => '0', 'source' => 'admin'])->assertUnprocessable();
+        $this->assertDatabaseHas('v2_shifts', ['id' => $id, 'business_date' => $date, 'status' => 'open', 'closed_at' => null]);
+        $this->assertDatabaseCount('v2_shifts', 1);
+    }
+
+    public function test_legacy_closed_drawer_still_blocks_its_opened_calendar_date(): void
+    {
+        $this->freezeTime();
+        $admin = $this->actor('admin');
+        DB::table('v2_shifts')->insert(['user_id' => $admin->id, 'source' => 'admin', 'opening_cash' => '17.25', 'admin_amount' => '17.25', 'status' => 'closed', 'opened_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        $this->actingAs($admin)->postJson(route('v2.shifts.open'), ['cash' => '0', 'source' => 'admin'])->assertUnprocessable();
+        $this->assertDatabaseCount('v2_shifts', 1);
     }
 
     public function test_cashiers_share_admin_drawer_without_losing_actor_attribution(): void
@@ -94,6 +193,7 @@ class V2SharedStoreShiftTest extends TestCase
         $shift = $ops->openShift($admin->id, '100', 'admin');
         $payment = $ops->collect($cashier->id, $this->invoice('payable'), '25', 'cash', 'pending');
         $ops->closeShift($admin->id, $shift, '100');
+        $this->travelTo(now()->addDay());
         $next = $ops->openShift($admin->id, '100', 'admin');
         $this->actingAs($admin)->postJson(route('v2.payments.approve', $payment))->assertUnprocessable();
         $this->assertDatabaseHas('v2_payments', ['id' => $payment, 'shift_id' => $shift, 'status' => 'proposed']);
@@ -110,14 +210,14 @@ class V2SharedStoreShiftTest extends TestCase
             $response = $this->actingAs($actor)->get(route('v2.index'))->assertOk();
             $this->assertStringContainsString('data-store-shift-id="'.$shift.'"', $response->getContent());
             $this->assertStringContainsString('data-pos-shift-state="open"', $response->getContent());
-            $this->assertStringContainsString('Shift toko #'.$shift.' aktif', $response->getContent());
+            $this->assertStringContainsString('Kas harian '.now()->toDateString().' aktif', $response->getContent());
         }
         $this->assertStringNotContainsString('id="form-open"', $response->getContent());
         $this->assertStringNotContainsString('class="form-close"', $response->getContent());
         $ops->closeShift($admin->id, $shift, '100');
         $response = $this->actingAs($cashier)->get(route('v2.index'))->assertOk();
         $this->assertStringContainsString('data-pos-shift-state="closed"', $response->getContent());
-        $this->assertStringContainsString('Menunggu admin membuka shift toko', $response->getContent());
+        $this->assertStringContainsString('Kas harian '.now()->toDateString().' sudah ditutup', $response->getContent());
     }
 
     public function test_active_shift_endpoint_is_authenticated_read_only_and_shared(): void
@@ -179,6 +279,7 @@ class V2SharedStoreShiftTest extends TestCase
             $this->assertDatabaseHas('v2_shifts', ['id' => $id, 'is_shared' => false, 'opening_cash' => '17.25', 'status' => 'open']);
             $ops->closeShift($admin->id, $id, '17.25');
         }
+        $this->travelTo(now()->addDay());
         $shared = $ops->openShift($admin->id, '0', 'admin');
         $this->assertSame($shared, (int) $ops->activeStoreShift()->id);
         $this->assertDatabaseCount('v2_shifts', 3);
@@ -196,6 +297,7 @@ class V2SharedStoreShiftTest extends TestCase
         $this->assertDatabaseHas('v2_shifts', ['id' => $id, 'user_id' => $cashier->id, 'is_shared' => false, 'opening_cash' => '17.25', 'status' => 'open']);
         $ops->closeShift($admin->id, $id, '17.25');
         $this->assertSame('closed', DB::table('v2_shifts')->where('id', $id)->value('status'));
+        $this->travelTo(now()->addDay());
         $this->assertNotSame($id, $ops->openShift($admin->id, '0', 'admin'));
         $this->assertDatabaseCount('v2_shifts', 2);
     }

@@ -20,16 +20,34 @@ class JournalController extends Controller
         $filters = $this->validatedFilters($request);
         $entries = $this->entries($filters);
         $opening = $openingService->current();
+        if (config('v2.enabled')) {
+            $v2Opening = DB::table('v2_opening_batches')->where('singleton_key', 1)->first();
+            if ($v2Opening) {
+                $opening = (object) [
+                    'id' => null,
+                    'status' => 'posted',
+                    'transaction_date' => $v2Opening->date,
+                    'cash_amount' => $v2Opening->cash_amount,
+                    'bank_amount' => $v2Opening->bank_amount,
+                ];
+            }
+        }
 
         $cashOpening = (string) ($opening->cash_amount ?? '0.00');
         $bankOpening = (string) ($opening->bank_amount ?? '0.00');
         $cashBalance = (string) $balances->balance('1101');
         $bankBalance = (string) $balances->balance('1102');
         $sources = DB::table('journal_entries')->distinct()->orderBy('reference_type')->pluck('reference_type');
-        $adjustmentAccounts = DB::table('chart_of_accounts')->where('is_active', true)->orderBy('account_code')->get();
+        $hasJournals = DB::table('journal_entries')->exists();
+        $adjustmentAccounts = DB::table('chart_of_accounts')->where('is_active', true)
+            ->when(config('v2.enabled'), fn ($query) => $query->whereIn('account_code', ['1101', '1102']))
+            ->orderBy('account_code')->get();
+        $counterAccounts = config('v2.enabled')
+            ? DB::table('chart_of_accounts')->where('is_active', true)->orderBy('account_code')->get()
+            : $adjustmentAccounts;
 
         return view('journals.index', compact(
-            'entries', 'opening', 'cashOpening', 'bankOpening', 'cashBalance', 'bankBalance', 'sources', 'filters', 'adjustmentAccounts'
+            'entries', 'opening', 'cashOpening', 'bankOpening', 'cashBalance', 'bankBalance', 'sources', 'filters', 'adjustmentAccounts', 'counterAccounts', 'hasJournals'
         ));
     }
 

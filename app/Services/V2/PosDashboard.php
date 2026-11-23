@@ -4,8 +4,11 @@ namespace App\Services\V2;
 
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Ringkasan dashboard kasir: omzet, transaksi, grafik, produk terlaris, dan pembanding periode lalu.
@@ -22,6 +25,45 @@ final class PosDashboard
     ];
 
     private const TOP_LIMIT = 10;
+
+    /** @return array<string,mixed> */
+    public function custom(string $from, string $to): array
+    {
+        Validator::make(['from' => $from, 'to' => $to], [
+            'from' => ['required', 'date_format:Y-m-d', 'before_or_equal:to'],
+            'to' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+        ])->validate();
+        $start = Carbon::parse($from)->startOfDay();
+        $end = Carbon::parse($to)->startOfDay();
+        $days = (int) $start->diffInDays($end) + 1;
+        if ($days > 366) {
+            throw ValidationException::withMessages(['to' => 'Rentang khusus maksimal 366 hari.']);
+        }
+        $totals = $counts = $hours = $quantities = [];
+        foreach (DB::table('v2_sales')->where('created_at', '>=', $start->copy()->subDays($days))
+            ->where('created_at', '<=', $end->copy()->endOfDay())->select(['total', 'created_at'])->cursor() as $sale) {
+            $day = substr((string) $sale->created_at, 0, 10);
+            $totals[$day] = ($totals[$day] ?? BigDecimal::zero())->plus((string) $sale->total);
+            $counts[$day] = ($counts[$day] ?? 0) + 1;
+            if ($days === 1 && $day === $from) {
+                $hour = (int) substr((string) $sale->created_at, 11, 2);
+                $hours[$hour] = ($hours[$hour] ?? BigDecimal::zero())->plus((string) $sale->total);
+            }
+        }
+        foreach (DB::table('v2_sale_items as i')->join('v2_sales as s', 's.id', '=', 'i.sale_id')
+            ->where('s.created_at', '>=', $start)->where('s.created_at', '<=', $end->copy()->endOfDay())
+            ->select(['i.product_id', 'i.name', 'i.quantity'])->cursor() as $item) {
+            $entry = $quantities[$item->product_id] ?? ['name' => $item->name, 'qty' => BigDecimal::zero()];
+            $entry['qty'] = $entry['qty']->plus((string) $item->quantity);
+            $quantities[$item->product_id] = $entry;
+        }
+        $data = $this->period($days === 1 ? 'today' : 'custom', $start->format('d/m/Y').' – '.$end->format('d/m/Y'), $days, $end, $totals, $counts, $hours, $quantities);
+        $data['period'] = 'custom';
+        $data['hourly'] = $days === 1;
+        $data['previous_label'] = 'periode sebelumnya';
+
+        return $data;
+    }
 
     /** @return array<string, array<string, mixed>> kunci: today, 7d, 30d */
     public function build(?int $onlyUserId, ?CarbonInterface $now = null): array
@@ -122,6 +164,17 @@ final class PosDashboard
             $previousCount += $dayCount[$d] ?? 0;
         }
 
+        if ($key === 'custom' && $days > 62) {
+            $grouped = [];
+            foreach (array_chunk($slots, $days > 180 ? 30 : 7) as $chunk) {
+                $sum = BigDecimal::zero();
+                foreach ($chunk as $slot) {
+                    $sum = $sum->plus($slot['amount']);
+                }
+                $grouped[] = ['label' => $chunk[0]['label'].'–'.end($chunk)['label'], 'date' => $chunk[0]['date'], 'amount' => $sum, 'show' => true];
+            }
+            $slots = $grouped;
+        }
         $max = BigDecimal::zero();
         $peak = null;
         foreach ($slots as $index => $slot) {

@@ -13,10 +13,12 @@
         ]],
         'operasional' => ['Operasional', 'M3 9 5 4h14l2 5M3 9h18M3 9v11h18V9M9 20v-6h6v6', [
             'kasir' => 'Kasir (POS)',
+            'riwayat-penjualan' => 'Riwayat penjualan',
             'tagihan' => 'Tagihan',
+            ...($navigationAdmin ? [] : ['persetujuan' => 'Status pembayaran']),
             'pengiriman' => 'Pengiriman',
             'penerimaan' => 'Penerimaan barang',
-            'shift' => [$navigationAdmin ? 'Kas & laporan' : 'Shift toko & laporan saya', ['shift' => 'Shift toko', 'laporan' => $navigationAdmin ? 'Laporan harian' : 'Laporan saya']],
+            'shift' => [$navigationAdmin ? 'Kas & laporan' : 'Kas harian & laporan saya', ['shift' => 'Kas harian', 'laporan' => $navigationAdmin ? 'Laporan harian' : 'Laporan saya']],
         ]],
         'master' => ['Master data', 'M4 6c0-3.5 16-3.5 16 0v12c0 3.5-16 3.5-16 0zM4 6c0 3.5 16 3.5 16 0M4 12c0 3.5 16 3.5 16 0', [
             'master-product' => 'Produk',

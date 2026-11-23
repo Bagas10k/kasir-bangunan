@@ -56,15 +56,15 @@
 </section>
 
 <section class="card" aria-labelledby="review-heading">
-<h2 id="review-heading">Pemeriksaan selisih shift</h2>
+<h2 id="review-heading">Pemeriksaan selisih kas harian</h2>
 @php $reviewShifts = collect($shifts)->filter(fn ($s) => ($s->status ?? '') === 'review')->values()->all(); @endphp
 <div data-live-list>
 @if (count($reviewShifts) === 0)
-    <p class="note">Tidak ada selisih shift yang perlu diperiksa.</p>
+    <p class="note">Tidak ada selisih kas harian yang perlu diperiksa.</p>
 @else
     @foreach ($reviewShifts as $shift)
     <form class="v2-json-form" action="{{ route('v2.shifts.resolve', $shift->id) }}">
-        <p>Shift #{{ $shift->id }}: fisik {{ $shift->counted_cash }}; selisih {{ $shift->difference }}. Angka historis tidak diubah.</p>
+        <p>Kas harian {{ substr((string) $shift->opened_at, 0, 10) }}: fisik {{ $shift->counted_cash }}; selisih {{ $shift->difference }}. Angka historis tidak diubah.</p>
         <div class="field">
             <label for="review-{{ $shift->id }}">Catatan pemeriksaan</label>
             <input id="review-{{ $shift->id }}" name="reason" required minlength="5" maxlength="1000">
@@ -80,8 +80,9 @@
 <section class="card" aria-labelledby="receipt-heading">
 <h2 id="receipt-heading">Penerimaan barang berutang</h2>
 <p class="note">Simpan sebagai draf dahulu. Stok, HPP, dan utang supplier baru berubah saat penerimaan dikonfirmasi dan dikunci.</p>
-<p class="note">Pilih supplier dahulu. Barang yang tersedia mengikuti relasi pada Master Produk.</p>
+<p class="note">Pilih barang di daftar Perlu restok; supplier diisi otomatis bila hanya satu. Satu penerimaan tetap untuk satu supplier.</p>
 <form id="receipt-form" novalidate>
+@include('v2.receipt-restock')
 <div class="row">
     <div class="field">
         <label for="rc-supplier">Supplier</label>
@@ -111,13 +112,21 @@
     </div>
 </fieldset>
 <p class="note">HPP satuan dipakai untuk nilai persediaan, bukan harga jual.</p>
+<fieldset class="row" @disabled(!($freightReady ?? false))>
+    <legend>Ongkir pembelian (beban, bukan HPP)</legend>
+    <div class="field"><label for="rc-freight">Ongkir</label><input id="rc-freight" name="freight_amount" data-money inputmode="decimal" value="0" maxlength="30"></div>
+    <div class="field"><label for="rc-freight-method">Pembayaran ongkir</label><select id="rc-freight-method" name="freight_method"><option value="supplier">Ikut tagihan supplier</option><option value="cash">Kas harian</option><option value="bank">Bank</option></select></div>
+    <div class="field"><label for="rc-freight-account">Akun beban ongkir</label><select id="rc-freight-account" name="freight_account"><option value="">Pilih akun beban</option>@foreach(($freightAccounts ?? collect()) as $account)<option value="{{ $account->account_code }}">{{ $account->account_code }} · {{ $account->account_name }}</option>@endforeach</select></div>
+</fieldset>
+@unless($freightReady ?? false)<p class="note">Ongkir belum aktif: migrasi perlu dijalankan setelah mendapat persetujuan admin. Penerimaan tanpa ongkir tetap tersedia.</p>@endunless
 <p class="rc-submit"><button type="submit">Periksa penerimaan</button></p>
 <div class="rc-review" id="receipt-review" data-popup-skip hidden>
     <h3 id="receipt-review-heading" tabindex="-1">Periksa sebelum simpan</h3>
     <p class="note">Pastikan jumlah dan harga sesuai nota supplier. Simpan draf belum mengubah stok, HPP, atau utang. Konfirmasi dilakukan terpisah dari daftar draf.</p>
     <dl class="rc-review-meta"><div><dt>Supplier</dt><dd data-review-supplier></dd></div><div><dt>Tanggal terima</dt><dd data-review-date></dd></div><div data-review-nota-row><dt>No. nota supplier</dt><dd data-review-nota></dd></div></dl>
     <ul class="rc-review-list" data-review-list></ul>
-    <p class="rc-review-total"><span>Total utang ke supplier</span><strong data-review-total></strong></p>
+    <p class="rc-review-total"><span>Nilai barang (tanpa ongkir)</span><strong data-review-total></strong></p>
+    <p class="note" data-freight-summary></p>
     <p class="rc-review-actions"><button type="button" class="secondary" data-review-back>Ubah lagi</button><button type="submit">Simpan draf penerimaan</button></p>
 </div>
 <p data-error class="err" tabindex="-1" hidden></p>
@@ -161,7 +170,7 @@
 <td data-label="Tipe" class="rh-type">@if($voided)<span class="ui-badge ui-badge--bad">Dibatalkan</span><span class="ui-sub rh-void-note">{{ \Carbon\Carbon::parse($receipt->voided_at)->locale('id')->translatedFormat('d M Y H:i') }}{{ $receipt->voided_by_name ? ' · '.$receipt->voided_by_name : '' }} · {{ $receipt->void_reason }}</span>@else<span class="ui-badge ui-badge--{{ $typeTone }}">{{ $typeLabel }}</span>@endif<span class="ui-sub" title="{{ $payLabel }}">Akun {{ $account !== '' ? $account : '—' }} · {{ $payLabel }}</span></td>
 <td data-label="Qty" class="ui-num rh-lines">@forelse($lines as $line)<span>{{ $qty($line->quantity) }} <small>{{ $line->product_unit }}</small></span>@empty<span>—</span>@endforelse</td>
 <td data-label="HPP satuan" class="ui-num rh-lines">@forelse($lines as $line)<span>{{ \App\Services\V2\Money::display($line->unit_cost) }}</span>@empty<span>—</span>@endforelse</td>
-<td data-label="Total" class="ui-num rh-total"><strong>{{ \App\Services\V2\Money::display($receipt->total_amount) }}</strong></td>
+<td data-label="Total" class="ui-num rh-total"><strong>{{ \App\Services\V2\Money::display($receipt->total_amount) }}</strong>@if(\Brick\Math\BigDecimal::of((string) ($receipt->freight_amount ?? '0'))->isPositive())<span class="ui-sub">Nilai barang</span><span class="ui-sub">Ongkir {{ \App\Services\V2\Money::display($receipt->freight_amount) }} · {{ ['supplier'=>'Utang supplier','cash'=>'Kas','bank'=>'Bank'][$receipt->freight_method] ?? '—' }}</span>@endif</td>
 <td data-label="Aksi" class="ui-actions">@if ($voided)<span class="ui-muted">Dibatalkan sebelumnya</span>@else<span class="ui-badge ui-badge--ok">Dikonfirmasi</span><span class="ui-sub">Terkunci · tidak dapat dibatalkan biasa</span>
 @php $finalAudit = ($receiptFinalAudit ?? collect())->get($receipt->id); @endphp
 @if ($finalAudit)<span class="ui-sub">{{ $finalAudit->confirmed_by_name }} · {{ \Carbon\Carbon::parse($finalAudit->confirmed_at)->format('d/m/Y H:i') }}</span>@endif
@@ -604,7 +613,7 @@ if (receipt) {
             items: data.results.map(p => ({
                 value: String(p.id),
                 label: p.name + ' · ' + p.unit,
-                meta: p.sku + ' · stok ' + count(p.stock) + ' · HPP saat ini ' + rupiah(Number(p.cost) || 0),
+                meta: p.sku + ' · stok ' + count(p.stock) + ' · minimum ' + count(p.minimum) + ' · ' + ({out:'Stok habis',low:'Stok menipis',available:'Stok tersedia'}[p.status] || '') + ' · HPP saat ini ' + rupiah(Number(p.cost) || 0),
                 cost: p.cost,
                 disabled: taken.includes(String(p.id))
             }))
@@ -615,16 +624,38 @@ if (receipt) {
         select.disabled = !receipt.elements.supplier_id.value;
         select._uiPickSync?.();
     };
-    const resetProducts = row => {
-        const select = row.querySelector('[data-name=product_id]');
-        Array.from(select.options).forEach(option => { if (option.value) { option.remove(); } });
-        select.value = '';
-        row.querySelector('[data-name=unit_cost]').placeholder = 'HPP satuan';
-        row.querySelector('[data-name=unit_cost]').removeAttribute('title');
-        select.dispatchEvent(new Event('change', {bubbles: true}));
-        filterProducts(row);
+    let receiptSupplier = receipt.elements.supplier_id.value;
+    function hasReceiptItems() {
+        return Array.from(box.children).some(row => ['product_id', 'quantity', 'unit_cost'].some(name => row.querySelector('[data-name=' + name + ']').value.trim() !== ''));
+    }
+    function canUseReceiptSupplier(id) {
+        return String(id) === receipt.elements.supplier_id.value || !hasReceiptItems();
+    }
+    receipt._hasReceiptItems = hasReceiptItems;
+    receipt._canUseReceiptSupplier = canUseReceiptSupplier;
+    receipt._selectReceiptSupplier = selected => {
+        if (receipt.dataset.busy || receipt.classList.contains('is-reviewing') || !canUseReceiptSupplier(selected.id)) { return false; }
+        const select = receipt.elements.supplier_id;
+        if (!Array.from(select.options).some(option => option.value === String(selected.id))) {
+            select.add(new Option(selected.name, String(selected.id)));
+        }
+        select.value = String(selected.id);
+        select.dispatchEvent(new Event('change', {bubbles:true}));
+        return select.value === String(selected.id);
     };
-    receipt.elements.supplier_id.addEventListener('change', () => Array.from(box.children).forEach(resetProducts));
+    receipt.elements.supplier_id.addEventListener('change', () => {
+        const select = receipt.elements.supplier_id;
+        if (select.value !== receiptSupplier && hasReceiptItems()) {
+            select.value = receiptSupplier;
+            select.dispatchEvent(new Event('ui-refresh'));
+            const error = receipt.querySelector('[data-error]');
+            if (error) { error.textContent = 'Selesaikan atau simpan draf supplier saat ini dahulu. Isian barang tidak dihapus.'; error.hidden = false; }
+            return;
+        }
+        receiptSupplier = select.value;
+        Array.from(box.children).forEach(filterProducts);
+    });
+    receipt.addEventListener('reset', () => queueMicrotask(() => { receiptSupplier = receipt.elements.supplier_id.value; }));
     const renumber = () => Array.from(box.children).forEach((row, i) => {
         row.querySelectorAll('[data-name]').forEach(el => { el.setAttribute('aria-label', labels[el.dataset.name] + ' baris ' + (i + 1)); });
     });
@@ -646,6 +677,17 @@ if (receipt) {
     };
     box.addEventListener('input', recalc);
     box.addEventListener('change', recalc);
+    function fillReceiptCost(row, raw) {
+        const cost = row.querySelector('[data-name=unit_cost]');
+        const value = String(raw ?? '').trim();
+        if (!/^\d{1,17}(?:\.\d{1,4})?$/.test(value) || BigInt(value.replace('.', '')) <= 0n) { return; }
+        if (cost.value.trim() !== '' && (cost.dataset.costEdited === '1' || cost.value !== cost.dataset.autoCost)) { return; }
+        window.uiMoney?.enhance(cost);
+        cost.value = value;
+        cost.dataset.autoCost = cost.value;
+        delete cost.dataset.costEdited;
+        cost.dispatchEvent(new Event('change', {bubbles:true}));
+    }
     const addRow = focus => {
         const node = tpl.content.firstElementChild.cloneNode(true);
         node.querySelector('[data-remove]').addEventListener('click', () => { node.remove(); renumber(); recalc(); });
@@ -653,12 +695,13 @@ if (receipt) {
         filterProducts(node);
         renumber();
         const productSelect = node.querySelector('[data-name=product_id]');
+        node.querySelector('[data-name=unit_cost]').addEventListener('input', event => { event.target.dataset.costEdited = '1'; });
         if (window.uiPick) {
             window.uiPick(productSelect, {
                 source: searchProducts(productSelect),
                 offText: 'Pilih supplier dulu',
                 emptyText: 'Barang harus ditautkan ke supplier ini di Master Produk.',
-                onPick: item => { const cost = node.querySelector('[data-name=unit_cost]'); cost.placeholder = rupiah(Number(item.cost) || 0); cost.title = 'HPP saat ini ' + cost.placeholder; node.dataset.label = item.label; node.dataset.meta = item.meta || ''; node.dataset.cost = item.cost ?? ''; }
+                onPick: item => { const cost = node.querySelector('[data-name=unit_cost]'); cost.placeholder = rupiah(Number(item.cost) || 0); cost.title = 'HPP saat ini ' + cost.placeholder; node.dataset.label = item.label; node.dataset.meta = item.meta || ''; node.dataset.cost = item.cost ?? ''; fillReceiptCost(node, item.cost); recalc(); }
             });
         }
         recalc();
@@ -668,6 +711,31 @@ if (receipt) {
     receipt.dataset.key = key();
     addRow(false);
     document.querySelector('#receipt-add').addEventListener('click', () => addRow(true));
+    function addRestockProduct(product) {
+        if (receipt.dataset.busy || receipt.classList.contains('is-reviewing')) { return 'busy'; }
+        const supplier = receipt.elements.supplier_id.value;
+        if (!supplier || !product.suppliers.some(item => String(item.id) === supplier)) { return 'supplier'; }
+        const rows = Array.from(box.children);
+        if (rows.some(row => row.querySelector('[data-name=product_id]').value === String(product.id))) { return 'duplicate'; }
+        const empty = rows.find(row => ['product_id', 'quantity', 'unit_cost'].every(name => !row.querySelector('[data-name=' + name + ']').value.trim()));
+        if (!empty && rows.length >= 100) { return 'limit'; }
+        const row = empty || addRow(false), select = row.querySelector('[data-name=product_id]');
+        select.add(new Option(product.name + ' · ' + product.unit, String(product.id), true, true));
+        select.value = String(product.id);
+        select.dispatchEvent(new Event('change', {bubbles:true}));
+        select._uiPickSync?.();
+        row.dataset.label = product.name + ' · ' + product.unit;
+        row.dataset.meta = 'stok ' + count(product.stock);
+        row.dataset.cost = product.cost;
+        const cost = row.querySelector('[data-name=unit_cost]');
+        cost.placeholder = rupiah(Number(product.cost) || 0); cost.title = 'HPP saat ini ' + cost.placeholder;
+        fillReceiptCost(row, product.cost);
+        recalc();
+        row.querySelector('[data-name=quantity]').focus();
+        row.scrollIntoView?.({block:'nearest',behavior:'instant'});
+        return 'added';
+    }
+    receipt._addRestockProduct = addRestockProduct;
     // Tinjau sebelum simpan: ringkasan per barang + perkiraan HPP baru (rata-rata bergerak, hanya tampilan; server menghitung ulang).
     // Harga yang jauh dari HPP saat ini (di bawah setengah atau di atas dua kali) ditandai supaya salah ketik nol terlihat.
     const review = receipt.querySelector('#receipt-review');
@@ -755,6 +823,12 @@ if (receipt) {
         receipt.elements.receipt_date.value = draft.receipt_date;
         receipt.elements.receipt_date.dispatchEvent(new Event('change', {bubbles:true}));
         receipt.elements.supplier_invoice_number.value = draft.supplier_invoice_number || '';
+        if (receipt.elements.freight_amount) {
+            receipt.elements.freight_amount.value = draft.freight_amount || '0';
+            receipt.elements.freight_method.value = draft.freight_method || 'supplier';
+            receipt.elements.freight_account.value = draft.freight_account || '';
+            for (const name of ['freight_amount','freight_method','freight_account']) receipt.elements[name].dispatchEvent(new Event('change',{bubbles:true}));
+        }
         box.replaceChildren();
         for (const item of draft.items) {
             const row = addRow(false), select = row.querySelector('[data-name=product_id]');
@@ -794,6 +868,11 @@ if (receipt) {
             version: receipt.dataset.draftVersion || null,
             notes: receipt.dataset.draftNotes || null
         };
+        if (receipt.elements.freight_amount && !receipt.elements.freight_amount.closest('fieldset')?.disabled) {
+            payload.freight_amount = receipt.elements.freight_amount.value || '0';
+            payload.freight_method = receipt.elements.freight_method.value;
+            payload.freight_account = receipt.elements.freight_account.value || null;
+        }
         receipt._lastError = null;
         const url = receipt.dataset.draftId ? draftUpdateUrl.replace(/\/0$/, '/' + receipt.dataset.draftId) : @json(route('v2.receipts.store'));
         if (await send(receipt, url, payload, false, null, true)) {

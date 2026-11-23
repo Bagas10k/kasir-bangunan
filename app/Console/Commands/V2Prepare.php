@@ -5,10 +5,11 @@ namespace App\Console\Commands;
 use App\Services\V2\Money;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class V2Prepare extends Command
 {
-    protected $signature = 'v2:prepare {--admin= : Existing user ID} {--cashier=* : Existing user IDs} {--apply : Apply roles and missing system COA only}';
+    protected $signature = 'v2:prepare {--admin= : Existing user ID} {--cashier=* : Existing user IDs} {--accounts-only : Check or add missing system accounts without cutover or role changes} {--apply : Apply roles and missing system COA only}';
 
     protected $description = 'Read-only release preflight by default; never posts opening balances or copies legacy transactions.';
 
@@ -48,6 +49,37 @@ class V2Prepare extends Command
 
                 return self::FAILURE;
             }
+        }
+        if ($this->option('accounts-only')) {
+            if ($cashiers !== [] || DB::table('v2_user_roles')->where('user_id', $admin)->value('role') !== 'admin'
+                || ! DB::table('users')->where('id', $admin)->where('is_active', true)->exists()) {
+                $this->error('Accounts-only requires one existing active admin; cashier role changes are not allowed.');
+
+                return self::FAILURE;
+            }
+            if ($this->option('apply')) {
+                DB::transaction(function () use ($required, $missing): void {
+                    foreach ($missing as $code) {
+                        [$name, $type, $normal] = $required[$code];
+                        DB::table('chart_of_accounts')->insertOrIgnore([
+                            'account_code' => $code, 'account_name' => $name, 'account_type' => $type,
+                            'normal_balance' => $normal, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+                        ]);
+                        $account = DB::table('chart_of_accounts')->where('account_code', $code)->lockForUpdate()->first();
+                        if (! $account || ! $account->is_active || $account->account_type !== $type || $account->normal_balance !== $normal) {
+                            throw new \RuntimeException('System account changed during repair; no changes committed.');
+                        }
+                    }
+                });
+                Log::info('coa.system_accounts_prepared', ['actor_id' => $admin, 'account_codes' => $missing]);
+            }
+            $this->line(json_encode([
+                'status' => $this->option('apply') ? 'accounts_prepared' : 'accounts_preflight_ok',
+                'missing_accounts' => $missing, 'roles_unchanged' => true, 'journals_unchanged' => true,
+                'scope' => 'Missing system COA only; existing names, classifications, balances and legacy data are not changed.',
+            ]));
+
+            return self::SUCCESS;
         }
         $bad = DB::table('journal_entry_lines')->select('journal_entry_id')->groupBy('journal_entry_id')->havingRaw('SUM(debit) <> SUM(credit)')->exists();
         if ($bad) {

@@ -8,7 +8,7 @@ const navigation=sidebar.querySelector('.sidebar-nav');if(!navigation)return;
 const menuGroups=Array.from(navigation.querySelectorAll('[data-menu-group]'));
 const menuStorageKey='v2-workspace-groups:'+navigation.dataset.role;
 try{const stored=JSON.parse(sessionStorage.getItem(menuStorageKey)||'null');if(stored&&typeof stored==='object'){for(const group of menuGroups){if(typeof stored[group.dataset.menuGroup]==='boolean')group.open=stored[group.dataset.menuGroup];}}}catch{}
-for(const group of menuGroups){group.addEventListener('toggle',()=>{try{sessionStorage.setItem(menuStorageKey,JSON.stringify(Object.fromEntries(menuGroups.map(item=>[item.dataset.menuGroup,item.open]))));}catch{}});}
+for(const group of menuGroups){group.addEventListener('toggle',()=>{measureSubmenus();try{sessionStorage.setItem(menuStorageKey,JSON.stringify(Object.fromEntries(menuGroups.map(item=>[item.dataset.menuGroup,item.open]))));}catch{}});}
 const currentLink=navigation.querySelector('[aria-current="page"]');if(currentLink)currentLink.closest('details').open=true;
 const menu=document.querySelector('.mobile-menu-toggle'),overlay=document.querySelector('#sidebar-overlay')||(()=>{/* Halaman kerja tidak memuat shell-sidebar: buat latar laci agar halaman meredup dan ketuk di luar menutup menu. */const o=document.createElement('button');o.type='button';o.id='sidebar-overlay';o.className='sidebar-overlay';o.tabIndex=-1;o.setAttribute('aria-label','Tutup menu');document.body.append(o);return o})(),top=document.querySelector('header.top,header.main-topbar'),main=document.querySelector('main');
 function mobile(){return matchMedia('(max-width:900px)').matches;}
@@ -71,7 +71,13 @@ fly.addEventListener('keydown',e=>{
 });
 document.addEventListener('pointerdown',e=>{if(!fly.hidden&&!fly.contains(e.target)&&!sidebar.contains(e.target))hideFly();});
 window.addEventListener('resize',()=>hideFly({instant:true}));
-function setPinned(on){hideFly({instant:true});document.body.classList.toggle('sidebar-pinned',on);sidebar.classList.toggle('pinned',on);edge.setAttribute('aria-pressed',String(on));edge.setAttribute('aria-label',on?'Ciutkan menu':'Buka menu tetap');edge.title=on?'Ciutkan menu':'Buka menu tetap';try{localStorage.setItem('v2-sidebar-pinned',on?'1':'0');}catch{}}
+function measureSubmenus(){
+ for(const group of menuGroups){
+  const submenu=group.querySelector('.workspace-submenu');
+  if(submenu)submenu.style.setProperty('--side-submenu-height',submenu.scrollHeight+'px');
+ }
+}
+function setPinned(on){hideFly({instant:true});measureSubmenus();document.body.classList.toggle('sidebar-pinned',on);sidebar.classList.toggle('pinned',on);edge.setAttribute('aria-pressed',String(on));edge.setAttribute('aria-label',on?'Ciutkan menu':'Buka menu tetap');edge.title=on?'Ciutkan menu':'Buka menu tetap';try{localStorage.setItem('v2-sidebar-pinned',on?'1':'0');}catch{}}
 edge.addEventListener('click',()=>setPinned(!sidebar.classList.contains('pinned')));
 // Logo menjadi tombol: klik melebarkan atau menciutkan sidebar (desktop). Di HP sidebar tetap laci dari tombol menu.
 const brand=sidebar.querySelector('.brand-mark');

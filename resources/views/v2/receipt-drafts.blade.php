@@ -19,6 +19,7 @@
 @php
     $draftNumber = 'DRF-'.str_pad((string) $draft->id, 6, '0', STR_PAD_LEFT);
     $editData = ['id' => $draft->id, 'version' => $draft->version, 'supplier_id' => $draft->supplier_id, 'supplier_name' => $draft->supplier_name, 'receipt_date' => $draft->receipt_date, 'supplier_invoice_number' => $draft->supplier_invoice_number, 'notes' => $draft->notes,
+        'freight_amount' => (string) ($draft->freight_amount ?? '0'), 'freight_method' => $draft->freight_method ?? null, 'freight_account' => $draft->freight_account ?? null,
         'items' => array_map(function ($item) use ($draftProducts) {
             $product = $draftProducts->get($item['product_id']);
             return $item + ['name' => $product->name ?? 'Barang tidak tersedia', 'unit' => $product->unit ?? '', 'current_cost' => (string) ($product->cost_price ?? '0'), 'stock' => (string) ($product->stock_quantity ?? '0')];
@@ -35,7 +36,7 @@
     <form class="v2-json-form receipt-confirm-form" action="{{ route('v2.receipt-drafts.confirm', $draft->id) }}" data-popup-title="Konfirmasi penerimaan">
         <h3 class="sr">{{ $draftNumber }} · {{ $draft->supplier_name }}</h3>
         <p class="note">Konfirmasi menambah stok dan utang supplier. Setelah dikonfirmasi, penerimaan terkunci dan tidak dapat dibatalkan biasa.</p>
-        <dl class="popup-summary"><div><dt>Supplier</dt><dd>{{ $draft->supplier_name }}</dd></div><div><dt>Tanggal terima</dt><dd>{{ \Carbon\Carbon::parse($draft->receipt_date)->format('d/m/Y') }}</dd></div><div class="is-total"><dt>Total utang supplier</dt><dd>{{ \App\Services\V2\Money::display($draft->total_amount) }}</dd></div></dl>
+        <dl class="popup-summary"><div><dt>Supplier</dt><dd>{{ $draft->supplier_name }}</dd></div><div><dt>Tanggal terima</dt><dd>{{ \Carbon\Carbon::parse($draft->receipt_date)->format('d/m/Y') }}</dd></div><div><dt>Nilai barang</dt><dd>{{ \App\Services\V2\Money::display($draft->total_amount) }}</dd></div><div><dt>Ongkir (beban {{ $draft->freight_account ?? '—' }})</dt><dd>{{ \App\Services\V2\Money::display($draft->freight_amount ?? '0') }} · {{ ['supplier'=>'Ikut tagihan supplier','cash'=>'Kas harian','bank'=>'Bank'][$draft->freight_method ?? ''] ?? 'Tanpa ongkir' }}</dd></div><div class="is-total"><dt>Total utang supplier</dt><dd>{{ \App\Services\V2\Money::display((string) \Brick\Math\BigDecimal::of((string) $draft->total_amount)->plus(($draft->freight_method ?? '') === 'supplier' ? (string) ($draft->freight_amount ?? '0') : '0')) }}</dd></div></dl>
         <p class="note">No. nota supplier: <strong>{{ $draft->supplier_invoice_number ?: 'Tidak diisi' }}</strong></p>
         <ul class="rc-review-list">
         @foreach ($editData['items'] as $item)

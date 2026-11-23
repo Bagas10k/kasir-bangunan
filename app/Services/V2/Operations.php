@@ -67,8 +67,16 @@ class Operations
 
         try {
             return DB::transaction(function () use ($actor, $opening, $source, $carryFrom) {
+                $openedAt = now();
+                $businessDate = $openedAt->toDateString();
                 if (DB::table('v2_shifts')->where('status', 'open')->lockForUpdate()->exists()) {
-                    $this->invalid('Masih ada shift terbuka; tutup shift tersebut sebelum membuka shift toko.');
+                    $this->invalid('Masih ada kas harian yang terbuka; tutup catatan tanggal tersebut sebelum membuka hari berikutnya.');
+                }
+
+                if (DB::table('v2_shifts')->where(function ($query) use ($businessDate): void {
+                    $query->where('business_date', $businessDate)->orWhereDate('opened_at', $businessDate);
+                })->lockForUpdate()->exists()) {
+                    $this->invalid('Kas harian untuk tanggal ini sudah pernah dibuka; pembukaan ulang tidak diizinkan.');
                 }
 
                 $carry = Money::value('0');
@@ -120,14 +128,15 @@ class Operations
                     'carry_amount' => $this->str($carry),
                     'admin_amount' => $this->str($admin),
                     'status' => 'open',
-                    'opened_at' => now(),
+                    'business_date' => $businessDate,
+                    'opened_at' => $openedAt,
                     'carried_from_id' => $carryFrom,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
             });
         } catch (QueryException $e) {
-            $this->invalid('Shift gagal dibuka; periksa shift terbuka atau carry ganda.');
+            $this->invalid('Kas harian gagal dibuka; periksa tanggal yang sudah dibuka, kas yang masih terbuka, atau saldo bawaan ganda.');
         }
     }
 

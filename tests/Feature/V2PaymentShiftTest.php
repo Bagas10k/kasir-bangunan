@@ -226,6 +226,7 @@ class V2PaymentShiftTest extends TestCase
 
     public function test_both_source_splits_carry_and_admin_amount_with_validation(): void
     {
+        $this->freezeTime();
         $admin = $this->actor('admin');
         $otherAdmin = $this->actor('admin');
         $this->accounts();
@@ -233,6 +234,7 @@ class V2PaymentShiftTest extends TestCase
         $prev1 = $this->ops()->openShift($admin->id, '40.00', 'admin');
         $this->ops()->closeShift($otherAdmin->id, $prev1, '40.00');
 
+        $this->travelTo(now()->addDay());
         $bothId = $this->ops()->openShift($otherAdmin->id, '100.00', 'both', $prev1);
         $both = DB::table('v2_shifts')->where('id', $bothId)->first();
         $this->assertEquals(100, $both->opening_cash);
@@ -240,9 +242,11 @@ class V2PaymentShiftTest extends TestCase
         $this->assertEquals(60, $both->admin_amount);
         $this->ops()->closeShift($this->storeShiftAdmin()->id, $bothId, '100.00');
 
+        $this->travelTo(now()->addDay());
         $prev2 = $this->ops()->openShift($this->storeShiftAdmin()->id, '40.00', 'admin');
         $this->ops()->closeShift($this->storeShiftAdmin()->id, $prev2, '40.00');
 
+        $this->travelTo(now()->addDay());
         $this->expectValidation(fn () => $this->ops()->openShift($this->storeShiftAdmin()->id, '30.00', 'both', $prev2));
         $carryId = $this->ops()->openShift($this->storeShiftAdmin()->id, '30.00', 'carry', $prev2);
         $carry = DB::table('v2_shifts')->where('id', $carryId)->first();
@@ -250,6 +254,7 @@ class V2PaymentShiftTest extends TestCase
         $this->assertEquals(0, $carry->admin_amount);
         $this->ops()->closeShift($this->storeShiftAdmin()->id, $carryId, '30.00');
 
+        $this->travelTo(now()->addDay());
         $this->expectValidation(fn () => $this->ops()->openShift($this->storeShiftAdmin()->id, '50.00', 'both', $prev1));
         $this->expectValidation(fn () => $this->ops()->openShift($this->storeShiftAdmin()->id, '10.00', 'admin', $prev2));
         $this->expectValidation(fn () => $this->ops()->openShift($this->storeShiftAdmin()->id, '10.00', 'both'));

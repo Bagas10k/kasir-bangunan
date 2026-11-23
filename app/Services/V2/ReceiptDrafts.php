@@ -5,6 +5,7 @@ namespace App\Services\V2;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -20,7 +21,11 @@ class ReceiptDrafts
         return DB::transaction(function () use ($actor, $data, $id) {
             DB::table('users')->where('id', $actor)->lockForUpdate()->first();
             $snapshot = $this->snapshot($data);
-            $hash = hash('sha256', json_encode($snapshot, JSON_THROW_ON_ERROR));
+            $hashSnapshot = $snapshot;
+            if (($hashSnapshot['freight_amount'] ?? '0.00') === '0.00') {
+                unset($hashSnapshot['freight_amount'], $hashSnapshot['freight_method'], $hashSnapshot['freight_account']);
+            }
+            $hash = hash('sha256', json_encode($hashSnapshot, JSON_THROW_ON_ERROR));
             if ($id === null) {
                 $key = $data['idempotency_key'] ?? null;
                 if (! is_string($key) || preg_match('/^[\x20-\x7E]{1,100}$/', $key) !== 1) {
@@ -65,6 +70,9 @@ class ReceiptDrafts
                 'items' => json_decode($row->items, true, 512, JSON_THROW_ON_ERROR),
                 'idempotency_key' => 'draft-receipt-'.$id,
                 'confirm_duplicate' => $input['confirm_duplicate'] ?? false,
+                'freight_amount' => (string) ($row->freight_amount ?? '0'),
+                'freight_method' => $row->freight_method ?? null,
+                'freight_account' => $row->freight_account ?? null,
             ]);
             DB::table('v2_receipt_drafts')->where('id', $id)->update(['status' => 'confirmed', 'version' => $row->version + 1, 'receipt_id' => $posted['receipt_id'], 'confirmed_by' => $actor, 'confirmed_at' => now(), 'updated_at' => now()]);
 
@@ -151,7 +159,10 @@ class ReceiptDrafts
         }
         ksort($items);
 
-        return ['supplier_id' => $supplier, 'receipt_date' => $data['receipt_date'], 'notes' => $this->text($data['notes'] ?? null), 'supplier_invoice_number' => $this->text($data['supplier_invoice_number'] ?? null), 'items' => json_encode(array_values($items), JSON_THROW_ON_ERROR), 'total_amount' => (string) $total];
+        $freight = $this->supplyTrips->freight($data);
+
+        return ['supplier_id' => $supplier, 'receipt_date' => $data['receipt_date'], 'notes' => $this->text($data['notes'] ?? null), 'supplier_invoice_number' => $this->text($data['supplier_invoice_number'] ?? null), 'items' => json_encode(array_values($items), JSON_THROW_ON_ERROR), 'total_amount' => (string) $total]
+            + (Schema::hasColumn('v2_receipt_drafts', 'freight_amount') ? $freight : []);
     }
 
     private function decimal(mixed $value): BigDecimal

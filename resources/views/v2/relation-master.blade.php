@@ -23,7 +23,7 @@
 @if(! $dialogsOnly)
     @include('partials.monitoring-cards', ['monitoringTask' => 'master-'.$kind, 'monitoringTitle' => 'Ringkasan '.$nounOf, 'monitoringHead' => $relationHead, 'monitoringCards' => $cards])
 @endif
-<section class="card master-entity-card @if($dialogsOnly) sr-section @endif" id="master-section-{{ $kind }}" aria-labelledby="heading-master-{{ $kind }}">
+<section class="@unless($dialogsOnly)card @endunless master-entity-card" id="master-section-{{ $kind }}" @if($dialogsOnly) data-dialog-host @else aria-labelledby="heading-master-{{ $kind }}" @endif>
     @unless($dialogsOnly)
     <h2 id="heading-master-{{ $kind }}">Daftar {{ $nounOf }}</h2>
     <p class="note">{{ $kind === 'driver' ? 'Sopir karyawan ditautkan ke data staf. Sopir luar didaftarkan terpisah. Nama pada transaksi lama tetap tersimpan.' : 'Pilihan bersama pada produk. Mengarsipkan pilihan tidak menghapus riwayat.' }}</p>

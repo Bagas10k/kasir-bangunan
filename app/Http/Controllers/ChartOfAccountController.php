@@ -2,24 +2,29 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\V2\Operations;
 use Brick\Math\BigDecimal;
 use Database\Seeders\ChartOfAccountsSeeder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ChartOfAccountController extends Controller
 {
     /** Core accounts used directly by automatic operational journals. */
     public const SYSTEM_ACCOUNTS = [
-        '1101', '1102', '1103', '1301', '2101',
-        '3101', '4101', '5101', '5201', '6201',
+        '1101', '1102', '1103', '1191', '1301', '2101',
+        '3101', '4101', '4102', '5101', '5201', '6101', '6201',
     ];
 
     public function index(Request $request)
     {
-        if (DB::table('chart_of_accounts')->count() === 0) {
-            (new ChartOfAccountsSeeder())->run();
+        if (! config('v2.enabled') && DB::table('chart_of_accounts')->count() === 0) {
+            (new ChartOfAccountsSeeder)->run();
         }
 
         $filters = $request->validate([
@@ -125,8 +130,9 @@ class ChartOfAccountController extends Controller
         };
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse|RedirectResponse
     {
+        $this->authorizeOperationalWrite($request);
         $validated = $request->validate([
             'account_code' => ['required', 'string', 'max:20', 'alpha_dash', 'unique:chart_of_accounts,account_code', $this->classificationRule($request)],
             'account_name' => ['required', 'string', 'max:100'],
@@ -138,7 +144,13 @@ class ChartOfAccountController extends Controller
             'account_code.alpha_dash' => 'Kode akun hanya boleh memuat huruf, angka, tanda strip, atau garis bawah.',
         ]);
 
-        DB::table('chart_of_accounts')->insert([
+        $code = trim($validated['account_code']);
+        $active = (bool) ($validated['is_active'] ?? true);
+        if (in_array($code, self::SYSTEM_ACCOUNTS, true) && ! $active) {
+            return $this->failure($request, 'Akun inti sistem wajib tetap aktif karena dipakai transaksi otomatis.', 'is_active');
+        }
+
+        $id = DB::table('chart_of_accounts')->insertGetId([
             'account_code' => trim($validated['account_code']),
             'account_name' => trim($validated['account_name']),
             'account_type' => $validated['account_type'],
@@ -148,13 +160,23 @@ class ChartOfAccountController extends Controller
             'updated_at' => now(),
         ]);
 
-        return redirect()->route('coa.index')->with('success', 'Akun ' . $validated['account_code'] . ' (' . $validated['account_name'] . ') berhasil ditambahkan ke Bagan Akun.');
+        if ($request->routeIs('v2.coa.*')) {
+            Log::info('coa.created', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $code]);
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Akun '.$code.' berhasil ditambahkan.'], 201);
+            }
+        }
+
+        return redirect()->route('coa.index')->with('success', 'Akun '.$validated['account_code'].' ('.$validated['account_name'].') berhasil ditambahkan ke Bagan Akun.');
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id): JsonResponse|RedirectResponse
     {
+        $this->authorizeOperationalWrite($request);
         $account = DB::table('chart_of_accounts')->where('id', $id)->first();
-        if (!$account) {
+        if (! $account) {
+            abort_if($request->routeIs('v2.coa.*'), 404);
+
             return redirect()->route('coa.index')->with('error', 'Akun tidak ditemukan.');
         }
 
@@ -166,54 +188,98 @@ class ChartOfAccountController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $newCode = trim($validated['account_code']);
-        $oldCode = $account->account_code;
-        $newActive = array_key_exists('is_active', $validated) ? (bool) $validated['is_active'] : (bool) $account->is_active;
-        $isSystem = in_array($oldCode, self::SYSTEM_ACCOUNTS, true);
+        return DB::transaction(function () use ($request, $id, $validated): JsonResponse|RedirectResponse {
+            $account = DB::table('chart_of_accounts')->where('id', $id)->lockForUpdate()->firstOrFail();
+            $newCode = trim($validated['account_code']);
+            $oldCode = $account->account_code;
+            $newActive = array_key_exists('is_active', $validated) ? (bool) $validated['is_active'] : (bool) $account->is_active;
+            $isSystem = in_array($oldCode, self::SYSTEM_ACCOUNTS, true);
 
-        if ($isSystem && $newCode !== $oldCode) {
-            return redirect()->route('coa.index')->with('error', 'Kode akun inti sistem (' . $oldCode . ') tidak boleh diubah nomornya karena terhubung langsung dengan alur transaksi otomatis kasir/operasional.');
+            if ($isSystem && $newCode !== $oldCode) {
+                return $this->failure($request, 'Kode akun inti sistem ('.$oldCode.') tidak boleh diubah nomornya karena terhubung langsung dengan alur transaksi otomatis kasir/operasional.', 'account_code');
+            }
+            if (($isSystem || in_array($newCode, self::SYSTEM_ACCOUNTS, true)) && ! $newActive) {
+                return $this->failure($request, 'Akun inti sistem wajib tetap aktif karena dipakai transaksi otomatis.', 'is_active');
+            }
+
+            $classificationChanged = $newCode !== $oldCode
+                || $validated['account_type'] !== $account->account_type
+                || $validated['normal_balance'] !== $account->normal_balance;
+            if ($classificationChanged && DB::table('journal_entry_lines')->where('account_code', $oldCode)->exists()) {
+                return $this->failure($request, 'Akun yang sudah digunakan di jurnal tidak boleh diubah kode, jenis, atau saldo normalnya.', 'account_code');
+            }
+
+            DB::table('chart_of_accounts')->where('id', $id)->update([
+                'account_code' => $newCode,
+                'account_name' => trim($validated['account_name']),
+                'account_type' => $validated['account_type'],
+                'normal_balance' => $validated['normal_balance'],
+                'is_active' => $newActive,
+                'updated_at' => now(),
+            ]);
+
+            if ($request->routeIs('v2.coa.*')) {
+                Log::info('coa.updated', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $newCode, 'is_active' => $newActive]);
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => 'Akun '.$newCode.' berhasil diperbarui.']);
+                }
+            }
+
+            return redirect()->route('coa.index')->with('success', 'Akun '.$newCode.' berhasil diperbarui.');
+        });
+    }
+
+    public function archive(Request $request, int $id): JsonResponse|RedirectResponse
+    {
+        $this->authorizeOperationalWrite($request);
+
+        return DB::transaction(function () use ($request, $id): JsonResponse|RedirectResponse {
+            $account = DB::table('chart_of_accounts')->where('id', $id)->lockForUpdate()->firstOrFail();
+            if (in_array($account->account_code, self::SYSTEM_ACCOUNTS, true)) {
+                return $this->failure($request, 'Akun inti sistem wajib tetap aktif karena dipakai transaksi otomatis.', 'is_active');
+            }
+            DB::table('chart_of_accounts')->where('id', $id)->update(['is_active' => false, 'updated_at' => now()]);
+            Log::info('coa.archived', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $account->account_code]);
+
+            return $request->expectsJson()
+                ? response()->json(['message' => 'Akun '.$account->account_code.' diarsipkan; riwayat jurnal tetap tersimpan.'])
+                : redirect()->route('coa.index')->with('success', 'Akun diarsipkan; riwayat jurnal tetap tersimpan.');
+        });
+    }
+
+    private function authorizeOperationalWrite(Request $request): void
+    {
+        if ($request->routeIs('v2.coa.*')) {
+            app(Operations::class)->requireRole((int) $request->user()->id, ['admin']);
         }
-        if ($isSystem && !$newActive) {
-            return redirect()->route('coa.index')->with('error', 'Akun inti sistem wajib tetap aktif karena dipakai transaksi otomatis.');
+    }
+
+    private function failure(Request $request, string $message, string $field): RedirectResponse
+    {
+        if ($request->routeIs('v2.coa.*') && $request->expectsJson()) {
+            throw ValidationException::withMessages([$field => $message]);
         }
 
-        $classificationChanged = $newCode !== $oldCode
-            || $validated['account_type'] !== $account->account_type
-            || $validated['normal_balance'] !== $account->normal_balance;
-        if ($classificationChanged && DB::table('journal_entry_lines')->where('account_code', $oldCode)->exists()) {
-            return redirect()->route('coa.index')->with('error', 'Akun yang sudah digunakan di jurnal tidak boleh diubah kode, jenis, atau saldo normalnya.');
-        }
-
-        DB::table('chart_of_accounts')->where('id', $id)->update([
-            'account_code' => $newCode,
-            'account_name' => trim($validated['account_name']),
-            'account_type' => $validated['account_type'],
-            'normal_balance' => $validated['normal_balance'],
-            'is_active' => $newActive,
-            'updated_at' => now(),
-        ]);
-
-        return redirect()->route('coa.index')->with('success', 'Akun ' . $newCode . ' berhasil diperbarui.');
+        return redirect()->route('coa.index')->with('error', $message);
     }
 
     public function destroy($id)
     {
         $account = DB::table('chart_of_accounts')->where('id', $id)->first();
-        if (!$account) {
+        if (! $account) {
             return redirect()->route('coa.index')->with('error', 'Akun tidak ditemukan.');
         }
         if (in_array($account->account_code, self::SYSTEM_ACCOUNTS, true)) {
-            return redirect()->route('coa.index')->with('error', 'Akun ' . $account->account_code . ' (' . $account->account_name . ') adalah akun inti sistem dan tidak boleh dihapus.');
+            return redirect()->route('coa.index')->with('error', 'Akun '.$account->account_code.' ('.$account->account_name.') adalah akun inti sistem dan tidak boleh dihapus.');
         }
 
         $transactionCount = DB::table('journal_entry_lines')->where('account_code', $account->account_code)->count();
         if ($transactionCount > 0) {
-            return redirect()->route('coa.index')->with('error', 'Akun ' . $account->account_code . ' (' . $account->account_name . ') tidak dapat dihapus karena sudah memiliki ' . $transactionCount . ' catatan transaksi di jurnal umum.');
+            return redirect()->route('coa.index')->with('error', 'Akun '.$account->account_code.' ('.$account->account_name.') tidak dapat dihapus karena sudah memiliki '.$transactionCount.' catatan transaksi di jurnal umum.');
         }
 
         DB::table('chart_of_accounts')->where('id', $id)->delete();
 
-        return redirect()->route('coa.index')->with('success', 'Akun ' . $account->account_code . ' berhasil dihapus dari Bagan Akun.');
+        return redirect()->route('coa.index')->with('success', 'Akun '.$account->account_code.' berhasil dihapus dari Bagan Akun.');
     }
 }

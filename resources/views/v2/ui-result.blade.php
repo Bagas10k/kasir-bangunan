@@ -153,13 +153,13 @@ html body .ur-btn.is-primary:hover{background:#0f2a1d}
     var NO_TOAST = null;
     var RULES = [
         ['POST', /\/v2\/sales$/, NO_TOAST],
-        ['POST', /\/v2\/shifts$/, function () { return { title: 'Shift dibuka', detail: 'Kasir siap berjualan.' }; }],
+        ['POST', /\/v2\/shifts$/, function () { return { title: 'Kas harian dibuka', detail: 'Kasir siap berjualan.' }; }],
         ['POST', /\/v2\/shifts\/\d+\/close$/, function (d) {
             return d && d.status === 'review'
-                ? { title: 'Shift ditutup, ada selisih kas', detail: 'Selisih ' + rupiah(d.difference) + '. Menunggu pemeriksaan admin.', tone: 'warn' }
-                : { title: 'Shift ditutup', detail: 'Uang laci cocok dengan catatan.' };
+                ? { title: 'Kas harian ditutup, ada selisih kas', detail: 'Selisih ' + rupiah(d.difference) + '. Menunggu pemeriksaan admin.', tone: 'warn' }
+                : { title: 'Kas harian ditutup', detail: 'Uang laci cocok dengan catatan.' };
         }],
-        ['POST', /\/v2\/shifts\/\d+\/resolve$/, function () { return { title: 'Selisih shift diselesaikan', detail: 'Alasan pemeriksaan tersimpan.' }; }],
+        ['POST', /\/v2\/shifts\/\d+\/resolve$/, function () { return { title: 'Selisih kas harian diselesaikan', detail: 'Alasan pemeriksaan tersimpan.' }; }],
         ['POST', /\/v2\/invoices\/\d+\/payments$/, function (d) {
             return { title: d && d.status === 'proposed' ? 'Pengajuan pembayaran dikirim' : 'Pembayaran dicatat', detail: d && d.status === 'pending' ? 'Transfer menunggu verifikasi admin.' : (d && d.status === 'proposed' ? 'Utang berkurang setelah admin menyetujui.' : 'Sisa tagihan sudah diperbarui.') };
         }],
