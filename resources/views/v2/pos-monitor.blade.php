@@ -41,16 +41,12 @@
                 @endforeach
             </div>
             <div id="pd-custom">
-                <button type="button" id="pd-custom-trigger" aria-expanded="false" aria-controls="pd-custom-panel">Tanggal khusus</button>
-                <div id="pd-custom-panel" class="pd-custom-panel" role="region" aria-labelledby="pd-custom-title" hidden>
-                <div class="pd-custom-heading"><strong id="pd-custom-title">Rentang tanggal</strong><button type="button" id="pd-custom-close" aria-label="Tutup tanggal khusus">×</button></div>
-                <form id="pd-custom-form" action="{{ route('v2.sales.dashboard') }}">
-                    <div class="pd-date-field"><label for="pd-from">Dari</label><input type="date" id="pd-from" required max="{{ now()->toDateString() }}"></div>
-                    <div class="pd-date-field"><label for="pd-to">Sampai</label><input type="date" id="pd-to" required max="{{ now()->toDateString() }}"></div>
-                    <button type="submit">Terapkan</button>
-                    <p id="pd-custom-status" role="status" aria-live="polite">Maksimal 366 hari. Tidak mengubah tanggal menu lain.</p>
+                <button type="button" id="pd-custom-trigger" aria-haspopup="dialog" aria-expanded="false" aria-controls="app-date-picker">Tanggal khusus</button>
+                <form id="pd-custom-form" action="{{ route('v2.sales.dashboard') }}" hidden novalidate>
+                    <input type="date" id="pd-from" data-themed-date="true" required max="{{ now()->toDateString() }}">
+                    <input type="date" id="pd-to" data-themed-date="true" required max="{{ now()->toDateString() }}">
                 </form>
-                </div>
+                <p id="pd-custom-status" role="status" aria-live="polite"></p>
             </div>
         </div>
     </header>

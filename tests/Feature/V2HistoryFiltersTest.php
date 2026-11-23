@@ -101,7 +101,7 @@ class V2HistoryFiltersTest extends TestCase
         ]);
     }
 
-    public function test_default_history_is_today_across_drawer_records_and_remains_after_closing(): void
+    public function test_default_history_is_last_seven_days_across_drawers_and_remains_after_closing(): void
     {
         $this->travelTo(now()->setDate(2026, 11, 21)->setTime(12, 0));
         $data = $this->setupBaseData();
@@ -116,14 +116,14 @@ class V2HistoryFiltersTest extends TestCase
         $this->insertSale($data['admin']->id, $data['shift1'], 'SYN-TOMORROW', 'cash', '2026-11-22 00:00:00');
 
         $response = $this->actingAs($data['cashier1'])->get(route('v2.index'))->assertOk();
-        $this->assertSame(2, $response->viewData('historySales')->total());
-        $this->assertSame('2026-11-21', $response->viewData('historyFilters')['start_date']);
+        $this->assertSame(3, $response->viewData('historySales')->total());
+        $this->assertSame('2026-11-15', $response->viewData('historyFilters')['start_date']);
         $this->assertSame('2026-11-21', $response->viewData('historyFilters')['end_date']);
         $response->assertDontSee('id="history-shift"', false)->assertDontSee('data-label="Kategori"', false);
         $response->assertSee('Cari nota')->assertSee('Filter tambahan')->assertSee('Lihat nota');
         $response->assertSee('data-cash-day="2026-11-21"', false);
         DB::table('v2_shifts')->where('id', $data['shift1'])->update(['status' => 'closed', 'store_open_key' => null]);
-        $this->assertSame(2, $this->get(route('v2.index'))->assertOk()->viewData('historySales')->total());
+        $this->assertSame(3, $this->get(route('v2.index'))->assertOk()->viewData('historySales')->total());
         $admin = $this->actingAs($data['admin'])->get(route('v2.index'))->assertOk();
         $this->assertSame(collect($response->viewData('historySales')->items())->pluck('id')->all(), collect($admin->viewData('historySales')->items())->pluck('id')->all());
     }
@@ -137,6 +137,20 @@ class V2HistoryFiltersTest extends TestCase
             ->assertJsonPath('shift', null)->assertJsonPath('today.status', 'closed');
         $this->get(route('v2.index'))->assertOk()->assertSee('Kas harian 2026-11-21 sudah ditutup')
             ->assertSee('data-open-allowed="0"', false);
+    }
+
+    public function test_history_quick_periods_have_inclusive_day_week_and_month_boundaries(): void
+    {
+        $this->travelTo(now()->setDate(2026, 11, 21)->setTime(12, 0));
+        $f = $this->setupBaseData();
+        foreach (['2026-11-21', '2026-11-15', '2026-10-23', '2026-10-22'] as $date) {
+            $this->insertSale($f['admin']->id, $f['shift1'], 'SYN-PERIOD-'.$date, 'cash', $date.' 12:00:00');
+        }
+        foreach (['day' => 1, 'week' => 2, 'month' => 3] as $period => $count) {
+            $response = $this->actingAs($f['cashier1'])->get(route('v2.index', ['history_period' => $period]))->assertOk();
+            $this->assertSame($count, $response->viewData('historySales')->total());
+        }
+        $this->getJson('/v2/sales/history?history_period=invalid')->assertUnprocessable();
     }
 
     public function test_historical_date_is_shared_and_does_not_depend_on_a_shift_selector(): void
@@ -170,12 +184,12 @@ class V2HistoryFiltersTest extends TestCase
         $this->insertSale($data['admin']->id, $data['shift1'], 'PARTIAL-SALE', 'cash', now()->toDateTimeString());
         $response = $this->actingAs($data['cashier1'])->getJson('/v2/sales/history')->assertOk();
         $this->assertSame(['html', 'filters'], array_keys($response->json()));
-        $response->assertJsonPath('filters.start_date', now()->toDateString())->assertJsonPath('filters.end_date', now()->toDateString());
+        $response->assertJsonPath('filters.start_date', now()->subDays(6)->toDateString())->assertJsonPath('filters.end_date', now()->toDateString());
         $this->assertStringContainsString('PARTIAL-SALE', $response->json('html'));
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
         $this->assertStringContainsString('private', $response->headers->get('Cache-Control'));
         $this->getJson('/v2/sales/history?'.http_build_query(['history_shift' => ['active']]))->assertUnprocessable();
-        $this->getJson('/v2/sales/history?history_shift=99999999')->assertOk()->assertJsonPath('filters.start_date', now()->toDateString());
+        $this->getJson('/v2/sales/history?history_shift=99999999')->assertOk()->assertJsonPath('filters.start_date', now()->subDays(6)->toDateString());
         $unassigned = User::factory()->create();
         $this->actingAs($unassigned)->getJson('/v2/sales/history')->assertForbidden();
         $data['cashier1']->forceFill(['is_active' => false])->save();

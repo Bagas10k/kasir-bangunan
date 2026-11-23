@@ -1,6 +1,6 @@
 <p class="note" data-history-scope>Transaksi {{ $historyFilters['start_date'] !== '' && $historyFilters['start_date'] === $historyFilters['end_date'] ? \Illuminate\Support\Carbon::parse($historyFilters['start_date'])->locale('id')->translatedFormat('j M Y') : ($historyFilters['start_date'] !== '' || $historyFilters['end_date'] !== '' ? 'sesuai rentang tanggal' : 'seluruh tanggal') }} · semua petugas</p>
 @if($historySales->isEmpty())
-<p class="note" id="history-empty">Belum ada transaksi pada tanggal ini.</p>
+<p class="note" id="history-empty">Belum ada transaksi pada rentang ini.</p>
 @else
 <div class="scroll" tabindex="0" role="region" aria-label="Riwayat penjualan"><table id="history-table" class="ui-table"><caption class="sr">Transaksi sesuai tanggal dan filter, mencakup semua petugas</caption><thead><tr><th scope="col">Nomor nota</th><th scope="col">Pembeli</th><th scope="col">Pembayaran</th><th scope="col" class="ui-num">Total</th><th scope="col" class="ui-num">Sisa tagihan</th><th scope="col">Status</th><th scope="col" class="ui-actions">Dokumen</th></tr></thead><tbody>
 @foreach($historySales as $historySale)

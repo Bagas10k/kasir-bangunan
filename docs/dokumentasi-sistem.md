@@ -1,7 +1,7 @@
 ---
 judul: Dokumentasi Sistem Kasir Bangunan (tb01)
 versi_sistem: V2 (V2_ENABLED=true)
-terakhir_diperbarui: 2026-11-21
+terakhir_diperbarui: 2026-11-23
 sumber_kebenaran: kode di repositori ini (app/Services/V2, app/Http, routes, database/migrations)
 ---
 
@@ -418,9 +418,10 @@ Scrollbar keranjang dan katalog mengikuti warna tema. Pada HP, nama produk memak
 
 - Menu **Kasir (POS)** tidak lagi memuat tabel riwayat panjang. Di area ringkasan **di atas keranjang**, kartu putih **Penjualan terbaru** berdampingan dengan **Produk terlaris**, dengan tinggi mengikuti isinya, bukan panjang keranjang. Isinya **5 penjualan terbaru seluruh toko**, tanpa filter tanggal riwayat: nama pembeli, atau Pelanggan umum bila kosong, dengan nomor nota kecil sebagai pembeda. Kartu hanya dirender sekali dan tetap tampil saat periode grafik diganti. Klik nama membuka Detail; tautan **Lihat semua penjualan** membuka menu **Operasional › Riwayat penjualan**. Di tablet grafik berada di atas dua kartu daftar; di HP kartu disusun ke bawah. Tidak mengunci tinggi halaman atau menyembunyikan kontrol untuk memaksakan tanpa gulir di HP.
 - Menu **Riwayat penjualan** memuat tabel lengkap: nota/pembeli (tanggal, jam dan petugas di bawahnya), metode, total, sisa tagihan, status, serta akses dokumen. Piutang yang berasal dari penjualan tetap melekat pada nota tersebut; cicilan tidak membuat penjualan kedua. Menu Tagihan tetap tersedia, termasuk utang supplier dan piutang saldo awal/migrasi tanpa nota penjualan.
-- Admin dan kasir membaca data bersama, bukan hanya transaksi akun sendiri. Tampilan awal adalah **hari ini**, dari tanggal server aplikasi. Menutup laci tidak menghilangkan riwayat hari itu. Tidak ada pemilih nomor shift; metadata tanggal laci asal tetap disimpan sebagai keterangan aksesibel, bukan kolom kategori berulang.
+- Admin dan kasir membaca data bersama, bukan hanya transaksi akun sendiri. Tampilan awal adalah **Mingguan: 7 hari terakhir termasuk hari ini**, dari tanggal server aplikasi. Pilihan cepat **Harian** berarti hari ini, **Mingguan** 7 hari, dan **Bulanan** 30 hari (bukan minggu/bulan kalender). Menutup laci tidak menghilangkan riwayat. Tidak ada pemilih nomor shift; metadata tanggal laci asal tetap disimpan sebagai keterangan aksesibel.
 - Pencarian nomor nota/nama pembeli, metode, status (**Semua penjualan / Belum lunas / Dibayar sebagian / Lunas**), tanggal transaksi, dan jumlah baris10/25/50 diproses di server sebelum pagination. Belum lunas mencakup pembayaran sebagian. Sisa/status memakai saldo tagihan yang terkait, dan transfer pending diberi penanda **Menunggu verifikasi**, bukan dianggap lunas. Rentang atau satu batas tanggal boleh dipakai; mengosongkan kedua tanggal secara eksplisit mencari seluruh tanggal.
-- Dengan JavaScript aktif, Terapkan, Hari ini dan pagination mengambil fragmen `GET /v2/sales/history` (authenticated, private/no-store) dan hanya mengganti hasil. Tautan fallback GET membuka `#riwayat-penjualan`. Filter tetap terpisah dari periode grafik, Tagihan dan laporan; tidak mengubah keranjang. Reset meminta tanggal hari ini dari server,10 baris, serta pencarian/metode/status kosong. Pembaruan uiLive mempertahankan filter terapan dan draft isian.
+- Dengan JavaScript aktif, filter, pilihan periode, Atur ulang dan pagination mengambil fragmen `GET /v2/sales/history` (authenticated, private/no-store) dan hanya mengganti hasil. Tautan fallback GET membuka `#riwayat-penjualan`. Filter tetap terpisah dari periode grafik, Tagihan dan laporan; tidak mengubah keranjang. Reset meminta rentang mingguan terbaru dari server,10 baris, serta pencarian/metode/status kosong. Tanggal manual menjadi periode khusus. Pembaruan uiLive mempertahankan filter terapan dan draft isian.
+- Tombol **Tanggal khusus** pada ringkasan Kasir langsung membuka kalender rentang bersama, tanpa popup perantara. Pilih awal/akhir lalu **Oke** untuk menerapkan; Tutup/Esc/klik luar membatalkan pilihan sementara. Validasi maksimal366hari dan batas hari ini tetap berlaku; lima penjualan terbaru serta tanggal menu lain tidak mengikuti rentang ini.
 - Klik nama pada daftar ringkas atau tabel membuka satu dialog Detail melalui `GET /v2/sales/{id}/detail`. Identitas nota/nama dan status tampil di atas; barang ditampilkan dalam tabel jumlah/harga/diskon/subtotal. Total, terbayar, sisa, diskon nota/ongkir bila ada serta riwayat cicilan dikelompokkan dengan jelas; setiap pembayaran memiliki nominal/status, waktu, petugas, referensi, alasan penolakan dan tautan foto bila tersedia. **Cetak struk/nota** berada di footer untuk nota aktif bersama tombol Tutup; aksi cetak lama dibersihkan saat memuat detail lain atau menutup dialog. Bila masih ada sisa, form **Catat pembayaran** menggunakan endpoint, kunci idempotensi, dan penjaga entri dobel yang sama dengan Tagihan; tidak membuat salinan invoice. Tunai langsung tercatat; transfer baru berpengaruh sesudah verifikasi admin.
 - Pembayaran selesai akan memperbarui riwayat/saldo lewat uiLive. Tidak mencetak bukti cicilan khusus; nota yang dicetak membaca pembayaran tercatat dan sisa terbaru. Foto hanya untuk transfer pelanggan, per pembayaran (bagian8.7).
 - Detail/fragmen memeriksa peran admin/kasir aktif. Respons detail lama tidak boleh mengganti penjualan lain atau dialog yang sudah ditutup. Galat mempertahankan hasil lama, tidak membocorkan rincian server, dan memungkinkan membuka ulang. Semua endpoint baca hanya membaca; izin persetujuan, pengiriman dan laporan per petugas tidak diperluas.
@@ -675,9 +676,15 @@ Kode, nama, catatan (alamat, telepon), dan **harga di kasir** (eceran atau kontr
 
 Pelanggan juga bisa dibuat langsung dari kasir (kode `CUS-0001` dan seterusnya, harga eceran). Pelanggan arsip tidak bisa dipilih di kasir.
 
+Daftar master menampilkan **Frekuensi belanja** (jumlah nota penjualan yang terhubung ke ID pelanggan, bukan jumlah cicilan) dan **Piutang pelanggan** (jumlah sisa positif tagihan receivable yang belum dibatalkan, termasuk saldo awal). Pembayaran menunggu/ditolak tidak mengurangi piutang; pelanggan tanpa transaksi bernilai0. Pembelian tanpa pelanggan terpilih tidak ditebak berdasarkan nama.
+
 ### 12.3 Supplier
 
 Kode, nama, catatan. Menekan nama supplier menampilkan produk yang dipasoknya dan riwayat transaksinya. Kolom "Utang berjalan" menunjukkan sisa utang ke supplier itu.
+
+Detail supplier khusus admin memuat aktivitas tagihan dan pembayaran berdasarkan **tanggal pencatatan**, default30hari terakhir, maksimal366hari sampai hari ini. Daftar20aktivitas per halaman, tanpa batas8aktivitas lama. Ringkasan membedakan tagihan, pembayaran terverifikasi, pengajuan menunggu dalam rentang, dan **utang berjalan saat ini** seluruh tanggal. Tagihan dibatalkan tidak menambah utang/ringkasan tagihan; aktivitasnya tetap dapat ditelusuri.
+
+**Cetak transaksi** mencetak satu aktivitas milik supplier tersebut; **Cetak semua dalam rentang** mencakup semua halaman pada rentang yang sudah diterapkan, bukan draft tanggal yang belum ditampilkan. Halaman cetak menyediakan Cetak/Simpan PDF, nomor tagihan, nominal, status, metode/referensi pembayaran. Ini rincian aktivitas, bukan bukti pembayaran atau saldo penutupan historis. Endpoint GET `suppliers/{id}/activity` dan `suppliers/{id}/statement` memeriksa admin aktif, lingkup supplier/entri, tanggal, dan memakai private/no-store. Tidak memposting stok, utang, pembayaran atau jurnal baru.
 
 ### 12.4 Karyawan dan sopir
 
@@ -1064,6 +1071,7 @@ Daftar ini jujur tentang apa yang belum ditangani sistem. Butir bertanda **[cek 
 
 | Tanggal | Perubahan |
 |---|---|
+| 2026-11-23 | Kalender khusus Kasir langsung; riwayat default7hari dan periode cepat1/7/30hari; frekuensi/piutang pelanggan; perbaikan popup supplier, aktivitas berhalaman dan cetak per aktivitas/seluruh rentang khusus admin (bagian7.10/12.2/12.3). |
 | 2026-11-23 | Jumlah katalog dapat diketik dengan validasi/pemulihan draft; sidebar menjaga layout teks dan tinggi submenu; keranjang morph dari bar pembuka tanpa menskalakan/menyalin form (bagian7.1/7.10). |
 | 2026-11-23 | Skeleton login/workspace/Keuangan, tanggal khusus Kasir maksimal366hari dan pembanding periode, serta ongkir pembelian sebagai beban (supplier/kas/bank). Migrasi ongkir hanya diuji terisolasi, belum dijalankan pada database toko. QA browser tulis dan konkurensi MySQL masih terblokir lingkungan (bagian1.2/7.10/11.3). |
 | 2026-11-21 | Penyederhanaan Perlu restok: hapus filter supplier, pilih barang dahulu; supplier tunggal otomatis, multi-supplier dipilih, supplier manual existing/baru dengan konfirmasi aditif dan idempotensi. Pergantian supplier tidak lagi menghapus isian penerimaan (bagian11.1/11.4). |

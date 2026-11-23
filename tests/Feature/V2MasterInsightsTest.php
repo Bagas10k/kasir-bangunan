@@ -46,10 +46,13 @@ class V2MasterInsightsTest extends TestCase
             ['invoice_id' => $invoice, 'amount' => '400000.00', 'method' => 'transfer', 'status' => 'posted', 'requested_by' => $admin->id, 'idempotency_key' => 'syn-pay-1', 'request_hash' => 'h1', 'created_at' => now(), 'updated_at' => now()],
             ['invoice_id' => $invoice, 'amount' => '100000.00', 'method' => 'transfer', 'status' => 'proposed', 'requested_by' => $admin->id, 'idempotency_key' => 'syn-pay-2', 'request_hash' => 'h2', 'created_at' => now(), 'updated_at' => now()],
         ]);
+        DB::table('v2_invoices')->insert(['direction' => 'payable', 'party_id' => $supplier, 'number' => 'SYN-VOIDED-SUPPLIER',
+            'amount' => '900000.00', 'paid' => '0.00', 'status' => 'open', 'voided_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
 
         $info = app(MasterInsights::class)->suppliers([$supplier])[$supplier];
 
         $this->assertSame('600000.00', $info['outstanding'], 'Utang = tagihan dikurangi yang sudah dibayar.');
+        $this->assertSame('1000000.00', $info['billed']);
         $this->assertSame('400000.00', $info['settled']);
         $this->assertSame('100000.00', $info['awaiting'], 'Pengajuan belum mengurangi utang.');
         $skus = array_column($info['products'], 'sku');
@@ -90,6 +93,28 @@ class V2MasterInsightsTest extends TestCase
         $this->assertSame($driverName, $info['history'][0]['driver'], 'Riwayat mobil menyebut sopirnya.');
         $this->assertSame('Proyek Sintetis', $info['history'][0]['destination']);
         $this->assertNotNull($info['last_used']);
+    }
+
+    public function test_customer_counts_sales_once_and_keeps_unverified_and_voided_debt_separate(): void
+    {
+        $admin = $this->admin();
+        $customer = DB::table('v2_parties')->insertGetId(['kind' => 'customer', 'code' => 'SYN-C-METRIC', 'name' => 'Pelanggan Sintetis', 'is_active' => true]);
+        $other = DB::table('v2_parties')->insertGetId(['kind' => 'customer', 'code' => 'SYN-C-OTHER', 'name' => 'Pelanggan Lain Sintetis', 'is_active' => true]);
+        $shift = DB::table('v2_shifts')->insertGetId(['user_id' => $admin->id, 'source' => 'admin', 'opening_cash' => 0, 'status' => 'open', 'opened_at' => now()]);
+        foreach ([1, 2] as $index) {
+            DB::table('v2_sales')->insert(['number' => 'SYN-METRIC-'.$index, 'user_id' => $admin->id, 'shift_id' => $shift, 'customer_id' => $customer,
+                'total' => '70.00', 'payment_method' => 'credit', 'status' => 'unpaid', 'fulfillment' => 'pickup', 'request_hash' => 'metric-'.$index, 'idempotency_key' => 'metric-'.$index]);
+        }
+        $invoice = DB::table('v2_invoices')->insertGetId(['party_id' => $customer, 'direction' => 'receivable', 'number' => 'SYN-AR-METRIC', 'amount' => '140.25', 'paid' => '40.10', 'status' => 'open']);
+        DB::table('v2_invoices')->insert(['party_id' => $customer, 'direction' => 'receivable', 'number' => 'SYN-AR-VOID', 'amount' => '999.99', 'paid' => '0', 'status' => 'open', 'voided_at' => now()]);
+        DB::table('v2_payments')->insert(['invoice_id' => $invoice, 'amount' => '7.05', 'method' => 'transfer', 'status' => 'pending', 'requested_by' => $admin->id, 'idempotency_key' => 'syn-metric-pending', 'request_hash' => 'h']);
+
+        $info = app(MasterInsights::class)->customers([$customer, $other]);
+
+        $this->assertSame(2, $info[$customer]['purchase_count']);
+        $this->assertSame('100.15', $info[$customer]['outstanding']);
+        $this->assertSame(0, $info[$other]['purchase_count']);
+        $this->assertSame('0.00', $info[$other]['outstanding']);
     }
 
     public function test_master_screens_expose_relation_details_and_merged_staff_table(): void

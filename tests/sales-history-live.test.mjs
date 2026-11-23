@@ -13,28 +13,44 @@ function setup() {
     const form = { dataset: { historyUrl: '/v2/sales/history' }, elements: fields, reportValidity: () => true, addEventListener: (name, fn) => { formListeners[name] = fn; }, dispatchEvent: event => { appliedEvents.push(event.type); }, querySelector: () => button, querySelectorAll: () => [button] };
     const results = { innerHTML: 'old results', setAttribute: (k, v) => attributes.set(k, v), removeAttribute: k => attributes.delete(k) };
     const error = { hidden: true, textContent: '', focus() {} };
-    const root = { dataset: { historyToday: '2026-11-21' }, querySelector: s => s === '#history-filter-form' ? form : s === '#history-results' ? results : error, addEventListener: (name, fn) => { handlers[name] = fn; }, setAttribute: (k, v) => attributes.set(k, v), removeAttribute: k => attributes.delete(k) };
+    const root = { dataset: { historyToday: '2026-11-21',historyDefaultStart:'2026-11-15',historySelected:'custom' }, querySelectorAll:()=>[],querySelector: s => s === '#history-filter-form' ? form : s === '#history-results' ? results : error, addEventListener: (name, fn) => { handlers[name] = fn; }, setAttribute: (k, v) => attributes.set(k, v), removeAttribute: k => attributes.delete(k) };
     const location = { href: 'http://example.test/?start_date=2026-11-20&sale_search=&date=2026-11-19#kasir', origin: 'http://example.test' };
     const history = { state: null, replaceState: (_s, _t, url) => { location.href = String(url); } };
     const requests = [];
     let responder = async url => {
         const filters = Object.fromEntries(new URL(url).searchParams);
-        if (!Object.hasOwn(filters, 'start_date') && !Object.hasOwn(filters, 'end_date')) Object.assign(filters, { start_date: '2026-11-21', end_date: '2026-11-21' });
+        if (!Object.hasOwn(filters, 'start_date') && !Object.hasOwn(filters, 'end_date')) Object.assign(filters, { start_date: '2026-11-15', end_date: '2026-11-21' });
         return { ok: true, redirected: false, json: async () => ({ html: '<p>new results</p>', filters }) };
     };
     const document = { getElementById: id => ({ 'sales-history': root, 'history-filter-form': form, 'history-results': results, 'history-error': error })[id], querySelector: () => root, createElement: () => ({ value: '', textContent: '' }), addEventListener: (name, fn) => { documentHandlers[name] = fn; } };
     const context = { window: { history, location }, document, location, history, URL, URLSearchParams, AbortController, Event, console, setTimeout, clearTimeout, FormData: class { constructor(f) { this.entries = Object.entries(f.elements).map(([key, field]) => [key, field.value]); } [Symbol.iterator]() { return this.entries[Symbol.iterator](); } }, fetch: (url, options) => { requests.push({ url: String(url), options }); return responder(String(url)); } };
     vm.runInNewContext(source, context);
     const submit = async () => { let prevented = false; const event = { target: form, preventDefault: () => { prevented = true; } }; await (formListeners.submit ?? handlers.submit)?.(event); return prevented; };
-    const click = async ({ reset = false, page = 2, modified = false } = {}) => {
+    const click = async ({ reset = false, page = 2, modified = false, period = null } = {}) => {
         let prevented = false;
         const link = { id: reset ? 'history-reset' : '', href: `http://example.test/?history_page=${page}`, closest: selector => selector.includes('pagination') ? (!reset ? link : null) : link };
-        const event = { target: { closest: selector => selector.includes('history-reset') ? (reset ? link : null) : selector.includes('pagination') ? (!reset ? link : null) : link }, button: 0, metaKey: modified, preventDefault: () => { prevented = true; } };
+        const event = { target: { closest: selector => selector==='[data-history-period]'?(period?{dataset:{historyPeriod:period}}:null):selector.includes('history-reset') ? (reset ? link : null) : selector.includes('pagination') ? (!reset ? link : null) : link }, button: 0, metaKey: modified, preventDefault: () => { prevented = true; } };
         await handlers.click?.(event);
         return prevented;
     };
     return { fields, form, results, error, root, button, location, requests, appliedEvents, documentHandlers, submit, click, respond: fn => { responder = fn; } };
 }
+
+test('quick periods request fresh server boundaries and later manual dates become custom', async () => {
+    const app = setup();
+    app.respond(async url => {
+        const period = new URL(url).searchParams.get('history_period');
+        return {ok:true,json:async()=>({html:'period results',filters:{history_period:period,start_date:'2026-11-21',end_date:'2026-11-21',history_page:1}})};
+    });
+    await app.click({period:'day'});
+    const query = new URL(app.requests.at(-1).url).searchParams;
+    assert.equal(query.get('history_period'),'day');
+    assert.equal(query.has('start_date'),false);
+    assert.equal(app.fields.start_date.value,'2026-11-21');
+    app.fields.start_date.value='2026-11-10';
+    await app.submit();
+    assert.equal(new URL(app.requests.at(-1).url).searchParams.get('history_period'),'custom');
+});
 
 test('apply filters uses a background GET, clean URL and only replaces history results', async () => {
     const app = setup();
@@ -52,7 +68,7 @@ test('apply filters uses a background GET, clean URL and only replaces history r
     assert.deepEqual(app.appliedEvents, ['ui-filter:applied']);
 });
 
-test('pagination uses applied filters and reset returns to today without navigation', async () => {
+test('pagination uses applied filters and reset returns to the last seven days without navigation', async () => {
     const app = setup();
     app.fields.sale_search.value = 'INV-SYN';
     await app.submit();
@@ -64,7 +80,7 @@ test('pagination uses applied filters and reset returns to today without navigat
     assert.equal(await app.click({ modified: true }), false);
     assert.equal(app.requests.length, count);
     assert.equal(await app.click({ reset: true }), true);
-    assert.equal(app.fields.start_date.value, '2026-11-21');
+    assert.equal(app.fields.start_date.value, '2026-11-15');
     assert.equal(app.fields.end_date.value, '2026-11-21');
     assert.equal(app.fields.sale_search.value, '');
     assert.equal(new URL(app.requests.at(-1).url).searchParams.has('history_shift'), false);
@@ -89,10 +105,10 @@ test('failed validation/network retains old results, input and usable controls',
 
 test('reset uses the server date after midnight rather than a stale page date', async () => {
     const app = setup();
-    app.respond(async () => ({ ok: true, json: async () => ({ html: 'next day', filters: { sale_search: '', sale_method: '', start_date: '2026-11-22', end_date: '2026-11-22', history_per_page: 10, history_page: 1 } }) }));
+    app.respond(async () => ({ ok: true, json: async () => ({ html: 'next day', filters: { history_period:'week',sale_search: '', sale_method: '', start_date: '2026-11-16', end_date: '2026-11-22', history_per_page: 10, history_page: 1 } }) }));
     await app.click({ reset: true });
     assert.equal(new URL(app.requests.at(-1).url).searchParams.has('start_date'), false);
-    assert.equal(app.fields.start_date.value, '2026-11-22');
+    assert.equal(app.fields.start_date.value, '2026-11-16');
     assert.equal(app.fields.end_date.value, '2026-11-22');
     assert.equal(app.form.dataset.filtered, '0');
     assert.equal(app.root.dataset.historyToday, '2026-11-22');

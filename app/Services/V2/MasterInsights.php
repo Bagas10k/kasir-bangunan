@@ -14,6 +14,30 @@ final class MasterInsights
 {
     private const HISTORY_LIMIT = 8;
 
+    /** @return array<int, array{purchase_count:int, outstanding:string}> */
+    public function customers(array $customerIds): array
+    {
+        if ($customerIds === []) {
+            return [];
+        }
+        $counts = DB::table('v2_sales')->whereIn('customer_id', $customerIds)
+            ->selectRaw('customer_id, COUNT(*) as purchases')->groupBy('customer_id')->pluck('purchases', 'customer_id');
+        $out = [];
+        foreach ($customerIds as $id) {
+            $out[(int) $id] = ['purchase_count' => (int) ($counts[$id] ?? 0), 'outstanding' => '0.00'];
+        }
+        $invoices = DB::table('v2_invoices')->where('direction', 'receivable')->whereNull('voided_at')
+            ->whereIn('party_id', $customerIds)->select(['party_id', 'amount', 'paid'])->cursor();
+        foreach ($invoices as $invoice) {
+            $remaining = BigDecimal::of((string) $invoice->amount)->minus((string) $invoice->paid);
+            if ($remaining->isPositive()) {
+                $out[(int) $invoice->party_id]['outstanding'] = (string) BigDecimal::of($out[(int) $invoice->party_id]['outstanding'])->plus($remaining)->toScale(2);
+            }
+        }
+
+        return $out;
+    }
+
     /** @return array<int, array<string, mixed>> rincian per supplier */
     public function suppliers(array $supplierIds): array
     {
@@ -32,7 +56,7 @@ final class MasterInsights
             ->where('direction', 'payable')
             ->whereIn('party_id', $supplierIds)
             ->orderByDesc('id')
-            ->get(['id', 'party_id', 'number', 'amount', 'paid', 'status', 'created_at', 'receipt_id'])
+            ->get(['id', 'party_id', 'number', 'amount', 'paid', 'status', 'created_at', 'receipt_id', 'voided_at'])
             ->groupBy('party_id');
 
         $payments = DB::table('v2_payments as pm')
@@ -40,7 +64,7 @@ final class MasterInsights
             ->where('i.direction', 'payable')
             ->whereIn('i.party_id', $supplierIds)
             ->orderByDesc('pm.id')
-            ->get(['pm.id', 'pm.amount', 'pm.method', 'pm.status', 'pm.reference', 'pm.created_at', 'i.party_id', 'i.number as invoice_number'])
+            ->get(['pm.id', 'pm.amount', 'pm.method', 'pm.status', 'pm.reference', 'pm.created_at', 'i.party_id', 'i.number as invoice_number', 'i.voided_at as invoice_voided_at'])
             ->groupBy('party_id');
 
         $out = [];
@@ -52,6 +76,9 @@ final class MasterInsights
             $outstanding = BigDecimal::zero();
             $billed = BigDecimal::zero();
             foreach ($supplierInvoices as $invoice) {
+                if ($invoice->voided_at !== null) {
+                    continue;
+                }
                 $amount = BigDecimal::of((string) $invoice->amount);
                 $paid = BigDecimal::of((string) $invoice->paid);
                 $billed = $billed->plus($amount);
@@ -63,6 +90,9 @@ final class MasterInsights
             $settled = BigDecimal::zero();
             $awaiting = BigDecimal::zero();
             foreach ($supplierPayments as $payment) {
+                if ($payment->invoice_voided_at !== null) {
+                    continue;
+                }
                 $amount = BigDecimal::of((string) $payment->amount);
                 if ($payment->status === 'posted') {
                     $settled = $settled->plus($amount);
@@ -75,7 +105,7 @@ final class MasterInsights
                 'type' => 'invoice',
                 'label' => 'Tagihan '.($invoice->number ?: '#'.$invoice->id),
                 'amount' => (string) $invoice->amount,
-                'status' => $invoice->status ?: 'unpaid',
+                'status' => $invoice->voided_at ? 'void' : ($invoice->status ?: 'unpaid'),
                 'date' => (string) $invoice->created_at,
             ])->concat($supplierPayments->map(fn ($payment) => [
                 'type' => 'payment',

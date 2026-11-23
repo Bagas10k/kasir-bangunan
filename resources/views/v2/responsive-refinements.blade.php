@@ -58,16 +58,27 @@ html body #panel-kasir #kasir #products-tbody .pm-step [data-pm-quantity]:focus-
 html body #panel-kasir #kasir #products-tbody .pm-step [data-pm-quantity][aria-invalid=true]{color:var(--ui-warn-ink) !important;background:var(--ui-warn-bg) !important}
 html body #panel-kasir #kasir #pd-custom{min-width:0;position:relative}
 html body #panel-kasir #kasir #pd-custom-trigger{min-height:var(--ui-tap);display:flex;align-items:center;cursor:pointer;font-size:var(--ui-t-label);padding:var(--ui-space-control) var(--ui-space-group);border:var(--ui-stroke) solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-surface);color:var(--ui-green)}
-html body #panel-kasir #kasir #pd-custom-panel{position:fixed;inset:auto;margin:0;padding:var(--ui-space-section);width:var(--ui-period-panel-width);max-width:calc(100vw - var(--ui-space-section));box-sizing:border-box;overflow:auto;gap:var(--ui-space-control);border:var(--ui-stroke) solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-surface);color:var(--ui-ink);z-index:var(--ui-loading-layer);animation:var(--ui-float-in)}
-html body #panel-kasir #kasir #pd-custom-panel[hidden]{display:none !important}
-html body #panel-kasir #kasir .pd-custom-heading{display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-control);margin-bottom:var(--ui-space-control)}
-html body #panel-kasir #kasir #pd-custom-close{min-width:var(--ui-tap);min-height:var(--ui-tap);padding:var(--ui-space-control);border:0;background:transparent;color:var(--ui-ink);font-size:var(--ui-h2)}
-html body #panel-kasir #kasir #pd-custom-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--ui-space-control);padding:0;border:0;background:var(--ui-surface);max-width:100%}
-html body #panel-kasir #kasir #pd-custom-form>.pd-date-field{min-width:0}
-html body #panel-kasir #kasir #pd-custom-form>.pd-date-field label{display:block;margin-bottom:var(--ui-space-tight);font-size:var(--ui-t-label)}
-html body #panel-kasir #kasir #pd-custom-form>:is(button,p){grid-column:1/-1}
-html body #panel-kasir #kasir #pd-custom-form :is(input,button){width:100%;min-width:0;min-height:var(--ui-tap);box-sizing:border-box}
+html body #panel-kasir #kasir #pd-custom-form[hidden]{display:none !important}
 html body #panel-kasir #kasir #pd-custom-status{font-size:var(--ui-t-caption);overflow-wrap:anywhere}
+html body #panel-kasir #kasir #pd-custom-status:empty{display:none}
+html body #sales-history .history-periods{display:flex;gap:var(--ui-space-control);flex-wrap:wrap;margin-block:var(--ui-space-section)}
+html body #sales-history .history-periods button{min-height:var(--ui-tap);padding:var(--ui-space-control) var(--ui-space-section);border:var(--ui-stroke) solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-surface);color:var(--ui-green)}
+html body #sales-history .history-periods button[aria-pressed=true]{background:var(--ui-green);color:var(--ui-surface)}
+html body #insight-dialog [data-supplier-activity]{margin-top:var(--ui-space-panel)}
+html body #insight-dialog #supplier-activity-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--ui-space-control);align-items:end}
+html body #insight-dialog #supplier-activity-form>div{min-width:0}
+html body #insight-dialog #supplier-activity-form label{display:block;font-size:var(--ui-t-label);margin-bottom:var(--ui-space-tight)}
+html body #insight-dialog :is(.supplier-print-link,[data-supplier-print],.supplier-activity-pages a){display:inline-flex;align-items:center;justify-content:center;min-height:var(--ui-tap);padding:var(--ui-space-control) var(--ui-space-group);border:var(--ui-stroke) solid var(--ui-line);border-radius:var(--ui-radius);color:var(--ui-green);text-decoration:none;box-sizing:border-box}
+html body #insight-dialog [data-supplier-activity] [hidden],html body #insight-dialog [data-supplier-activity][hidden]{display:none !important}
+html body #insight-dialog .supplier-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--ui-space-group);margin-block:var(--ui-space-section)}
+html body #insight-dialog .supplier-summary>div{padding:var(--ui-space-group);background:var(--ui-canvas);border-radius:var(--ui-radius)}
+html body #insight-dialog .supplier-summary dt{font-size:var(--ui-t-caption);color:var(--ui-ink-2)}
+html body #insight-dialog .supplier-summary dd{margin:var(--ui-space-tight) 0 0;font-weight:var(--ui-weight-strong);font-variant-numeric:tabular-nums}
+html body #insight-dialog [data-supplier-results]>.scroll{max-height:var(--ui-supplier-history-height);overflow:auto}
+html body #insight-dialog .supplier-activity-table{width:100%;border-collapse:collapse}
+html body #insight-dialog .supplier-activity-table :is(th,td){padding:var(--ui-space-control);vertical-align:top}
+html body #insight-dialog .supplier-activity-table .ui-sub{display:block;font-size:var(--ui-t-caption);overflow-wrap:anywhere}
+html body #insight-dialog .supplier-activity-pages{display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-control);margin-block:var(--ui-space-section);flex-wrap:wrap}
 @media(min-width:47.5625rem){
     html body #panel-kasir #kasir #products-table{table-layout:fixed;width:100%}
     html body #panel-kasir #kasir #products-table th:first-child{width:var(--ui-catalog-product-width)}
@@ -127,8 +138,5 @@ html body #panel-shift :is([data-filter-ready],#u#u#u)>.ui-search[data-filter-se
 }
 @media(forced-colors:active){
     html body #kasir :is(#items,.cart-table-scroll,.catalog-table-scroll,.catalog-page-list){scrollbar-color:auto}
-}
-@media(prefers-reduced-motion:reduce){
-    html body #panel-kasir #kasir #pd-custom-panel{animation:none !important}
 }
 </style>

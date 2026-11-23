@@ -88,9 +88,16 @@
     }
     function commit() {
         if (!active) return;
+        if (active.requireRange && (!active.range?.start || !active.range?.end)) {
+            const summary = calendar.querySelector('.calendar-range-summary');
+            if (summary) summary.textContent = 'Pilih tanggal awal dan tanggal akhir dahulu.';
+            return;
+        }
         const trigger = active.trigger;
+        const onCommit = active.onCommit;
         close(false, true);
         trigger.focus();
+        onCommit?.();
     }
     function footerWith(left) {
         const footer = document.createElement('div'); footer.className = 'calendar-footer';
@@ -217,10 +224,10 @@
     function openDate(input, trigger, opts = {}) {
         if (active?.trigger === trigger) { if (opts.keepFocus) return; close(true); return; }
         close();
-        const startInput = input.form?.querySelector('input[type="date"][name="start_date"]');
-        const endInput = input.form?.querySelector('input[type="date"][name="end_date"]');
+        const startInput = opts.endInput ? input : input.form?.querySelector('input[type="date"][name="start_date"]');
+        const endInput = opts.endInput || input.form?.querySelector('input[type="date"][name="end_date"]');
         const isRange = startInput && endInput && startInput !== endInput;
-        active = {input, trigger, snapshot: isRange ? {start: startInput.value, end: endInput.value} : {value: input.value}};
+        active = {input, trigger, onCommit:opts.onCommit, requireRange:opts.requireRange, snapshot: isRange ? {start: startInput.value, end: endInput.value} : {value: input.value}};
         if (isRange) {
             active.range = {startInput, endInput, start:startInput.value, end:endInput.value};
             month = new Date(parse(startInput.value || endInput.value || iso(new Date())).getFullYear(), parse(startInput.value || endInput.value || iso(new Date())).getMonth(), 1);
@@ -269,7 +276,7 @@
         startInput.tabIndex = -1; endInput.tabIndex = -1; startInput._dateTrigger = text; endInput._dateTrigger = text;
         const part = digits => { let out = digits.slice(0, 2); if (digits.length > 2) out += '/' + digits.slice(2, 4); if (digits.length > 4) out += '/' + digits.slice(4, 8); return out; };
         const mark = message => { text.setCustomValidity(message); shell.classList.toggle('is-invalid', !!message); };
-        const open = () => { if (!text.disabled) openDate(startInput, text, {keepFocus:true}); };
+        const open = () => { if (!text.disabled) openDate(startInput, text, {keepFocus:true, endInput}); };
         text.addEventListener('click', open);
         text.addEventListener('keydown', event => {
             if (event.key === 'ArrowDown') { event.preventDefault(); open(); calendar.querySelector('.calendar-days button[aria-pressed="true"]:not(:disabled)')?.focus() || calendar.querySelector('.calendar-days button:not(:disabled)')?.focus(); }
@@ -388,5 +395,9 @@
     window.addEventListener('resize', position);
     document.addEventListener('close',event=>{if(active&&event.target.matches?.('dialog'))close();},true);
     window.addEventListener('scroll',event=>{if(active&&!calendar.contains(event.target))close();},true);
+    window.uiDatePicker = {
+        openRange(start, end, trigger, onCommit) { openDate(start, trigger, {endInput:end, onCommit, requireRange:true}); },
+        closeFor(trigger) { if (active?.trigger === trigger) close(); }
+    };
 })();
 </script>

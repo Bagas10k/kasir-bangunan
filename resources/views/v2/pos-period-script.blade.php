@@ -49,7 +49,7 @@ async function load(range={from:from.value,to:to.value}){
 }
 form.addEventListener('submit',event=>{event.preventDefault();load();});
 for(const button of buttons)button.addEventListener('click',()=>{
-    version++;controller?.abort();form.removeAttribute('aria-busy');show(button.dataset.period);
+    version++;controller?.abort();form.removeAttribute('aria-busy');status.textContent='';show(button.dataset.period);
 });
 document.addEventListener('ui-live:patched',()=>{if(selected==='custom'&&appliedRange)load(appliedRange);});
 try{

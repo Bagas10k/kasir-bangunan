@@ -70,7 +70,7 @@ Setiap elemen yang muncul di atas halaman wajib memakai **satu animasi yang sama
 
 ### Pemilih tanggal
 - Memilih tanggal di kalender **tidak menutup** kalender. Tombol **Oke** menyimpan pilihan dan menutup. **Tutup**, klik di luar, Esc, atau menggulir halaman menutup **tanpa menyimpan**, dan nilai kembali seperti sebelum kalender dibuka. Berlaku untuk tanggal tunggal maupun rentang di seluruh aplikasi.
-- Oke hanya mengisi tanggal; menerapkan filter tetap lewat tombol filter halaman (mis. Terapkan).
+- Oke hanya mengisi tanggal; menerapkan filter tetap lewat tombol filter halaman (mis. Terapkan). Pengecualian ringkasan Kasir: tombol Tanggal khusus langsung membuka kalender dan Oke sekaligus menerapkan rentang.
 - Kolom tanggal yang bisa diketik memakai `data-date-typed`, dan rentang satu kolom memakai `data-date-range-start` / `data-date-range-end` (format `dd/mm/yyyy` dan `dd/mm/yyyy – dd/mm/yyyy`). Tanggal yang diketik dianggap sudah disimpan, tanpa menunggu Oke.
 - Rentang tanggal ditampilkan sebagai **satu kolom**, bukan dua kolom Dari/Sampai.
 
@@ -435,3 +435,10 @@ Berkas: `partials/table-filter-styles.blade.php` (kedua cangkang), `partials/fil
 - Jenis mobil memakai dropdown shared field type select: Pick-up, Truk engkel, Truk double, Dump truck. Jenis lama di luar pilihan ditampilkan sebagai opsi tersimpan yang tetap selected agar edit tidak mengganti data diam-diam. Tidak mengubah backend menjadi enum atau memigrasi data lama.
 - HPP bawaan dipakai untuk pencarian barang biasa dan rekomendasi. Nilai string positif sampai4desimal, tanpa konversi float; field kosong atau saran otomatis yang belum diedit dapat diperbarui. Isian manual/draf, termasuk0, tidak ditimpa. Produk tanpa HPP positif membiarkan harga kosong. Nilai ini tetap harus diperiksa terhadap harga faktur.
 - Rekomendasi langsung membuat/mengisi baris penerimaan dan menetapkan value produk secara eksplisit sebelum sinkron pemilih. Jika sudah ada barang, baris berikutnya dibuat otomatis. Setelah ditambahkan, fokus dan gulir ke baris jumlah. Guard supplier tunggal, duplikat, busy/review, maksimum100 dan perlindungan baris parsial dipertahankan.
+
+## 45. Kalender langsung, periode riwayat dan aktivitas master
+
+- Menggantikan popup perantara bagian43: Tanggal khusus langsung membuka kalender rentang shared; Oke menerapkan, pembatalan memulihkan snapshot. Tetap memakai animasi/keyboard kalender existing.
+- Riwayat menyediakan tombol Harian/Mingguan/Bulanan dengan aria-pressed. Default mingguan7hari inklusif; tanggal manual tetap tersedia, reset meminta minggu terbaru dari server.
+- Pelanggan memiliki frekuensi transaksi dan piutang tersisa rata kanan/tabular. Dialog supplier existing dipakai kembali, dengan satu kolom rentang tanggal, status pemuatan/error, pagination dan cetak rentang terapan.
+- Warna/jarak/radius memakai ui-tokens existing. Token --ui-supplier-history-height:50dvh membatasi area gulir aktivitas; menggantikan token lebar popup perantara yang tidak dipakai. Tidak menambah sistem tema/dependensi.

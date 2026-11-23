@@ -24,6 +24,6 @@
   --ui-catalog-quantity-width:4rem;--ui-morph-duration:300ms;--ui-morph-easing:ease-in-out;--ui-morph-layer:121;
   --ui-sidebar-duration:260ms;--ui-sidebar-text-duration:180ms;
   --ui-number-duration:var(--ui-morph-duration);
-  --ui-period-panel-width:28rem;
+  --ui-supplier-history-height:50dvh;
 }
 </style>

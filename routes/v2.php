@@ -3,6 +3,7 @@
 use App\Http\Controllers\ChartOfAccountController;
 use App\Http\Controllers\V2\AccountController;
 use App\Http\Controllers\V2\CashBankAdjustmentController;
+use App\Http\Controllers\V2\SupplierActivityController;
 use App\Http\Controllers\V2\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,8 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::post('/imports/{kind}/preview', [WorkspaceController::class, 'importPreview'])->name('imports.preview');
     Route::post('/import-batches/{id}/commit', [WorkspaceController::class, 'importCommit'])->whereNumber('id')->name('imports.commit');
     Route::get('/suppliers/{id}/products', [WorkspaceController::class, 'supplierProducts'])->whereNumber('id')->name('suppliers.products');
+    Route::get('/suppliers/{id}/activity', [SupplierActivityController::class, 'index'])->whereNumber('id')->middleware('throttle:60,1')->name('suppliers.activity');
+    Route::get('/suppliers/{id}/statement', [SupplierActivityController::class, 'statement'])->whereNumber('id')->middleware('throttle:30,1')->name('suppliers.statement');
     Route::get('/receipts/restock-products', [WorkspaceController::class, 'restockProducts'])->name('receipts.restock-products');
     Route::post('/receipts/product-supplier', [WorkspaceController::class, 'linkReceiptSupplier'])->middleware('throttle:30,1')->name('receipts.product-supplier');
     Route::post('/receipts', [WorkspaceController::class, 'receive'])->name('receipts.store');

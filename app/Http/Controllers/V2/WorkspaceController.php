@@ -121,6 +121,9 @@ class WorkspaceController extends Controller
         }
         // Rincian relasi master: produk yang dipasok tiap supplier, dan riwayat pemakaian tiap mobil.
         $insights = app(MasterInsights::class);
+        $customerInsights = $role === 'admin'
+            ? $insights->customers(collect($allMasterRecords['customer'] ?? [])->pluck('id')->map(fn ($id): int => (int) $id)->all())
+            : [];
         $supplierInsights = $role === 'admin'
             ? $insights->suppliers(collect($allMasterRecords['supplier'] ?? [])->pluck('id')->map(fn ($id): int => (int) $id)->all())
             : [];
@@ -143,7 +146,7 @@ class WorkspaceController extends Controller
         $recentSales = DB::table('v2_sales as s')->leftJoin('v2_parties as p', 'p.id', '=', 's.customer_id')
             ->orderByDesc('s.id')->limit(5)->get(['s.id', 's.number', 'p.name as customer_name']);
 
-        return view('v2.workspace', compact('activeStoreShift', 'todayCashDay', 'adminSummary', 'role', 'shifts', 'invoices', 'invoiceFilters', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'receiptDrafts', 'draftProducts', 'receiptFinalAudit', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters', 'recentSales', 'freightReady', 'freightAccounts'));
+        return view('v2.workspace', compact('activeStoreShift', 'todayCashDay', 'adminSummary', 'role', 'shifts', 'invoices', 'invoiceFilters', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'customerInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'receiptDrafts', 'draftProducts', 'receiptFinalAudit', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters', 'recentSales', 'freightReady', 'freightAccounts'));
     }
 
     public function dashboardPeriod(Request $request): JsonResponse
@@ -244,7 +247,7 @@ class WorkspaceController extends Controller
 
     private function historyData(Request $request): array
     {
-        foreach (['sale_search', 'sale_method', 'start_date', 'end_date', 'history_per_page', 'history_page', 'history_shift'] as $param) {
+        foreach (['sale_search', 'sale_method', 'start_date', 'end_date', 'history_per_page', 'history_page', 'history_shift', 'history_period'] as $param) {
             if ($request->has($param) && is_array($request->query($param))) {
                 abort(422);
             }
@@ -258,15 +261,18 @@ class WorkspaceController extends Controller
         $saleStatus = $request->query('sale_status', '');
         abort_unless(is_string($saleStatus) && in_array($saleStatus, ['', 'unpaid', 'partial', 'paid'], true), 422);
 
-        $defaultToday = ! $request->has('start_date') && ! $request->has('end_date');
-        $startDate = $request->query('start_date', $defaultToday ? now()->toDateString() : null);
+        $defaultPeriod = ! $request->has('start_date') && ! $request->has('end_date') ? 'week' : 'custom';
+        $historyPeriod = $request->query('history_period', $defaultPeriod);
+        abort_unless(is_string($historyPeriod) && in_array($historyPeriod, ['day', 'week', 'month', 'custom'], true), 422);
+        $periodDays = ['day' => 0, 'week' => 6, 'month' => 29];
+        $startDate = $historyPeriod === 'custom' ? $request->query('start_date') : now()->subDays($periodDays[$historyPeriod])->toDateString();
         if ($startDate !== null && $startDate !== '') {
             abort_unless(is_string($startDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $startDate) && checkdate((int) substr($startDate, 5, 2), (int) substr($startDate, 8, 2), (int) substr($startDate, 0, 4)), 422);
         } else {
             $startDate = null;
         }
 
-        $endDate = $request->query('end_date', $defaultToday ? now()->toDateString() : null);
+        $endDate = $historyPeriod === 'custom' ? $request->query('end_date') : now()->toDateString();
         if ($endDate !== null && $endDate !== '') {
             abort_unless(is_string($endDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDate) && checkdate((int) substr($endDate, 5, 2), (int) substr($endDate, 8, 2), (int) substr($endDate, 0, 4)), 422);
         } else {
@@ -286,6 +292,7 @@ class WorkspaceController extends Controller
         $historyPage = (int) $rawPage;
 
         $historyFilters = [
+            'history_period' => $historyPeriod,
             'sale_search' => $saleSearch,
             'sale_method' => $saleMethod,
             'sale_status' => $saleStatus,

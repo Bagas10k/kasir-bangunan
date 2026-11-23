@@ -124,6 +124,9 @@
                     @elseif ($kind === 'supplier')
                         <th scope="col" class="ui-num">Produk</th>
                         <th scope="col" class="ui-num">Utang berjalan</th>
+                    @elseif ($kind === 'customer')
+                        <th scope="col" class="ui-num">Frekuensi belanja</th>
+                        <th scope="col" class="ui-num">Piutang pelanggan</th>
                     @elseif ($kind === 'vehicle')
                         <th scope="col" class="ui-num">Dipakai</th>
                         <th scope="col">Terakhir</th>
@@ -173,6 +176,10 @@
                             @php $supplierInfo = ($supplierInsights ?? [])[$record->id] ?? null; @endphp
                             <td data-label="Produk" class="ui-num">{{ $supplierInfo ? count($supplierInfo['products']) : 0 }}</td>
                             <td data-label="Utang berjalan" class="ui-num">{{ $rp($supplierInfo['outstanding'] ?? '0') }}</td>
+                        @elseif ($kind === 'customer')
+                            @php $customerInfo = ($customerInsights ?? [])[$record->id] ?? ['purchase_count' => 0, 'outstanding' => '0.00']; @endphp
+                            <td data-label="Frekuensi belanja" class="ui-num">{{ number_format($customerInfo['purchase_count'], 0, ',', '.') }}<span class="ui-sub">transaksi</span></td>
+                            <td data-label="Piutang pelanggan" class="ui-num">{{ $rp($customerInfo['outstanding']) }}</td>
                         @elseif ($kind === 'vehicle')
                             @php $vehicleInfo = ($vehicleInsights ?? [])[$record->id] ?? null; @endphp
                             <td data-label="Dipakai" class="ui-num">{{ $vehicleInfo ? $vehicleInfo['deliveries'] + $vehicleInfo['trips'] : 0 }}<span class="ui-sub">kali</span></td>
@@ -211,7 +218,7 @@
                     </tr>
                 @empty
                     <tr data-ui-empty-static>
-                        <td colspan="{{ count($display) + (in_array($kind, ['product', 'supplier', 'vehicle'], true) ? 4 : 2) }}" class="ui-empty">
+                        <td colspan="{{ count($display) + (in_array($kind, ['product', 'supplier', 'customer', 'vehicle'], true) ? 4 : 2) }}" class="ui-empty">
                             <strong>Belum ada data {{ $noun }}.</strong>
                             Tekan tombol "Tambah {{ $noun }}" di atas untuk memasukkan data pertama.
                         </td>
