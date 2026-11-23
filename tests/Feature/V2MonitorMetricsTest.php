@@ -134,7 +134,7 @@ class V2MonitorMetricsTest extends TestCase
         $this->assertSame(['total' => '100.00', 'count' => 1], $s['advances']);
         $this->assertSame(['prepared' => 1, 'sent' => 1, 'received_today' => 1, 'unassigned' => 1], $s['deliveries']);
         $this->assertSame(['total' => '1250.50', 'count' => 2, 'purchase' => 2, 'opening' => 0], $s['receipts_month']);
-        $this->assertSame(['open' => 1, 'review' => 1, 'difference_month' => '-4.50'], $s['shifts']);
+        $this->assertSame(['open' => 1, 'review' => 1, 'difference_month' => '-4.50', 'difference_unresolved' => '-3.00'], $s['shifts']);
         $this->assertSame(['active' => 3, 'archived' => 1, 'out' => 1, 'low' => 1], $s['stock']);
         $this->assertSame(['active' => 1, 'archived' => 0], $s['parties']['customer']);
         $this->assertSame(['active' => 1, 'archived' => 1], $s['parties']['supplier']);
@@ -148,7 +148,7 @@ class V2MonitorMetricsTest extends TestCase
 
         $s = app(MonitorMetrics::class)->snapshot('2026-11-05', false, $cashier->id);
 
-        $this->assertSame(['open' => 1, 'review' => 0, 'difference_month' => '-1.50'], $s['shifts']);
+        $this->assertSame(['open' => 1, 'review' => 0, 'difference_month' => '-1.50', 'difference_unresolved' => '0.00'], $s['shifts']);
         $this->assertNull($s['accounts']);
     }
 
@@ -160,6 +160,7 @@ class V2MonitorMetricsTest extends TestCase
 
         $this->assertSame(['total' => '0.00', 'count' => 0, 'billed' => '0.00', 'paid' => '0.00'], $s['receivable']);
         $this->assertSame('0.00', $s['shifts']['difference_month']);
+        $this->assertSame('0.00', $s['shifts']['difference_unresolved']);
         $this->assertSame(0, $s['stock']['active']);
         $this->assertSame(['admin' => 1, 'cashier' => 0, 'inactive' => 0], $s['accounts']);
     }
@@ -178,5 +179,78 @@ class V2MonitorMetricsTest extends TestCase
         foreach ($statements as $sql) {
             $this->assertStringStartsWith('select', $sql, 'MonitorMetrics hanya boleh membaca: '.$sql);
         }
+    }
+
+    public function test_resolution_clears_unresolved_amount_without_erasing_monthly_history_or_posting_journals(): void
+    {
+        $this->travelTo(now()->setDate(2026, 11, 24)->setTime(12, 0));
+        $admin = $this->user('admin');
+        $current = $this->shift($admin, 'review', '-10.25', '2026-11-03 17:00:00');
+        $previous = $this->shift($admin, 'review', '2.10', '2026-10-31 17:00:00');
+        $this->shift($admin, 'closed', '-1.50', '2026-11-02 17:00:00');
+        $this->shift($admin, 'closed', '-999.00', '2026-10-01 17:00:00');
+        $metrics = app(MonitorMetrics::class);
+
+        $before = $metrics->snapshot('2026-11-24', true, $admin->id)['shifts'];
+        $this->assertSame('-11.75', $before['difference_month']);
+        $this->assertSame('-8.15', $before['difference_unresolved']);
+        $this->assertSame(2, $before['review']);
+
+        $this->actingAs($admin)->postJson(route('v2.shifts.resolve', $current), ['reason' => 'Pemeriksaan sintetis telah selesai.'])->assertOk();
+        $after = $metrics->snapshot('2026-11-24', true, $admin->id)['shifts'];
+        $this->assertSame('-11.75', $after['difference_month']);
+        $this->assertSame('2.10', $after['difference_unresolved']);
+        $this->assertSame(1, $after['review']);
+        $this->assertDatabaseHas('v2_shifts', ['id' => $current, 'difference' => '-10.25', 'status' => 'closed', 'reviewed_by' => $admin->id]);
+
+        $this->postJson(route('v2.shifts.resolve', $previous), ['reason' => 'Pemeriksaan sintetis bulan lalu selesai.'])->assertOk();
+        $settled = $metrics->snapshot('2026-11-24', true, $admin->id)['shifts'];
+        $this->assertSame('0.00', $settled['difference_unresolved']);
+        $this->assertSame(0, $settled['review']);
+        $this->assertSame('-11.75', $settled['difference_month']);
+        $this->assertSame('0.00', $metrics->snapshot('2026-12-01', true, $admin->id)['shifts']['difference_month']);
+        $this->assertDatabaseCount('journal_entries', 0);
+        $this->assertDatabaseCount('journal_entry_lines', 0);
+    }
+
+    public function test_offsetting_unresolved_differences_still_have_two_cases_to_review(): void
+    {
+        $admin = $this->user('admin');
+        $this->shift($admin, 'review', '-3.05', '2026-11-02 17:00:00');
+        $this->shift($admin, 'review', '3.05', '2026-10-31 17:00:00');
+
+        $shifts = app(MonitorMetrics::class)->snapshot('2026-11-24', true, $admin->id)['shifts'];
+
+        $this->assertSame('0.00', $shifts['difference_unresolved']);
+        $this->assertSame(2, $shifts['review']);
+    }
+
+    public function test_unresolved_cashier_figures_keep_the_existing_own_and_shared_visibility_boundary(): void
+    {
+        $cashier = $this->user('cashier');
+        $other = $this->user('admin');
+        $this->shift($cashier, 'review', '-1.25', '2026-11-03 17:00:00');
+        $this->shift($other, 'review', '-999.00', '2026-11-03 17:00:00');
+        $shared = $this->shift($other, 'review', '0.10', '2026-10-31 17:00:00');
+        DB::table('v2_shifts')->where('id', $shared)->update(['is_shared' => true]);
+
+        $shifts = app(MonitorMetrics::class)->snapshot('2026-11-24', false, $cashier->id)['shifts'];
+
+        $this->assertSame('-1.15', $shifts['difference_unresolved']);
+        $this->assertSame(2, $shifts['review']);
+    }
+
+    public function test_admin_can_find_an_unresolved_shift_older_than_the_latest_thirty_records(): void
+    {
+        $admin = $this->user('admin');
+        $old = $this->shift($admin, 'review', '-5.25', '2026-10-31 17:00:00');
+        for ($index = 0; $index < 31; $index++) {
+            $this->shift($admin, 'closed', '0.00', '2026-11-03 17:00:00');
+        }
+
+        $this->actingAs($admin)->get(route('v2.index'))->assertOk()
+            ->assertSee(route('v2.shifts.resolve', $old), false)
+            ->assertSee('Belum diselesaikan')
+            ->assertSee('Selisih bulan ini (riwayat)');
     }
 }

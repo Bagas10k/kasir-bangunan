@@ -45,6 +45,9 @@ class WorkspaceController extends Controller
         $shifts = DB::table('v2_shifts as s')->leftJoin('users as u', 'u.id', '=', 's.user_id')
             ->when($role !== 'admin', fn ($q) => $q->where(fn ($visible) => $visible->where('s.is_shared', true)->orWhere('s.user_id', $request->user()->id)))
             ->orderByDesc('s.id')->limit(30)->get(['s.*', 'u.name as user_name']);
+        $reviewShifts = $role === 'admin'
+            ? DB::table('v2_shifts')->where('status', 'review')->orderBy('closed_at')->orderBy('id')->get(['id', 'opened_at', 'counted_cash', 'difference'])
+            : collect();
         $activeStoreShift = $this->operations->activeStoreShift();
         $todayCashDay = $activeStoreShift ? null : $this->todayCashDay();
         ['invoices' => $invoices, 'invoiceFilters' => $invoiceFilters] = $this->invoiceData($request);
@@ -146,7 +149,7 @@ class WorkspaceController extends Controller
         $recentSales = DB::table('v2_sales as s')->leftJoin('v2_parties as p', 'p.id', '=', 's.customer_id')
             ->orderByDesc('s.id')->limit(5)->get(['s.id', 's.number', 'p.name as customer_name']);
 
-        return view('v2.workspace', compact('activeStoreShift', 'todayCashDay', 'adminSummary', 'role', 'shifts', 'invoices', 'invoiceFilters', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'customerInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'receiptDrafts', 'draftProducts', 'receiptFinalAudit', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters', 'recentSales', 'freightReady', 'freightAccounts'));
+        return view('v2.workspace', compact('activeStoreShift', 'todayCashDay', 'adminSummary', 'role', 'shifts', 'reviewShifts', 'invoices', 'invoiceFilters', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'customerInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'receiptDrafts', 'draftProducts', 'receiptFinalAudit', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters', 'recentSales', 'freightReady', 'freightAccounts'));
     }
 
     public function dashboardPeriod(Request $request): JsonResponse

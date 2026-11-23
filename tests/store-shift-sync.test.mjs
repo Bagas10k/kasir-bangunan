@@ -27,6 +27,7 @@ test('shared shift changes update cashier state without navigating or clearing c
     const app = setup();
     await app.window.uiStoreShift.check();
     assert.match(app.title.textContent, /Menunggu admin/);
+    assert.match(app.reminder.textContent, /Belum bisa checkout.*Minta admin/);
     app.setReply({ shift: { id: 42, opened_at: '2026-11-21 08:00:00' } });
     await app.window.uiStoreShift.check();
     assert.equal(app.state.dataset.storeShiftId, '42');
@@ -59,6 +60,7 @@ test('a closed daily drawer does not tell the admin to reopen on the same date',
     await app.window.uiStoreShift.check();
     assert.equal(app.opener.hidden, false);
     assert.equal(app.fieldset.disabled, false);
+    assert.match(app.reminder.textContent, /Belum bisa checkout.*Buka kas harian melalui menu/);
 });
 
 test('admin sees correct open action, hidden tabs do not poll and focus resumes', async () => {

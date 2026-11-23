@@ -6,7 +6,6 @@
     $reportLabel = $reportDate === $today ? 'hari ini' : \Carbon\Carbon::parse($reportDate)->locale('id')->translatedFormat('j M Y');
     $attention = fn (int|string $n): ?string => (float) $n > 0 ? 'attention' : null;
     $actionCount = $m['awaiting']['count'] + $m['shifts']['review'] + $m['deliveries']['prepared'];
-    $differenceTone = $m['shifts']['difference_month'] === '0.00' ? null : 'attention';
     $monthLabel = \Carbon\Carbon::parse($today)->locale('id')->translatedFormat('F Y');
     // Persentase hanya untuk keterangan tampilan; nilai uang tetap dari MonitorMetrics (BigDecimal).
     $billed = \Brick\Math\BigDecimal::of($m['receivable']['billed']);
@@ -15,7 +14,7 @@
     $monitoringHeads = [
         'tagihan' => ['Ringkasan tagihan', 'Piutang pelanggan dan utang ke supplier yang belum lunas', $m['awaiting']['count'] > 0 ? [$m['awaiting']['count'].' transfer menunggu verifikasi', 'ok'] : null],
         'pengiriman' => ['Ringkasan pengiriman', 'Status surat jalan saat ini', $m['deliveries']['unassigned'] > 0 ? [$m['deliveries']['unassigned'].' surat jalan belum ada mobil', 'warn'] : null],
-        'shift' => ['Ringkasan kas', 'Shift toko dan selisih kas bulan ini', $m['shifts']['review'] > 0 ? [$m['shifts']['review'].' shift perlu diperiksa', 'warn'] : null],
+        'shift' => ['Ringkasan kas', 'Riwayat selisih bulanan dan pemeriksaan yang belum selesai', $m['shifts']['review'] > 0 ? [$m['shifts']['review'].' shift perlu diperiksa', 'warn'] : null],
         'laporan' => ['Ringkasan harian', 'Tunai, transfer terverifikasi, dan transfer menunggu dipisahkan', null],
         'penerimaan' => ['Ringkasan penerimaan', 'Barang masuk bulan ini: pembelian dan stok awal', ['Khusus admin', 'ok']],
     ];
@@ -23,8 +22,8 @@
     $monitoringPages = [
         'shift' => [
             ['Shift terbuka', $m['shifts']['open'], 'shift toko bersama; riwayat pribadi tetap terpisah', 'hero', 'status:open'],
-            ['Perlu diperiksa', $m['shifts']['review'], $m['shifts']['review'] > 0 ? 'selisih menunggu pemeriksaan' : 'tidak ada', $attention($m['shifts']['review']), 'status:review'],
-            ['Selisih kas bulan ini', $rp($m['shifts']['difference_month']), 'jumlah dari shift yang sudah ditutup', $differenceTone],
+            ['Belum diselesaikan', $rp($m['shifts']['difference_unresolved']), $m['shifts']['review'].' shift · neto pemeriksaan semua tanggal', $attention($m['shifts']['review']), 'status:review'],
+            ['Selisih bulan ini (riwayat)', $rp($m['shifts']['difference_month']), 'neto seluruh shift yang ditutup bulan ini, termasuk yang sudah diperiksa', null],
         ],
         'tagihan' => [
             ['Sisa piutang', $rp($m['receivable']['total']), $m['receivable']['count'].' tagihan belum lunas', 'hero', 'direction:receivable'],

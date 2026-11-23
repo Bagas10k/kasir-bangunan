@@ -37,6 +37,46 @@ function staggerItems(items,base=0){
  void items[0].offsetWidth;for(const el of items)el.classList.add('ui-row-in');
  setTimeout(()=>{for(const el of items)el.classList.remove('ui-row-in');},base+MAX_ROWS*26+400);
 }
+const dataAnimations=new WeakMap(),seenNumbers=new WeakSet();
+const dataNumberKey=el=>el.dataset.numberKey??'text:'+el.dataset.numberText;
+function dataSnapshot(root){
+ const bars=new Map(),numbers=new Map();
+ if(!root)return {bars,numbers};
+ for(const bar of root.querySelectorAll('[data-motion-bar]')){
+  if(!bar.getClientRects().length)continue;
+  const axis=bar.dataset.motionAxis==='x'?'width':'height';
+  bars.set(bar.dataset.motionKey,getComputedStyle(bar)[axis]);
+ }
+ for(const el of root.querySelectorAll('[data-number-key],[data-number-text]')){
+  if(el.getClientRects().length)numbers.set(dataNumberKey(el),window.uiNumbers?.get(el)??el.textContent);
+ }
+ return {bars,numbers};
+}
+function dataChange(root,previous){
+ if(!root)return;
+ const tokens=getComputedStyle(document.documentElement),duration=parseFloat(tokens.getPropertyValue('--ui-number-duration'))||0;
+ const easing=tokens.getPropertyValue('--ui-morph-easing').trim()||'ease-in-out',calm=reduce()||document.hidden||!duration;
+ const animate=(el,frames)=>{
+  dataAnimations.get(el)?.cancel();
+  if(calm||!el.getClientRects().length||!el.animate)return;
+  dataAnimations.set(el,el.animate(frames,{duration,easing}));
+ };
+ for(const bar of root.querySelectorAll('[data-motion-bar]')){
+  const axis=bar.dataset.motionAxis==='x'?'width':'height',target=bar.dataset.motionBar;
+  if(!/^\d+(?:\.\d+)?$/.test(target))continue;
+  animate(bar,[{[axis]:previous?.bars.get(bar.dataset.motionKey)||'0px'},{[axis]:target+'%'}]);
+ }
+ for(const el of Array.from(root.querySelectorAll('[data-motion-item]')).filter(el=>el.getClientRects().length).slice(0,MAX_ROWS)){
+  animate(el,[{opacity:0,transform:'translateY(var(--ui-space-tight))'},{opacity:1,transform:'none'}]);
+ }
+ for(const el of root.querySelectorAll('[data-number-key],[data-number-text]')){
+  if(!el.getClientRects().length||!window.uiNumbers)continue;
+  const target=window.uiNumbers.get(el),from=previous?.numbers.get(dataNumberKey(el))??(seenNumbers.has(el)?undefined:target.replace(/\d+(?:\.\d{3})*(?:,\d{1,4})?/g,'0'));
+  seenNumbers.add(el);
+  const update=el.hasAttribute('data-number-text')?window.uiNumbers.text:window.uiNumbers.set;
+  update(el,target,{from:calm?target:from});
+ }
+}
 function enter(panel){
  if(!panel||reduce())return;
  // Isi panel jarak jauh (Keuangan) dibungkus satu elemen: turun ke pembungkus itu agar kartu di dalamnya tetap bertahap.
@@ -52,6 +92,7 @@ function enter(panel){
  const tables=panel.querySelectorAll('[data-ui-table]');
  tables.forEach(wrap=>staggerRows(wrap,180));
  if(!tables.length)staggerItems(Array.from(panel.querySelectorAll(LIST_SEL)),220);
+ dataChange(panel);
 }
 // Baris tabel bertahap saat halaman/saringan berganti. Event ui-table:render tidak menggelembung: dengarkan di fase tangkap.
 let booting=true;
@@ -203,7 +244,7 @@ new MutationObserver(records=>{
 }).observe(document.documentElement,{subtree:true,attributes:true,attributeOldValue:true,attributeFilter:['hidden','open','aria-checked','aria-pressed','aria-selected','class']});
 // Judul halaman di kepala berganti dengan pudar-naik, bukan meloncat.
 function textIn(el){if(!el||reduce())return;el.animate([{opacity:0,transform:'translateY(4px)'},{opacity:1,transform:'none'}],{duration:220,easing:EASE});}
-window.uiMotion={enter,staggerRows,markSaved,restoreSaved,morphBox,morphFrom,dismiss,reveal,slidePill,textIn};
+window.uiMotion={enter,staggerRows,markSaved,restoreSaved,morphBox,morphFrom,dismiss,reveal,slidePill,textIn,dataSnapshot,dataChange};
 // Halaman penuh tanpa panel workspace (mis. Keuangan dibuka langsung): isi main yang dianimasikan.
 const start=()=>{booting=false;enter(document.querySelector('.task-panel:not([hidden])')||document.querySelector('body[data-finance-page] main.main-content'));restoreSaved();};
 // setTimeout, bukan requestAnimationFrame: rAF tidak berjalan di tab latar sehingga sorotan bisa hilang.

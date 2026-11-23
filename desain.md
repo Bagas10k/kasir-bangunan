@@ -442,3 +442,43 @@ Berkas: `partials/table-filter-styles.blade.php` (kedua cangkang), `partials/fil
 - Riwayat menyediakan tombol Harian/Mingguan/Bulanan dengan aria-pressed. Default mingguan7hari inklusif; tanggal manual tetap tersedia, reset meminta minggu terbaru dari server.
 - Pelanggan memiliki frekuensi transaksi dan piutang tersisa rata kanan/tabular. Dialog supplier existing dipakai kembali, dengan satu kolom rentang tanggal, status pemuatan/error, pagination dan cetak rentang terapan.
 - Warna/jarak/radius memakai ui-tokens existing. Token --ui-supplier-history-height:50dvh membatasi area gulir aktivitas; menggantikan token lebar popup perantara yang tidak dipakai. Tidak menambah sistem tema/dependensi.
+
+## 46. Penjelasan checkout tanpa kas harian aktif
+
+- Keterangan shift di keranjang tidak boleh disembunyikan oleh tema. Saat belum buka, sudah ditutup atau status tidak diketahui, tampilkan pesan Belum bisa checkout dekat tombol, memakai token peringatan existing dan role status.
+- Tombol checkout keranjang valid tetap dapat diklik untuk menerima penjelasan; dialog pembayaran tetap diblokir selama kas tidak aktif. Pesan klik memakai alert yang dapat difokuskan. Keranjang tidak dihapus; saat shift aktif pemberitahuan disembunyikan kembali.
+
+## 47. Animasi data bersama untuk chart, daftar dan angka
+
+- Ringkasan admin dan Kasir menggunakan uiMotion.dataSnapshot/dataChange, bukan animasi batang admin tersendiri. Durasi dari ui-number-duration dan easing dari ui-morph-easing:300ms/ease-in-out. Batang vertikal berubah tinggi, bar produk berubah lebar; daftar produk terlaris/katalog memudar-naik memakai jarak space-tight. Tidak mengkloning atau menskalakan teks/isian.
+- Snapshot batang memakai dimensi visual saat ini, dicocokkan menurut tanggal/jam atau nama produk. Angka dicocokkan menurut peran/nama produk dan memakai uiNumbers BigInt existing; nilai canonical/aksesibel langsung final. Kemunculan pertama dapat menghitung dari0, pergantian periode dari snapshot sebelumnya. Isian editable dan payload tidak dianimasikan.
+- Animasi lama dibatalkan saat pembaruan cepat. Konten tersembunyi, tab latar dan reduced-motion tidak memulai animasi. Maksimal12item daftar dianimasikan agar katalog panjang tidak membebani.
+- Area chart/produk terlaris ditandai data-motion-region dengan versi berdasarkan data server. uiLive mengganti area pasif hanya ketika versinya berubah, termasuk geometri/label chart dan kondisi kosong; data sama tidak memutar animasi ulang. Pilihan periode, form/keranjang dan perluasan daftar admin tetap dipertahankan.
+- Form internal Tanggal khusus adalah GET tersembunyi dan dikecualikan dari popupForms; tidak boleh menghasilkan tombol Isi formulir. Hanya pemicu Tanggal khusus yang membuka kalender.
+
+## 48. Ringkasan Admin satu layar desktop
+
+- Pada desktop lebar minimal1180px, Ringkasan memakai gap/control dan padding/group yang lebih padat: tugas tindak lanjut satu bilah, kepala KPI sejajar rentang tanggal, empat KPI tetap jelas, chart dan terlaris sejajar, tiga rincian operasional sejajar. Tidak menetapkan overflow:hidden atau tinggi layar yang memotong konten.
+- Tinggi plot memakai token --ui-overview-plot-height:clamp(6rem,14dvh,9rem). Font angka penting tetap terbaca, data/label/status tidak dihapus. Tautan tindak lanjut memiliki title dengan jumlah, status lengkap dan konteks.
+- Desktop setinggi maksimal860px memulai Uang/Pengiriman/Stok sebagai disclosure ringkas dengan nilai/status di summary dan petunjuk Rincian. Pengguna dapat membukanya lewat native details/keyboard; membuka rincian boleh menambah scroll. Desktop lebih tinggi tetap membuka semua rincian.
+- HP mempertahankan susunan satu kolom dan gulir vertikal alami; tidak mengecilkan skala halaman agar dipaksa muat. Tidak mengubah layout menu Kasir/keuangan/master.
+
+## 49. Riwayat selisih dan pemeriksaan yang belum selesai
+
+- Uang pada Ringkasan Admin dan monitor Kas harian membedakan Selisih bulan ini (riwayat) dengan Belum diselesaikan. Riwayat memakai nada netral, bukan merah terus setelah pemeriksaan selesai.
+- Belum diselesaikan menampilkan neto dan jumlah shift review semua tanggal. Peringatan mengikuti jumlah kasus>0, sehingga neto0 dari selisih plus/minus tidak terlihat sebagai tidak ada masalah. Label/hint menjelaskan bahwa ini pemeriksaan, bukan saldo kas.
+- Kartu monitor Kas mempertahankan tiga ubin; nilai Perlu diperiksa lama menjadi nominal Belum diselesaikan dengan jumlah kasus sebagai keterangan dan filter review tetap tersedia. Tidak menambah ubin kosong atau mengubah layout kompak.
+- Penjelasan pada daftar pemeriksaan menyatakan riwayat tetap disimpan dan tidak ada jurnal penyesuaian otomatis. Proses penyelesaian tetap membutuhkan catatan admin.
+
+## 50. Kolom master produk dan detail baca-saja
+
+- Tabel produk tepat8kolom: SKU, Nama, Kategori, HPP / modal, Harga jual, Stok / satuan, Status dan Aksi. Harga kontraktor tetap keterangan harga jual bila terisi; kondisi Habis/Menipis tetap menyertai stok. Kolom Supplier dipindahkan ke rincian.
+- Detail memakai native dialog dan pengelola popup existing, bukan form baru atau endpoint baru. Fakta produk ditata dua kolom desktop/satu kolom HP, dengan label jelas, angka tabular rata kanan, warna/jarak/radius dari token existing. Tombol Tutup memulihkan fokus ke pemicu; Ubah/Arsipkan tidak berubah.
+- HPP per satuan ditampilkan hingga4desimal dan kuantitas hingga desimal yang tersimpan melalui pemformatan string, bukan float. Semua nama/teks di-escape Blade. Supplier utama/arsip dan alasan HPP terkunci tetap terlihat di rincian.
+- Dialog ikut baris master sehingga fragmen uiLive yang mengganti baris membawa rincian terbaru; tidak menyimpan salinan JSON statis yang menjadi kedaluwarsa setelah edit.
+
+## 51. Kepemilikan parameter URL workspace
+
+- Pemilihan menu tetap memakai hash existing. Tanggal laporan hanya tampak di URL #laporan; produk/Kasir/Tagihan/menu lain tidak membawa date. master_kind lama yang sudah digantikan hash dan partial transport dibersihkan, tanpa menghapus parameter asing atau prefix deployment.
+- Pembersihan memakai replaceState tanpa reload atau menambah entri history. Berlaku pada tautan awal, klik menu dan navigasi hash. Form/filter tidak dimodifikasi.
+- Tanggal laporan terapan dibaca dari defaultValue input server, bukan value yang mungkin masih draft. Kembali ke Laporan dalam dokumen yang sama memulihkan tanggal terapan di alamat; uiLive menggunakannya pada GET internal sekalipun menu aktif memiliki URL bersih. Form fallback/reset riwayat penjualan tidak membawa date/master_kind.

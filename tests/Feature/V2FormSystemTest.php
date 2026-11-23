@@ -78,6 +78,63 @@ class V2FormSystemTest extends TestCase
             ->assertDontSee('<datalist', false);
     }
 
+    public function test_product_table_has_cost_and_combined_stock_unit_with_read_only_detail_action(): void
+    {
+        $admin = $this->admin();
+        $product = DB::table('products')->insertGetId([
+            'sku' => 'SYN-DETAIL-001', 'name' => 'Material Sintetis <b>Alpha</b>', 'unit' => 'sak', 'category' => 'Material',
+            'cost_price' => '60.1234', 'selling_price' => '100.50', 'contractor_price' => '95.25',
+            'stock_quantity' => '1250.1250', 'min_stock' => '2.5000', 'is_active' => true,
+        ]);
+        $supplier = DB::table('v2_parties')->insertGetId(['kind' => 'supplier', 'code' => 'SYN-DETAIL-S', 'name' => 'Supplier Sintetis Detail', 'is_active' => true]);
+        DB::table('v2_product_suppliers')->insert(['product_id' => $product, 'supplier_id' => $supplier, 'is_primary' => true]);
+        $response = $this->actingAs($admin)->get(route('v2.index'))->assertOk();
+        $dom = new \DOMDocument;
+        $dom->loadHTML('<?xml encoding="utf-8" ?>'.$response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new \DOMXPath($dom);
+        $headers = [];
+        foreach ($xpath->query('//table[@id="table-master-product"]/thead/tr/th') as $header) {
+            $headers[] = trim($header->textContent);
+        }
+        $this->assertSame(['SKU', 'Nama', 'Kategori', 'HPP / modal', 'Harga jual', 'Stok / satuan', 'Status', 'Aksi'], $headers);
+        $row = '//table[@id="table-master-product"]/tbody/tr[@data-record-id="'.$product.'"]';
+        $this->assertSame(8, $xpath->query($row.'/td')->length);
+        $this->assertStringContainsString('Rp 60,1234', $xpath->query($row.'/td[@data-field="cost_price"]')->item(0)->textContent);
+        $this->assertStringContainsString('1.250,125 sak', preg_replace('/\s+/', ' ', $xpath->query($row.'/td[@data-field="stock_quantity"]')->item(0)->textContent));
+        $this->assertSame(1, $xpath->query($row.'/td/button[@data-open-popup="popup-detail-product-'.$product.'"]')->length);
+        $detail = '//dialog[@id="popup-detail-product-'.$product.'"]';
+        $this->assertSame(1, $xpath->query($detail)->length);
+        $this->assertSame(0, $xpath->query($detail.'//form | '.$detail.'//input | '.$detail.'//b')->length);
+        $text = $xpath->query($detail)->item(0)->textContent;
+        foreach (['Rp 60,1234', 'Rp 100,50', 'Rp 95,25', '2,5 sak', 'Supplier Sintetis Detail', 'utama'] as $value) {
+            $this->assertStringContainsString($value, $text);
+        }
+    }
+
+    public function test_empty_product_table_spans_the_eight_visible_columns(): void
+    {
+        $response = $this->actingAs($this->admin())->get(route('v2.index'))->assertOk();
+        $dom = new \DOMDocument;
+        $dom->loadHTML($response->getContent(), LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new \DOMXPath($dom);
+
+        $this->assertSame('8', $xpath->query('//table[@id="table-master-product"]/tbody/tr/td/@colspan')->item(0)->nodeValue);
+    }
+
+    public function test_cashier_does_not_receive_product_cost_details(): void
+    {
+        $cashier = User::factory()->create();
+        DB::table('v2_user_roles')->insert(['user_id' => $cashier->id, 'role' => 'cashier']);
+        DB::table('products')->insert([
+            'sku' => 'SYN-PRIVATE-COST', 'name' => 'Material Sintetis Privat', 'unit' => 'sak', 'category' => 'Material',
+            'cost_price' => '98765.4321', 'selling_price' => '100000.00', 'stock_quantity' => '1', 'min_stock' => '0', 'is_active' => true,
+        ]);
+
+        $this->actingAs($cashier)->get(route('v2.index'))->assertOk()
+            ->assertDontSee('id="popup-detail-product-', false)
+            ->assertDontSee('Rp 98.765,4321');
+    }
+
     public function test_rendered_master_dialogs_use_the_shared_field_templates(): void
     {
         $admin = $this->admin();

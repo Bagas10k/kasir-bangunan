@@ -43,6 +43,8 @@ final class MonitorMetrics
         $shiftScope = fn () => DB::table('v2_shifts')->when(! $admin, fn ($q) => $q->where(fn ($visible) => $visible->where('is_shared', true)->orWhere('user_id', $actor)));
         $differences = $shiftScope()->whereIn('status', ['closed', 'review'])->whereBetween(DB::raw('date(closed_at)'), [$monthStart, $monthEnd])->get(['difference']);
         [$differenceTotal] = $this->sumRows($differences, fn (object $row): BigDecimal => BigDecimal::of((string) ($row->difference ?? '0')));
+        $unresolvedDifferences = $shiftScope()->where('status', 'review')->get(['difference']);
+        [$unresolvedTotal, $unresolvedCount] = $this->sumRows($unresolvedDifferences, fn (object $row): BigDecimal => BigDecimal::of((string) ($row->difference ?? '0')));
 
         $products = DB::table('products');
 
@@ -66,8 +68,9 @@ final class MonitorMetrics
             ],
             'shifts' => [
                 'open' => $shiftScope()->where('status', 'open')->count(),
-                'review' => $shiftScope()->where('status', 'review')->count(),
+                'review' => $unresolvedCount,
                 'difference_month' => $differenceTotal,
+                'difference_unresolved' => $unresolvedTotal,
             ],
             'stock' => [
                 'active' => (clone $products)->where('is_active', true)->count(),

@@ -5,24 +5,11 @@ const buttons=[...root.querySelectorAll('.pd-seg button')],sub=document.getEleme
 const form=document.getElementById('pd-custom-form'),from=document.getElementById('pd-from'),to=document.getElementById('pd-to'),status=document.getElementById('pd-custom-status');
 const data=JSON.parse(document.getElementById('pos-monitor-precomputed').textContent||'{}');
 let version=0,controller=null,selected='7d',appliedRange=null;
-function numberSnapshot(){
-    if(!globalThis.uiNumbers)return new Map();
-    const pane=root.querySelector('.pd-pane:not([hidden])');
-    return new Map([...pane?.querySelectorAll('[data-number-key],[data-number-text]')||[]].map(el=>[el.dataset.numberKey??'text:'+el.dataset.numberText,globalThis.uiNumbers.get(el)]));
-}
-function show(period,previous=numberSnapshot()){
+function show(period,previous=globalThis.uiMotion?.dataSnapshot(root)){
     selected=period;
     for(const button of buttons)button.setAttribute('aria-pressed',String(button.dataset.period===period));
     for(const pane of root.querySelectorAll('.pd-pane'))pane.hidden=pane.dataset.pane!==period;
-    if(globalThis.uiNumbers){
-        const pane=root.querySelector('.pd-pane[data-pane="'+period+'"]');
-        for(const el of pane?.querySelectorAll('[data-number-key]')||[]){
-            globalThis.uiNumbers.set(el,globalThis.uiNumbers.get(el),{from:previous.get(el.dataset.numberKey)});
-        }
-        for(const el of pane?.querySelectorAll('[data-number-text]')||[]){
-            globalThis.uiNumbers.text(el,globalThis.uiNumbers.get(el),{from:previous.get('text:'+el.dataset.numberText)});
-        }
-    }
+    globalThis.uiMotion?.dataChange(root,previous);
     if(sub&&data[period])sub.textContent=data[period].sub_label;
     try{localStorage.setItem('pd-period',period);}catch{}
 }
@@ -36,7 +23,7 @@ async function load(range={from:from.value,to:to.value}){
         const result=await response.json();if(current!==version)return;
         const parsed=new DOMParser().parseFromString(result.html,'text/html');
         const pane=parsed.querySelector('.pd-pane[data-pane="custom"]');if(!pane)throw Error('shape');
-        const previous=numberSnapshot();
+        const previous=globalThis.uiMotion?.dataSnapshot(root);
         root.querySelector('.pd-pane[data-pane="custom"]')?.remove();
         root.querySelector('.pd-body').append(document.importNode(pane,true));
         appliedRange={...range};data.custom={sub_label:range.from+' – '+range.to};show('custom',previous);

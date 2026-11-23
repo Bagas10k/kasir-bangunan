@@ -80,6 +80,17 @@ function syncForm(oldForm,newForm){
 }
 function syncNode(oldEl,newEl){
   if(oldEl.matches(OPAQUE))return;
+  if(newEl.hasAttribute('data-motion-region')){
+    if(oldEl.dataset.motionVersion===newEl.dataset.motionVersion)return;
+    const previous=window.uiMotion?.dataSnapshot(oldEl);
+    syncAttrs(oldEl,newEl);
+    if(newEl.hasAttribute('aria-label'))oldEl.setAttribute('aria-label',newEl.getAttribute('aria-label'));
+    oldEl.replaceChildren(...imported(newEl.childNodes));
+    const more=oldEl.querySelector('.as-more-btn');
+    if(more&&oldEl.classList.contains('is-all')){more.setAttribute('aria-expanded','true');more.textContent='Tampilkan 5 besar';}
+    window.uiMotion?.dataChange(oldEl,previous);
+    return;
+  }
   if(newEl.hasAttribute('data-number-key')&&window.uiNumbers){window.uiNumbers.set(oldEl,newEl.textContent);return;}
   if(newEl.hasAttribute('data-number-text')&&window.uiNumbers){window.uiNumbers.text(oldEl,newEl.textContent);return;}
   if(newEl.tagName==='TBODY'){swapBody(oldEl,newEl);return;}
@@ -91,7 +102,7 @@ function syncNode(oldEl,newEl){
   if(newEl.tagName==='SELECT'){syncSelect(oldEl,newEl);return;}
   if(newEl.matches('input,textarea'))return;
   syncAttrs(oldEl,newEl);
-  if(passive(oldEl)&&passive(newEl)&&!newEl.querySelector('[data-number-key],[data-number-text]')){
+  if(passive(oldEl)&&passive(newEl)&&!newEl.querySelector('[data-number-key],[data-number-text],[data-motion-region]')){
     if(squash(oldEl.textContent)!==squash(newEl.textContent)||oldEl.childElementCount!==newEl.childElementCount)oldEl.replaceChildren(...imported(newEl.childNodes));
     return;
   }
@@ -127,6 +138,8 @@ function refresh(){
   running=(async()=>{
     try{
       const url=new URL(location.href);url.hash='';
+      const appliedReportDate=document.getElementById('report-date')?.defaultValue;
+      if(appliedReportDate)url.searchParams.set('date',appliedReportDate);
       const response=await fetch(url,{credentials:'same-origin',cache:'no-store',headers:{'Accept':'text/html'}});
       if(!response.ok||response.redirected&&new URL(response.url).pathname!==url.pathname)throw new Error('HTTP '+response.status);
       const doc=new DOMParser().parseFromString(await response.text(),'text/html');

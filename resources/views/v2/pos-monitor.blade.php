@@ -42,7 +42,7 @@
             </div>
             <div id="pd-custom">
                 <button type="button" id="pd-custom-trigger" aria-haspopup="dialog" aria-expanded="false" aria-controls="app-date-picker">Tanggal khusus</button>
-                <form id="pd-custom-form" action="{{ route('v2.sales.dashboard') }}" hidden novalidate>
+                <form id="pd-custom-form" method="get" action="{{ route('v2.sales.dashboard') }}" hidden novalidate>
                     <input type="date" id="pd-from" data-themed-date="true" required max="{{ now()->toDateString() }}">
                     <input type="date" id="pd-to" data-themed-date="true" required max="{{ now()->toDateString() }}">
                 </form>
@@ -85,7 +85,7 @@
                     $bucketLabels = array_column($d['buckets'] ?? [], 'label');
                     $rangeLabel = $key === 'today' || count($bucketLabels) === 0 ? $d['sub_label'] : reset($bucketLabels).' – '.end($bucketLabels);
                 @endphp
-                <div class="pd-main">
+                <div class="pd-main" data-motion-region data-motion-version="{{ hash('sha256', json_encode($d['buckets'])) }}">
                     <div class="pd-card-head"><h3 class="pd-card-title">{{ ($d['hourly'] ?? ($key === 'today')) ? 'Penjualan per jam' : 'Penjualan per periode' }}</h3><p class="pd-card-sub">{{ $rangeLabel }}</p></div>
                     <figure class="pd-chart" @if ($key === $initial) id="sales-dashboard-card" @endif>
                         {{-- Pertahankan titik kait grafik; periode kosong hanya menampilkan keterangan, bukan batang semu. --}}
@@ -99,7 +99,7 @@
                                     <div class="pd-bars" @if ($key === $initial) id="sales-chart" @endif>
                                         @foreach ($d['buckets'] as $bucket)
                                             <div class="pd-col @if ($bucket['peak']) is-peak @endif" title="{{ $bucket['label'] }} · {{ $bucket['formatted_total'] }}">
-                                                <i style="height: {{ $bucket['height'] }}%"></i>
+                                                <i style="height: {{ $bucket['height'] }}%" data-motion-bar="{{ $bucket['height'] }}" data-motion-key="sale-{{ $bucket['date'] ?? $bucket['label'] }}"></i>
                                             </div>
                                         @endforeach
                                     </div>
@@ -115,18 +115,18 @@
                     </figure>
                 </div>
 
-                <aside class="pd-side" aria-label="Produk terlaris {{ $d['sub_label'] }}">
+                <aside class="pd-side" aria-label="Produk terlaris {{ $d['sub_label'] }}" data-motion-region data-motion-version="{{ hash('sha256', json_encode($d['top_products'])) }}">
                     <div class="pd-card-head"><h3 class="pd-card-title">Produk terlaris</h3><p class="pd-card-sub">@if (count($d['top_products']) > 1){{ count($d['top_products']) }} besar · @endif{{ $d['sub_label'] }}</p></div>
                     @if (count($d['top_products']) === 0)
                         <p class="pd-empty">Belum ada barang terjual.</p>
                     @else
                         <ol class="pd-top" style="--pd-rows: {{ min(5, count($d['top_products'])) }}; --pd-columns: {{ count($d['top_products']) > 5 ? 2 : 1 }}">
                             @foreach ($d['top_products'] as $i => $top)
-                                <li>
+                                <li data-motion-item>
                                     <span class="pd-rank">{{ $i + 1 }}</span>
                                     <span class="pd-top-name" title="{{ $top['name'] }}">{{ $top['name'] }}</span>
                                     <span class="pd-top-qty" data-number-text="top-{{ $top['name'] }}">{{ $top['formatted_qty'] }} {{ $top['unit'] }}</span>
-                                    <i class="pd-top-bar" style="width: {{ $top['share'] }}%" aria-hidden="true"></i>
+                                    <i class="pd-top-bar" style="width: {{ $top['share'] }}%" data-motion-axis="x" data-motion-bar="{{ $top['share'] }}" data-motion-key="product-{{ $top['name'] }}" aria-hidden="true"></i>
                                 </li>
                             @endforeach
                         </ol>

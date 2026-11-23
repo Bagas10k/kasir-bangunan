@@ -25,5 +25,6 @@
   --ui-sidebar-duration:260ms;--ui-sidebar-text-duration:180ms;
   --ui-number-duration:var(--ui-morph-duration);
   --ui-supplier-history-height:50dvh;
+  --ui-overview-plot-height:clamp(6rem,14dvh,9rem);
 }
 </style>

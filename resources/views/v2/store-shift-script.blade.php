@@ -14,7 +14,7 @@ function paint(shift,failed=false,today=null){
  state.querySelector('strong').textContent=failed?'Status kas harian belum dapat diperiksa':next?'Kas harian'+(date?' '+date:'')+' aktif':closedToday?'Kas harian '+date+' sudah ditutup':admin?'Kas harian belum dibuka':'Menunggu admin membuka kas harian';
  state.querySelector('a span').textContent=next||closedToday||!admin?'Lihat kas harian':'Buka kas harian';
  const header=document.querySelector('[data-store-shift-header]');if(header)header.textContent=next||closedToday?'Kas harian '+date:admin?'Kelola kas harian':'Lihat kas harian';
- if(reminder){reminder.hidden=!!next&&!failed;reminder.textContent=failed?'Status kas harian belum dapat diperiksa. Periksa koneksi; keranjang tetap tersimpan.':closedToday?'Kas harian sudah ditutup. Penjualan baru menunggu kas hari berikutnya; keranjang tetap tersimpan.':admin?'Buka kas harian sebelum menyimpan penjualan.':'Menunggu admin membuka kas harian. Keranjang tetap tersimpan.';}
+  if(reminder){reminder.hidden=!!next&&!failed;reminder.textContent=failed?'Belum bisa checkout: status kas harian belum dapat diperiksa. Periksa koneksi; keranjang tetap tersimpan.':closedToday?'Belum bisa checkout: kas harian sudah ditutup. Penjualan baru menunggu kas hari berikutnya; keranjang tetap tersimpan.':admin?'Belum bisa checkout: kas harian belum dibuka. Buka kas harian melalui menu Kas harian. Keranjang tetap tersimpan.':'Belum bisa checkout: kas harian belum dibuka. Minta admin membuka kas harian. Keranjang tetap tersimpan.';}
  const openForm=document.getElementById('form-open');
  if(openForm){
   const allowed=!failed&&!next&&!closedToday,opener=document.querySelector('[data-cash-day-open]');

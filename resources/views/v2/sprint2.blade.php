@@ -57,7 +57,7 @@
 
 <section class="card" aria-labelledby="review-heading">
 <h2 id="review-heading">Pemeriksaan selisih kas harian</h2>
-@php $reviewShifts = collect($shifts)->filter(fn ($s) => ($s->status ?? '') === 'review')->values()->all(); @endphp
+<p class="note">Mencakup semua tanggal. Mencatat pemeriksaan mengurangi daftar belum diselesaikan, tetapi tidak menghapus riwayat selisih atau membuat jurnal penyesuaian kas.</p>
 <div data-live-list>
 @if (count($reviewShifts) === 0)
     <p class="note">Tidak ada selisih kas harian yang perlu diperiksa.</p>

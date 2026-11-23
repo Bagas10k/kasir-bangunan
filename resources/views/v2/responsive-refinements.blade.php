@@ -1,4 +1,57 @@
 <style>
+html body .product-detail-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--ui-space-group);margin:0 0 var(--ui-space-section)}
+html body .product-detail-facts>div{min-width:0;padding:var(--ui-space-group);border:var(--ui-stroke) solid var(--ui-line-soft);border-radius:var(--ui-radius);background:var(--ui-canvas)}
+html body .product-detail-facts dt{font-size:var(--ui-t-caption);color:var(--ui-ink-2)}
+html body .product-detail-facts dd{margin:var(--ui-space-tight) 0 0;font-size:var(--ui-t-label);font-weight:var(--ui-weight-medium);color:var(--ui-ink);overflow-wrap:anywhere;white-space:normal}
+html body .product-detail-facts .ui-num{font-variant-numeric:tabular-nums;text-align:right}
+html body .product-detail-facts .ui-sub{display:block;font-size:var(--ui-t-caption);font-weight:normal}
+html body .product-detail-suppliers{margin:0 0 var(--ui-space-section);padding-left:var(--ui-space-section);font-size:var(--ui-t-label)}
+html body .product-detail-suppliers li+li{margin-top:var(--ui-space-control)}
+@media(max-width:760px){html body .product-detail-facts{grid-template-columns:1fr}}
+@media(min-width:1180px){
+ html body[data-active-task=ringkasan] main.wrap.main-content{padding:var(--ui-space-control) var(--ui-space-section)}
+ html body #admin-overview.as-page{gap:var(--ui-space-control)}
+ html body #admin-overview .as-top{gap:var(--ui-space-control)}
+ html body #admin-overview .as-seg button{min-height:var(--ui-tap) !important;height:auto;padding-inline:var(--ui-space-section) !important}
+ html body[data-active-task=ringkasan] #admin-overview .as-card{padding:var(--ui-space-group) !important}
+ html body[data-active-task=ringkasan] #admin-overview .as-card h2{font-size:var(--ui-t-body) !important;line-height:var(--ui-leading-tight) !important}
+ html body #admin-overview .as-sub{margin:var(--ui-space-tight) 0 var(--ui-space-control);font-size:var(--ui-t-caption);line-height:var(--ui-leading-tight)}
+ html body #admin-overview .as-todo{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:var(--ui-space-group)}
+ html body #admin-overview .as-todo>.as-sub{display:none}
+ html body #admin-overview .as-todo-list{grid-template-columns:repeat(auto-fit,minmax(var(--ui-detail-column-min),1fr));gap:var(--ui-space-control)}
+ html body #admin-overview .as-todo-item{min-height:var(--ui-tap) !important;padding:var(--ui-space-control);row-gap:var(--ui-space-tight)}
+ html body #admin-overview .as-todo-label{font-size:var(--ui-t-caption)}
+ html body #admin-overview .as-todo-hint{font-size:var(--ui-t-caption)}
+ html body #admin-overview .as-ok{margin:0}
+ html body #admin-overview .as-kpi{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--ui-space-control) var(--ui-space-section);align-items:center}
+ html body #admin-overview .as-kpi>.as-sub{justify-self:end;margin:0}
+ html body #admin-overview .as-tiles{grid-column:1/-1;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--ui-space-control)}
+ html body #admin-overview .as-tile{padding:var(--ui-space-control) var(--ui-space-group)}
+ html body #admin-overview .as-tile strong{line-height:var(--ui-leading-tight)}
+ html body[data-active-task=ringkasan] #admin-overview .as-tile--hero strong{font-size:var(--ui-h2) !important}
+ html body #admin-overview :is(.as-row2,.as-row3){gap:var(--ui-space-control)}
+ html body #admin-overview .as-row2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ html body #admin-overview .as-row3{grid-template-columns:repeat(3,minmax(0,1fr))}
+ html body #admin-overview .as-plot{height:var(--ui-overview-plot-height);margin:var(--ui-space-control) 0 var(--ui-space-panel)}
+ html body #admin-overview .as-best-list{column-gap:var(--ui-space-section)}
+ html body #admin-overview .as-best-list li{min-height:calc(var(--ui-space-section) * 2);gap:var(--ui-space-tight)}
+ html body #admin-overview :is(.as-name,.as-lines dt,.as-lines dd){font-size:var(--ui-t-caption)}
+ html body #admin-overview .as-lines>div{min-height:calc(var(--ui-space-group) * 2);gap:var(--ui-space-control)}
+ html body #admin-overview .as-link{top:var(--ui-space-control);right:var(--ui-space-group);min-height:var(--ui-tap);display:inline-flex;align-items:center}
+ html body #admin-overview .as-status{gap:var(--ui-space-control);margin:var(--ui-space-tight) 0 var(--ui-space-control)}
+ html body #admin-overview .as-status div{min-height:var(--ui-row);padding:var(--ui-space-tight)}
+ html body #admin-overview .as-status strong{font-size:var(--ui-h2);line-height:var(--ui-leading-tight)}
+ html body #admin-overview .as-watch li{min-height:calc(var(--ui-space-group) * 2);gap:var(--ui-space-tight) var(--ui-space-control)}
+ html body #admin-overview .as-foot{margin:var(--ui-space-control) 0 0;padding:var(--ui-space-control);font-size:var(--ui-t-caption)}
+}
+@media(min-width:1180px) and (max-height:860px){
+ html body #admin-overview .as-todo-list{grid-template-columns:repeat(auto-fit,minmax(var(--ui-detail-summary-min),1fr))}
+ html body #admin-overview .as-fold>summary{align-items:center;min-height:var(--ui-tap) !important;cursor:pointer}
+ html body #admin-overview .as-fold-val{display:block;font-size:var(--ui-t-caption);font-weight:var(--ui-weight-strong)}
+ html body #admin-overview .as-fold>summary::after{content:'Rincian';font-size:var(--ui-t-caption);color:var(--ui-green)}
+ html body #admin-overview .as-fold-body{padding-top:var(--ui-space-control)}
+ html body #admin-overview .as-link{position:static;justify-content:flex-start}
+}
 html body .task-panel>[data-dialog-host]{display:contents !important}
 /* Scrollbar mengikuti warna tema, tanpa mengganti perilaku gulir native. */
 html body #kasir :is(#items,.cart-table-scroll,.catalog-table-scroll,.catalog-page-list){
@@ -58,6 +111,8 @@ html body #panel-kasir #kasir #products-tbody .pm-step [data-pm-quantity]:focus-
 html body #panel-kasir #kasir #products-tbody .pm-step [data-pm-quantity][aria-invalid=true]{color:var(--ui-warn-ink) !important;background:var(--ui-warn-bg) !important}
 html body #panel-kasir #kasir #pd-custom{min-width:0;position:relative}
 html body #panel-kasir #kasir #pd-custom-trigger{min-height:var(--ui-tap);display:flex;align-items:center;cursor:pointer;font-size:var(--ui-t-label);padding:var(--ui-space-control) var(--ui-space-group);border:var(--ui-stroke) solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-surface);color:var(--ui-green)}
+html body #panel-kasir #kasir #store-shift-reminder:not([hidden]){display:block !important;margin:var(--ui-space-control) 0 0;padding:var(--ui-space-group);border-radius:var(--ui-radius);background:var(--ui-warn-bg);color:var(--ui-warn-ink);font-size:var(--ui-t-caption);line-height:var(--ui-leading-body)}
+html body #panel-kasir #kasir #store-shift-reminder[hidden]{display:none !important}
 html body #panel-kasir #kasir #pd-custom-form[hidden]{display:none !important}
 html body #panel-kasir #kasir #pd-custom-status{font-size:var(--ui-t-caption);overflow-wrap:anywhere}
 html body #panel-kasir #kasir #pd-custom-status:empty{display:none}

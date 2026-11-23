@@ -15,7 +15,7 @@
 
     $labels = [
         'sku' => 'SKU', 'name' => 'Nama', 'unit' => 'Satuan', 'category' => 'Kategori',
-        'cost_price' => 'HPP', 'selling_price' => 'Harga jual', 'min_stock' => 'Stok minimum',
+        'cost_price' => 'HPP / modal', 'selling_price' => 'Harga jual', 'min_stock' => 'Stok minimum',
         'code' => 'Kode', 'notes' => 'Catatan',
         'license_plate' => 'Nomor polisi', 'vehicle_type' => 'Tipe mobil',
     ];
@@ -25,7 +25,7 @@
         'license_plate' => 32, 'vehicle_type' => 32,
     ];
     $display = [
-        'product' => ['sku', 'name', 'unit', 'category', 'selling_price'],
+        'product' => ['sku', 'name', 'category', 'cost_price', 'selling_price'],
         'vehicle' => ['license_plate', 'vehicle_type'],
     ][$kind] ?? ['code', 'name', 'notes'];
 
@@ -34,10 +34,11 @@
 
     $noun = ['product' => 'produk', 'customer' => 'pelanggan', 'supplier' => 'supplier', 'employee' => 'karyawan', 'vehicle' => 'mobil'][$kind];
     $searchHint = ['product' => 'Cari nama, SKU, atau kategori', 'vehicle' => 'Cari nomor polisi atau tipe'][$kind] ?? 'Cari nama atau kode '.$noun;
-    $qty = function ($value): string {
-        $text = (string) $value;
-        if (str_contains($text, '.')) { $text = rtrim(rtrim($text, '0'), '.'); }
-        return $text === '' ? '0' : $text;
+    $decimalText = function ($value): string {
+        [$integer, $fraction] = array_pad(explode('.', (string) ($value ?? '0'), 2), 2, '');
+        $fraction = rtrim($fraction, '0');
+        $grouped = preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', $integer === '' ? '0' : $integer);
+        return $grouped.($fraction !== '' ? ','.$fraction : '');
     };
     $stockState = function (object $record): string {
         $stock = \Brick\Math\BigDecimal::of((string) ($record->stock_quantity ?? '0'));
@@ -119,8 +120,7 @@
                         <th scope="col" @class(['ui-num' => in_array($column, ['cost_price', 'selling_price'], true)])>{{ $labels[$column] ?? $column }}</th>
                     @endforeach
                     @if ($kind === 'product')
-                        <th scope="col" class="ui-num">Stok</th>
-                        <th scope="col">Supplier</th>
+                        <th scope="col" class="ui-num">Stok / satuan</th>
                     @elseif ($kind === 'supplier')
                         <th scope="col" class="ui-num">Produk</th>
                         <th scope="col" class="ui-num">Utang berjalan</th>
@@ -146,7 +146,9 @@
                     <tr data-record-id="{{ $record->id }}" data-active="{{ $isActive ? '1' : '0' }}" @if($stock) data-stock="{{ $stock }}" @endif>
                         @foreach ($display as $column)
                             <td data-field="{{ $column }}" data-label="{{ $labels[$column] ?? $column }}" @class(['ui-num' => in_array($column, ['cost_price', 'selling_price'], true), 'ui-primary' => in_array($column, ['name', 'license_plate'], true), 'ui-nowrap' => in_array($column, ['sku', 'code'], true)])>
-                                @if(in_array($column, ['cost_price', 'selling_price']))
+                                @if($column === 'cost_price')
+                                    Rp {{ $decimalText($record->cost_price ?? '0') }}
+                                @elseif($column === 'selling_price')
                                     {{ $rp($record->{$column} ?? 0) }}@if($column === 'selling_price' && ($record->contractor_price ?? null) !== null)<span class="ui-sub">Kontraktor {{ $rp($record->contractor_price) }}</span>@endif
                                 @elseif($kind === 'customer' && $column === 'name' && ($record->price_tier ?? '') === 'contractor')
                                     {{ $record->name }} <span class="ui-badge ui-badge--ok">Kontraktor</span>
@@ -160,16 +162,9 @@
                             </td>
                         @endforeach
                         @if ($kind === 'product')
-                            <td data-field="stock_quantity" data-label="Stok" class="ui-num">
-                                <strong class="ui-figure">{{ $qty($record->stock_quantity) }}</strong>
+                            <td data-field="stock_quantity" data-label="Stok / satuan" class="ui-num">
+                                <strong class="ui-figure">{{ $decimalText($record->stock_quantity) }} {{ $record->unit }}</strong>
                                 @if($stock === 'out')<span class="ui-sub"><x-ui.status status="rejected" label="Habis"/></span>@elseif($stock === 'low')<span class="ui-sub"><x-ui.status status="pending" label="Menipis"/></span>@endif
-                            </td>
-                            <td data-field="suppliers" data-label="Supplier">
-                                @forelse($productSupplierLinks[$record->id] ?? [] as $link)
-                                    <div>{{ $link->name }}@if($link->is_primary) <span class="ui-muted">(utama)</span>@endif @unless($link->is_active)<span class="ui-muted">(diarsipkan)</span>@endunless</div>
-                                @empty
-                                    <span class="ui-muted">Belum ditautkan</span>
-                                @endforelse
                             </td>
                         @endif
                         @if ($kind === 'supplier')
@@ -187,6 +182,10 @@
                         @endif
                         <td data-label="Status"><x-ui.status :status="$isActive ? 'active' : ($kind === 'vehicle' ? 'inactive' : 'archived')"/></td>
                         <td class="ui-actions">
+                            @if($kind === 'product')
+                                <button type="button" class="btn-action-pill" data-open-popup="popup-detail-product-{{ $record->id }}" aria-label="Detail {{ $recordName }}">Detail</button>
+                                @include('v2.master-product-detail')
+                            @endif
                             <button type="button" class="btn-action-pill btn-action-edit" data-open-popup="popup-edit-{{ $kind }}-{{ $record->id }}" aria-label="Ubah {{ $recordName }}">Ubah</button>
                             <form method="POST" action="{{ route('v2.master.archive', ['kind' => $kind, 'id' => $record->id]) }}" data-master-form data-method="PATCH">
                                 @csrf
@@ -218,7 +217,7 @@
                     </tr>
                 @empty
                     <tr data-ui-empty-static>
-                        <td colspan="{{ count($display) + (in_array($kind, ['product', 'supplier', 'customer', 'vehicle'], true) ? 4 : 2) }}" class="ui-empty">
+                        <td colspan="{{ count($display) + ($kind === 'product' ? 3 : (in_array($kind, ['supplier', 'customer', 'vehicle'], true) ? 4 : 2)) }}" class="ui-empty">
                             <strong>Belum ada data {{ $noun }}.</strong>
                             Tekan tombol "Tambah {{ $noun }}" di atas untuk memasukkan data pertama.
                         </td>

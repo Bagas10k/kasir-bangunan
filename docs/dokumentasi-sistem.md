@@ -1,7 +1,7 @@
 ---
 judul: Dokumentasi Sistem Kasir Bangunan (tb01)
 versi_sistem: V2 (V2_ENABLED=true)
-terakhir_diperbarui: 2026-11-23
+terakhir_diperbarui: 2026-11-24
 sumber_kebenaran: kode di repositori ini (app/Services/V2, app/Http, routes, database/migrations)
 ---
 
@@ -272,6 +272,10 @@ Contoh: modal 500.000, penjualan tunai 2.300.000, bayar supplier tunai 200.000. 
 
 - Admin membuka **Kas & laporan**, kartu "Pemeriksaan selisih kas harian", lalu menulis alasan (5–1000 karakter). Status menjadi Selesai, dan nama admin, waktu, serta alasan tersimpan. Pemeriksaan tidak membuka ulang tanggal tersebut.
 - **Selisih kas tidak dijurnal otomatis.** Buku besar Kas tetap memakai angka seharusnya. Lihat bagian 21.
+- Ringkasan membedakan **Selisih bulan ini (riwayat)** dan **Belum diselesaikan**. Riwayat adalah jumlah neto selisih shift berstatus closed/review yang ditutup pada bulan berjalan; selesai diperiksa tidak menghapus nilainya. Bulan berikutnya hanya menghitung shift yang ditutup pada bulan baru.
+- Belum diselesaikan adalah jumlah neto selisih shift yang masih review **dari semua tanggal**, termasuk bulan lalu. Jumlah shift tetap ditampilkan dan peringatan mengikuti jumlah kasus, bukan netonya: kurang10.000 dan lebih10.000 bernilai neto0 tetapi tetap2kasus yang perlu diperiksa.
+- Setelah admin mencatat pemeriksaan, shift itu keluar dari perhitungan belum diselesaikan; nominal selisih asli, admin, waktu dan alasan tetap tersimpan. Ini penyelesaian **pemeriksaan**, bukan bukti uang pengganti sudah diterima atau penyesuaian saldo kas. Koreksi pembukuan, bila diperlukan, memakai proses terpisah pada bagian14.5.
+- Daftar pemeriksaan mengambil seluruh shift review, tidak dibatasi30shift terbaru seperti tabel riwayat. Hak admin untuk menyelesaikan dan batas data kasir (shift sendiri/toko bersama) tidak berubah.
 
 ---
 
@@ -422,6 +426,10 @@ Scrollbar keranjang dan katalog mengikuti warna tema. Pada HP, nama produk memak
 - Pencarian nomor nota/nama pembeli, metode, status (**Semua penjualan / Belum lunas / Dibayar sebagian / Lunas**), tanggal transaksi, dan jumlah baris10/25/50 diproses di server sebelum pagination. Belum lunas mencakup pembayaran sebagian. Sisa/status memakai saldo tagihan yang terkait, dan transfer pending diberi penanda **Menunggu verifikasi**, bukan dianggap lunas. Rentang atau satu batas tanggal boleh dipakai; mengosongkan kedua tanggal secara eksplisit mencari seluruh tanggal.
 - Dengan JavaScript aktif, filter, pilihan periode, Atur ulang dan pagination mengambil fragmen `GET /v2/sales/history` (authenticated, private/no-store) dan hanya mengganti hasil. Tautan fallback GET membuka `#riwayat-penjualan`. Filter tetap terpisah dari periode grafik, Tagihan dan laporan; tidak mengubah keranjang. Reset meminta rentang mingguan terbaru dari server,10 baris, serta pencarian/metode/status kosong. Tanggal manual menjadi periode khusus. Pembaruan uiLive mempertahankan filter terapan dan draft isian.
 - Tombol **Tanggal khusus** pada ringkasan Kasir langsung membuka kalender rentang bersama, tanpa popup perantara. Pilih awal/akhir lalu **Oke** untuk menerapkan; Tutup/Esc/klik luar membatalkan pilihan sementara. Validasi maksimal366hari dan batas hari ini tetap berlaku; lima penjualan terbaru serta tanggal menu lain tidak mengikuti rentang ini.
+- Chart Ringkasan admin dan Kasir, daftar produk terlaris, hasil katalog, serta angka ringkasan memakai animasi data bersama300ms. Pergantian periode membaca snapshot sebelumnya; pembaruan uiLive mengganti chart/daftar yang datanya berubah, bukan memutar ulang hasil identik. Angka canonical/aksesibel langsung hasil akhir, tidak mengubah pembukuan; reduced-motion menampilkan hasil langsung. Form tersembunyi tanggal khusus tidak membuat tombol tambahan **Isi formulir**.
+- **Ringkasan Admin** ditata padat agar informasi utama muat satu layar desktop: tindak lanjut, empat KPI, chart, terlaris dan status operasional tetap tersedia. Laptop pendek menampilkan Uang/Pengiriman/Stok sebagai ringkasan bernilai/status yang dapat dibuka lewat **Rincian**; membuka rincian boleh menambah gulir, tidak membuang informasi. Desktop tinggi membuka rincian langsung; ponsel tetap memakai gulir vertikal, bukan pemotongan isi. Perhitungan/periode/hak akses tidak berubah.
+- Navigasi membersihkan parameter workspace yang tidak relevan: **date** hanya ditampilkan pada menu Laporan harian; **master_kind** lama dan **partial** tidak dibawa ke alamat menu. Contoh produk cukup `/#master-product`. Saat kembali ke Laporan dalam halaman yang sama, URL memakai tanggal yang sudah diterapkan dari server, bukan tanggal yang masih diketik. Pembaruan uiLive tetap meminta tanggal laporan terapan secara internal agar laporan tidak diam-diam berganti ke hari ini. Path/subpath dan parameter lain yang tidak dikenal tetap dipertahankan; filter terapan menu dan isi form tidak direset. Setelah muat ulang tautan produk yang bersih, tanggal laporan yang tidak aktif kembali mengikuti default server; tautan Laporan sendiri tetap membawa tanggal.
+- Bila kas harian belum dibuka, sudah ditutup, atau statusnya belum dapat diperiksa, keterangan **Belum bisa checkout** tampil dekat tombol keranjang. Untuk keranjang terisi dan valid, klik Checkout menampilkan penjelasan yang dapat difokuskan, bukan tombol diam; pembayaran tidak dibuka. Admin diarahkan ke menu Kas harian, kasir diminta menunggu/menghubungi admin; kas yang sudah ditutup menunggu hari berikutnya. Keranjang tetap tersimpan dan pemberitahuan mengikuti status shift lintas sesi. Keranjang kosong/isian tidak valid tetap menonaktifkan checkout; validasi server tetap berlaku.
 - Klik nama pada daftar ringkas atau tabel membuka satu dialog Detail melalui `GET /v2/sales/{id}/detail`. Identitas nota/nama dan status tampil di atas; barang ditampilkan dalam tabel jumlah/harga/diskon/subtotal. Total, terbayar, sisa, diskon nota/ongkir bila ada serta riwayat cicilan dikelompokkan dengan jelas; setiap pembayaran memiliki nominal/status, waktu, petugas, referensi, alasan penolakan dan tautan foto bila tersedia. **Cetak struk/nota** berada di footer untuk nota aktif bersama tombol Tutup; aksi cetak lama dibersihkan saat memuat detail lain atau menutup dialog. Bila masih ada sisa, form **Catat pembayaran** menggunakan endpoint, kunci idempotensi, dan penjaga entri dobel yang sama dengan Tagihan; tidak membuat salinan invoice. Tunai langsung tercatat; transfer baru berpengaruh sesudah verifikasi admin.
 - Pembayaran selesai akan memperbarui riwayat/saldo lewat uiLive. Tidak mencetak bukti cicilan khusus; nota yang dicetak membaca pembayaran tercatat dan sisa terbaru. Foto hanya untuk transfer pelanggan, per pembayaran (bagian8.7).
 - Detail/fragmen memeriksa peran admin/kasir aktif. Respons detail lama tidak boleh mengganti penjualan lain atau dialog yang sudah ditutup. Galat mempertahankan hasil lama, tidak membocorkan rincian server, dan memungkinkan membuka ulang. Semua endpoint baca hanya membaca; izin persetujuan, pengiriman dan laporan per petugas tidak diperluas.
@@ -669,6 +677,10 @@ Aturan umum:
 | Supplier | Satu atau lebih. Supplier pertama menjadi supplier utama. Wajib ditautkan agar produk bisa diterima dari supplier itu |
 
 Stok **tidak bisa** diubah lewat form produk; stok hanya berubah lewat penjualan, penerimaan, dan saldo awal.
+
+Daftar master produk menampilkan **SKU, Nama, Kategori, HPP / modal, Harga jual, Stok / satuan, Status, Aksi**. HPP/modal adalah harga per satuan, ditampilkan hingga4desimal yang tersimpan; stok dan satuan digabung dalam satu kolom. Angka memakai pemisah Indonesia tanpa konversi float.
+
+Aksi **Detail** membuka rincian baca-saja: identitas, kategori, status, HPP, harga jual/kontraktor, stok/minimum, kondisi stok, dan seluruh supplier terkait (utama/diarsipkan). Supplier dipindahkan dari kolom daftar ke detail agar tabel ringkas, bukan dihapus dari produk. Ubah/Arsipkan tetap tersedia dan mengikuti penjaga lama; detail tidak mengubah stok, HPP, harga atau transaksi. Data master/HPP tetap hanya diberikan kepada admin, bukan kasir.
 
 ### 12.2 Pelanggan
 
@@ -1071,6 +1083,12 @@ Daftar ini jujur tentang apa yang belum ditangani sistem. Butir bertanda **[cek 
 
 | Tanggal | Perubahan |
 |---|---|
+| 2026-11-24 | URL menu tidak membawa tanggal laporan yang tidak relevan atau parameter master_kind/partial lama; tanggal terapan laporan dipertahankan saat pindah menu/uiLive tanpa menimpa draft (bagian7.10). |
+| 2026-11-24 | Kolom master produk menjadi SKU/nama/kategori/HPP/harga jual/stok+satuan/status/aksi, dengan detail baca-saja dan supplier terkait; HPP4desimal tetap utuh (bagian12.1). |
+| 2026-11-24 | Pisahkan riwayat selisih bulanan dan neto/jumlah pemeriksaan belum selesai semua tanggal; selisih lama tetap bisa diperiksa di luar30shift terbaru. Penyelesaian tidak menghapus nominal historis atau membuat jurnal (bagian6.4). |
+| 2026-11-24 | Ringkasan Admin dipadatkan untuk satu layar desktop; rincian operasional dapat dibuka pada laptop pendek, mobile tetap bergulir tanpa pemotongan isi (bagian7.10, desain48). |
+| 2026-11-23 | Animasi data chart admin/Kasir, produk terlaris, katalog dan angka memakai helper bersama; uiLive memperbarui geometri chart saat data berubah; tombol Isi formulir dari form tanggal tersembunyi dicegah (bagian7.10, desain47). |
+| 2026-11-23 | Keterangan belum bisa checkout saat kas harian belum aktif ditampilkan kembali; klik checkout memberi alasan tanpa membuka pembayaran/menghapus keranjang (bagian7.10). |
 | 2026-11-23 | Kalender khusus Kasir langsung; riwayat default7hari dan periode cepat1/7/30hari; frekuensi/piutang pelanggan; perbaikan popup supplier, aktivitas berhalaman dan cetak per aktivitas/seluruh rentang khusus admin (bagian7.10/12.2/12.3). |
 | 2026-11-23 | Jumlah katalog dapat diketik dengan validasi/pemulihan draft; sidebar menjaga layout teks dan tinggi submenu; keranjang morph dari bar pembuka tanpa menskalakan/menyalin form (bagian7.1/7.10). |
 | 2026-11-23 | Skeleton login/workspace/Keuangan, tanggal khusus Kasir maksimal366hari dan pembanding periode, serta ongkir pembelian sebagai beban (supplier/kas/bank). Migrasi ongkir hanya diuji terisolasi, belum dijalankan pada database toko. QA browser tulis dan konkurensi MySQL masih terblokir lingkungan (bagian1.2/7.10/11.3). |

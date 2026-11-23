@@ -14,9 +14,7 @@
             <div class="field"><label for="sales-perpage">Jumlah baris</label><select id="sales-perpage" name="history_per_page" class="form-control">@foreach([10,25,50] as $perPage)<option value="{{ $perPage }}" @selected($historyFilters['history_per_page']===$perPage)>{{ $perPage }} baris</option>@endforeach</select></div>
         </div>
     </details>
-    @if(request()->filled('date'))<input type="hidden" name="date" value="{{ $reportDate }}">@endif
-    @if(request()->filled('master_kind'))<input type="hidden" name="master_kind" value="{{ $masterKind }}">@endif
-    <div class="sales-filter-actions"><button type="submit" class="btn-table-action">Tampilkan</button><a id="history-reset" class="btn-table-action" href="{{ route(config('v2.enabled') ? 'pos.index' : 'v2.index', request()->only(['date','master_kind'])) }}#riwayat-penjualan">Atur ulang</a></div>
+    <div class="sales-filter-actions"><button type="submit" class="btn-table-action">Tampilkan</button><a id="history-reset" class="btn-table-action" href="{{ route(config('v2.enabled') ? 'pos.index' : 'v2.index') }}#riwayat-penjualan">Atur ulang</a></div>
 </form>
 <p class="err" id="history-error" role="alert" tabindex="-1" hidden></p>
 <div id="history-results" aria-live="polite">@include('v2.sales-history-results')</div>

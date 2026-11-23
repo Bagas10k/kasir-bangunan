@@ -332,7 +332,7 @@ function enhanceCollect(form,result){
 }
 // Form isian di halaman menjadi popup. Dipasang saat muat dan pada baris/daftar baru dari uiLive (form di dalam dialog dilewati).
 function popupForms(root){for(const form of root.querySelectorAll(root===document?'main form':'form')){
- if(form.id==='form-checkout'||form.closest('dialog')||(form.getAttribute('method')||'').toLowerCase()==='get')continue;
+  if(form.hidden||form.id==='form-checkout'||form.closest('dialog')||(form.getAttribute('method')||'').toLowerCase()==='get')continue;
  if(!form.querySelector('input:not([type=hidden]),select,textarea'))continue;
  const submit=form.querySelector('button[type=submit],button:not([type])');const label=form.dataset.popupTitle||(form.id==='form-open'?'Buka shift':(submit?.textContent.trim()||'Isi formulir'));const contextEl=form.querySelector('h3,p:not([data-error]):not([data-ok])');const context=contextEl?.tagName==='H3'&&contextEl.textContent.trim()!==label?contextEl.textContent.trim():'';if(contextEl?.tagName==='H3'&&contextEl.textContent.trim()===label)contextEl.classList.add('sr');const result=popup(form,label,label);if(result&&context){const note=document.createElement('p');note.className='popup-sub';note.textContent=context;result.dialog.querySelector('.popup-titles').append(note);}
  if(result&&form.id==='form-open'){result.button.dataset.cashDayOpen='1';result.button.hidden=form.dataset.openAllowed==='0';if(result.button.hidden)result.button.style.setProperty('display','none','important');}
@@ -360,6 +360,13 @@ const storageKey='v2-workspace-task:'+navigation.dataset.role;
 function store(value){try{sessionStorage.setItem(storageKey,value);}catch{}}
 let saved;try{saved=sessionStorage.getItem(storageKey);}catch{}
 const requested=()=>({admin:'master-product',master:'master-product'}[location.hash.slice(1)]||location.hash.slice(1));let active=null;
+function workspaceUrl(task){
+ const url=new URL(location.href);
+ for(const key of ['date','master_kind','partial'])url.searchParams.delete(key);
+ const appliedDate=document.getElementById('report-date')?.defaultValue;
+ if(task==='laporan'&&appliedDate)url.searchParams.set('date',appliedDate);
+ return url;
+}
 function select(key,{focus=false,updateURL=true}={}){
   if(!panels.has(key))key=defaultTask;const changed=active!==key;
  for(const [id,panel]of panels){panel.hidden=id!==key;panel.inert=id!==key;}
@@ -371,7 +378,8 @@ function select(key,{focus=false,updateURL=true}={}){
  const remoteUrl=owner.get(key)?.dataset.remote;
  document.body.toggleAttribute('data-remote-task',!!remoteUrl);
  if(remoteUrl)loadRemote(key,remoteLast.get(key)||remoteUrl);const own=owner.get(key);document.querySelector('#workspace-title').textContent=tabsOf.get(key)?own.textContent.trim():text[key][0];document.querySelector('#workspace-description').textContent=text[key][1];document.querySelector('.top-context strong').textContent=key==='kasir'?'Kasir':(own?.textContent.trim()||text[key][0]);
- if(updateURL&&changed)history.replaceState(null,'','#'+key);if(focus)own?.focus({preventScroll:true});
+  const url=workspaceUrl(key);if(updateURL&&changed)url.hash=key;
+  if(url.href!==location.href)history.replaceState(history.state,'',url.href);if(focus)own?.focus({preventScroll:true});
  if(changed&&document.body.classList.contains('workspace-enhanced')){window.uiMotion?.enter(panels.get(key));window.uiMotion?.textIn(document.querySelector('#workspace-title'));window.uiMotion?.textIn(document.querySelector('#workspace-description'));window.scrollTo({top:0,behavior:'instant'});}
 }
 for(const link of links){link.addEventListener('click',e=>{e.preventDefault();select(link.dataset.task);if(matchMedia('(max-width:900px)').matches)window.v2Sidebar?.close();});link.addEventListener('keydown',e=>{const visible=links.filter(item=>item.closest('[data-menu-group]')?.open!==false),i=visible.indexOf(link);let n;if(e.key==='ArrowDown')n=(i+1)%visible.length;if(e.key==='ArrowUp')n=(i-1+visible.length)%visible.length;if(e.key==='Home')n=0;if(e.key==='End')n=visible.length-1;if(n!==undefined){e.preventDefault();visible[n].focus({preventScroll:true});}});}

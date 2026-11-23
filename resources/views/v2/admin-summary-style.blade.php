@@ -48,11 +48,10 @@ html body #admin-overview .as-card h2{margin:0 !important;font-size:18px !import
 #admin-overview .as-plot{position:relative;display:flex;align-items:stretch;gap:6px;height:190px;margin:24px 0 30px;border-bottom:1px solid #C9D4CD;background-image:linear-gradient(#E9EFEB 1px,transparent 1px);background-size:100% 33.333%}
 #admin-overview .as-plot--7d{gap:clamp(12px,4%,40px);padding:0 2%}
 #admin-overview .as-col{position:relative;flex:1;min-width:0}
-#admin-overview .as-col i{position:absolute;left:50%;bottom:0;width:min(34px,78%);height:calc(var(--h) * 1%);border-radius:4px 4px 0 0;background:#3E9B6E;transform:translateX(-50%);transform-origin:bottom;animation:as-grow .5s cubic-bezier(.22,.8,.24,1) both;animation-delay:calc(var(--i) * 28ms)}
+#admin-overview .as-col i{position:absolute;left:50%;bottom:0;width:min(34px,78%);height:calc(var(--h) * 1%);border-radius:4px 4px 0 0;background:#3E9B6E;transform:translateX(-50%);transform-origin:bottom}
 #admin-overview .as-col.is-peak i{background:#1B4332}
 #admin-overview .as-col:hover i{filter:brightness(1.08)}
 #admin-overview .as-col small{position:absolute;top:calc(100% + 9px);left:50%;transform:translateX(-50%);font-size:12px;color:#5F7468;white-space:nowrap}
-@keyframes as-grow{from{transform:translateX(-50%) scaleY(0)}to{transform:translateX(-50%) scaleY(1)}}
 #admin-overview .as-best-list{display:grid;grid-auto-flow:column;grid-template-rows:repeat(var(--rows),auto);grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px;margin:6px 0 0;padding:0;list-style:none}
 #admin-overview .as-best-list li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:6px;min-height:46px;border-bottom:1px solid #EEF2EF}
 #admin-overview .as-rank{font-size:12.5px;color:#7C8C83}
@@ -146,13 +145,15 @@ html body #admin-overview .as-fold-h>*{border:0 !important;padding:0 !important}
 (()=>{
 'use strict';
 const page=document.querySelector('#admin-overview.as-page');if(!page)return;
-const KEY='tb01-ringkasan-periode',mobile=matchMedia('(max-width:760px)');
+const KEY='tb01-ringkasan-periode',mobile=matchMedia('(max-width:760px)'),compact=matchMedia('(min-width:1180px) and (max-height:860px)');
 const picks=Array.from(page.querySelectorAll('[data-as-pick]'));
 function pick(period,save){
  if(!picks.some(b=>b.dataset.asPick===period))period='7d';
+ const previous=window.uiMotion?.dataSnapshot(page);
  page.dataset.asPeriod=period;
  for(const b of picks){const on=b.dataset.asPick===period;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;}
- if(save)try{localStorage.setItem(KEY,period)}catch{}
+  if(save)try{localStorage.setItem(KEY,period)}catch{}
+ window.uiMotion?.dataChange(page,previous);
 }
 page.querySelector('.as-seg').addEventListener('click',e=>{const b=e.target.closest('[data-as-pick]');if(b)pick(b.dataset.asPick,true);});
 page.querySelector('.as-seg').addEventListener('keydown',e=>{
@@ -161,11 +162,11 @@ page.querySelector('.as-seg').addEventListener('keydown',e=>{
 });
 let saved=null;try{saved=localStorage.getItem(KEY)}catch{}
 pick(saved||'7d',false);
-// Kartu Uang/Pengiriman/Stok: selalu terbuka di desktop; di HP Uang terbuka, sisanya ringkas.
+// Laptop pendek memakai ringkasan yang dapat dibuka; desktop tinggi tetap menampilkan semua rincian.
 const folds=Array.from(page.querySelectorAll('[data-as-fold]'));
-function layout(){folds.forEach((d,i)=>{d.open=!mobile.matches||i===0;});}
-for(const d of folds)d.querySelector('summary').addEventListener('click',e=>{if(!mobile.matches)e.preventDefault();});
-mobile.addEventListener('change',layout);layout();
+function layout(){folds.forEach((d,i)=>{d.open=(!mobile.matches&&!compact.matches)||(mobile.matches&&i===0);});}
+for(const d of folds)d.querySelector('summary').addEventListener('click',e=>{if(!mobile.matches&&!compact.matches)e.preventDefault();});
+mobile.addEventListener('change',layout);compact.addEventListener('change',layout);layout();
 // HP: produk terlaris 5 besar, tombol membuka 10 besar.
 page.addEventListener('click',e=>{const b=e.target.closest('.as-more-btn');if(!b)return;const box=b.parentElement,all=box.classList.toggle('is-all');b.setAttribute('aria-expanded',String(all));b.textContent=all?'Tampilkan 5 besar':'Lihat '+box.querySelectorAll('.as-best-list li').length+' besar';});
 })();

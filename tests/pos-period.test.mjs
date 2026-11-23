@@ -20,7 +20,10 @@ function setup(withNumbers=false){
     const form={action:'http://example.test/v2/sales/dashboard',setAttribute:(k,v)=>attrs.set(k,v),removeAttribute:k=>attrs.delete(k),addEventListener:(type,fn)=>formEvents[type]=fn};
     const nodes={'pos-dashboard':root,'pd-custom-form':form,'pd-from':{value:'2025-01-10'},'pd-to':{value:'2025-01-11'},'pd-custom-status':{textContent:''},'pd-sub':{},'pos-monitor-precomputed':{textContent:JSON.stringify({'7d':{sub_label:'7 hari'}})}};
     let respond=async()=>({ok:true,json:async()=>({html:'safe server fragment'})});
-    vm.runInNewContext(source,{uiNumbers:withNumbers?{get:el=>el.textContent,set:(el,target,options)=>tweens.push({target,from:options.from})}:undefined,
+    vm.runInNewContext(source,{uiMotion:withNumbers?{
+        dataSnapshot:root=>root.querySelector('.pd-pane:not([hidden])'),
+        dataChange:(root,previous)=>tweens.push({target:root.querySelector('.pd-pane:not([hidden])').querySelectorAll('[data-number-key]')[0].textContent,from:previous?.querySelectorAll('[data-number-key]')[0].textContent})
+    }:undefined,
         document:{getElementById:id=>nodes[id],addEventListener:(type,fn)=>events[type]=fn,importNode:node=>node},
         localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},URL,AbortController,
         location:{href:'http://example.test/#kasir'},fetch:(url,options)=>{requests.push({url,options});return respond();},

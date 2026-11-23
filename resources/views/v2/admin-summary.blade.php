@@ -37,6 +37,7 @@
     ], fn ($row) => $row[2] > 0));
     $cashTotal = \Brick\Math\BigDecimal::of((string) $sum['drawer']['total'])->plus((string) $sum['bank']);
     $difference = \Brick\Math\BigDecimal::of((string) $metrics['shifts']['difference_month']);
+    $unresolvedDifference = (string) $metrics['shifts']['difference_unresolved'];
     $deliveries = $metrics['deliveries'];
     $watch = $sum['stock_watch'];
 @endphp
@@ -53,7 +54,7 @@
 <p class="as-sub"><span class="as-desk">Hal yang menunggu keputusan Anda. Hilang sendiri setelah ditangani.</span><span class="as-mob">{{ count($todo) }} hal menunggu Anda</span></p>
 <ul class="as-todo-list">
 @foreach($todo as [$label, $labelLong, $count, $hint, $target, $button, $tone])
-<li><a class="as-todo-item" href="#{{ $target }}" data-task-link="{{ $target }}"><span class="as-dot as-dot--{{ $tone }}" aria-hidden="true"></span><strong class="as-todo-n">{{ $count }}</strong><span class="as-todo-label"><span class="as-desk">{{ $label }}</span><span class="as-mob">{{ $count }} {{ $labelLong }}</span></span><small class="as-todo-hint">{{ $hint }}</small><span class="as-todo-go">{{ $button }}</span></a></li>
+<li><a class="as-todo-item" href="#{{ $target }}" data-task-link="{{ $target }}" title="{{ $count }} {{ $labelLong }} · {{ $hint }}"><span class="as-dot as-dot--{{ $tone }}" aria-hidden="true"></span><strong class="as-todo-n">{{ $count }}</strong><span class="as-todo-label"><span class="as-desk">{{ $label }}</span><span class="as-mob">{{ $count }} {{ $labelLong }}</span></span><small class="as-todo-hint">{{ $hint }}</small><span class="as-todo-go">{{ $button }}</span></a></li>
 @endforeach
 </ul>
 @endif
@@ -65,7 +66,7 @@
 <div class="as-tile as-tile--hero">
 <small>Penjualan</small>
 @foreach($periods as $key => $label)@php $p = $posDashboard[$key]; $d = $p['delta']; $base = $key === 'today' ? 'kemarin' : $periodDays[$key].' hari sebelumnya'; @endphp
-<div data-period="{{ $key }}"><strong>{{ $p['formatted_revenue'] }}</strong><span>@if($d['pct'] !== null){{ $d['direction'] === 'turun' ? '−' : '+' }}{{ $d['pct'] }}%<span class="as-desk">&nbsp;dari {{ $base }}</span> · @elseif($d['direction'] === 'baru')<span class="as-desk">belum ada pembanding ·&nbsp;</span>@endif{{ $p['transaction_count'] }} nota</span></div>
+<div data-period="{{ $key }}"><strong data-number-key="admin-revenue">{{ $p['formatted_revenue'] }}</strong><span>@if($d['pct'] !== null){{ $d['direction'] === 'turun' ? '−' : '+' }}{{ $d['pct'] }}%<span class="as-desk">&nbsp;dari {{ $base }}</span> · @elseif($d['direction'] === 'baru')<span class="as-desk">belum ada pembanding ·&nbsp;</span>@endif<span data-number-text="admin-transactions">{{ $p['transaction_count'] }} nota</span></span></div>
 @endforeach
 </div>
 <div class="as-tile"><small><span class="as-dot as-dot--muted" aria-hidden="true"></span>Kas di laci</small><strong>{{ \App\Services\V2\Money::display($sum['drawer']['total']) }}</strong><span>{{ $sum['drawer']['count'] > 0 ? $sum['drawer']['count'].' shift terbuka' : 'tidak ada shift terbuka' }}</span></div>
@@ -78,10 +79,10 @@
 <section class="card as-card as-chart" aria-labelledby="as-chart-h">
 <h2 id="as-chart-h"><span data-period="today">Penjualan per jam</span><span data-period="7d">Penjualan harian</span><span data-period="30d">Penjualan harian</span></h2>
 @foreach($periods as $key => $label)@php $p = $posDashboard[$key]; @endphp
-<div data-period="{{ $key }}">
+<div data-period="{{ $key }}" data-motion-region data-motion-version="{{ hash('sha256', json_encode($p['buckets'])) }}">
 <p class="as-sub">@if($p['peak'])Tertinggi Rp {{ $p['peak']['short'] }} pada {{ $p['peak']['date'] ? $dayLabel($p['peak']['date']) : 'pukul '.$p['peak']['label'] }}@else Belum ada penjualan pada periode ini @endif</p>
 <div class="as-plot as-plot--{{ $key }}" role="img" aria-label="Grafik penjualan {{ strtolower($label) }}@if($p['peak']), tertinggi {{ $p['peak']['formatted'] }}@endif">
-@foreach($p['buckets'] as $i => $b)<span class="as-col @if($b['peak']) is-peak @endif" style="--h:{{ $b['height'] }};--i:{{ $i }}" title="{{ $b['date'] ? $dayLabel($b['date']) : $b['label'] }}: {{ $b['formatted_total'] }}"><i></i>@if($b['show'])<small>@if($b['date']){{ (int) substr($b['date'], 8, 2) }}<span class="as-desk"> {{ $months[(int) substr($b['date'], 5, 2) - 1] }}</span>@else{{ substr($b['label'], 0, 2) }}@endif</small>@endif</span>@endforeach
+@foreach($p['buckets'] as $i => $b)<span class="as-col @if($b['peak']) is-peak @endif" style="--h:{{ $b['height'] }};--i:{{ $i }}" title="{{ $b['date'] ? $dayLabel($b['date']) : $b['label'] }}: {{ $b['formatted_total'] }}"><i data-motion-bar="{{ $b['height'] }}" data-motion-key="sale-{{ $b['date'] ?? $b['label'] }}"></i>@if($b['show'])<small>@if($b['date']){{ (int) substr($b['date'], 8, 2) }}<span class="as-desk"> {{ $months[(int) substr($b['date'], 5, 2) - 1] }}</span>@else{{ substr($b['label'], 0, 2) }}@endif</small>@endif</span>@endforeach
 </div>
 </div>
 @endforeach
@@ -89,10 +90,10 @@
 <section class="card as-card as-best" aria-labelledby="as-best-h">
 <h2 id="as-best-h">Produk terlaris</h2>
 @foreach($periods as $key => $label)@php $rows = $posDashboard[$key]['top_products']; @endphp
-<div data-period="{{ $key }}">
+<div data-period="{{ $key }}" data-motion-region data-motion-version="{{ hash('sha256', json_encode($rows)) }}">
 <p class="as-sub"><span class="as-desk">{{ count($rows) ?: 10 }} besar</span><span class="as-mob">{{ min(5, count($rows)) ?: 5 }} besar</span> · {{ strtolower($label) }}</p>
 @if(count($rows) === 0)<p class="as-empty">Belum ada barang terjual pada periode ini.</p>@else
-<ol class="as-best-list" style="--rows:{{ (int) ceil(count($rows) / 2) }}">@foreach($rows as $i => $row)<li @if($i >= 5) class="as-more" @endif><span class="as-rank">{{ $i + 1 }}</span><span class="as-name">{{ $row['name'] }}</span><strong>{{ $row['formatted_qty'] }} {{ $row['unit'] }}</strong></li>@endforeach</ol>
+<ol class="as-best-list" style="--rows:{{ (int) ceil(count($rows) / 2) }}">@foreach($rows as $i => $row)<li data-motion-item @if($i >= 5) class="as-more" @endif><span class="as-rank">{{ $i + 1 }}</span><span class="as-name">{{ $row['name'] }}</span><strong data-number-text="top-{{ $row['name'] }}">{{ $row['formatted_qty'] }} {{ $row['unit'] }}</strong></li>@endforeach</ol>
 @if(count($rows) > 5)<button type="button" class="as-more-btn" aria-expanded="false">Lihat {{ count($rows) }} besar</button>@endif
 @endif
 </div>
@@ -109,7 +110,8 @@
 <div><dt>Bank terverifikasi</dt><dd>{{ \App\Services\V2\Money::display($sum['bank']) }}</dd></div>
 <div class="{{ \Brick\Math\BigDecimal::of((string) $metrics['awaiting']['total'])->isPositive() ? 'is-warn' : '' }}"><dt><span class="as-dot as-dot--warn" aria-hidden="true"></span>Transfer menunggu</dt><dd>{{ \App\Services\V2\Money::display($metrics['awaiting']['total']) }}</dd></div>
 <div><dt>Uang muka sopir terbuka</dt><dd>{{ \App\Services\V2\Money::display($metrics['advances']['total']) }}</dd></div>
-<div class="{{ $difference->isNegative() ? 'is-bad' : '' }}"><dt><span class="as-dot as-dot--{{ $difference->isNegative() ? 'bad' : 'muted' }}" aria-hidden="true"></span>Selisih kas bulan ini</dt><dd>{{ $signed((string) $difference) }}</dd></div>
+<div><dt title="Neto seluruh shift yang ditutup bulan ini, termasuk yang sudah diperiksa">Selisih bulan ini (riwayat)</dt><dd>{{ $signed((string) $difference) }}</dd></div>
+<div class="{{ $metrics['shifts']['review'] > 0 ? 'is-warn' : '' }}"><dt title="Pemeriksaan selisih yang belum selesai dari semua tanggal; bukan saldo kas">Belum diselesaikan</dt><dd>{{ $signed($unresolvedDifference) }} · {{ $metrics['shifts']['review'] }} shift</dd></div>
 </dl>
 </div>
 </details>
