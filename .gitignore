@@ -51,3 +51,6 @@ database/*.sqlite*
 __pycache__/
 *.pyc
 *.pyo
+
+# State rilis di server (tag image berubah setiap deploy)
+docker-compose.release.json

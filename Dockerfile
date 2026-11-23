@@ -28,5 +28,9 @@ RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/fra
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R ug+rwX storage bootstrap/cache
 
+COPY docker/init-storage.sh /usr/local/bin/init-storage.sh
+RUN chmod +x /usr/local/bin/init-storage.sh
+
 EXPOSE 9000
+ENTRYPOINT ["/usr/local/bin/init-storage.sh"]
 CMD ["php-fpm"]
