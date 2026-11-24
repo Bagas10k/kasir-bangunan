@@ -333,8 +333,19 @@ class Operations
 
         $vehicleId = isset($data['vehicle_id']) && $data['vehicle_id'] !== '' ? (int) $data['vehicle_id'] : null;
         $driverName = isset($data['driver_name']) && trim((string) $data['driver_name']) !== '' ? trim((string) $data['driver_name']) : null;
+        $dueDate = null;
+        if ($method === 'credit' && isset($data['due_date']) && trim((string) $data['due_date']) !== '') {
+            $rawDue = trim((string) $data['due_date']);
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawDue) !== 1 || ! checkdate((int) substr($rawDue, 5, 2), (int) substr($rawDue, 8, 2), (int) substr($rawDue, 0, 4))) {
+                $this->invalid('Tanggal jatuh tempo tidak valid.');
+            }
+            if ($rawDue < now()->toDateString()) {
+                $this->invalid('Tanggal jatuh tempo tidak boleh sebelum hari ini.');
+            }
+            $dueDate = $rawDue;
+        }
 
-        return DB::transaction(function () use ($actor, $data, $key, $method, $fulfillment, $destination, $items, $deliveryFee, $customerId, $vehicleId, $driverName, $tier) {
+        return DB::transaction(function () use ($actor, $data, $key, $method, $fulfillment, $destination, $items, $deliveryFee, $customerId, $vehicleId, $driverName, $tier, $dueDate) {
             $shift = $this->openShiftFor($actor, true);
             $requestHash = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
             $existing = DB::table('v2_sales')->where('idempotency_key', $key)->first();
@@ -537,7 +548,7 @@ class Operations
                 'number' => 'TMP-'.bin2hex(random_bytes(8)),
                 'amount' => $this->str($total),
                 'paid' => $this->str($paid),
-                'due_date' => null,
+                'due_date' => $dueDate,
                 'status' => $paid->isGreaterThanOrEqualTo($total) ? 'paid' : 'open',
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -811,11 +822,11 @@ class Operations
         });
     }
 
-    public function approvePayment(int $actor, int $paymentId): void
+    public function approvePayment(int $actor, int $paymentId, ?string $bankAccountCode = null): void
     {
         $this->requireRole($actor, ['admin']);
 
-        DB::transaction(function () use ($actor, $paymentId) {
+        DB::transaction(function () use ($actor, $paymentId, $bankAccountCode) {
             $head = DB::table('v2_payments')->where('id', $paymentId)->first();
             if (! $head) {
                 $this->invalid('Pembayaran tidak ditemukan.');
@@ -840,6 +851,18 @@ class Operations
             $remaining = Money::value((string) $invoice->amount, 2)->minus(Money::value((string) $invoice->paid, 2));
             if ($amount->isGreaterThan($remaining)) {
                 $this->invalid('Nominal melebihi sisa tagihan.');
+            }
+
+            $overrideBank = null;
+            if ($payment->method === 'transfer' && $bankAccountCode !== null && trim($bankAccountCode) !== '') {
+                $overrideBank = app(BankAccounts::class)->resolve($bankAccountCode);
+                $payment->bank_account_code = $overrideBank;
+                if (Schema::hasColumn('v2_payments', 'bank_account_code')) {
+                    DB::table('v2_payments')->where('id', $paymentId)->update([
+                        'bank_account_code' => $overrideBank,
+                        'updated_at' => now(),
+                    ]);
+                }
             }
 
             $entryId = null;

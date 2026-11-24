@@ -5,35 +5,34 @@
     {"from":"RP07","to":"RP09","label":"AP dibuat dengan receipt_id hasil konfirmasi; pembayaran memakai invoice_id AP itu, bukan id draf"},
     {"from":"KS09","to":"PG2","label":"v2_deliveries.id terkait sale_id yang sama: prepared kemudian pengguna dispatch"},
     {"from":"KS05","to":"JL1","label":"Operations::checkout memanggil Ledger::post v2_sale dengan reference_id sale_id"},
-    {"from":"RP07","to":"JL1","label":"SupplyTrips::receive memanggil Ledger::post v2_receipt dengan receipt_id final"},
+    {"from":"RP07","to":"JL1","label":"SupplyTrips::receive memanggil Ledger::post v2_receipt dengan receipt_id final (termasuk ongkir bila ada)"},
     {"from":"RP10","to":"JL1","label":"collect tunai AR memanggil Ledger::post v2_payment untuk payment_id yang sama"},
     {"from":"RP13","to":"JL1","label":"postPayable sumber main memposting jurnal v2_payment; tanpa mutasi laci"},
-    {"from":"RP14","to":"JL1","label":"postPayable sumber cash memposting jurnal v2_payment dan mutasi shift pemohon"},
-    {"from":"RP15","to":"JL1","label":"postPayable sumber transfer memposting jurnal v2_payment, bukan AR transfer pending"},
-    {"from":"RP16","to":"JL1","label":"Approve AR transfer memposting jurnal untuk payment_id terverifikasi"},
+    {"from":"RP14","to":"JL1","label":"postPayable sumber cash memposting jurnal v2_payment dan mutasi kas harian"},
+    {"from":"RP15","to":"JL1","label":"postPayable sumber transfer memposting jurnal v2_payment dari rekening bank aktif terpilih"},
+    {"from":"RP16","to":"JL1","label":"Approve AR transfer memposting jurnal untuk payment_id terverifikasi ke rekening bank terpilih"},
     {"from":"RP17","to":"JL1","label":"Approve AP memanggil postPayable untuk payment_id pengajuan yang sama"},
     {"from":"PG4","to":"JL1","label":"Trip langsung diposting dengan reference_type v2_trip / trip_id"},
     {"from":"PG5","to":"JL1","label":"Uang muka aset diposting dengan reference_type v2_driver_advance / advance_id"},
     {"from":"PG7","to":"JL1","label":"Settlement memposting v2_driver_advance_settlement / settlement_id; bukan trip kedua"},
     {"from":"AM16","to":"JL1","label":"Pembukaan V2 memanggil Ledger::post dengan batch_id pembukaan"},
+    {"from":"AM17","to":"JL7","label":"Akun bertanda is_bank_account aktif di COA dibaca BankAccounts pada pembayaran, pengeluaran, laporan harian, dan arus kas"},
     {"from":"KS05","to":"JL3","label":"sale_id dan snapshot item hasil checkout dibaca endpoint documents untuk sale yang sama"},
-    {"from":"KS02","to":"JL2","label":"Laporan harian memilih shift lewat tanggal opened_at; shift kosong sah tanpa nota"}
+    {"from":"KS02","to":"JL2","label":"Laporan harian memilih kas harian lewat tanggal opened_at; kas harian kosong sah tanpa nota"}
   ],
   "unknowns":[
     "Peta ini bukan spesifikasi, SOP baru, atau rujukan untuk menyesuaikan kode. Sumber kebenaran adalah berkas PHP/Blade working tree. Bila berbeda, kode menang; telusuri ulang narasi dan bukti sebelum menerbitkan ulang.",
-    "Cakupan dominan: akses/akun, master-relasi, impor XLSX, pembukaan awal, draf/final penerimaan, AP/AR/pembayaran, checkout tunai/transfer/kredit, pengiriman, biaya/uang muka, rekap/tutup shift, jurnal dan tiga laporan keuangan. Alur independen tetap terpisah; daftar modul bukan urutan runtime wajib.",
-    "Belum dipetakan end-to-end: provisioning akun pertama/COA lewat command V2Prepare, migrasi/upgrade/deploy, seluruh alur legacy ketika V2 nonaktif, demo-setup, stok opname legacy, expenses legacy, seluruh perhitungan dashboard/insight/monitor dan seluruh detail JavaScript UI. Source dipantau perubahan untuk meminta telaah, bukan disamakan dengan sudah dianalisis.",
-    "Tidak membaca .env, seed berisi identitas/kredensial, dump, database atau data operasional. Tidak menjalankan kode aplikasi, Artisan, migrasi, tes aplikasi, atau dependensi aplikasi. Helper dokumentasi baru hanya membaca sumber dan menulis ke docx/.",
-    "Pemeriksa sinkron membandingkan SHA-256 sumber dalam cakupan app PHP, routes PHP, migrations PHP, resources views/JS/CSS, bootstrap/app.php, config/v2.php serta composer.json/package.json. Penambahan/penghapusan juga diperiksa. Konfigurasi runtime, vendor, .env, DB dan perubahan di luar cakupan tidak dideteksi.",
-    "Kode bukti adalah cuplikan langsung yang diambil ulang dari berkas dan nomor baris saat build, bukan pseudocode atau hasil rekonstruksi. Potongan tidak mencakup setiap baris validasi; baca berkas sumber penuh untuk detail. Nilai rahasia/identitas yang tidak relevan sengaja tidak dikutip.",
-    "Cek sinkron mendeteksi drift sumber, model/resep dan artefak, tetapi tidak membuktikan seluruh klaim semantik. Jika sumber berubah, build biasa ditolak sampai alur ditelusuri kembali dan operator secara eksplisit mengakui hasil telaah. Jangan memakai flag penerimaan hanya agar cek menjadi hijau.",
-    "Pembukaan stok sekali dan penerimaan supplier adalah jalur menambah persediaan yang berbeda. Master stok nol tidak wajib melalui saldo awal untuk dapat menerima barang; pembukaan awal mensyaratkan sistem bersih sehingga tidak boleh dipaksakan sesudah transaksi berjalan.",
-    "Keadaan runtime/deployment tidak diverifikasi dalam tugas dokumentasi ini. Commit dasar saja tidak cukup mengidentifikasi sumber: hash working tree juga mencakup perubahan lokal belum commit."
+    "Cakupan dominan: akses/akun (username/email), master-relasi (termasuk aktivasi ulang), Bagan Akun & multi-rekening bank, impor XLSX, pembukaan awal, draf/final penerimaan + ongkir pembelian, AP/AR/pembayaran + foto bukti transfer, checkout tunai/transfer/kredit + jatuh tempo, pengiriman, biaya/uang muka, kas harian bersama (buka/rekap/tutup/resolusi), pengeluaran operasional, penyesuaian & pindah dana kas/bank, jurnal dan tiga laporan keuangan.",
+    "Belum dipetakan end-to-end: provisioning akun pertama/COA lewat command V2Prepare, migrasi/upgrade/deploy, seluruh alur legacy ketika V2 nonaktif, demo-setup, stok opname legacy, seluruh perhitungan dashboard/insight/monitor dan seluruh detail JavaScript UI.",
+    "Tidak membaca .env, seed berisi identitas/kredensial, dump, database atau data operasional. Helper dokumentasi hanya membaca sumber dan menulis ke docx/.",
+    "Pemeriksa sinkron membandingkan SHA-256 sumber dalam cakupan app PHP, routes PHP, migrations PHP, resources views/JS/CSS, bootstrap/app.php, config/v2.php serta composer.json/package.json. Penambahan/penghapusan juga diperiksa.",
+    "Kode bukti adalah cuplikan langsung yang diambil ulang dari berkas dan nomor baris saat build, bukan pseudocode. Nilai rahasia/identitas yang tidak relevan sengaja tidak dikutip.",
+    "Cek sinkron mendeteksi drift sumber, model/resep dan artefak, tetapi tidak membuktikan seluruh klaim semantik. Jika sumber berubah, build biasa ditolak sampai alur ditelusuri kembali dan operator secara eksplisit mengakui hasil telaah.",
+    "Pembukaan stok sekali dan penerimaan supplier adalah jalur menambah persediaan yang berbeda. Pembukaan awal mensyaratkan sistem bersih sehingga tidak boleh dipaksakan sesudah transaksi berjalan."
   ],
   "observations":[
-    {"title":"Token rekap tutup shift masih opsional","evidence":"app/Services/V2/Operations.php:132-155; resources/views/v2/workspace.blade.php:708-741","description":"Badan closeShift hanya mengecek snapshot jika fingerprint diberikan; UI tetap membolehkan menutup saat fetch rekap gagal. Expected tetap dihitung server. Ini batas jaminan rekap, bukan klaim transaksi telah salah; tidak diperbaiki dalam tugas dokumentasi."},
-    {"title":"Label sumber pembayaran tertimpa peta sumber shift","evidence":"resources/views/v2/workspace.blade.php:55-56; resources/views/v2/workspace.blade.php:283","description":"Dua assignment berurutan memakai variabel sourceLabel yang sama. Nilai main/transfer/cash kemudian tidak ada di peta admin/carry/both. Temuan dari pembacaan sumber, belum direproduksi di browser; tidak mengubah saldo atau implementasi pada tugas ini."},
-    {"title":"Pengajuan laci tidak menghalangi penutupan shift","evidence":"app/Services/V2/Operations.php:158-188; app/Services/V2/Operations.php:870-880","description":"Penutupan tidak menolak cash proposed. Posting AP kemudian mewajibkan shift pemohon masih open, sehingga pengajuan yang belum disetujui dapat tertahan setelah shift ditutup. Dicatat sebagai perilaku kode, bukan keputusan menambah larangan baru."},
-    {"title":"Final penerimaan tidak punya pembatalan biasa","evidence":"app/Services/V2/SupplyTrips.php:437-451; routes/v2.php:28-32","description":"Endpoint void final menolak walau PHPDoc lama masih menjelaskan reversal. Pesan menyarankan koreksi/retur, tetapi rute koreksi/retur final belum tersedia pada rute V2 yang dibaca. Jangan menyajikan komentar itu sebagai fitur yang berjalan."}
+    {"title":"Token rekap tutup kas harian masih opsional","evidence":"app/Services/V2/Operations.php:144-168; resources/views/v2/workspace.blade.php:655-714","description":"Badan closeShift hanya mengecek snapshot jika fingerprint diberikan; UI tetap membolehkan menutup saat fetch rekap gagal. Expected tetap dihitung server. Ini batas jaminan rekap, bukan klaim transaksi telah salah; tidak diperbaiki dalam tugas dokumentasi."},
+    {"title":"Pengajuan laci tidak menghalangi penutupan kas harian","evidence":"app/Services/V2/Operations.php:170-202; app/Services/V2/Operations.php:940-952","description":"Penutupan tidak menolak cash proposed. Posting AP kemudian mewajibkan kas harian pengajuan masih open, sehingga pengajuan yang belum disetujui dapat tertahan setelah kas harian ditutup. Dicatat sebagai perilaku kode, bukan keputusan menambah larangan baru."},
+    {"title":"Final penerimaan tidak punya pembatalan biasa","evidence":"app/Services/V2/SupplyTrips.php:610-617; routes/v2.php:47-51","description":"Endpoint void final menolak walau PHPDoc lama masih menjelaskan reversal. Pesan menyarankan koreksi/retur, tetapi rute koreksi/retur final belum tersedia pada rute V2 yang dibaca. Jangan menyajikan komentar itu sebagai fitur yang berjalan."}
   ]
 }

@@ -508,6 +508,7 @@ class WorkspaceController extends Controller
             'payment_method' => ['required', Rule::in(['cash', 'transfer', 'credit'])],
             'deposit_method' => ['nullable', Rule::in(['cash', 'transfer'])],
             'bank_account_code' => ['nullable', 'string', 'max:20'],
+            'due_date' => ['nullable', 'date_format:Y-m-d'],
             'paid_amount' => ['required', 'string', 'max:30'],
             'idempotency_key' => ['required', 'string', 'min:8', 'max:100'],
             'fulfillment' => ['required', Rule::in(['pickup', 'delivery'])],
@@ -577,8 +578,12 @@ class WorkspaceController extends Controller
 
     public function approve(Request $request, int $id): JsonResponse
     {
-        return $this->run(function () use ($request, $id): array {
-            $this->operations->approvePayment($request->user()->id, $id);
+        $data = $request->validate([
+            'bank_account_code' => ['nullable', 'string', 'max:20'],
+        ]);
+
+        return $this->run(function () use ($request, $id, $data): array {
+            $this->operations->approvePayment($request->user()->id, $id, $data['bank_account_code'] ?? null);
 
             return ['id' => $id, 'status' => 'posted'];
         });

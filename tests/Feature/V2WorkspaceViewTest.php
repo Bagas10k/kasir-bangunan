@@ -128,6 +128,10 @@ class V2WorkspaceViewTest extends TestCase
                     ->assertSee('data-monitoring-task="penerimaan"', false)
                     ->assertSee('data-menu-group="master"', false)
                     ->assertSee('data-task="akun"', false)
+                    ->assertSee('id="mobile-quick-actions"', false)
+                    ->assertSee('Buat orderan')
+                    ->assertSee('Barang masuk')
+                    ->assertSee('Status bayar')
                     ->assertDontSee('data-menu-group="akses"', false);
                 // Menu gabungan: setiap panel tetap bisa dicapai lewat tautan sidebar atau tab di dalam menu.
                 $this->assertEqualsCanonicalizing(

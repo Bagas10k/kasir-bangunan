@@ -1699,3 +1699,83 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
   - Seluruh 103 tes PHPUnit (termasuk 5 skenario baru `V2MultiBankAccountsTest` dan benchmark skala 2.500 produk) serta 174 tes Node UI lulus tanpa regresi.
   - Gerbang belum diuji (*untested gate*): verifikasi visual langsung di peramban terautentikasi dan eksekusi migrasi pada database lokal/produksi (menunggu persetujuan / eksekusi `php artisan migrate`).
 - **Status & Catatan Akhir**: SELESAI di source, migrasi, pengujian terisolasi, dan dokumentasi. Belum commit/deploy.
+
+## [2026-11-24 09:01 WIB] - Migrasi Lokal, Pindah Dana Kas/Bank, Koreksi Rekening Verifikasi, Rincian Per Bank & Jatuh Tempo Kredit
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Menjalankan migrasi pending atas persetujuan pengguna serta menerapkan penyempurnaan multi-rekening bank & kas (**Pindah Dana**, koreksi rekening bank saat verifikasi admin, filter per rekening di Pengeluaran, rincian per bank di Laporan Harian, tautan setor bank dari Kas Harian, dan jatuh tempo opsional penjualan kredit di Kasir).
+- **Berkas yang Diubah**:
+  - Migrasi lokal dijalankan (`php artisan migrate`): `2026_11_23_173947_add_freight_to_v2_receipts` dan `2026_11_24_040733_add_multi_bank_account_support`.
+  - `app/Services/V2/CashBankTransfers.php`, `app/Http/Controllers/V2/CashBankTransferController.php`, `routes/v2.php`, `resources/views/journals/index.blade.php`, `resources/views/v2/journal-adjustment-script.blade.php`, `resources/views/v2/ui-result.blade.php`: Menambahkan alur **Pindah Dana (Kas ↔ Bank / Antar-Bank)** (`POST /v2/journals/transfers`, jurnal seimbang `cash_bank_transfer`, konfirmasi password admin, saldo sumber dijaga tidak negatif, arus kas bersih nol) beserta tautan cepat dari status Kas Harian ditutup di `resources/views/v2/workspace.blade.php`.
+  - `app/Services/V2/Operations.php`, `app/Http/Controllers/V2/WorkspaceController.php`, `resources/views/v2/workspace.blade.php`: Menambahkan parameter opsional `bank_account_code` pada `approvePayment` + dropdown koreksi rekening bank pada `.form-approve` bila >1 rekening bank aktif.
+  - `app/Http/Controllers/ExpenseController.php`, `resources/views/expenses/index.blade.php`: Menambahkan filter per rekening bank (`bank:<kode>`) pada dropdown sumber dana Pengeluaran.
+  - `app/Services/V2/ReportsDocuments.php`, `resources/views/v2/workspace.blade.php`: Menambahkan rincian `bank.by_account` (terverifikasi & menunggu per rekening bank) pada Laporan Harian.
+  - `app/Services/V2/Operations.php`, `app/Http/Controllers/V2/WorkspaceController.php`, `resources/views/v2/pos-cashier.blade.php`, `resources/views/v2/pos-cashier-script.blade.php`, `resources/views/v2/workspace.blade.php`: Menambahkan input tanggal jatuh tempo opsional (`due_date`) untuk penjualan kredit di Kasir yang tersimpan di `v2_invoices.due_date`.
+  - `tests/Feature/V2MultiBankAccountsTest.php`: Menambah 3 skenario pengujian fitur baru (Pindah Dana, koreksi rekening saat verifikasi + rincian Laporan Harian, jatuh tempo penjualan kredit + filter Pengeluaran per rekening).
+  - `docs/dokumentasi-sistem.md` & `desain.md`: Memperbarui dokumentasi perilaku sistem dan pedoman UI.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan migrate --no-interaction` (Exit code: `0`; 2 migrasi `DONE`)
+  - `php vendor/bin/pint --dirty --format agent` (Exit code: `0`)
+  - `php artisan test --compact tests/Feature/V2MultiBankAccountsTest.php tests/Feature/V2CashBankAdjustmentTest.php tests/Feature/CashFlowReportTest.php tests/Feature/V2SalesWorkspaceTest.php tests/Feature/V2OperatingExpensesTest.php tests/Feature/V2WorkspaceViewTest.php` (Exit code: `0`; **38/38** tes, **370 asersi** lulus pada SQLite `:memory:`)
+  - `node --test tests/*.test.mjs` (Exit code: `0`; **174/174** tes lulus)
+  - `git diff --check` (Exit code: `0`)
+- **Bukti & Hasil Pengujian Empiris**:
+  - Seluruh rangkaian uji baru & regresi (38 tes PHPUnit + 174 tes Node UI) lulus setelah perbaikan terakhir `CashBankTransfers`.
+  - Gerbang belum diuji (*untested gate*): inspeksi visual langsung pada peramban terautentikasi belum dijalankan dari sesi ini.
+- **Status & Catatan Akhir**: SELESAI di source, migrasi lokal, pengujian terisolasi, dan dokumentasi. Belum commit/deploy.
+
+
+## [2026-11-24 09:33 WIB] - Pembaruan Sistem Peta Alur Hidup (`docx/alur.html` & Sinkronisasi `docx/`)
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Memperbarui peta alur operasional hidup (`docx/alur.html`, `docx/alur-live.json`, `docx/DIAGRAM.md`), resep modul sumber (`docx/sumber/*`), serta artefak sinkronisasi (`docx/model.json`, `docx/sinkron.json`, `docx/ALUR.md`, `docx/BUKTI-KODE.md`, `docx/modul/*.md`, `docx/ALUR-SISTEM.docx`) agar seluruh narasi, diagram, dan bukti nomor baris selaras dengan working tree terbaru.
+- **Berkas Sumber yang Diubah**:
+  - `docx/sumber/modul/01-kasir-shift.json`, `02-penerimaan-pembayaran.json`, `03-akses-master-awal.json`, `04-pengiriman-perjalanan.json`, `05-jurnal-laporan.json`: Memperbarui seluruh narasi dan nomor baris bukti terhadap kode terkini (kas harian bersama dibuka/ditutup admin sekali per tanggal, login username/email, aktivasi ulang master/relasi, foto bukti transfer, ongkir pembelian, jatuh tempo kredit opsional, koreksi rekening bank saat verifikasi, rincian per bank di Laporan Harian & Arus Kas) serta menambahkan 3 langkah baru: `AM17` (Bagan Akun & Rekening Bank), `JL8` (Pengeluaran Operasional V2), dan `JL9` (Penyesuaian Saldo & Pindah Dana Kas/Bank V2).
+  - `docx/sumber/lintas-modul.json`: Menambahkan relasi lintas modul `AM17 -> JL7`, memperbarui nomor baris observasi, dan menghapus observasi lama `$sourceLabel` yang sudah diperbaiki di `workspace.blade.php:62`.
+  - `docx/sumber/alur-operasional.json` & `docx/sumber/diagram-view.js`: Memperbarui 9 alur operasional lama, menambahkan alur ke-10 **`keuangan-kas`** (*Pengeluaran & kelola kas/bank*), dan melengkapi diagram gambaran sistem (`overview()`) dengan simpul *Pengeluaran & kas/bank*.
+  - `docx/sinkron.py`: Memperbarui ringkasan `MAIN_FLOW` untuk keluaran Word.
+- **Artefak Terbangun (Generated)**:
+  - `docx/model.json`, `docx/sinkron.json`, `docx/ALUR.md`, `docx/BUKTI-KODE.md`, `docx/modul/*.md`, `docx/ALUR-SISTEM.docx` (melalui `sinkron.py --build --accept-reviewed-source` memakai venv sementara terisolasi untuk `python-docx`, lalu venv dihapus kembali).
+  - `docx/alur.html`, `docx/alur-live.json`, `docx/DIAGRAM.md`, `docx/sumber/live-bindings.json` (melalui `live.py --build`).
+- **Perintah Verifikasi & Exit Code**:
+  - `sinkron.py --build --accept-reviewed-source` (Exit code: `0`; `5` modul, `67` langkah, `81` panah, `181` bukti kode, `229` file sumber)
+  - `python -B docx/live.py --build` (Exit code: `0`; `104` rute, `335` metode, `1.514.232` byte `docx/alur.html`)
+  - Validasi `docx/alur-live.json`: `Journeys: 10`, `Steps: 39`, `Stale: []`, `NoEvidence: []` (Exit code: `0`)
+  - `python -B docx/sinkron.py --check` (Exit code: `0`; `synchronized: true`, `source_digest: d6911d0133713a2130406b17c599fd1034011c3982c488d8e36be468717b0945`)
+  - `python -B docx/sumber/test_sinkron.py` (Exit code: `0`; **13/13** tes lulus)
+  - `python -B docx/sumber/test_live.py` (Exit code: `0`; **27/27** tes lulus)
+  - `git diff --check -- docx/sumber/ docx/sinkron.py` (Exit code: `0`)
+- **Bukti & Hasil Pengujian Empiris**:
+  - Seluruh 10 alur bisnis (39 tahap) di `docx/alur.html` berstatus `current: true` (tidak ada peringatan *"Kode berubah — penjelasan tahap ini perlu ditinjau"*) dan memiliki bukti kode langsung tanpa menyalin nilai rahasia/email literal.
+  - Tidak ada perubahan kode aplikasi PHP/Blade/database pada tugas ini.
+- **Status & Catatan Akhir**: SELESAI. Belum commit/deploy.
+
+## [2026-11-24] - Pil aksi cepat mobile
+- **Pelaksana**: OpenCode / DeepSeek V4 Pro, tanpa delegasi.
+- **Permintaan**: optimasi mobile dengan pil aksi bawah, seperti Buat orderan, Input barang masuk, dan lain-lain, maksimal 3 interaksi.
+- **Komponen**: baru `resources/views/v2/mobile-quick-actions.blade.php`, dimuat di `workspace.blade.php`. Tampil ≤900px, pil fixed dengan safe-area, **tiga ikon tanpa label terlihat**, permukaan hijau gelap, lingkaran **lime** untuk aksi aktif/utama, tombol48px, label lengkap lewat `aria-label`, role toolbar, fokus terlihat, reduced-motion tanpa transisi, cetak disembunyikan. Desktop ≥901px tidak tampil.
+- **Aksi/aktif**: Admin Buat orderan (Kasir+fokus `#pos-product-search`), Barang masuk (Penerimaan+dialog `[data-receipt-new]`), Pengeluaran (halaman pengeluaran+`.expenses-page .exp-btn--primary`). Kasir: Kasir (fokus katalog), Riwayat (`riwayat-penjualan`), Status bayar (`persetujuan`). Lingkaran lime mengikuti halaman aktif (Penerimaan/Pengeluaran/Riwayat/Status); di halaman lain aksi pertama menjadi highlight utama. `aria-current=page` hanya saat aksinya memang halaman aktif. Navigasi lewat hash workspace; target remote ditunggu dengan MutationObserver maks3detik dan harus terlihat/tidak inert.
+- **Tampilan aman**: tidak tampil di Kasir; disembunyikan saat `dialog[open]`, `.modal-overlay.open`, keranjang, `body.sidebar-open`, atau kolom `input/select/textarea` fokus; `main` diberi padding-bottom84px saat pil aktif.
+- **Berkas**: baru `mobile-quick-actions.blade.php`, tes `mobile-quick-actions.test.mjs`; update `workspace.blade.php`, `ui-tokens` (`--ui-lime`), `V2WorkspaceViewTest`; dokumentasi1.5+changelog, desain60, log ini.
+- **Verifikasi & exit code**:
+  - Live 471px admin: tiga ikon tanpa teks, `mqa-on`, padding84px; di Master lingkaran lime pada Buat orderan, di Penerimaan pada Barang masuk, di Pengeluaran pada Pengeluaran; bar hijau rgb(15,66,36), lingkaran rgb(200,242,107), tombol48, tinggi64, tanpa overflow; aksi tetap membuka dialog/modal/fokus katalog; sidebar membuka/menutup pil dengan benar.
+  - Iframe408 admin: tiga tombol48px berisi satu SVG masing-masing, teks kosong, lingkaran lime pada aksi pertama; 408 kasir: tiga ikon, aktif Riwayat pada halaman Riwayat; keduanya sembunyi saat task kasir. Iframe1000: pil disembunyikan CSS desktop.
+  - `node --test --test-reporter=dot tests/mobile-quick-actions.test.mjs`: 4/4; `V2WorkspaceViewTest`: 3/3 (128 asersi).
+  - Suite penuh: Node **178/178**; PHP **647 tes, 639 lulus, 8 dilewati, 0 gagal, 4.550 asersi**.
+  - Catatan: penyembunyian saat kolom fokus memakai CSS `:has(...:focus)`; tidak dapat diamati di tab otomasi karena window tidak memiliki fokus OS, tetapi selektornya terpasang.
+- **Batas**: Tidak mengubah alur bisnis, data, atau tombol lama; hanya shortcut. Belum commit/deploy. (Ada perubahan berkas docx/agent lain yang tidak disentuh; `git diff --check` global melaporkan trailing whitespace di `docx/BUKTI-KODE.md` dari pekerjaan tersebut.)
+
+## [2026-11-24] - Tabel Pengeluaran responsif dan batas lebar pil
+- **Pelaksana**: OpenCode / GPT-6.2 Sol.
+- **Perubahan**: `resources/views/expenses/{index,theme-styles}.blade.php` memakai gaya tabel operasional bersama; `resources/views/v2/{mobile-quick-actions,ui-tokens}.blade.php` memusatkan pil dengan batas 400 px. `desain.md` dan `docs/dokumentasi-sistem.md` diselaraskan.
+- **Verifikasi**: Chromium headless, 12/12 skenario HTML Blade sintetis pada 360/390/768/900/1024 px: kartu/tabel sesuai ukuran, daftar kosong terbaca, teks panjang tidak membuat halaman melebar, nominal rata kanan, pil 400 px di tablet dan tersembunyi di desktop. Mekanisme modal diuji dengan pemanggil form yang sama pada panel dan halaman penuh, tanpa menyimpan (exit 0).
+- **Regresi**: Node `tests/mobile-quick-actions.test.mjs` 4/4 (exit 0); PHPUnit `V2OperatingExpenseMenuTest|V2WorkspaceViewTest|V2UiUxAndExpenseTest|ExpensesSummaryCardsTest|V2MultiBankAccountsTest` pada SQLite in-memory 19/19, 242 asersi (exit 0). Pemeriksa token masih exit 1 karena gaya lama: 80 error/174 warning, turun dari 102/191 saat tampilan Pengeluaran dibandingkan dengan HEAD dan berkas pil/token yang sama.
+- **Batas**: Tidak mengubah data, filter, form, jurnal, izin, atau keranjang. Tidak ada migrasi, commit, push, atau deploy. Tidak menguji sesi toko aktif.
+
+## [2026-11-24] - Geser tabel Pengeluaran di tablet
+- **Pelaksana**: OpenCode / GPT-6.2 Sol. CSS `resources/views/expenses/theme-styles.blade.php` memberi tabel lebar minimum 50 rem khusus tablet, dengan gulir di pembungkus yang sudah ada. `desain.md` dan `docs/dokumentasi-sistem.md` diselaraskan.
+- **Verifikasi**: Chromium headless dengan data sintetis (exit 0), 5/5 pada 760/768/850/900/1024 px. Pada tablet, tabel bisa digeser sampai kolom Status dan badge tidak membungkus; halaman tidak melebar. HP tetap kartu; desktop tetap tabel biasa.
+- **Batas**: Tidak mengubah pil, filter, form, data, atau jurnal; belum commit/deploy.
+
+## [2026-11-24] - Penambahan rekomendasi dan susunan form Penerimaan
+- **Pelaksana**: OpenCode / GPT-6.2 Sol. `sprint2`, `receipt-restock`, skrip dan gaya rekomendasi, serta `ui-forms-styles` diperbarui. Dokumentasi serta tes `receipt-restock` dan `restock-panel` diselaraskan.
+- **Bukti**: tes regresi fokus gagal sebelum perbaikan; Chromium merekam dialog melompat ke Jumlah setelah klik. Sesudahnya, fixture Chromium 390/820/1150 px menambah lima rekomendasi tanpa loncat fokus/gulir, lalu menguji tambah manual, penolakan supplier berbeda, Periksa → Ubah lagi, dan tidak ada overflow horizontal (exit 0).
+- **Regresi**: Node penuh 179/179 (exit 0), PHP terfokus SQLite in-memory 42/42, 399 asersi (exit 0). Tidak menyimpan draf toko, mengubah pembukuan, migrasi, commit, atau deploy.

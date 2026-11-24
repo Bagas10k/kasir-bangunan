@@ -3,7 +3,7 @@
 :root{
   --ui-ink:#172b20;--ui-ink-2:#33483b;--ui-line:#d2ddd5;--ui-line-soft:#e6eee8;
   --ui-surface:#fff;--ui-canvas:#f3f6f4;--ui-head:#edf3ef;--ui-hover:#f6faf7;
-  --ui-green:#14532d;--ui-green-2:#0f4224;--ui-green-soft:#e4f0e8;--ui-focus:#0b5cab;
+  --ui-green:#14532d;--ui-green-2:#0f4224;--ui-green-soft:#e4f0e8;--ui-lime:#c8f26b;--ui-focus:#0b5cab;
   --ui-warn-bg:#fff2cc;--ui-warn-ink:#5b3f00;--ui-warn-bar:#c58a00;
   --ui-bad-bg:#fbe4e0;--ui-bad-ink:#82201a;--ui-bad-bar:#b3261e;
   --ui-info-bg:#e2ecf7;--ui-info-ink:#194569;
@@ -15,6 +15,7 @@
   --ui-weight-medium:600;--ui-weight-strong:700;--ui-leading-tight:1.35;--ui-leading-body:1.5;--ui-stroke:1px;
   --ui-detail-column-min:12rem;--ui-detail-summary-min:8rem;
   --ui-cart-width:34rem;--ui-cart-bar-width:32.5rem;--ui-cart-layer:120;
+  --ui-quick-actions-max-width:400px;
   --ui-cart-backdrop:rgba(9,30,18,.55);
   --ui-cart-list-min:6rem;
   --ui-catalog-product-width:40%;--ui-catalog-detail-width:20%;

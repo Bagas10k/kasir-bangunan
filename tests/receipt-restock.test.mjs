@@ -8,7 +8,7 @@ function setup(){
     const row=(id='',qty='',cost='')=>{
         const select={value:id,add(option){this.value=option.value;},dispatchEvent(){},_uiPickSync(){}};
         const quantity={value:qty,focus(){this.focused=true;}},price={value:cost,dataset:{},dispatchEvent(){}};
-        return {dataset:{},select,quantity,price,querySelector:s=>s==='[data-name=product_id]'?select:s==='[data-name=quantity]'?quantity:price};
+        return {dataset:{},select,quantity,price,scrollIntoView(){this.scrolled=true;},querySelector:s=>s==='[data-name=product_id]'?select:s==='[data-name=quantity]'?quantity:price};
     };
     const initial=row(),receipt={dataset:{},elements:{supplier_id:{value:'7'}},classList:{contains:()=>false}};
     const box={children:[initial]};
@@ -32,14 +32,16 @@ test('adding a restock item selects it immediately and fills its current cost wh
     assert.equal(app.initial.price.value,'123.4500');
     assert.equal(app.initial.dataset.cost,'123.4500');
 });
-test('recommendations create the next row automatically without a manual Add item click',()=>{
+test('five consecutive recommendations add rows without moving focus or scrolling away',()=>{
     const app=setup();app.addRestockProduct(product);
     app.initial.quantity.value='8';app.initial.price.value='250';
-    assert.equal(app.addRestockProduct({...product,id:43}),'added');
-    assert.equal(app.box.children.length,2);
-    assert.equal(app.box.children[1].select.value,'43');
-    assert.equal(app.box.children[1].price.value,'123.4500');
-    assert.equal(app.box.children[1].quantity.focused,true);
+    for(const id of [43,44,45,46]) assert.equal(app.addRestockProduct({...product,id}),'added');
+    assert.deepEqual(app.box.children.map(row=>row.select.value),['42','43','44','45','46']);
+    for(const row of app.box.children){
+        assert.equal(row.quantity.focused,undefined);
+        assert.equal(row.scrolled,undefined);
+    }
+    assert.equal(app.box.children[4].price.value,'123.4500');
     assert.equal(app.initial.quantity.value,'8');assert.equal(app.initial.price.value,'250');
 });
 test('default cost uses all four decimals and never overwrites a manually entered cost',()=>{

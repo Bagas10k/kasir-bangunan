@@ -11,12 +11,14 @@ function feedback(message){
 }
 
 function bind(node){
-    const form=node.querySelector('#adjustment-form');
-    if(!form)return;
-    form.addEventListener('submit',event=>{
-        event.preventDefault();
-        return save(form);
-    });
+    for(const id of ['#adjustment-form','#transfer-form']){
+        const form=node.querySelector(id);
+        if(!form)continue;
+        form.addEventListener('submit',event=>{
+            event.preventDefault();
+            return save(form);
+        });
+    }
 }
 
 async function refresh(message){

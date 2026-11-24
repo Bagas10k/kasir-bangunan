@@ -40,15 +40,16 @@ INTRO = (
     'Kutipan kode dibaca langsung ketika build; tidak ditulis ulang sebagai pseudocode.'
 )
 MAIN_FLOW = (
-    ('Persiapan', 'Login/peran → master barang, pihak, satuan, kategori, sopir/kendaraan; impor opsional; saldo awal hanya saat sistem bersih.'),
-    ('Persediaan', 'Supplier/produk tertaut → draf penerimaan → edit ATAU batal ATAU konfirmasi → stok/HPP + AP + jurnal; final terkunci.'),
-    ('Utang supplier', 'AP yang sama → pilih Kas Utama / Bank Utama / Laci shift; admin posting langsung, kasir proposed → admin setujui ATAU tolak.'),
-    ('Penjualan', 'Shift open + keranjang → konfirmasi checkout → nota, stok keluar, AR, pendapatan/HPP; cash, transfer, dan credit adalah alternatif.'),
-    ('Piutang', 'Cash menambah laci langsung; transfer pending → admin verifikasi ATAU tolak. Pending belum menambah bank atau paid invoice.'),
+    ('Persiapan', 'Login username/email & peran → master barang, pihak, satuan, kategori, sopir/kendaraan (termasuk aktivasi ulang), Bagan Akun & penanda Rekening Bank; impor XLSX opsional; saldo awal hanya saat sistem bersih.'),
+    ('Persediaan', 'Supplier/produk tertaut → draf penerimaan (+ ongkir pembelian opsional) → edit ATAU batal ATAU konfirmasi → stok/HPP + beban ongkir + AP + jurnal; final terkunci.'),
+    ('Utang supplier', 'AP yang sama → pilih Kas Utama / Rekening Bank aktif / Laci kas harian; admin posting langsung, kasir proposed → admin setujui (bisa koreksi bank) ATAU tolak.'),
+    ('Penjualan', 'Kas harian bersama open (dibuka admin sekali per tanggal) + keranjang → konfirmasi checkout → nota, stok keluar, AR (+ jatuh tempo kredit opsional), pendapatan/HPP; cash, transfer (+ bukti foto & rekening bank), dan credit adalah alternatif.'),
+    ('Piutang', 'Cash menambah laci kas harian langsung; transfer (+ foto bukti & rekening bank) pending → admin verifikasi (bisa koreksi bank) ATAU tolak.'),
     ('Pengiriman', 'Sale fulfillment delivery → SJ prepared → dispatch sent → konfirmasi received; tidak mengurangi stok untuk kedua kali.'),
-    ('Biaya dan uang muka', 'Trip langsung ATAU advance open → realisasi + refund → settled; tidak wajib ada pada setiap pengiriman.'),
-    ('Penutupan', 'Rekap per shift → hitung uang fisik → cocok closed ATAU selisih review → resolusi admin; bukan tutup periode akuntansi.'),
-    ('Hilir pembukuan', 'Jurnal transaksi → buku jurnal serta laba rugi / neraca / arus kas yang dibaca independen, bukan rangkaian laporan wajib.'),
+    ('Biaya dan uang muka', 'Trip langsung ATAU advance open (dari laci kas harian atau Rekening Bank aktif) → realisasi + refund → settled; tidak wajib ada pada setiap pengiriman.'),
+    ('Pengeluaran & kelola kas/bank', 'Pengeluaran operasional V2 (beban non-HPP dari Kas 1101 / Rekening Bank aktif), penyesuaian saldo, serta pindah dana Kas ↔ Bank / Antar-Bank dengan konfirmasi kata sandi admin.'),
+    ('Penutupan kas harian', 'Admin rekap kas harian bersama → hitung uang fisik → cocok closed ATAU selisih review → resolusi admin; setor ke bank dilakukan terpisah lewat Pindah Dana.'),
+    ('Hilir pembukuan', 'Jurnal transaksi → buku jurnal, rekap harian (per Rekening Bank), serta laba rugi / neraca / arus kas (mencakup semua Rekening Bank COA) yang dibaca independen.'),
 )
 
 

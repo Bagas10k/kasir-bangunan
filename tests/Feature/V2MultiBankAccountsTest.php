@@ -10,6 +10,7 @@ use App\Services\V2\DeliveryTrips;
 use App\Services\V2\Ledger;
 use App\Services\V2\Operations;
 use App\Services\V2\ReceiptDrafts;
+use App\Services\V2\ReportsDocuments;
 use App\Services\V2\SupplyTrips;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -430,5 +431,194 @@ class V2MultiBankAccountsTest extends TestCase
 
         $this->expectException(ValidationException::class);
         app(Operations::class)->collect($admin->id, $invoiceId, '50000.00', 'transfer', 'archived-bank-key', null, null, false, '1104');
+    }
+
+    public function test_admin_can_transfer_between_cash_and_banks_with_zero_net_cash_flow(): void
+    {
+        config(['v2.enabled' => true]);
+        $this->seedBaseAccounts();
+        DB::table('chart_of_accounts')->insert([
+            'account_code' => '1104',
+            'account_name' => 'Bank BCA',
+            'account_type' => 'asset',
+            'normal_balance' => 'debit',
+            'is_active' => true,
+            'is_bank_account' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->fund('1101', '800000.00');
+        $this->fund('1102', '200000.00');
+        $admin = $this->actor('admin');
+
+        // Cashier cannot transfer.
+        $this->actingAs($this->actor('cashier'))->postJson(route('v2.journals.transfers.store'), [
+            'transaction_date' => now()->toDateString(),
+            'from_account_code' => '1101',
+            'to_account_code' => '1104',
+            'amount' => '100000.00',
+            'description' => 'Setor kasir ditolak',
+            'password' => 'password',
+        ])->assertForbidden();
+
+        // Exceeding balance rejected.
+        $this->actingAs($admin)->postJson(route('v2.journals.transfers.store'), [
+            'transaction_date' => now()->toDateString(),
+            'from_account_code' => '1101',
+            'to_account_code' => '1104',
+            'amount' => '900000.00',
+            'description' => 'Melebihi saldo kas',
+            'password' => 'password',
+        ])->assertUnprocessable()->assertJsonValidationErrors('amount');
+
+        // Valid transfer 1101 -> 1104 (300k).
+        $this->actingAs($admin)->postJson(route('v2.journals.transfers.store'), [
+            'transaction_date' => now()->toDateString(),
+            'from_account_code' => '1101',
+            'to_account_code' => '1104',
+            'amount' => '300000.00',
+            'description' => 'Setor kas sore ke BCA',
+            'password' => 'password',
+        ])->assertCreated()->assertJsonPath('status', 'posted');
+
+        $balances = app(AccountBalanceService::class);
+        $this->assertSame('500000.00', (string) $balances->balance('1101'));
+        $this->assertSame('300000.00', (string) $balances->balance('1104'));
+
+        $report = app(AccountingReportService::class)->generateCashFlow();
+        $this->assertTrue($report['is_reconciled']);
+        $this->assertSame('1000000.00', $report['ending_cash']);
+    }
+
+    public function test_admin_can_correct_bank_account_during_approval_and_daily_report_breaks_down_by_bank(): void
+    {
+        Storage::fake('local');
+        config(['v2.enabled' => true]);
+        $this->seedBaseAccounts();
+        DB::table('chart_of_accounts')->insert([
+            'account_code' => '1104',
+            'account_name' => 'Bank BCA',
+            'account_type' => 'asset',
+            'normal_balance' => 'debit',
+            'is_active' => true,
+            'is_bank_account' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $admin = $this->actor('admin');
+        $ops = app(Operations::class);
+        $ops->openShift($admin->id, '50000.00', 'admin');
+
+        $customerId = DB::table('v2_parties')->insertGetId([
+            'kind' => 'customer', 'code' => 'PLG-0099', 'name' => 'Pak Hendra', 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $productId = DB::table('products')->insertGetId([
+            'sku' => 'CAT-01', 'name' => 'Cat Tembok 5kg', 'unit' => 'kaleng', 'category' => 'Cat',
+            'selling_price' => '120000.00', 'cost_price' => '90000.0000', 'stock_quantity' => '10.0000',
+            'min_stock' => '2.0000', 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // Cashier selects 1102 by mistake, admin corrects to 1104 upon approval.
+        $res = $this->actingAs($admin)->post(route('v2.sales.store'), [
+            'items' => [['product_id' => $productId, 'quantity' => '1']],
+            'delivery_fee' => '0',
+            'customer_id' => $customerId,
+            'payment_method' => 'transfer',
+            'bank_account_code' => '1102',
+            'paid_amount' => '120000.00',
+            'idempotency_key' => 'pos-approve-override-1',
+            'fulfillment' => 'pickup',
+            'transfer_proof' => UploadedFile::fake()->image('bca.png', 100, 100),
+        ], ['Accept' => 'application/json'])->assertOk();
+
+        $paymentId = (int) DB::table('v2_payments')->where('invoice_id', $res->json('invoice_id'))->value('id');
+        $this->actingAs($admin)->postJson(route('v2.payments.approve', ['id' => $paymentId]), [
+            'bank_account_code' => '1104',
+        ])->assertOk()->assertJsonPath('status', 'posted');
+
+        $this->assertDatabaseHas('v2_payments', ['id' => $paymentId, 'bank_account_code' => '1104', 'status' => 'posted']);
+        $this->assertSame('120000.00', (string) app(AccountBalanceService::class)->balance('1104'));
+        $this->assertSame('0.00', (string) app(AccountBalanceService::class)->balance('1102'));
+
+        $daily = app(ReportsDocuments::class)->daily($admin->id, now()->toDateString());
+        $this->assertSame('120000.00', $daily['bank']['posted']);
+        $this->assertCount(1, $daily['bank']['by_account']);
+        $this->assertSame('1104', $daily['bank']['by_account'][0]['code']);
+        $this->assertSame('120000.00', $daily['bank']['by_account'][0]['posted']);
+    }
+
+    public function test_credit_sale_stores_optional_due_date_and_expenses_filter_by_specific_bank(): void
+    {
+        config(['v2.enabled' => true]);
+        $this->seedBaseAccounts();
+        DB::table('chart_of_accounts')->insert([
+            'account_code' => '1104',
+            'account_name' => 'Bank BCA',
+            'account_type' => 'asset',
+            'normal_balance' => 'debit',
+            'is_active' => true,
+            'is_bank_account' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->fund('1102', '500000.00');
+        $this->fund('1104', '500000.00');
+
+        $admin = $this->actor('admin');
+        app(Operations::class)->openShift($admin->id, '50000.00', 'admin');
+
+        $customerId = DB::table('v2_parties')->insertGetId([
+            'kind' => 'customer', 'code' => 'PLG-0100', 'name' => 'CV Bangun', 'is_active' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $productId = DB::table('products')->insertGetId([
+            'sku' => 'BSI-01', 'name' => 'Besi 10mm', 'unit' => 'batang', 'category' => 'Besi',
+            'selling_price' => '85000.00', 'cost_price' => '70000.0000', 'stock_quantity' => '10.0000',
+            'min_stock' => '2.0000', 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // Past due_date rejected.
+        $this->actingAs($admin)->postJson(route('v2.sales.store'), [
+            'items' => [['product_id' => $productId, 'quantity' => '1']],
+            'delivery_fee' => '0',
+            'customer_id' => $customerId,
+            'payment_method' => 'credit',
+            'due_date' => now()->subDay()->toDateString(),
+            'paid_amount' => '0',
+            'idempotency_key' => 'credit-due-past',
+            'fulfillment' => 'pickup',
+        ])->assertUnprocessable();
+
+        // Valid future due_date saved on receivable invoice.
+        $due = now()->addDays(14)->toDateString();
+        $res = $this->actingAs($admin)->postJson(route('v2.sales.store'), [
+            'items' => [['product_id' => $productId, 'quantity' => '2']],
+            'delivery_fee' => '0',
+            'customer_id' => $customerId,
+            'payment_method' => 'credit',
+            'due_date' => $due,
+            'paid_amount' => '0',
+            'idempotency_key' => 'credit-due-ok',
+            'fulfillment' => 'pickup',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('v2_invoices', ['id' => $res->json('invoice_id'), 'due_date' => $due]);
+
+        // Expenses filter by specific bank account.
+        $this->actingAs($admin)->postJson(route('v2.expenses.store'), [
+            'date' => now()->toDateString(), 'account_code' => '6102', 'source' => 'bank',
+            'bank_account_code' => '1102', 'amount' => '20000.00', 'description' => 'Biaya dari Bank Utama',
+        ])->assertCreated();
+        $this->actingAs($admin)->postJson(route('v2.expenses.store'), [
+            'date' => now()->toDateString(), 'account_code' => '6102', 'source' => 'bank',
+            'bank_account_code' => '1104', 'amount' => '35000.00', 'description' => 'Biaya dari Bank BCA',
+        ])->assertCreated();
+
+        $this->actingAs($admin)->get(route('expenses.index', ['payment_method' => 'bank:1104']))
+            ->assertOk()
+            ->assertSee('Biaya dari Bank BCA')
+            ->assertDontSee('Biaya dari Bank Utama');
     }
 }

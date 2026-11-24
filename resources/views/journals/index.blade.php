@@ -218,6 +218,35 @@
     </article>
 </section>
 
+@if($v2Writes)
+<details class="card adjustment-panel" id="transfer-panel">
+    <summary class="adjustment-summary">
+        <span><strong id="transfer-title">Pindah dana (Kas ↔ Bank / Antar-Bank)</strong><small>Setor kas tunai ke bank, tarik tunai, atau pindah saldo antar rekening bank.</small></span>
+        <span class="adjustment-toggle" aria-hidden="true">+</span>
+    </summary>
+    <div class="adjustment-content">
+    <h2 class="section-title">Pindah Dana Kas &amp; Bank</h2>
+    <p class="section-copy">Pilih akun sumber, akun tujuan, dan nominal. Jurnal seimbang dibuat otomatis tanpa memengaruhi laba rugi atau arus kas bersih.</p>
+    <form id="transfer-form" method="POST" action="{{ route('v2.journals.transfers.store') }}">
+        @csrf
+        <p class="err" data-adjustment-error role="alert" tabindex="-1" hidden></p>
+        <div class="adjustment-grid">
+            <div class="form-group"><label for="transfer-from">Dari akun (sumber)</label><select class="form-control" id="transfer-from" name="from_account_code" data-native-select required><option value="">Pilih akun sumber</option>@foreach($adjustmentAccounts as $account)<option value="{{ $account->account_code }}">{{ $account->account_code }} — {{ $account->account_name }}</option>@endforeach</select></div>
+            <div class="form-group"><label for="transfer-to">Ke akun (tujuan)</label><select class="form-control" id="transfer-to" name="to_account_code" data-native-select required><option value="">Pilih akun tujuan</option>@foreach($adjustmentAccounts as $account)<option value="{{ $account->account_code }}">{{ $account->account_code }} — {{ $account->account_name }}</option>@endforeach</select></div>
+            <div class="form-group"><label for="transfer-amount">Nominal (Rp)</label><input class="form-control" id="transfer-amount" name="amount" type="number" step="0.01" min="0.01" placeholder="0,00" required style="text-align:right;font-variant-numeric:tabular-nums"></div>
+            <div class="form-group"><label for="transfer-date">Tanggal</label><input class="form-control" id="transfer-date" type="date" name="transaction_date" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" required></div>
+            <div class="form-group adjustment-wide"><label for="transfer-description">Keterangan</label><input class="form-control" id="transfer-description" name="description" maxlength="200" placeholder="Mis. setor kas harian ke Bank BCA" required></div>
+        </div>
+        <p class="adjustment-hint">Saldo akun sumber tidak boleh menjadi negatif. Jurnal terkunci permanen setelah disimpan.</p>
+        <div class="adjustment-confirm">
+            <div class="form-group"><label for="transfer-password">Password login untuk konfirmasi</label><input class="form-control" id="transfer-password" name="password" type="password" autocomplete="current-password" placeholder="Masukkan password Anda" required></div>
+            <div class="adjustment-actions"><button class="btn btn-secondary" type="button" onclick="document.getElementById('transfer-panel').open = false; document.getElementById('transfer-password').value = ''; document.querySelector('#transfer-panel > summary').focus();">Batal</button><button class="btn" type="submit" @disabled($adjustmentAccounts->count() < 2)>Pindahkan dana</button></div>
+        </div>
+    </form>
+    </div>
+</details>
+@endif
+
 <details class="card adjustment-panel" id="adjustment-panel" @if($errors->any() && !$errors->has('opening_balance')) open @endif>
     <summary class="adjustment-summary">
         <span><strong id="adjustment-title">Sesuaikan saldo</strong><small>Saldo awal go-live atau koreksi akun.</small></span>

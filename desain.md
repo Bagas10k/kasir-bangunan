@@ -542,3 +542,21 @@ Berkas: `partials/table-filter-styles.blade.php` (kedua cangkang), `partials/fil
 - Di modal **Bagan Akun** (`coa/index.blade.php`), akun bertipe **Aset** menampilkan opsi **Gunakan sebagai Rekening Bank (metode pembayaran)** (`is_bank_account`); akun inti `1102` tetap terkunci aktif sebagai rekening bank bawaan.
 - Semua formulir transaksi yang mendukung metode Transfer/Bank (**Kasir**, **Tagihan Piutang & Utang Supplier**, **Pengeluaran**, **Uang Muka & Realisasi Sopir**, **Biaya Ritase**, dan **Ongkir Penerimaan**) menampilkan pemilih **Rekening bank** kontekstual (`[data-bank-account-field]` / `[data-expense-bank-field]`) hanya saat metode Transfer/Bank dipilih, sehingga form tunai tetap ringkas.
 - Menambah/mengubah akun bank di COA memicu `uiLive.refresh()` agar pilihan rekening di seluruh ruang kerja langsung terbarui tanpa muat ulang manual; tabel Verifikasi Pembayaran, Riwayat Tagihan, Detail Nota, dan Pengeluaran menampilkan kode + nama rekening bank yang dipakai, sementara Ringkasan Admin merinci saldo per rekening bila lebih dari satu bank aktif.
+- Di **Jurnal Umum** (`journals/index.blade.php`), tersedia panel **Pindah dana (Kas ↔ Bank / Antar-Bank)** (`#transfer-panel` / `#transfer-form`) beserta tautan cepat dari status Kas Harian yang sudah ditutup; di **Verifikasi pembayaran** admin tersedia dropdown koreksi rekening bank bila >1 bank aktif; di **Pengeluaran** filter sumber mendukung per rekening bank (`bank:<kode>`); di **Laporan Harian** blok Transfer bank merinci per rekening; dan di **Kasir** metode Kredit menampilkan input opsional **Jatuh tempo piutang**.
+
+## 60. Pil aksi cepat mobile
+
+- Pada ≤900px tampil pil aksi bawah dengan maksimal tiga tombol. Admin: **Buat orderan**, **Barang masuk**, **Pengeluaran**. Kasir: **Kasir**, **Riwayat**, **Status bayar**. Tidak ada menu keempat; setiap aksi satu ketukan.
+- Aksi memakai kontrol yang sudah ada: fokus katalog Kasir, tombol dialog penerimaan, atau tombol modal pengeluaran. Target remote ditunggu sebentar; bila tidak tersedia, halaman tetap terbuka tanpa error.
+- Pil tidak tampil di halaman Kasir (bar keranjang tetap utama). Disembunyikan saat dialog/modal, lembar keranjang, drawer sidebar, atau kolom teks fokus; konten utama diberi ruang bawah. Desktop menyembunyikan pil.
+- Visual: satu permukaan pil **hijau gelap**, tiga ikon garis tanpa label terlihat, tombol48px, lingkaran **lime** pada aksi aktif/utama dengan ikon hijau gelap. `role=toolbar`, `aria-label` per aksi, fokus terlihat, reduced-motion tanpa transisi; desktop menyembunyikan pil. Tombol lama di halaman tetap ada sebagai cadangan.
+- Pil dipusatkan di bawah dengan batas lebar **400 px** (`--ui-quick-actions-max-width`) dan jarak tepi 12 px pada ponsel; safe-area tetap dihormati.
+
+## 61. Tabel Pengeluaran responsif
+
+- Daftar Pengeluaran memakai gaya tabel Operasional bersama (`ui-dna-ops`, `ui-table-wrap`, `ui-table`): kartu label–nilai pada ≤760 px, tabel di atasnya, badge bertulisan, dan nominal rata kanan. Teks panjang boleh membungkus; gulir horizontal, bila perlu, terbatas di dalam tabel.
+- Khusus tablet (>760 hingga 900 px), tabel Pengeluaran punya lebar minimum 50 rem. Nomor, tanggal, dan badge tetap satu baris; kolom yang tidak muat bisa dijangkau dengan menggeser tabel.
+
+## 62. Dialog Penerimaan barang
+
+- Info penerimaan, rekomendasi stok, barang terpilih, dan ongkir dipisahkan secara visual. Bila ruang form sempit, gunakan kartu dengan label Jumlah/HPP, subtotal, dan hapus; bila lebar, gunakan baris sejajar. Penambahan rekomendasi tidak memindahkan fokus ke isian jumlah.

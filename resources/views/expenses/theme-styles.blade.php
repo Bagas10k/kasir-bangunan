@@ -33,21 +33,10 @@
 :is(.expenses-page,#exp#exp) .exp-filter:not([data-filter-ready]) :is(input,select,.date-trigger,.select-shell>.select-trigger){width:100% !important;min-height:44px !important;height:44px !important;padding:0 12px !important;border:1px solid #dfe6e1 !important;border-radius:8px !important;background:#fff !important;color:#102a1d !important;font:inherit;font-size:14px !important;box-shadow:none !important}
 :is(.expenses-page,#exp#exp) .exp-filter:not([data-filter-ready]) .exp-filter-actions{display:flex;gap:8px;align-items:center}
 
-/* Tabel berkepala hijau tua (#14532D) teks putih — bobot selektor menang atas ui-minimal */
-:is(.expenses-page,#exp#exp) .exp-table-wrap{overflow:auto;border:1px solid #e4ebe6 !important;border-radius:10px !important;background:#fff !important}
-:is(.expenses-page,#exp#exp) .exp-table{width:100%;border-collapse:separate !important;border-spacing:0 !important;margin:0 !important}
-:is(.expenses-page,#exp#exp) .exp-table thead th{position:static;height:44px !important;padding:0 16px !important;vertical-align:middle !important;border:0 !important;border-radius:0 !important;background:#14532d !important;color:#fff !important;font-size:13px !important;font-weight:600 !important;text-align:left;text-transform:none !important;letter-spacing:0 !important;white-space:nowrap}
-:is(.expenses-page,#exp#exp) .exp-table tbody td{padding:12px 16px !important;border:0 !important;border-bottom:1px solid #eef2ef !important;vertical-align:middle;font-size:14px !important;line-height:20px;color:#3c4a42 !important;background:#fff !important}
-:is(.expenses-page,#exp#exp) .exp-table tbody tr:last-child td{border-bottom:0 !important}
-:is(.expenses-page,#exp#exp) .exp-table tbody tr:hover td{background:#f8faf9 !important}
-:is(.expenses-page,#exp#exp) .exp-table .exp-amount{text-align:right;font-weight:700 !important;color:#102a1d !important;font-variant-numeric:tabular-nums;white-space:nowrap}
-:is(.expenses-page,#exp#exp) .exp-table .exp-code{font-size:13px !important;font-weight:600 !important;color:#102a1d !important;white-space:nowrap;font-variant-numeric:tabular-nums}
-:is(.expenses-page,#exp#exp) .exp-badge{display:inline-flex;align-items:center;min-height:28px;padding:0 12px !important;border:1px solid transparent;border-radius:999px !important;font-size:13px !important;font-weight:700 !important;white-space:nowrap}
-:is(.expenses-page,#exp#exp) .exp-badge--mute{background:#f1f4f2 !important;border-color:#dfe6e1 !important;color:#5f7468 !important}
-:is(.expenses-page,#exp#exp) .exp-badge--ok{background:#e4f0e8 !important;border-color:#bfd8c7 !important;color:#14532d !important}
-:is(.expenses-page,#exp#exp) .exp-badge--warn{background:#fef3c7 !important;border-color:#f4d47c !important;color:#7a4b00 !important}
-:is(.expenses-page,#exp#exp) .exp-empty{padding:28px 16px !important;text-align:center;color:#5f7468 !important}
-:is(.expenses-page,#exp#exp) .exp-empty strong{display:block;margin-bottom:4px;font-size:15px;color:#102a1d}
+.expenses-page .exp-list,.expenses-page .exp-filter{min-width:0;max-width:100%}
+.expenses-page .exp-fact,.expenses-page .exp-table td{overflow-wrap:anywhere}
+html body .expenses-page .exp-table .ui-num{text-align:right;font-variant-numeric:tabular-nums}
+html body :is(.ui-dna-ops,#ui-dna-ops).expenses-page .exp-table .ui-badge{min-width:0;white-space:normal}
 :is(.expenses-page,#exp#exp) .exp-alert{padding:10px 14px;border-radius:10px;font-size:14px;line-height:1.45}
 :is(.expenses-page,#exp#exp) .exp-alert[hidden]{display:none !important}
 :is(.expenses-page,#exp#exp) .exp-alert--ok{border:1px solid #bfd8c7;background:#e4f0e8;color:#14532d;font-weight:600}
@@ -101,7 +90,18 @@
  :is(.expenses-page,#exp#exp) .exp-filter:not([data-filter-ready]){grid-template-columns:repeat(2,minmax(0,1fr))}
  :is(.expenses-page,#exp#exp) .exp-filter:not([data-filter-ready]) .exp-filter-actions{grid-column:1/-1}
 }
+@media(760px < width <= 900px){
+ .expenses-page{--expense-table-min-width:50rem}
+ .expenses-page .exp-table{min-width:var(--expense-table-min-width)}
+ .expenses-page .exp-table tbody td:not(:nth-child(4)){overflow-wrap:normal}
+ html body :is(.ui-dna-ops,#ui-dna-ops).expenses-page .exp-table :is(td:nth-child(-n+2),.ui-badge){white-space:nowrap}
+}
 @media(max-width:760px){
+ html body[data-active-task=pengeluaran] main.wrap.main-content{padding-inline:var(--ui-space-group)}
+ .expenses-page .exp-facts>.exp-fact:last-child{grid-column:1/-1}
+ .expenses-page .exp-table,.expenses-page .exp-table tbody{display:block}
+ .expenses-page .exp-table td[data-label]::before{content:attr(data-label)}
+ html body .expenses-page .exp-table .ui-num{min-width:0;white-space:normal}
  :is(.expenses-page,#exp#exp) .exp-card{padding:16px !important}
  :is(.expenses-page,#exp#exp) .exp-summary-head .exp-btn{width:100%}
  :is(.expenses-page,#exp#exp) .exp-filter:not([data-filter-ready]){grid-template-columns:1fr}

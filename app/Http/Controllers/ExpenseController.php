@@ -9,6 +9,7 @@ use Brick\Math\BigDecimal;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class ExpenseController extends Controller
@@ -19,7 +20,12 @@ class ExpenseController extends Controller
             'start_date' => 'nullable|date_format:Y-m-d',
             'end_date' => ['nullable', 'date_format:Y-m-d', ...($request->filled('start_date') ? ['after_or_equal:start_date'] : [])],
             'category' => 'nullable|string|max:100',
-            'payment_method' => 'nullable|in:cash,transfer',
+            'payment_method' => ['nullable', 'string', 'max:30', function (string $attribute, mixed $value, \Closure $fail): void {
+                $val = (string) $value;
+                if ($val !== 'cash' && $val !== 'transfer' && ! preg_match('/^bank:[A-Za-z0-9_-]{1,20}$/', $val)) {
+                    $fail('Filter sumber dana tidak valid.');
+                }
+            }],
         ]);
         $expenseQuery = DB::table('expenses');
         if (! empty($filters['start_date'])) {
@@ -32,7 +38,21 @@ class ExpenseController extends Controller
             $expenseQuery->where('category', $filters['category']);
         }
         if (! empty($filters['payment_method'])) {
-            $expenseQuery->where('payment_method', $filters['payment_method']);
+            $methodFilter = (string) $filters['payment_method'];
+            if (str_starts_with($methodFilter, 'bank:')) {
+                $bankCode = substr($methodFilter, 5);
+                $expenseQuery->where('payment_method', 'transfer');
+                if (Schema::hasColumn('expenses', 'bank_account_code')) {
+                    $expenseQuery->where(function ($q) use ($bankCode): void {
+                        $q->where('bank_account_code', $bankCode);
+                        if ($bankCode === BankAccounts::DEFAULT_BANK) {
+                            $q->orWhereNull('bank_account_code');
+                        }
+                    });
+                }
+            } else {
+                $expenseQuery->where('payment_method', $methodFilter);
+            }
         }
         $expenses = $expenseQuery->latest()->limit(10)->get();
         $expenseCategories = DB::table('expenses')->distinct()->orderBy('category')->pluck('category');

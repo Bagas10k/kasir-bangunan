@@ -3,6 +3,7 @@
 use App\Http\Controllers\ChartOfAccountController;
 use App\Http\Controllers\V2\AccountController;
 use App\Http\Controllers\V2\CashBankAdjustmentController;
+use App\Http\Controllers\V2\CashBankTransferController;
 use App\Http\Controllers\V2\OperatingExpenseController;
 use App\Http\Controllers\V2\SupplierActivityController;
 use App\Http\Controllers\V2\WorkspaceController;
@@ -15,6 +16,7 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::put('/chart-of-accounts/{id}', [ChartOfAccountController::class, 'update'])->whereNumber('id')->middleware('throttle:30,1')->name('coa.update');
     Route::patch('/chart-of-accounts/{id}/archive', [ChartOfAccountController::class, 'archive'])->whereNumber('id')->middleware('throttle:30,1')->name('coa.archive');
     Route::post('/journals/adjustments', [CashBankAdjustmentController::class, 'store'])->middleware('throttle:30,1')->name('journals.adjustments.store');
+    Route::post('/journals/transfers', [CashBankTransferController::class, 'store'])->middleware('throttle:30,1')->name('journals.transfers.store');
     Route::post('/expenses', [OperatingExpenseController::class, 'store'])->middleware('throttle:30,1')->name('expenses.store');
     Route::get('/invoices', [WorkspaceController::class, 'invoices'])->name('invoices.index');
     Route::get('/sales/{id}/detail', [WorkspaceController::class, 'saleDetail'])->whereNumber('id')->name('sales.detail');

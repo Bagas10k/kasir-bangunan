@@ -6,6 +6,7 @@ use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -120,6 +121,11 @@ final class ReportsDocuments
 
         $posted = $this->zero();
         $pending = $this->zero();
+        $hasBankCol = Schema::hasColumn('v2_payments', 'bank_account_code');
+        $paymentCols = ['v2_payments.amount', 'v2_payments.status'];
+        if ($hasBankCol) {
+            $paymentCols[] = 'v2_payments.bank_account_code';
+        }
         $payments = DB::table('v2_payments')
             ->join('v2_invoices', 'v2_invoices.id', '=', 'v2_payments.invoice_id')
             ->where('v2_invoices.direction', 'receivable')
@@ -134,15 +140,36 @@ final class ReportsDocuments
                     });
             })
             ->when($own, fn ($q) => $q->where('v2_payments.requested_by', $actor))
-            ->get(['v2_payments.amount', 'v2_payments.status']);
+            ->get($paymentCols);
 
+        $bankNames = app(BankAccounts::class)->nameMap(false);
+        $byBank = [];
         foreach ($payments as $payment) {
+            $bankCode = trim((string) ($payment->bank_account_code ?? '')) ?: BankAccounts::DEFAULT_BANK;
+            if (! isset($byBank[$bankCode])) {
+                $byBank[$bankCode] = [
+                    'code' => $bankCode,
+                    'name' => $bankNames[$bankCode] ?? ($bankCode === BankAccounts::DEFAULT_BANK ? 'Bank Utama' : $bankCode),
+                    'posted' => $this->zero(),
+                    'pending' => $this->zero(),
+                ];
+            }
+            $amount = $this->money($payment->amount);
             if ($payment->status === 'posted') {
-                $posted = $posted->plus($this->money($payment->amount));
+                $posted = $posted->plus($amount);
+                $byBank[$bankCode]['posted'] = $byBank[$bankCode]['posted']->plus($amount);
             } elseif (in_array($payment->status, ['pending', 'proposed'], true)) {
-                $pending = $pending->plus($this->money($payment->amount));
+                $pending = $pending->plus($amount);
+                $byBank[$bankCode]['pending'] = $byBank[$bankCode]['pending']->plus($amount);
             }
         }
+        ksort($byBank);
+        $bankBreakdown = array_values(array_map(fn (array $row): array => [
+            'code' => $row['code'],
+            'name' => $row['name'],
+            'posted' => $this->str($row['posted']),
+            'pending' => $this->str($row['pending']),
+        ], $byBank));
 
         return [
             'date' => $date,
@@ -168,6 +195,7 @@ final class ReportsDocuments
             'bank' => [
                 'posted' => $this->str($posted),
                 'pending' => $this->str($pending),
+                'by_account' => $bankBreakdown,
             ],
             'shifts' => [
                 'count' => count($shiftIds),

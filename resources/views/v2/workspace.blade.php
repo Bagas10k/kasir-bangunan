@@ -98,7 +98,7 @@
                 @if($activeStoreShift)
                 Kas harian {{ substr((string) $activeStoreShift->opened_at, 0, 10) }} masih terbuka. Selesaikan penghitungan dan penutupannya sebelum memulai hari berikutnya.
                 @elseif(!empty($todayCashDay))
-                Kas harian {{ substr((string) $todayCashDay->opened_at, 0, 10) }} sudah ditutup dan tidak dapat dibuka lagi. Catatan baru tersedia pada hari berikutnya.
+                Kas harian {{ substr((string) $todayCashDay->opened_at, 0, 10) }} sudah ditutup dan tidak dapat dibuka lagi. Catatan baru tersedia pada hari berikutnya. Perlu setor kas ke bank? Buka <a href="#jurnal" data-task-link="jurnal">Jurnal umum → Pindah dana</a>.
                 @else
                 Buka satu catatan kas harian untuk tanggal hari ini.
                 @endif
@@ -221,6 +221,15 @@
                                 @if($isAdmin)<td class="ui-actions">
                                 @if ($isAdmin && in_array(($pm->status ?? ''), ['pending', 'proposed'], true))
                                     <form class="form-approve" action="{{ route('v2.payments.approve', ['id' => $pm->id]) }}" novalidate>
+                                        @if(($pm->method ?? '') === 'transfer' && count($bankAccounts ?? []) > 1)
+                                            @php $selectedApproveBank = trim((string) ($pm->bank_account_code ?? '')) ?: '1102'; @endphp
+                                            <label class="sr" for="approve-bank-{{ $pm->id }}">Rekening bank verifikasi</label>
+                                            <select id="approve-bank-{{ $pm->id }}" name="bank_account_code" style="margin-bottom:6px;max-width:210px">
+                                                @foreach($bankAccounts as $bankAcc)
+                                                    <option value="{{ $bankAcc->account_code }}" @selected($selectedApproveBank === (string) $bankAcc->account_code)>{{ $bankAcc->account_code }} · {{ $bankAcc->account_name }}</option>
+                                                @endforeach
+                                            </select>
+                                        @endif
                                         <p><button type="submit" class="secondary">Verifikasi pembayaran</button></p>
                                         <p class="err" data-error tabindex="-1" hidden></p>
                                         <p class="ok" data-ok hidden></p>
@@ -289,6 +298,11 @@
                     <dl class="ui-kv">
                         <div class="is-total"><dt>Transfer terverifikasi</dt><dd>{{ $rp($daily['bank']['posted'] ?? null) }}</dd></div>
                         <div><dt>Menunggu verifikasi <x-ui.info-tip key="transfer_menunggu" label="Keterangan transfer menunggu verifikasi"/></dt><dd>{{ $rp($daily['bank']['pending'] ?? null) }}</dd></div>
+                        @if(!empty($daily['bank']['by_account']))
+                            @foreach($daily['bank']['by_account'] as $bankDay)
+                                <div><dt>&nbsp;&nbsp;↳ {{ $bankDay['code'] }} · {{ $bankDay['name'] }}</dt><dd>{{ $rp($bankDay['posted']) }}@if(\Brick\Math\BigDecimal::of((string) $bankDay['pending'])->isPositive()) <small class="ui-muted">(+{{ $rp($bankDay['pending']) }} tunggu)</small>@endif</dd></div>
+                            @endforeach
+                        @endif
                     </dl>
                     <p class="ui-sub">Transfer yang menunggu belum masuk bank sampai admin memverifikasi.</p>
                 </section>
@@ -491,6 +505,8 @@
             var credit = payMethod.value === 'credit';
             deposit.disabled = !credit;
             if (!credit) { deposit.value = 'cash'; }
+            var dueInput = document.getElementById('credit-due-date');
+            if (dueInput) { dueInput.disabled = !credit; if (!credit) { dueInput.value = ''; } }
             paidHint.textContent = credit
                 ? 'Kredit: isi DP yang dibayar sekarang di kolom Dibayar; sisa tagihan menjadi piutang pelanggan.'
                 : 'Tunai berlebih menjadi kembalian; transfer menerima sebesar total.';
@@ -520,6 +536,7 @@
                 payment_method: method,
                 deposit_method: method === 'credit' ? val(checkout, 'deposit_method') : null,
                 bank_account_code: checkout.elements['bank_account_code'] && !checkout.elements['bank_account_code'].disabled && checkout.elements['bank_account_code'].value ? checkout.elements['bank_account_code'].value : null,
+                due_date: method === 'credit' && val(checkout, 'due_date') !== '' ? val(checkout, 'due_date') : null,
                 paid_amount: val(checkout, 'paid_amount'),
                 idempotency_key: val(checkout, 'idempotency_key'),
                 fulfillment: val(checkout, 'fulfillment'),
@@ -617,7 +634,9 @@
         if (!form) { return; }
         {
             ev.preventDefault();
-            post(form, form.action, {}, true).then(function (data) { if (data) { liveSaved(form); } });
+            var approveBank = form.elements['bank_account_code'];
+            var approvePayload = approveBank && approveBank.value ? { bank_account_code: approveBank.value } : {};
+            post(form, form.action, approvePayload, true).then(function (data) { if (data) { liveSaved(form); } });
         }
     });
 })();
@@ -732,5 +751,6 @@
 @include('v2.transfer-proof-script')
 @include('v2.table-actions')
 @include('v2.ui-tooltip')
+@include('v2.mobile-quick-actions')
 </body>
 </html>

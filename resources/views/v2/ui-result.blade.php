@@ -181,7 +181,8 @@ html body .ur-btn.is-primary:hover{background:#0f2a1d}
         ['PATCH', /\/v2\/(?:master|relations)\/([a-z]+)\/\d+$/, function (d, m) { return { title: (SHOP[m[1]] || 'Data') + ' diarsipkan', detail: 'Riwayat transaksi tetap utuh.' }; }],
         ['POST', /\/v2\/accounts$/, function () { return { title: 'Akun login dibuat' }; }],
         ['PUT', /\/v2\/accounts\/\d+$/, function () { return { title: 'Akun login diperbarui' }; }],
-        ['POST', /\/v2\/expenses$/, function (d) { return { title: 'Pengeluaran dicatat', detail: (d && d.expense_number ? d.expense_number + ' · ' : '') + 'Jurnal seimbang sudah dikunci.' }; }]
+        ['POST', /\/v2\/expenses$/, function (d) { return { title: 'Pengeluaran dicatat', detail: (d && d.expense_number ? d.expense_number + ' · ' : '') + 'Jurnal seimbang sudah dikunci.' }; }],
+        ['POST', /\/v2\/journals\/transfers$/, function (d) { return { title: 'Pindah dana tercatat', detail: (d && d.from_account_code && d.to_account_code ? d.from_account_code + ' → ' + d.to_account_code + ' · ' : '') + 'Jurnal seimbang sudah dikunci.' }; }]
     ];
 
     function persist(o) {

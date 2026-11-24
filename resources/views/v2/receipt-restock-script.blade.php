@@ -18,8 +18,9 @@ function updateActions(){
         const product=records.find(row=>String(row.id)===id);
         const added=[...items.children].some(row=>row.querySelector('[data-name=product_id]')?.value===id);
         const matches=product.suppliers.some(row=>String(row.id)===supplier.value);
-        button.textContent=added?'Sudah ditambahkan':!product.suppliers.length?'Isi supplier':product.suppliers.length>1&&!matches?'Pilih supplier':'Tambahkan';
-        button.disabled=pending||!fresh||added||writing||Boolean(form.dataset.busy)||form.classList.contains('is-reviewing');
+        button.textContent=added?'Ditambahkan':!product.suppliers.length?'Isi supplier':product.suppliers.length>1&&!matches?'Pilih supplier':'Tambahkan';
+        if(added)button.setAttribute('aria-disabled','true');else button.removeAttribute('aria-disabled');
+        button.disabled=pending||!fresh||writing||Boolean(form.dataset.busy)||form.classList.contains('is-reviewing');
     }
 }
 function render(data){
@@ -87,7 +88,7 @@ function applySupplier(product,selected){
     }
     if(!form._selectReceiptSupplier?.(selected))return;
     const outcome=form._addRestockProduct?.(product);
-    message.textContent=outcome==='added'?product.name+' ditambahkan ke daftar penerimaan. Isi jumlah; HPP saat ini diisi jika tersedia dan dapat diubah.'
+    message.textContent=outcome==='added'?product.name+' ditambahkan. Lanjut pilih barang atau isi jumlah di bawah.'
         :outcome==='duplicate'?'Barang sudah ditambahkan.'
         :outcome==='limit'?'Maksimal 100 baris per penerimaan.':'Barang belum ditambahkan. Periksa formulir penerimaan.';
     updateActions();
@@ -152,7 +153,7 @@ save.addEventListener('click',async()=>{
 root.addEventListener('click',event=>{
     const button=event.target.closest('[data-restock-status],[data-restock-product]');if(!button)return;
     if(button.dataset.restockStatus){return load({...current,status:button.dataset.restockStatus,page:1});}
-    if(pending||!fresh||writing||button.disabled)return;
+    if(pending||!fresh||writing||button.disabled||button.getAttribute('aria-disabled')==='true')return;
     const product=records.find(row=>String(row.id)===button.dataset.restockProduct);if(!product)return;
     const matching=product.suppliers.find(row=>String(row.id)===supplier.value);
     if(matching||product.suppliers.length===1){closeEditor(false);applySupplier(product,matching||product.suppliers[0]);}

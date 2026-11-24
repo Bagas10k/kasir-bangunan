@@ -20,7 +20,7 @@
     $bankNamesMap = $bankAccountNames ?? $activeBankAccounts->pluck('account_name', 'account_code')->all();
     $bankBalancesMap = $bankBalances ?? ['1102' => $bankBalance ?? '0.00'];
 @endphp
-<div class="expenses-page" data-expense-root data-refresh-url="{{ route('expenses.index') }}">
+<div class="expenses-page ui-dna-ops" data-expense-root data-refresh-url="{{ route('expenses.index') }}">
     @if(session('success'))
         <div class="exp-alert exp-alert--ok" role="status">{{ session('success') }}</div>
     @endif
@@ -59,7 +59,7 @@
         </div>
     </section>
 
-    <section class="exp-card" aria-labelledby="exp-list-heading">
+    <section class="card exp-list" aria-labelledby="exp-list-heading">
         <div class="exp-head">
             <div>
                 <h2 id="exp-list-heading">Daftar pengeluaran</h2>
@@ -85,7 +85,13 @@
                     <select id="expense-filter-method" name="payment_method">
                         <option value="">Semua sumber</option>
                         <option value="cash" @selected(request('payment_method') === 'cash')>Kas tunai</option>
-                        <option value="transfer" @selected(request('payment_method') === 'transfer')>Transfer bank</option>
+                        <option value="transfer" @selected(request('payment_method') === 'transfer')>Transfer bank (semua)</option>
+                        @if($activeBankAccounts->count() > 1)
+                            @foreach($activeBankAccounts as $bankAcc)
+                                @php $bankOpt = 'bank:'.$bankAcc->account_code; @endphp
+                                <option value="{{ $bankOpt }}" @selected(request('payment_method') === $bankOpt)>{{ $bankAcc->account_code }} · {{ $bankAcc->account_name }}</option>
+                            @endforeach
+                        @endif
                     </select>
                 </div>
                 <div class="exp-filter-actions">
@@ -95,8 +101,8 @@
             </form>
         </div>
 
-        <div class="exp-table-wrap">
-            <table class="exp-table">
+        <div class="ui-table-wrap" tabindex="0" role="region" aria-labelledby="exp-list-heading">
+            <table class="ui-table exp-table" role="table">
                 <thead>
                     <tr>
                         <th scope="col">Nomor</th>
@@ -104,7 +110,7 @@
                         <th scope="col">Akun beban</th>
                         <th scope="col">Keterangan</th>
                         <th scope="col">Sumber</th>
-                        <th scope="col" style="text-align:right">Jumlah</th>
+                        <th scope="col" class="ui-num">Jumlah</th>
                         <th scope="col">Status</th>
                     </tr>
                 </thead>
@@ -118,22 +124,22 @@
                                 : 'Kas tunai';
                         @endphp
                         <tr>
-                            <td data-label="Nomor" class="exp-code">{{ $ex->expense_number }}</td>
+                            <td data-label="Nomor" class="ui-primary">{{ $ex->expense_number }}</td>
                             <td data-label="Tanggal">{{ \Illuminate\Support\Carbon::parse($ex->expense_date)->locale('id')->translatedFormat('j M Y') }}</td>
                             <td data-label="Akun beban">{{ $accountLabel }}</td>
                             <td data-label="Keterangan">{{ $ex->description ?: '—' }}</td>
-                            <td data-label="Sumber"><span class="exp-badge exp-badge--mute">{{ $sourceLabel }}</span></td>
-                            <td data-label="Jumlah" class="exp-amount">Rp {{ $formatMoney($ex->amount) }}</td>
+                            <td data-label="Sumber"><span class="ui-badge ui-badge--mute">{{ $sourceLabel }}</span></td>
+                            <td data-label="Jumlah" class="ui-num"><strong>Rp {{ $formatMoney($ex->amount) }}</strong></td>
                             <td data-label="Status">
                                 @if($ex->journal_entry_id)
-                                    <span class="exp-badge exp-badge--ok" data-tip="Jurnal pengeluaran sudah seimbang dan terkunci.">Terkunci</span>
+                                    <span class="ui-badge ui-badge--ok" data-tip="Jurnal pengeluaran sudah seimbang dan terkunci.">Terkunci</span>
                                 @else
-                                    <span class="exp-badge exp-badge--warn" data-tip="Belum memiliki jurnal di buku besar.">Belum dijurnal</span>
+                                    <span class="ui-badge ui-badge--warn" data-tip="Belum memiliki jurnal di buku besar.">Belum dijurnal</span>
                                 @endif
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="exp-empty"><strong>Belum ada catatan pengeluaran operasional.</strong>Tekan "+ Catat pengeluaran" di atas untuk mencatat biaya baru.</td></tr>
+                        <tr data-ui-empty-static><td colspan="7" class="ui-empty"><strong>Belum ada catatan pengeluaran operasional.</strong>Tekan "+ Catat pengeluaran" di atas untuk mencatat biaya baru.</td></tr>
                     @endforelse
                 </tbody>
             </table>

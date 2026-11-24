@@ -114,17 +114,22 @@ dialog.input-dialog.uf-dialog-wide{width:min(780px,calc(100vw - 32px));max-width
   dialog.input-dialog.uf-dialog,dialog.input-dialog.uf-dialog-wide{width:calc(100vw - 16px);max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
 }
 
-/* Penerimaan barang: satu baris per barang supaya daftar panjang tetap terbaca. */
-.rc-items{border:0;padding:0;margin:14px 0 0;min-width:0}
-.rc-items .lbl{padding:0;font-size:var(--ui-t-label);font-weight:600;color:var(--ui-muted)}
-.rc-head,.rc-row{display:grid;grid-template-columns:minmax(0,1fr) 92px 128px 112px 44px;gap:8px;align-items:center}
-.rc-head{margin:8px 0 4px;font-size:var(--ui-t-caption);font-weight:600;color:var(--ui-muted)}
+/* Adapt to the actual dialog width, not to the viewport. */
+#receipt-form{container-type:inline-size;--rc-compact-column:6rem;--rc-cost-column:8rem;--rc-value-column:7rem}
+html body #receipt-form :is(.rc-info,.rc-items,.rc-freight){min-width:0;margin:0 0 var(--ui-space-section);padding:var(--ui-space-group);border:var(--ui-stroke) solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-surface)}
+html body #receipt-form :is(.rc-info,.rc-freight):not([hidden]){display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--ui-detail-summary-min)),1fr));gap:var(--ui-space-group)}
+#receipt-form :is(.rc-info,.rc-items,.rc-freight)>legend{padding-inline:var(--ui-space-tight);font-size:var(--ui-t-label);font-weight:var(--ui-weight-strong);color:var(--ui-ink)}
+#receipt-form :is(.rc-info,.rc-freight)>.field{min-width:0;margin:0}
+.rc-head,.rc-row{display:grid;grid-template-columns:minmax(0,1fr) var(--rc-compact-column) var(--rc-cost-column) var(--rc-value-column) var(--ui-tap);gap:var(--ui-space-control);align-items:center}
+.rc-head{margin-block-end:var(--ui-space-tight);font-size:var(--ui-t-caption);font-weight:var(--ui-weight-medium);color:var(--ui-muted)}
 .rc-head>span:nth-child(2),.rc-head>span:nth-child(3),.rc-head>span:nth-child(4){text-align:right}
-.rc-row{padding:4px 0;border-top:1px solid var(--ui-line)}
+.rc-row{padding-block:var(--ui-space-tight);border-top:var(--ui-stroke) solid var(--ui-line)}
 .rc-row .field{margin:0;min-width:0}
-.rc-row input,.rc-row select,.rc-row .ui-pick-input{min-height:38px;margin:0}
+.rc-row input,.rc-row select,.rc-row .ui-pick-input{min-height:var(--ui-tap);margin:0;max-width:100%;min-width:0}
 .rc-row input[data-name=quantity],.rc-row input[data-name=unit_cost]{text-align:right}
-.rc-value{justify-self:end;font-variant-numeric:tabular-nums;font-size:var(--ui-t-body);color:var(--ui-ink);white-space:nowrap}
+.rc-field-label{display:none}
+.rc-line-value{text-align:right;min-width:0;overflow-wrap:anywhere}
+.rc-value{font-variant-numeric:tabular-nums;font-size:var(--ui-t-label);font-weight:var(--ui-weight-medium);color:var(--ui-ink)}
 .rc-remove{width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border-radius:10px;line-height:1}
 .rc-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--ui-line)}
 .rc-total{display:flex;align-items:baseline;gap:10px;margin:0}
@@ -188,13 +193,14 @@ html body dialog .close-recap .recap-pending{background:#FEF7E0;color:#7A4B00;bo
 tr.rh-void .rh-total strong,tr.rh-void .ui-num.rh-lines span{text-decoration:line-through;color:var(--ui-muted)}
 .rh-void-note{white-space:normal}
 @media (max-width:720px){.rc-review-meta{grid-template-columns:1fr}.rc-review-list li{grid-template-columns:1fr}.rc-review-list li>span{justify-self:start}.rc-review-actions button{flex:1}}
-@media (max-width:720px){
+@container (max-width:40rem){
   .rc-head{display:none}
-  .rc-row{grid-template-columns:1fr 1fr;grid-template-areas:'barang barang' 'jumlah hpp' 'nilai hapus';padding:10px 0}
+  .rc-row{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:'barang barang' 'jumlah hpp' 'nilai hapus';padding:var(--ui-space-control);margin-block-end:var(--ui-space-control);border:var(--ui-stroke) solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-canvas)}
   .rc-row .field:nth-child(1){grid-area:barang}
   .rc-row .field:nth-child(2){grid-area:jumlah}
   .rc-row .field:nth-child(3){grid-area:hpp}
-  .rc-value{grid-area:nilai;justify-self:start}
+  html body #receipt-form .rc-field-label{display:block;margin-block-end:var(--ui-space-tight);font-size:var(--ui-t-caption);color:var(--ui-ink-2)}
+  .rc-line-value{grid-area:nilai;text-align:left}
   .rc-remove{grid-area:hapus;justify-self:end}
 }
 </style>

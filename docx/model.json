@@ -3,11 +3,11 @@
   "steps": [
     {
       "id": "AM01",
-      "label": "Masuk dan keluar sesi",
+      "label": "Masuk dengan username atau email, dan keluar sesi",
       "actor": "Tamu / pengguna login",
-      "before": "GET/POST /login hanya guest; POST dibatasi throttle:10,1. Input email berupa email valid atau alias admin, password wajib; limiter identitas+IP menolak setelah 5 kegagalan selama jendela 60 detik.",
-      "after": "Auth::attempt mensyaratkan users.is_active; berhasil meregenerasi sesi, menyimpan pasangan id/auth_version, menghapus intended URL dan menuju pos.index (/). Gagal kembali ke login tanpa password. POST /logout (auth) logout, invalidasi sesi dan regenerasi token. Alias admin dipetakan ke email statis dalam sumber, bukan pencarian username umum.",
-      "evidence": "app/Http/Controllers/AuthController.php:126",
+      "before": "GET/POST /login hanya guest; POST dibatasi throttle:10,1. Input identitas berupa username pendek, email valid, atau alias admin, password wajib; limiter identitas+IP menolak setelah 5 kegagalan selama jendela 60 detik.",
+      "after": "Jika input bukan format email dan bukan alias admin, autentikasi diarahkan ke kolom users.username; Auth::attempt mensyaratkan users.is_active. Berhasil meregenerasi sesi, menyimpan pasangan id/auth_version, menghapus intended URL dan menuju pos.index (/). POST /logout (auth) logout, invalidasi sesi dan regenerasi token.",
+      "evidence": "app/Http/Controllers/AuthController.php:149",
       "tables": {
         "users": "read"
       }
@@ -29,7 +29,7 @@
       "label": "Batasi arsip legacy saat cutover",
       "actor": "Middleware web / admin atau kasir",
       "before": "config/v2.php:2 menetapkan enabled dari V2_ENABLED dengan default false; nilai runtime tidak dibaca. Bila aktif, demo-setup ditolak 404. Jalur v2, login, logout, up dan root memiliki pengecualian eksplisit.",
-      "after": "Untuk jalur legacy lain yang sudah terautentikasi, hanya admin dengan metode GET lolos; kasir atau metode tulis ditolak 403 oleh server. Root diteruskan; PosController::index mendelegasikan ke workspace bila enabled. Tidak menyatakan cutover sedang aktif pada instalasi ini.",
+      "after": "Untuk jalur legacy lain yang sudah terautentikasi, hanya admin dengan metode GET lolos; kasir atau metode tulis ditolak 403 oleh server. Root diteruskan; PosController::index mendelegasikan ke workspace bila enabled.",
       "evidence": "app/Http/Middleware/V2Cutover.php:12",
       "tables": {
         "users": "read",
@@ -38,11 +38,11 @@
     },
     {
       "id": "AM04",
-      "label": "Baca dan buat akun login",
+      "label": "Baca dan buat akun login (username dan/atau email)",
       "actor": "Admin aktif",
-      "before": "GET /v2/accounts dan POST /v2/accounts memerlukan auth dan admin aktif. POST throttle:20,1; name/email wajib max255; password terkonfirmasi 12–128; role admin/cashier dan is_active boolean wajib.",
-      "after": "Daftar memakai users LEFT JOIN v2_user_roles tanpa hash dan respons no-store. Pembuatan mengunci role, memeriksa ulang admin aktif dan email lower(trim) unik; membuat users dengan password hash/auth_version=1, role dan audit create secara atomik, respons 201. Email bentrok menjadi validasi. Akun login bukan v2_parties(kind=employee).",
-      "evidence": "app/Http/Controllers/V2/AccountController.php:55",
+      "before": "GET/POST /v2/accounts memerlukan auth dan admin aktif. POST throttle:20,1; name wajib max255; minimal salah satu dari username (3–32 karakter huruf kecil/angka/._-, bukan admin) atau email valid wajib; password terkonfirmasi 12–128; role admin/cashier dan is_active boolean wajib.",
+      "after": "Daftar memakai users LEFT JOIN v2_user_roles tanpa hash dan respons no-store. Pembuatan mengunci role, memeriksa ulang admin aktif serta keunikan username/email lower(trim); membuat users dengan password hash/auth_version=1, role dan audit create secara atomik, respons 201. Akun login bukan v2_parties(kind=employee).",
+      "evidence": "app/Http/Controllers/V2/AccountController.php:57",
       "tables": {
         "users": "create,read",
         "v2_user_roles": "create,read",
@@ -53,9 +53,9 @@
       "id": "AM05",
       "label": "Ubah akun tanpa memutus kendali admin",
       "actor": "Admin aktif",
-      "before": "PUT /v2/accounts/{id} numerik, throttle:20,1; payload name/email/role/is_active wajib, password opsional terkonfirmasi 12–128. Transaksi mengunci role/aktor/target; target hilang 404, aktor tidak sah 403.",
-      "after": "Dilarang nonaktif/demosi diri sendiri dan admin aktif terakhir (422). Shift target berstatus open melarang perubahan role/nonaktif. Email harus unik. users dan role diperbarui, audit update dibuat. HANYA perubahan role/status/password menaikkan auth_version, memutar remember_token serta menghapus sesi DB jika tabel sessions ada; perubahan nama/email saja tidak menaikkan versi.",
-      "evidence": "app/Http/Controllers/V2/AccountController.php:142",
+      "before": "PUT /v2/accounts/{id} numerik, throttle:20,1; payload name/role/is_active wajib, minimal salah satu username/email tetap terisi, password opsional terkonfirmasi 12–128. Transaksi mengunci role/aktor/target; target hilang 404, aktor tidak sah 403.",
+      "after": "Dilarang nonaktif/demosi diri sendiri dan admin aktif terakhir (422). Shift target berstatus open melarang perubahan role/nonaktif. Username dan email harus unik. users dan role diperbarui, audit update dibuat. Perubahan role, status, password, ATAU username menaikkan auth_version, memutar remember_token serta menghapus sesi DB jika tabel sessions ada.",
+      "evidence": "app/Http/Controllers/V2/AccountController.php:147",
       "tables": {
         "users": "read,update",
         "v2_user_roles": "create,read,update",
@@ -68,9 +68,9 @@
       "id": "AM06",
       "label": "Baca dan buat master dasar",
       "actor": "Admin aktif",
-      "before": "GET/POST /v2/master/{kind}: kind product/customer/supplier/employee/vehicle; kind tidak dikenal pada dua handler ini 404. Validasi text wajib dan batas panjang, angka nonnegatif; SKU/kode/plat tidak boleh sudah ada.",
+      "before": "GET/POST /v2/master/{kind}: kind product/customer/supplier/employee/vehicle; kind tidak dikenal 404. Validasi text wajib dan batas panjang, angka nonnegatif; SKU/kode/plat tidak boleh sudah ada.",
       "after": "GET membaca maksimal 100 record terbaru per kind, produk disertai supplier. POST atomik membuat produk stok 0, kendaraan status active atau pihak is_active=true; produk melalui resolusi satuan/kategori dan supplier. Customer price_tier hanya retail/contractor; contractor_price positif atau null. Employee hanya master pihak, tidak membuat users/role atau akses login.",
-      "evidence": "app/Services/V2/MasterData.php:95",
+      "evidence": "app/Services/V2/MasterData.php:96",
       "tables": {
         "products": "create,read",
         "vehicles": "create,read",
@@ -81,11 +81,11 @@
     },
     {
       "id": "AM07",
-      "label": "Ubah atau arsip master tanpa hapus riwayat",
+      "label": "Ubah, arsip, atau aktifkan kembali master tanpa hapus riwayat",
       "actor": "Admin aktif",
-      "before": "PUT/PATCH /v2/master/{kind}/{id} numerik; service memeriksa admin/kind dan mengunci record terikat kind. ID hilang atau input tidak valid menghasilkan pesan 422 melalui WorkspaceController::run.",
-      "after": "PUT tidak mengganti kind/stok/status arsip; field numerik tertentu, notes dan tier yang tidak dikirim dipertahankan. HPP produk tidak boleh berubah bila stok nonzero atau ada stock_movements. PATCH hanya menonaktifkan (kendaraan status inactive, lainnya is_active=false), tanpa hard delete; tidak ada guard larangan arsip berdasar pemakaian di metode ini.",
-      "evidence": "app/Services/V2/MasterData.php:136",
+      "before": "PUT/PATCH /v2/master/{kind}/{id} dan PATCH /v2/master/{kind}/{id}/activate numerik; service memeriksa admin/kind dan mengunci record terikat kind.",
+      "after": "PUT tidak mengganti kind/stok/status arsip; HPP produk tidak boleh berubah bila stok nonzero atau ada stock_movements. PATCH arsip menonaktifkan (kendaraan status inactive, lainnya is_active=false) tanpa hard delete; PATCH activate memulihkan kembali dari arsip (active/is_active=true) dengan riwayat utuh.",
+      "evidence": "app/Services/V2/MasterData.php:137",
       "tables": {
         "products": "read,update",
         "vehicles": "read,update",
@@ -97,10 +97,10 @@
     },
     {
       "id": "AM08",
-      "label": "Kelola satuan dan kategori",
+      "label": "Kelola satuan dan kategori (termasuk aktivasi ulang)",
       "actor": "Admin aktif",
-      "before": "POST/PUT/PATCH /v2/relations/{kind}[/{id}] membatasi kind driver/unit/category dan ID numerik. Untuk unit/category: name wajib dengan batas 32/50 dan unik dalam type.",
-      "after": "Membuat product_options aktif; rename memperbarui teks unit/category pada products yang terhubung ID. Arsip hanya is_active=false; pemakaian produk tidak menghalangi arsip dan relasi lama tidak dihapus. Jenis/ID tidak cocok ditolak. Pembuatan atau penggantian pilihan produk baru perlu opsi aktif, sedangkan tautan produk yang sudah sama tetap sah setelah opsi diarsip.",
+      "before": "POST/PUT/PATCH /v2/relations/{kind}[/{id}] dan PATCH /v2/relations/{kind}/{id}/activate membatasi kind driver/unit/category dan ID numerik. Untuk unit/category: name wajib dengan batas 32/50 dan unik dalam type.",
+      "after": "Membuat product_options aktif; rename memperbarui teks unit/category pada products yang terhubung ID. Arsip menyetel is_active=false tanpa menghapus relasi lama; activate memulihkan is_active=true. Pilihan produk baru wajib opsi aktif, sedangkan tautan lama tetap sah walau opsi diarsip.",
       "evidence": "app/Services/V2/MasterRelations.php:31",
       "tables": {
         "product_options": "create,read,update",
@@ -111,9 +111,9 @@
       "id": "AM09",
       "label": "Kelola sopir terpisah dari akun login",
       "actor": "Admin aktif",
-      "before": "Rute relations driver memakai MasterRelations. kind internal/external wajib; code unik. Internal wajib merujuk v2_parties employee aktif yang belum dipakai sopir lain; external tidak boleh employee_id dan wajib nama.",
-      "after": "Create/PUT menyimpan v2_drivers, internal memakai nama employee; saat PUT menuju external employee_id dikosongkan. PATCH menonaktifkan sopir, tidak menghapus. Driver resolver menolak sopir nonaktif/pegawai internal nonaktif. Tidak ada pembuatan users/role pada alur ini.",
-      "evidence": "app/Services/V2/MasterRelations.php:179",
+      "before": "Rute relations driver memakai MasterRelations (store/update/archive/activate). kind internal/external wajib; code unik. Internal wajib merujuk v2_parties employee aktif yang belum dipakai sopir lain; external tidak boleh employee_id dan wajib nama.",
+      "after": "Create/PUT menyimpan v2_drivers, internal memakai nama employee; saat PUT menuju external employee_id dikosongkan. PATCH menonaktifkan atau mengaktifkan kembali sopir tanpa menghapus. Driver resolver menolak sopir nonaktif/pegawai internal nonaktif. Tidak ada pembuatan users/role pada alur ini.",
+      "evidence": "app/Services/V2/MasterRelations.php:192",
       "tables": {
         "v2_drivers": "create,read,update",
         "v2_parties": "read"
@@ -124,8 +124,8 @@
       "label": "Validasi tautan produk ke opsi dan supplier",
       "actor": "Admin melalui create/update produk",
       "before": "Payload product menerima unit_id/category_id atau nama teks; supplier_ids array ID unik dan primary_supplier_id opsional. Dipanggil dalam transaksi MasterData::store/update, bukan endpoint mandiri.",
-      "after": "Teks opsi baru dapat membuat product_options saat write saja; pilihan baru harus aktif, tautan opsi lama boleh tetap walau arsip. Supplier baru harus kind supplier aktif; supplier terarsip yang sudah tertaut boleh dipertahankan. Primary harus anggota daftar. Jika field supplier tidak dikirim, tautan tidak diubah; replace menghapus lalu membuat ulang link, hanya-primary memperbarui is_primary. Kesalahan membatalkan transaksi master.",
-      "evidence": "app/Services/V2/MasterRelations.php:100",
+      "after": "Teks opsi baru dapat membuat product_options saat write saja; pilihan baru harus aktif, tautan opsi lama boleh tetap walau arsip. Supplier baru harus kind supplier aktif; supplier terarsip yang sudah tertaut boleh dipertahankan. Primary harus anggota daftar. Kesalahan membatalkan transaksi master.",
+      "evidence": "app/Services/V2/MasterRelations.php:113",
       "tables": {
         "product_options": "create,read",
         "v2_parties": "read",
@@ -137,7 +137,7 @@
       "label": "Cari atau buat pelanggan dari kasir",
       "actor": "Admin / kasir aktif",
       "before": "GET /v2/customers/search menerima q wajib string max255; role admin/cashier. POST /v2/customers/resolve menerima name wajib string max255, service menormalkan spasi dan mensyaratkan panjang 2–255.",
-      "after": "Search di bawah 2 karakter kosong; hanya customer aktif, nama mengandung term atau kode berawalan term, default maksimal 8. Resolve memakai kecocokan nama case-insensitive: customer aktif dikembalikan, terarsip ditolak 422; bila belum ada dibuat kode CUS berurutan aktif. Tidak menyentuh uang/stok/jurnal dan tidak membuka master umum untuk kasir.",
+      "after": "Search di bawah 2 karakter kosong; hanya customer aktif, nama mengandung term atau kode berawalan term, default maksimal 8. Resolve memakai kecocokan nama case-insensitive: customer aktif dikembalikan, terarsip ditolak 422; bila belum ada dibuat kode CUS berurutan aktif. Tidak menyentuh uang/stok/jurnal.",
       "evidence": "app/Services/V2/CustomerLookup.php:48",
       "tables": {
         "v2_parties": "create,read"
@@ -149,7 +149,7 @@
       "actor": "Admin aktif",
       "before": "GET /v2/templates/{kind}; MasterData mensyaratkan admin. Hanya product/customer/supplier/employee/vehicle; driver/unit/category secara eksplisit tidak tersedia.",
       "after": "Menghasilkan XLSX header sesuai columns(kind), sebagai unduhan private/no-store tanpa mutasi master. Template produk berisi sku,name,unit,category,cost_price,selling_price,min_stock; tidak menyediakan stok awal atau tautan supplier.",
-      "evidence": "app/Services/V2/MasterData.php:354",
+      "evidence": "app/Services/V2/MasterData.php:374",
       "tables": {
         "users": "read",
         "v2_user_roles": "read"
@@ -160,8 +160,8 @@
       "label": "Pratinjau impor dan simpan batch tervalidasi",
       "actor": "Admin aktif",
       "before": "POST /v2/imports/{kind}/preview dengan file wajib max2048 KB. Parser XLSX memeriksa header lengkap tanpa kolom asing/duplikat/stok-saldo; batas 1000 baris, ZIP 100 entri/10MB, menolak path tidak aman, macro, formula dan external reference.",
-      "after": "Validasi kolom/angka dan duplikasi key dalam file maupun DB. Gagal memberi errors dan batch_id=null tanpa menulis master; berhasil menyimpan v2_import_batches status preview, rows normalisasi dan actor_id, lalu mengembalikan batch_id/count serta maksimal 100 baris. Preview bukan read-only total: ada tulis batch, namun tidak membuat product_options/master.",
-      "evidence": "app/Services/V2/MasterData.php:363",
+      "after": "Validasi kolom/angka dan duplikasi key dalam file maupun DB. Gagal memberi errors dan batch_id=null tanpa menulis master; berhasil menyimpan v2_import_batches status preview, rows normalisasi dan actor_id, lalu mengembalikan batch_id/count serta maksimal 100 baris.",
+      "evidence": "app/Services/V2/MasterData.php:383",
       "tables": {
         "v2_import_batches": "create",
         "products": "read",
@@ -174,8 +174,8 @@
       "label": "Commit batch impor milik sendiri",
       "actor": "Admin pemilik batch",
       "before": "POST /v2/import-batches/{id}/commit, ID numerik; requireAdmin dan lock v2_import_batches. Batch hilang 422; actor_id berbeda 403.",
-      "after": "Batch committed dikembalikan idempoten tanpa insert ulang. Batch belum committed dibaca rows/kind lalu tiap baris masuk MasterData::store untuk revalidasi aturan terbaru. Seluruh insert dan perubahan status committed satu transaksi; bentrok/perubahan opsi setelah preview menggagalkan seluruh commit. Produk impor tetap stok 0, tanpa jurnal/faktur awal.",
-      "evidence": "app/Services/V2/MasterData.php:451",
+      "after": "Batch committed dikembalikan idempoten tanpa insert ulang. Batch belum committed dibaca rows/kind lalu tiap baris masuk MasterData::store untuk revalidasi aturan terbaru. Seluruh insert dan perubahan status committed satu transaksi; produk impor tetap stok 0, tanpa jurnal/faktur awal.",
+      "evidence": "app/Services/V2/MasterData.php:471",
       "tables": {
         "v2_import_batches": "read,update",
         "products": "create,read",
@@ -188,8 +188,8 @@
       "id": "AM15",
       "label": "Pratinjau saldo awal sistem bersih",
       "actor": "Admin dengan sesi aktif",
-      "before": "POST /v2/opening-balances/preview meneruskan payload date,reference,cash,bank,inventory,receivables,payables. requireAdmin membaca role; web middleware menegakkan akun aktif. Dilarang bila sudah ada batch pembukaan, journal_entries, stok produk nonzero atau v2_invoices.",
-      "after": "Tanpa mutasi DB: normalisasi desimal, tanggal valid, referensi max50, kas/bank/qty/HPP nonnegatif; produk harus ada dan tidak duplikat. Piutang butuh customer aktif, utang supplier aktif, nomor faktur unik termasuk antar kedua kelompok, amount positif dan due_date valid. Ringkasan serta rancangan jurnal mengimbangi selisih aset-utang ke ekuitas 3101; pembukaan kosong ditolak.",
+      "before": "POST /v2/opening-balances/preview meneruskan payload date,reference,cash,bank,inventory,receivables,payables. Dilarang bila sudah ada batch pembukaan, journal_entries, stok produk nonzero atau v2_invoices.",
+      "after": "Tanpa mutasi DB: normalisasi desimal, tanggal valid, referensi max50, kas/bank/qty/HPP nonnegatif; produk harus ada dan tidak duplikat. Piutang butuh customer aktif, utang supplier aktif, nomor faktur unik, amount positif dan due_date valid. Ringkasan serta rancangan jurnal mengimbangi selisih aset-utang ke ekuitas 3101.",
       "evidence": "app/Services/V2/OpeningBalances.php:60",
       "tables": {
         "v2_user_roles": "read",
@@ -204,8 +204,8 @@
       "id": "AM16",
       "label": "Posting saldo awal sekali, atomik dan immutable",
       "actor": "Admin dengan sesi aktif",
-      "before": "POST /v2/opening-balances dengan payload pembukaan; idempotency_key string 8–100 dan array inventory/receivables/payables masing-masing max1000 pada controller. Service mengulangi validasi preview dan mengunci batch singleton, akun modal serta produk. Tidak mewajibkan token/batch hasil preview.",
-      "after": "Jika batch sudah ada, key DAN hash payload sama mengembalikan idempotent_ok; selain itu ditolak sebagai immutable. Posting membuat v2_opening_batches, jurnal seimbang melalui Ledger, memperbarui stok/HPP dan stock_movements, membuat faktur receivable/payable open paid=0 tanpa sale/receipt palsu, menautkan journal_entry_id. Akun COA terpakai harus aktif/ada; gagal membatalkan transaksi. Tidak tersedia edit/reset saldo awal di routes/v2.php.",
+      "before": "POST /v2/opening-balances dengan payload pembukaan; idempotency_key string 8–100 dan array inventory/receivables/payables masing-masing max1000 pada controller. Service mengulangi validasi preview dan mengunci batch singleton, akun modal serta produk.",
+      "after": "Jika batch sudah ada, key DAN hash payload sama mengembalikan idempotent_ok; selain itu ditolak sebagai immutable. Posting membuat v2_opening_batches, jurnal seimbang melalui Ledger, memperbarui stok/HPP dan stock_movements, membuat faktur receivable/payable open paid=0 tanpa sale/receipt palsu. Tidak tersedia edit/reset saldo awal di routes/v2.php.",
       "evidence": "app/Services/V2/OpeningBalances.php:84",
       "tables": {
         "v2_user_roles": "read",
@@ -220,17 +220,32 @@
       }
     },
     {
+      "id": "AM17",
+      "label": "Kelola Bagan Akun (COA) dan tandai Rekening Bank aktif",
+      "actor": "Admin aktif",
+      "before": "POST /v2/chart-of-accounts, PUT /v2/chart-of-accounts/{id}, PATCH /v2/chart-of-accounts/{id}/archive (throttle:30,1, admin wajib). Kode akun wajib cocok dengan jenis akun dan saldo normalnya. Penanda is_bank_account hanya sah untuk akun Aset bersaldo normal Debet yang bukan akun inti non-bank; 1102 wajib tetap aktif dan bertanda Rekening Bank.",
+      "after": "Menambah, memperbarui, atau mengarsipkan akun pada chart_of_accounts tanpa hard delete; akun yang sudah dipakai jurnal tidak boleh diubah kode/jenis/saldo normalnya dan akun inti sistem tidak boleh diubah kodenya atau diarsip. Setiap akun aktif bertanda is_bank_account=true (bersama 1102) dibaca terpusat lewat BankAccounts dan otomatis tersedia sebagai pilihan Rekening Bank pada Kasir, Tagihan, Verifikasi, Pengeluaran, Perjalanan, Ongkir Penerimaan, Penyesuaian/Pindah Dana, Laporan Harian, dan Arus Kas.",
+      "evidence": "app/Http/Controllers/ChartOfAccountController.php:139",
+      "tables": {
+        "chart_of_accounts": "create,read,update",
+        "journal_entry_lines": "read",
+        "v2_user_roles": "read",
+        "users": "read"
+      }
+    },
+    {
       "id": "RP01",
-      "label": "Buka tagihan dan penerimaan",
+      "label": "Buka tagihan, penerimaan dan daftar pembayaran",
       "actor": "Admin; kasir untuk tagihan/pembayaran",
-      "before": "GET /v2, autentikasi web dan sesi akun aktif; Operations::role hanya menerima admin/cashier aktif. Jika konfigurasi V2 aktif, endpoint ini mengalihkan ke pos.index, bukan langsung merender. Pemfilteran data dijelaskan untuk WorkspaceController::index saat dipanggil.",
-      "after": "Tagihan 100 terakhir dibaca tanpa pembatas pemilik; last_payment_id ialah pembayaran terakhir selain rejected. Pembayaran 50 terakhir dibatasi requested_by untuk kasir. Admin membaca 50 penerimaan final dan 50 draf draft/cancelled; final memiliki audit konfirmasi melalui receipt_id. Tidak mengubah data transaksi.",
-      "evidence": "app/Http/Controllers/V2/WorkspaceController.php:34",
+      "before": "GET /v2 atau GET /v2/invoices (filter arah/status/pencarian/tanggal/paginasi server), autentikasi web dan sesi akun aktif; Operations::role hanya menerima admin/cashier aktif. Jika konfigurasi V2 aktif, /v2 mengalihkan ke pos.index.",
+      "after": "Tagihan dipaginasi di server lintas tanggal; last_payment_id ialah pembayaran terakhir selain rejected, dilengkapi riwayat pembayaran beserta penanda bukti transfer dan rekening bank. Pembayaran 50 terakhir dibatasi requested_by untuk kasir. Admin membaca 50 penerimaan final dan 50 draf draft/cancelled; final memiliki audit konfirmasi melalui receipt_id. Tidak mengubah data transaksi.",
+      "evidence": "app/Http/Controllers/V2/WorkspaceController.php:39",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
         "v2_invoices": "read",
         "v2_payments": "read",
+        "v2_payment_proofs": "read",
         "v2_parties": "read",
         "inventory_receipts": "read",
         "inventory_receipt_items": "read",
@@ -240,57 +255,59 @@
     },
     {
       "id": "RP02",
-      "label": "Cari barang supplier",
+      "label": "Cari barang supplier atau daftar perlu restok",
       "actor": "Admin",
-      "before": "GET /v2/suppliers/{id}/products; autentikasi, sesi aktif, role admin di service. q opsional string maksimal 100 karakter; supplier id numerik pada rute.",
-      "after": "Hanya relasi produk-supplier milik id tersebut, supplier aktif berjenis supplier dan produk aktif. Nama/SKU dicari dengan LIKE, hasil diurut nama, default 30 dibatasi 1..50; total dan results dikembalikan. Supplier tidak cocok menghasilkan daftar kosong, bukan penerimaan atau jurnal.",
-      "evidence": "app/Services/V2/SupplyTrips.php:395",
+      "before": "GET /v2/suppliers/{id}/products (q opsional <=100 karakter), GET /v2/receipts/restock-products, dan POST /v2/receipts/product-supplier (taut cepat produk ke supplier); autentikasi, sesi aktif, role admin.",
+      "after": "Pencarian supplier hanya mengembalikan relasi produk-supplier milik id tersebut, supplier aktif dan produk aktif (maksimal 50 hasil). Daftar restok menyaring produk aktif berstok habis/menipis dengan tautan supplier aktif. Tidak membuat penerimaan atau jurnal.",
+      "evidence": "app/Services/V2/SupplyTrips.php:448",
       "tables": {
         "v2_user_roles": "read",
-        "v2_product_suppliers": "read",
+        "v2_product_suppliers": "read,create",
         "v2_parties": "read",
         "products": "read"
       }
     },
     {
       "id": "RP03",
-      "label": "Simpan draf baru",
+      "label": "Simpan draf penerimaan baru (termasuk ongkir opsional)",
       "actor": "Admin",
-      "before": "POST /v2/receipts memanggil ReceiptDrafts::save, BUKAN SupplyTrips::receive langsung. Autentikasi, sesi aktif dan admin; supplier aktif, tanggal Y-m-d tidak di masa depan, nota opsional <=64, catatan <=255, 1..100 produk berbeda aktif tertaut supplier, jumlah positif dan harga >=0 dengan <=4 desimal; total positif. Kunci ASCII 1..100 karakter wajib.",
-      "after": "Transaksi mengunci user, menyimpan snapshot di v2_receipt_drafts status draft/version 1. Kunci per created_by dengan hash sama mengembalikan draf yang tersimpan; hash berbeda gagal validasi. Tidak membuat receipt final, utang, stok, HPP, kas/bank, atau jurnal. Validasi gagal membatalkan transaksi.",
-      "evidence": "app/Services/V2/ReceiptDrafts.php:16",
+      "before": "POST /v2/receipts memanggil ReceiptDrafts::save, BUKAN SupplyTrips::receive langsung. Autentikasi, sesi aktif dan admin; supplier aktif, tanggal Y-m-d tidak di masa depan, nota opsional <=64, catatan <=255, 1..100 produk berbeda aktif tertaut supplier, jumlah positif, harga >=0 <=4 desimal; total positif. Ongkir pembelian opsional: freight_amount >=0, bila positif wajib freight_method (supplier|cash|bank), freight_account (beban aktif), dan freight_bank_account_code (bila bank, default 1102). Kunci ASCII 1..100 karakter wajib.",
+      "after": "Transaksi mengunci user, menyimpan snapshot (termasuk rincian ongkir) di v2_receipt_drafts status draft/version 1. Kunci per created_by dengan hash sama mengembalikan draf yang tersimpan; hash berbeda gagal validasi. Tidak membuat receipt final, utang, stok, HPP, kas/bank, atau jurnal.",
+      "evidence": "app/Services/V2/ReceiptDrafts.php:17",
       "tables": {
         "v2_user_roles": "read",
         "users": "read",
         "v2_parties": "read",
         "products": "read",
         "v2_product_suppliers": "read",
+        "chart_of_accounts": "read",
         "v2_receipt_drafts": "create,read"
       }
     },
     {
       "id": "RP04",
-      "label": "Ubah draf",
+      "label": "Ubah draf penerimaan",
       "actor": "Admin, tidak harus pembuat draf",
-      "before": "POST /v2/receipt-drafts/{id}; autentikasi/sesi aktif, role admin. Id draf harus ada, status draft dan version input harus sama persis setelah FILTER_VALIDATE_INT; snapshot penuh divalidasi ulang seperti draf baru.",
+      "before": "POST /v2/receipt-drafts/{id}; autentikasi/sesi aktif, role admin. Id draf harus ada, status draft dan version input harus sama persis setelah FILTER_VALIDATE_INT; snapshot penuh (termasuk ongkir) divalidasi ulang seperti draf baru.",
       "after": "Mengunci user serta baris draf; memperbarui snapshot dan menaikkan version. Tidak mengubah request_hash/idempotency_key awal. Status cancelled/confirmed dan versi usang ditolak. Tidak ada efek ke stok, HPP, utang atau jurnal.",
-      "evidence": "app/Services/V2/ReceiptDrafts.php:39",
+      "evidence": "app/Services/V2/ReceiptDrafts.php:43",
       "tables": {
         "v2_user_roles": "read",
         "users": "read",
         "v2_receipt_drafts": "read,update",
         "v2_parties": "read",
         "products": "read",
-        "v2_product_suppliers": "read"
+        "v2_product_suppliers": "read",
+        "chart_of_accounts": "read"
       }
     },
     {
       "id": "RP05",
-      "label": "Batalkan draf",
+      "label": "Batalkan draf penerimaan",
       "actor": "Admin, tidak harus pembuat draf",
       "before": "POST /v2/receipt-drafts/{id}/cancel; autentikasi/sesi aktif dan admin. Draf harus ada, status draft dan version cocok; reason setelah trim sepanjang 5..255 karakter. Jika sudah cancelled, hasil lama dikembalikan sebelum cek versi/alasan.",
       "after": "Status cancelled, version bertambah dan cancelled_by/cancelled_at/cancel_reason dicatat; draf tidak dihapus. Confirmed tidak dapat dibatalkan. Stok, HPP, receipt final, utang, kas/bank dan jurnal tidak berubah.",
-      "evidence": "app/Services/V2/ReceiptDrafts.php:76",
+      "evidence": "app/Services/V2/ReceiptDrafts.php:85",
       "tables": {
         "v2_user_roles": "read",
         "users": "read",
@@ -299,11 +316,11 @@
     },
     {
       "id": "RP06",
-      "label": "Periksa konfirmasi dan nota ganda",
+      "label": "Periksa konfirmasi final dan nota ganda",
       "actor": "Admin",
-      "before": "POST /v2/receipt-drafts/{id}/confirm; autentikasi/sesi aktif, admin, confirm_final wajib accepted. Id terkunci; confirmed mengembalikan receipt/invoice lama tanpa posting ulang; selain itu status draft dan version cocok. Payload posting berasal dari snapshot tersimpan, bukan item baru pada request.",
-      "after": "SupplyTrips::receive dipanggil dengan kunci draft-receipt-{id}. Nota opsional yang sama untuk supplier sama, lower/trim dan hanya receipt belum void, memicu duplicate_receipt bila confirm_duplicate tidak benar; transaksi gagal sehingga draf tetap draft. Kirim ulang konfirmasi khusus hanya melewati guard nota ganda, bukan guard lain. Replay v2_requests dengan hash sama mengembalikan hasil lama.",
-      "evidence": "app/Services/V2/ReceiptDrafts.php:49",
+      "before": "POST /v2/receipt-drafts/{id}/confirm; autentikasi/sesi aktif, admin, confirm_final wajib accepted. Id terkunci; confirmed mengembalikan receipt/invoice lama tanpa posting ulang; selain itu status draft dan version cocok. Payload posting berasal dari snapshot tersimpan (termasuk ongkir), bukan item baru pada request.",
+      "after": "SupplyTrips::receive dipanggil dengan kunci draft-receipt-{id}. Nota opsional yang sama untuk supplier sama, lower/trim dan hanya receipt belum void, memicu duplicate_receipt bila confirm_duplicate tidak benar; transaksi gagal sehingga draf tetap draft. Replay v2_requests dengan hash sama mengembalikan hasil lama.",
+      "evidence": "app/Services/V2/ReceiptDrafts.php:54",
       "tables": {
         "v2_user_roles": "read",
         "users": "read",
@@ -316,11 +333,11 @@
     },
     {
       "id": "RP07",
-      "label": "Posting penerimaan final",
+      "label": "Posting penerimaan final, HPP, utang, dan ongkir pembelian",
       "actor": "Admin melalui konfirmasi draf",
-      "before": "POST /v2/receipt-drafts/{id}/confirm melanjutkan draf yang sama setelah seluruh guard. SupplyTrips mengunci actor, supplier, produk dan relasi. Supplier/produk harus aktif, semua produk ada dan tertaut; tanggal mundur melewati stock_movements dengan tanggal lebih baru ditolak; total positif. Ledger wajib akun aktif dan jurnal seimbang.",
-      "after": "Dalam transaksi: receipt purchase bernomor RCV dan item dibuat; stok naik, HPP rata-rata tertimbang diperbarui, mutasi v2_receipt masuk. Ledger debit Persediaan/kredit Utang supplier memakai tanggal penerimaan; receipt ditautkan jurnal. Invoice payable AP terhubung receipt_id dibuat amount=total, paid=0,status=open; v2_requests menyimpan replay. Draf menjadi confirmed, version naik, receipt_id/confirmed_by/confirmed_at disimpan. Tidak ada kas/bank keluar. Kegagalan posting menggulung seluruh konfirmasi.",
-      "evidence": "app/Services/V2/SupplyTrips.php:156",
+      "before": "POST /v2/receipt-drafts/{id}/confirm melanjutkan draf setelah semua guard. SupplyTrips mengunci actor, supplier, produk dan relasi. Tanggal mundur melewati stock_movements lebih baru ditolak. Bila ongkir > 0 metode cash: wajib kas harian aktif pada tanggal penerimaan dan laci + saldo 1101 cukup; bila bank: saldo rekening bank aktif cukup.",
+      "after": "Dalam satu transaksi: receipt RCV dan item dibuat; stok naik, HPP rata-rata tertimbang diperbarui (ongkir dicatat sebagai beban, TIDAK masuk HPP), mutasi v2_receipt masuk. Ledger debit Persediaan 1301 sebesar nilai barang, kredit Utang 2101 sebesar nilai barang (+ ongkir bila metode supplier). Bila ongkir > 0: tambah debit akun beban ongkir; bila metode cash/bank, tambah kredit 1101 atau rekening bank terpilih (dan mutasi out laci jika cash). Invoice AP payable dibuat sebesar payableTotal; draf menjadi confirmed. Kegagalan menggulung seluruh transaksi.",
+      "evidence": "app/Services/V2/SupplyTrips.php:157",
       "tables": {
         "v2_user_roles": "read",
         "users": "read",
@@ -333,9 +350,11 @@
         "inventory_receipts": "create,update",
         "inventory_receipt_items": "create",
         "v2_invoices": "create,read",
+        "v2_shifts": "read",
+        "v2_shift_movements": "create,read",
         "chart_of_accounts": "read",
         "journal_entries": "create",
-        "journal_entry_lines": "create"
+        "journal_entry_lines": "create,read"
       }
     },
     {
@@ -343,8 +362,8 @@
       "label": "Tolak void penerimaan final",
       "actor": "Admin",
       "before": "POST /v2/receipts/{id}/void; autentikasi/sesi aktif dan admin. Id merujuk inventory_receipts final, BUKAN id draf. Receipt tidak ditemukan menghasilkan 404.",
-      "after": "Receipt yang ada selalu gagal validasi: penerimaan sudah dikonfirmasi dan terkunci, gunakan koreksi/retur. Tidak ada reversal jurnal, pemulihan HPP/stok, pembatalan invoice, update voided_at, atau transisi kembali ke draft. Komentar lama sebelum method masih menjelaskan reversal, tetapi badan method tidak melaksanakannya.",
-      "evidence": "app/Services/V2/SupplyTrips.php:437",
+      "after": "Receipt yang ada selalu gagal validasi: penerimaan sudah dikonfirmasi dan terkunci, gunakan koreksi/retur. Tidak ada reversal jurnal, pemulihan HPP/stok, pembatalan invoice, update voided_at, atau transisi kembali ke draft.",
+      "evidence": "app/Services/V2/SupplyTrips.php:610",
       "tables": {
         "v2_user_roles": "read",
         "users": "read",
@@ -353,25 +372,27 @@
     },
     {
       "id": "RP09",
-      "label": "Validasi pembayaran dan entri ganda",
+      "label": "Validasi pembayaran, rekening bank, bukti transfer, dan entri ganda",
       "actor": "Admin atau kasir aktif",
-      "before": "POST /v2/invoices/{id}/payments; autentikasi/sesi aktif, role admin/cashier. amount string <=30, method cash/transfer/main, idempotency_key 8..100, reference opsional <=255, seen_payment_id opsional integer >=0, confirm_duplicate opsional boolean. Nilai uang skala 2 harus positif; invoice ada dan dikunci.",
-      "after": "Kunci pembayaran dicari global: pemohon harus actor sama (lainnya 403), hash invoice/amount/method/reference sama mengembalikan payment lama; isi berbeda ditolak. Arah invoice harus receivable/payable; main untuk receivable ditolak. Jika seen_payment_id ada dan tanpa confirm_duplicate, pembayaran id lebih baru selain rejected memicu duplicate_payment. Tanpa seen_payment_id guard dilewati. Nilai baru harus <= amount-paid dan sisa positif. Tidak ada pembatas kepemilikan invoice; cabang lanjutan bergantung direction/method/role.",
-      "evidence": "app/Services/V2/Operations.php:635",
+      "before": "POST /v2/invoices/{id}/payments; role admin/cashier. amount string <=30, method cash/transfer/main, bank_account_code opsional (divalidasi lewat BankAccounts::resolve saat transfer), foto transfer_proof wajib untuk transfer piutang (receivable), idempotency_key 8..100, reference opsional <=255, seen_payment_id dan confirm_duplicate opsional. Invoice ada dan dikunci.",
+      "after": "Kunci pembayaran dicari global: pemohon harus actor sama (lainnya 403), hash sama mengembalikan payment lama; isi berbeda ditolak. Arah invoice harus receivable/payable; main untuk receivable ditolak. Jika seen_payment_id ada tanpa confirm_duplicate, pembayaran lebih baru selain rejected memicu duplicate_payment. Nilai baru harus <= sisa invoice. Bukti foto disimpan atomik via PaymentProofs::record.",
+      "evidence": "app/Services/V2/Operations.php:665",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
         "v2_invoices": "read",
-        "v2_payments": "read"
+        "v2_payments": "read",
+        "v2_payment_proofs": "read,create",
+        "chart_of_accounts": "read"
       }
     },
     {
       "id": "RP10",
       "label": "Terima piutang tunai",
-      "actor": "Admin atau kasir aktif dengan shift sendiri terbuka",
-      "before": "POST /v2/invoices/{id}/payments; setelah validasi umum, invoice receivable dan method=cash. Shift actor berstatus open wajib ada dan dikunci; invoice bisa milik penjual lain karena collect tidak memfilter pemilik.",
-      "after": "Payment posted dengan shift_id sendiri dan approved_by actor dibuat; jurnal debit Kas/kredit Piutang, gerakan laci direction=in/kind=collection. paid invoice bertambah, status paid bila lunas atau open bila sebagian; bila sale_id ada, status penjualan dihitung paid/partial/unpaid. Gagal akun/jurnal atau validasi menggulung transaksi.",
-      "evidence": "app/Services/V2/Operations.php:731",
+      "actor": "Admin atau kasir aktif saat kas harian bersama terbuka",
+      "before": "POST /v2/invoices/{id}/payments; setelah validasi umum, invoice receivable dan method=cash. Kas harian bersama toko berstatus open wajib ada dan dikunci.",
+      "after": "Payment posted dengan shift_id kas harian bersama dan approved_by actor dibuat; jurnal debit Kas 1101/kredit Piutang 1103, gerakan laci direction=in/kind=collection. paid invoice bertambah, status paid bila lunas atau open bila sebagian; bila sale_id ada, status penjualan dihitung paid/partial/unpaid.",
+      "evidence": "app/Services/V2/Operations.php:776",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -387,46 +408,48 @@
     },
     {
       "id": "RP11",
-      "label": "Catat transfer pelanggan menunggu",
+      "label": "Catat transfer pelanggan menunggu (dengan rekening bank & foto bukti)",
       "actor": "Admin atau kasir aktif",
-      "before": "POST /v2/invoices/{id}/payments; validasi umum, invoice receivable, method=transfer. Tidak memerlukan shift; main ditolak untuk piutang.",
-      "after": "Payment pending, shift_id/approved_by/journal_entry_id null. Belum menambah paid invoice, belum mengubah sale atau laci/bank/jurnal. Menunggu approve admin atau reject admin atas payment_id yang sama; meski pencatat admin, transfer piutang tetap pending.",
-      "evidence": "app/Services/V2/Operations.php:713",
+      "before": "POST /v2/invoices/{id}/payments; validasi umum, invoice receivable, method=transfer. Wajib unggah foto transfer_proof; bank_account_code opsional memilih rekening bank tujuan aktif (bawaan 1102). Tidak memerlukan kas harian; main ditolak untuk piutang.",
+      "after": "Payment pending dengan bank_account_code dan bukti foto di v2_payment_proofs, shift_id/approved_by/journal_entry_id null. Belum menambah paid invoice, belum mengubah sale atau laci/bank/jurnal. Menunggu approve atau reject admin atas payment_id yang sama.",
+      "evidence": "app/Services/V2/Operations.php:753",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
         "v2_invoices": "read",
-        "v2_payments": "create,read"
+        "v2_payments": "create,read",
+        "v2_payment_proofs": "create",
+        "chart_of_accounts": "read"
       }
     },
     {
       "id": "RP12",
       "label": "Ajukan pembayaran supplier",
       "actor": "Kasir aktif",
-      "before": "POST /v2/invoices/{id}/payments; validasi umum, invoice payable. Pilih main (Kas Utama), transfer (Bank Utama), atau cash (Laci shift). Cash memerlukan shift actor sendiri terbuka; main/transfer tidak wajib shift.",
-      "after": "Payment proposed disimpan dengan requested_by actor, approved_by/journal null. currentShiftId juga disimpan untuk main/transfer bila ada, tetapi tidak berarti laci dipakai. Kasir tidak memanggil postPayable; paid invoice, kas/bank, jurnal dan gerakan laci belum berubah. Saldo buku besar/laci baru diperiksa saat posting; pengajuan tidak mereservasi sisa utang.",
-      "evidence": "app/Services/V2/Operations.php:683",
+      "before": "POST /v2/invoices/{id}/payments; validasi umum, invoice payable. Pilih main (Kas Utama), transfer (salah satu Rekening Bank aktif dari Bagan Akun), atau cash (Laci kas harian). Cash memerlukan kas harian bersama sedang terbuka; main/transfer tidak wajib shift dan tidak menyimpan shift_id.",
+      "after": "Payment proposed disimpan dengan requested_by actor, bank_account_code (bila transfer), approved_by/journal null. Kasir tidak memanggil postPayable; paid invoice, kas/bank, jurnal dan gerakan laci belum berubah. Saldo buku besar/laci baru diperiksa saat admin menyetujui; pengajuan tidak mereservasi sisa utang.",
+      "evidence": "app/Services/V2/Operations.php:719",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
         "v2_invoices": "read",
         "v2_payments": "create,read",
-        "v2_shifts": "read"
+        "v2_shifts": "read",
+        "chart_of_accounts": "read"
       }
     },
     {
       "id": "RP13",
       "label": "Bayar supplier dari Kas Utama",
       "actor": "Admin aktif",
-      "before": "POST /v2/invoices/{id}/payments; invoice payable, method=main dan validasi umum. Admin membuat proposed lalu langsung postPayable dalam transaksi sama; tidak memerlukan shift. Akun kas harus ada dan saldo debit-kredit setelah dikurangi pembayaran tidak boleh negatif; Ledger juga menuntut akun aktif.",
-      "after": "Payment menjadi posted dengan approved_by admin/journal_id. Jurnal debit Utang supplier/kredit Kas; invoice paid bertambah, status paid bila lunas atau open bila sebagian. Tidak mencatat mutasi laci meskipun shift_id kebetulan tersimpan. Kegagalan saldo/akun membatalkan insert dan posting.",
-      "evidence": "app/Services/V2/Operations.php:706",
+      "before": "POST /v2/invoices/{id}/payments; invoice payable, method=main dan validasi umum. Admin membuat proposed lalu langsung postPayable dalam transaksi sama; tidak memerlukan kas harian. Akun 1101 harus aktif dan saldo debit-kredit cukup.",
+      "after": "Payment menjadi posted dengan approved_by admin/journal_id. Jurnal debit Utang supplier 2101/kredit Kas 1101; invoice paid bertambah, status paid bila lunas atau open bila sebagian. Tidak mencatat mutasi laci. Kegagalan saldo/akun membatalkan insert dan posting.",
+      "evidence": "app/Services/V2/Operations.php:746",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
         "v2_invoices": "read,update",
         "v2_payments": "create,read,update",
-        "v2_shifts": "read",
         "chart_of_accounts": "read",
         "journal_entries": "create",
         "journal_entry_lines": "create,read"
@@ -434,11 +457,11 @@
     },
     {
       "id": "RP14",
-      "label": "Bayar supplier dari laci",
-      "actor": "Admin aktif dengan shift sendiri terbuka",
-      "before": "POST /v2/invoices/{id}/payments; invoice payable, method=cash dan validasi umum. Shift pemohon harus ada/open/milik requested_by; uang laci opening_cash ditambah masuk dikurangi keluar harus cukup. Saldo buku besar akun kas juga harus cukup dan akun aktif untuk jurnal.",
-      "after": "Admin langsung memposting: debit Utang supplier/kredit Kas, payment posted, invoice paid bertambah/status open atau paid. Gerakan out/kind=supplier dibuat pada shift PEMOHON; bukan mengambil shift admin penyetuju lain. Kegagalan satu guard menggulung transaksi.",
-      "evidence": "app/Services/V2/Operations.php:870",
+      "label": "Bayar supplier dari laci kas harian",
+      "actor": "Admin aktif saat kas harian bersama terbuka",
+      "before": "POST /v2/invoices/{id}/payments; invoice payable, method=cash dan validasi umum. Kas harian bersama harus terbuka (status open, store_open_key=1); uang laci dan saldo buku besar akun kas 1101 harus cukup.",
+      "after": "Admin langsung memposting: debit Utang supplier 2101/kredit Kas 1101, payment posted, invoice paid bertambah/status open atau paid. Gerakan out/kind=supplier dibuat pada kas harian yang dipakai saat pengajuan. Kegagalan satu guard menggulung transaksi.",
+      "evidence": "app/Services/V2/Operations.php:940",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -453,17 +476,16 @@
     },
     {
       "id": "RP15",
-      "label": "Bayar supplier dari bank",
+      "label": "Bayar supplier dari rekening bank aktif",
       "actor": "Admin aktif",
-      "before": "POST /v2/invoices/{id}/payments; invoice payable, method=transfer dan validasi umum. Berbeda dari transfer piutang, admin langsung postPayable. Tidak wajib shift; saldo akun bank debit-kredit harus cukup dan akun aktif.",
-      "after": "Jurnal debit Utang supplier/kredit Bank, payment posted dengan approved_by admin/journal_id, paid invoice naik dan status open/paid. Tidak ada pending verifikasi kedua atau gerakan laci. Jika saldo/akun tidak cukup transaksi gagal seluruhnya.",
-      "evidence": "app/Services/V2/Operations.php:868",
+      "before": "POST /v2/invoices/{id}/payments; invoice payable, method=transfer dan bank_account_code opsional (default 1102). Admin langsung postPayable tanpa kas harian; rekening bank terpilih harus aktif di Bagan Akun dan saldonya cukup.",
+      "after": "Jurnal debit Utang supplier 2101/kredit rekening bank terpilih, payment posted dengan approved_by admin/journal_id, paid invoice naik dan status open/paid. Tidak ada pending verifikasi kedua atau gerakan laci.",
+      "evidence": "app/Services/V2/Operations.php:930",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
         "v2_invoices": "read,update",
         "v2_payments": "create,read,update",
-        "v2_shifts": "read",
         "chart_of_accounts": "read",
         "journal_entries": "create",
         "journal_entry_lines": "create,read"
@@ -471,11 +493,11 @@
     },
     {
       "id": "RP16",
-      "label": "Setujui transfer piutang",
+      "label": "Setujui transfer piutang (dengan opsi koreksi rekening bank)",
       "actor": "Admin aktif",
-      "before": "POST /v2/payments/{id}/approve; payment harus ada, invoice terkait ada/dikunci lalu payment dikunci. Posted mengembalikan sukses tanpa posting lagi; selain pending/proposed ditolak. Nominal positif <= sisa invoice. Untuk receivable hanya method=transfer diizinkan.",
-      "after": "Jurnal debit Bank/kredit Piutang dibuat, payment menjadi posted, approved_by actor dan journal_id diisi. paid invoice bertambah/status open atau paid; sale_id terkait memperbarui status sale. Tidak memerlukan shift atau gerakan laci. Nominal yang sudah terlampaui pembayaran lain menggagalkan approve tanpa mengubah pending.",
-      "evidence": "app/Services/V2/Operations.php:780",
+      "before": "POST /v2/payments/{id}/approve (opsional membawa bank_account_code); payment ada, invoice dan payment dikunci. Posted idempoten; selain pending/proposed ditolak. Nominal positif <= sisa invoice. Untuk receivable hanya method=transfer diizinkan.",
+      "after": "Jika admin mengirim bank_account_code, kode rekening divalidasi aktif dan diperbarui pada payment sebelum posting. Jurnal debit rekening bank terpilih/kredit Piutang 1103 dibuat, payment menjadi posted, approved_by dan journal_id diisi. paid invoice dan status sale terkait diperbarui. Tidak memerlukan kas harian atau gerakan laci.",
+      "evidence": "app/Services/V2/Operations.php:825",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -489,11 +511,11 @@
     },
     {
       "id": "RP17",
-      "label": "Setujui pengajuan supplier",
+      "label": "Setujui pengajuan supplier (dengan opsi koreksi rekening bank)",
       "actor": "Admin aktif; boleh menyetujui pengajuan sendiri",
-      "before": "POST /v2/payments/{id}/approve; payment payable pending/proposed, nominal positif <= sisa invoice dan kunci invoice/payment. Posted idempoten; rejected tidak dapat disetujui. Tidak ada guard pemohon harus berbeda dari penyetuju.",
-      "after": "Memanggil postPayable untuk payment_id/invoice_id yang sama: main memakai Kas Utama, transfer memakai Bank tanpa laci; cash memerlukan shift PEMOHON masih open/miliknya, uang laci cukup dan gerakan out supplier. Semua sumber memerlukan saldo akun cukup dan akun aktif. Payment posted, approved_by/journal_id terisi dan paid invoice/status diperbarui. Gagal guard mempertahankan pengajuan belum posted, bukan mengganti shift atau sumber otomatis.",
-      "evidence": "app/Services/V2/Operations.php:820",
+      "before": "POST /v2/payments/{id}/approve (opsional membawa bank_account_code untuk transfer); payment payable pending/proposed, nominal positif <= sisa invoice dan kunci invoice/payment. Posted idempoten; rejected tidak dapat disetujui.",
+      "after": "Jika method=transfer dan admin mengirim bank_account_code, rekening sumber diperbarui sebelum postPayable. Memanggil postPayable: main memakai Kas 1101, transfer memakai rekening bank aktif terpilih tanpa laci; cash memerlukan kas harian pengajuan masih open dan uang laci cukup. Semua sumber memerlukan saldo akun cukup. Payment posted, approved_by/journal_id terisi dan paid invoice diperbarui.",
+      "evidence": "app/Services/V2/Operations.php:881",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -511,8 +533,8 @@
       "label": "Tolak pembayaran menunggu",
       "actor": "Admin aktif",
       "before": "POST /v2/payments/{id}/reject; reason string panjang 5..1000 dan trim tetap 5..1000. Payment ada/dikunci dan status pending/proposed. Posted tidak boleh ditolak. Rejected hanya idempoten jika resolved_by actor sama dan resolution_note persis sama.",
-      "after": "Payment menjadi rejected dengan resolution_note/resolved_by/resolved_at. Tidak mengubah paid invoice, sale, stok, laci, saldo kas/bank atau jurnal karena pembayaran belum diposting. Reject ulang dengan actor/catatan berbeda gagal. Tidak ada pembukaan kembali atau reversal untuk posted di endpoint ini.",
-      "evidence": "app/Services/V2/Operations.php:241",
+      "after": "Payment menjadi rejected dengan resolution_note/resolved_by/resolved_at. Tidak mengubah paid invoice, sale, stok, laci, saldo kas/bank atau jurnal karena pembayaran belum diposting. Reject ulang dengan actor/catatan berbeda gagal.",
+      "evidence": "app/Services/V2/Operations.php:255",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -524,7 +546,7 @@
       "label": "Masuk Kasir V2 dan pembatasan peran",
       "actor": "Admin/kasir aktif",
       "before": "GET / (pos.index) dalam grup auth; ketika config v2.enabled aktif, PosController::index menyerahkan request ke WorkspaceController::index. GET /v2 mengarah ke pos.index saat V2 aktif.",
-      "after": "Operations::role mensyaratkan users.is_active dan v2_user_roles admin/cashier; selain itu 403. Workspace menampilkan shift/penjualan kasir sendiri, admin lintas kasir. Cutover membuat rute legacy selain root hanya arsip GET admin; bukan jalur checkout V2.",
+      "after": "Operations::role mensyaratkan users.is_active dan v2_user_roles admin/cashier; selain itu 403. Workspace menampilkan kas harian bersama (serta penjualan kasir sendiri bagi kasir, atau lintas kasir bagi admin). Cutover membuat rute legacy selain root hanya arsip GET admin; bukan jalur checkout V2.",
       "evidence": "app/Http/Controllers/PosController.php:15",
       "tables": {
         "users": "read",
@@ -535,11 +557,11 @@
     },
     {
       "id": "KS02",
-      "label": "Buka shift dengan modal admin, carry, atau gabungan",
-      "actor": "Admin/kasir untuk shift sendiri",
-      "before": "POST /v2/shifts membawa cash string, source admin|carry|both, carry_from nullable. Role server wajib admin/cashier; modal tidak negatif; aktor tidak boleh masih memiliki shift open.",
-      "after": "Transaksi mengunci shift asal bila carry; asal wajib closed, milik aktor, counted_cash tersedia/tidak negatif dan belum pernah dibawa. carry paling banyak uang hitung asal; both wajib modal melebihi seluruh uang hitung asal serta kedua komponen positif. Insert v2_shifts open, open_user_id=aktor, opening_cash/carry_amount/admin_amount dan carried_from_id. Tidak ada jurnal modal atau mutasi laci pada openShift; sumber admin adalah label sumber, bukan persetujuan admin.",
-      "evidence": "app/Services/V2/Operations.php:51",
+      "label": "Buka kas harian bersama oleh admin (sekali per tanggal)",
+      "actor": "Admin aktif; semua kasir otomatis memakai kas harian yang dibuka",
+      "before": "POST /v2/shifts membawa cash string, source admin|carry|both, carry_from nullable. Role server wajib admin; modal tidak negatif; tidak boleh masih ada kas harian berstatus open dan tanggal bisnis hari ini belum pernah dibuka.",
+      "after": "Transaksi mengunci shift open/tanggal bisnis dan shift asal bila carry; asal wajib closed, counted_cash tersedia/tidak negatif dan belum pernah dibawa. carry paling banyak uang hitung asal; both wajib modal melebihi seluruh uang hitung asal serta kedua komponen positif. Insert v2_shifts open dengan is_shared=true, store_open_key=1, business_date=hari ini, open_user_id=admin, opening_cash/carry_amount/admin_amount dan carried_from_id. GET /v2/shifts/active memantau status kas harian untuk semua kasir. Tidak ada jurnal modal pada openShift.",
+      "evidence": "app/Services/V2/Operations.php:52",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -548,20 +570,20 @@
     },
     {
       "id": "KS03",
-      "label": "Susun keranjang, pembayaran, lalu tinjau sebelum konfirmasi",
+      "label": "Susun keranjang, pembayaran, rekening bank/jatuh tempo, lalu tinjau",
       "actor": "Admin/kasir",
-      "before": "Form Kasir beraksi ke route v2.sales.store (POST /v2/sales). Pilih produk/jumlah, pelanggan, harga retail/contractor, diskon item/nota, ongkir, metode cash|transfer|credit, nominal, DP dan pickup|delivery; delivery membawa destination.",
-      "after": "Dialog pembayaran lalu tinjau tetap belum menyimpan. Konfirmasi final menetapkan __finalConfirmed dan requestSubmit; handler membentuk payload dan kunci idempotensi. Respons sukses menampilkan nomor/status/kembalian, tautan nota, mengganti kunci dan mengosongkan item; event v2:sale-saved mengubah dialog menjadi hasil. Validasi UI bukan pengganti server.",
+      "before": "Form Kasir beraksi ke route v2.sales.store (POST /v2/sales). Pilih produk/jumlah, pelanggan, harga retail/contractor, diskon item/nota, ongkir, metode cash|transfer|credit, rekening bank tujuan (saat transfer/DP transfer), foto bukti transfer, jatuh tempo opsional (saat kredit), nominal, DP dan pickup|delivery; delivery membawa destination.",
+      "after": "Dialog pembayaran lalu tinjau tetap belum menyimpan. Konfirmasi final menetapkan __finalConfirmed dan requestSubmit; handler membentuk payload (termasuk bank_account_code, due_date, dan berkas transfer_proof bila ada) serta kunci idempotensi. Respons sukses menampilkan nomor/status/kembalian, tautan nota, mengganti kunci dan mengosongkan item; event v2:sale-saved mengubah dialog menjadi hasil. Validasi UI bukan pengganti server.",
       "evidence": "resources/views/v2/pos-cashier.blade.php:17",
       "tables": {}
     },
     {
       "id": "KS04",
-      "label": "Validasi server, kunci shift, dan cegah checkout ganda",
+      "label": "Validasi server, bukti transfer, kunci kas harian, dan cegah checkout ganda",
       "actor": "Server atas admin/kasir",
-      "before": "POST /v2/sales divalidasi WorkspaceController::checkout: 1–100 item, string nominal, enum, kunci 8–100 karakter dan tujuan delivery. Operations memeriksa pelanggan aktif (wajib transfer/kredit), metode, fulfillment dan diskon.",
-      "after": "Di dalam satu transaksi, openShiftFor mengunci shift open milik aktor SEBELUM mencari replay. Kunci lama hanya dapat diulang aktor sama dengan request_hash sama; berbeda aktor 403 atau isi berbeda ditolak. Replay mengembalikan transaksi lama tanpa menulis lagi; sesudah shift ditutup replay tetap dapat gagal karena syarat shift open diperiksa lebih dulu. Produk duplikat/tidak ditemukan/arsip, jumlah tidak positif dan stok kurang ditolak.",
-      "evidence": "app/Http/Controllers/V2/WorkspaceController.php:297",
+      "before": "POST /v2/sales divalidasi WorkspaceController::checkout: 1–100 item, string nominal, enum, bank_account_code opsional, due_date opsional, kunci 8–100 karakter dan tujuan delivery. Jika transfer atau DP transfer positif, foto bukti transfer (JPG/PNG/WebP <= 5 MB) wajib diunggah dan diproses lewat PaymentProofs::record. Operations memeriksa pelanggan aktif (wajib transfer/kredit), metode, fulfillment, jatuh tempo >= hari ini, dan diskon.",
+      "after": "Di dalam satu transaksi, openShiftFor mengunci kas harian bersama aktif (is_shared=true, store_open_key=1, status=open) SEBELUM mencari replay. Kunci lama hanya dapat diulang aktor sama dengan request_hash sama; berbeda aktor 403 atau isi berbeda ditolak. Replay mengembalikan transaksi lama tanpa menulis lagi; bukti transfer yang berbeda hash pada payment yang sama ditolak. Produk duplikat/tidak ditemukan/arsip, jumlah tidak positif dan stok kurang ditolak.",
+      "evidence": "app/Http/Controllers/V2/WorkspaceController.php:493",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -570,7 +592,8 @@
         "v2_sales": "read",
         "products": "read",
         "v2_invoices": "read",
-        "v2_deliveries": "read"
+        "v2_deliveries": "read",
+        "v2_payment_proofs": "read,create"
       }
     },
     {
@@ -578,8 +601,8 @@
       "label": "Posting nota, stok, HPP, piutang dan pendapatan secara atomik",
       "actor": "Server",
       "before": "Checkout baru yang lolos validasi; products dikunci urut id. Harga dibaca server dari selling_price atau contractor_price (fallback eceran), bukan harga kiriman klien. Qty skala 4, uang skala 2; HPP snapshot cost_price. Total = barang setelah diskon item − diskon nota + ongkir, wajib positif.",
-      "after": "Dalam transaksi checkout yang sama dibuat INV v2_sales dan snapshot v2_sale_items, stok products berkurang dan stock_movements reference_type=v2_sale negatif. Semua metode membuat AR v2_invoices dengan amount total dan paid sesuai cabang pembayaran; invoice paid jika lunas, selain itu open. Ledger v2_sale: DR1103 total; CR4101 barang net bila positif; CR4102 ongkir bila positif; DR5101/CR1301 HPP bila positif. Akun aktif dan jurnal seimbang wajib; kegagalan membatalkan keseluruhan checkout. Pilihan cash/transfer/credit berikut adalah alternatif dalam transaksi ini, bukan transaksi serial.",
-      "evidence": "app/Services/V2/Operations.php:502",
+      "after": "Dalam transaksi checkout yang sama dibuat INV v2_sales dan snapshot v2_sale_items, stok products berkurang dan stock_movements reference_type=v2_sale negatif. Semua metode membuat AR v2_invoices dengan amount total, paid sesuai cabang pembayaran, dan due_date opsional (kredit); invoice paid jika lunas, selain itu open. Ledger v2_sale: DR1103 total; CR4101 barang net bila positif; CR4102 ongkir bila positif; DR5101/CR1301 HPP bila positif. Akun aktif dan jurnal seimbang wajib; kegagalan membatalkan keseluruhan checkout.",
+      "evidence": "app/Services/V2/Operations.php:527",
       "tables": {
         "products": "read,update",
         "stock_movements": "create",
@@ -593,11 +616,11 @@
     },
     {
       "id": "KS06",
-      "label": "Cabang tunai: lunas, kembalian, dan masuk laci",
+      "label": "Cabang tunai: lunas, kembalian, dan masuk laci kas harian",
       "actor": "Admin/kasir; server posting otomatis",
       "before": "Alternatif payment_method=cash pada POST /v2/sales. paid_amount wajib dan tendered tidak boleh kurang dari total; pelanggan umum boleh tanpa customer_id.",
-      "after": "paid=total, change=tendered−total, status sale paid dan invoice paid. Buat pembayaran cash posted/approved_by aktor; jurnal DR1101/CR1103 sebesar total, bukan uang diserahkan. Mutasi laci in kind sale reference v2_sale sebesar paid neto, sehingga kembalian tidak dihitung sebagai penerimaan tambahan. Nota/stok/HPP/pendapatan tetap melalui posting bersama KS05.",
-      "evidence": "app/Services/V2/Operations.php:424",
+      "after": "paid=total, change=tendered−total, status sale paid dan invoice paid. Buat pembayaran cash posted/approved_by aktor; jurnal DR1101/CR1103 sebesar total, bukan uang diserahkan. Mutasi laci in kind sale reference v2_sale sebesar paid neto pada kas harian bersama, sehingga kembalian tidak dihitung sebagai penerimaan tambahan. Nota/stok/HPP/pendapatan tetap melalui posting bersama KS05.",
+      "evidence": "app/Services/V2/Operations.php:449",
       "tables": {
         "v2_sales": "create",
         "v2_invoices": "create",
@@ -610,28 +633,31 @@
     },
     {
       "id": "KS07",
-      "label": "Cabang transfer: tagihan terbuka dan verifikasi tertunda",
+      "label": "Cabang transfer: pilih rekening bank, bukti foto, dan verifikasi tertunda",
       "actor": "Admin/kasir menginput; admin memverifikasi terpisah",
-      "before": "Alternatif payment_method=transfer, customer_id aktif wajib; paid_amount hanya boleh nol atau persis total.",
-      "after": "paid tetap nol sehingga sale unpaid dan AR open. Jika tendered positif dibuat payment transfer pending, shift_id null, approved_by/journal_entry_id null; belum menambah bank, belum mengurangi AR dan tidak ada mutasi laci. Jika nominal nol, tidak dibuat payment sama sekali. Stok/HPP/pendapatan tetap diposting saat checkout, tidak menunggu verifikasi transfer; lanjut KS11 hanya jika payment pending benar-benar ada.",
-      "evidence": "app/Services/V2/Operations.php:435",
+      "before": "Alternatif payment_method=transfer, customer_id aktif wajib; paid_amount hanya boleh nol atau persis total. Jika tendered positif, foto bukti transfer wajib diunggah dan rekening bank tujuan divalidasi lewat BankAccounts::resolve (kosong jatuh ke 1102).",
+      "after": "paid tetap nol sehingga sale unpaid dan AR open. Jika tendered positif dibuat payment transfer pending dengan bank_account_code terpilih dan bukti foto tersimpan di v2_payment_proofs (disk lokal privat), shift_id null, approved_by/journal_entry_id null; belum menambah saldo bank, belum mengurangi AR dan tidak ada mutasi laci. Jika nominal nol, tidak dibuat payment sama sekali. Stok/HPP/pendapatan tetap diposting saat checkout; lanjut KS11 hanya jika payment pending benar-benar ada.",
+      "evidence": "app/Services/V2/Operations.php:464",
       "tables": {
         "v2_sales": "create",
         "v2_invoices": "create",
-        "v2_payments": "create"
+        "v2_payments": "create",
+        "v2_payment_proofs": "create",
+        "chart_of_accounts": "read"
       }
     },
     {
       "id": "KS08",
-      "label": "Cabang kredit: tanpa DP, DP tunai, atau DP transfer",
+      "label": "Cabang kredit: tanpa DP, DP tunai, atau DP transfer + jatuh tempo opsional",
       "actor": "Admin/kasir",
-      "before": "Alternatif payment_method=credit dengan pelanggan aktif. DP tidak negatif/tidak melebihi total; bila DP positif deposit_method wajib cash|transfer.",
-      "after": "Tanpa DP: paid nol, sale unpaid, AR open, tanpa payment. DP cash: paid langsung sebesar DP, payment cash posted DR1101/CR1103 dan mutasi laci in kind collection reference v2_payment; sale partial atau paid bila DP=total, AR open/paid mengikuti. DP transfer: paid tetap nol; buat transfer pending hanya sebesar DP, tanpa bank/laci/penurunan AR sebelum verifikasi KS11. Label metode sale tetap credit; rekap menggolongkan total nota kredit, bukan memecah DP menjadi omzet tunai.",
-      "evidence": "app/Services/V2/Operations.php:444",
+      "before": "Alternatif payment_method=credit dengan pelanggan aktif. due_date opsional berformat YYYY-MM-DD tidak sebelum hari ini. DP tidak negatif/tidak melebihi total; bila DP positif deposit_method wajib cash|transfer (DP transfer wajib foto bukti dan rekening bank aktif).",
+      "after": "Tanpa DP: paid nol, sale unpaid, AR open (dengan due_date jika diisi), tanpa payment. DP cash: paid langsung sebesar DP, payment cash posted DR1101/CR1103 dan mutasi laci in kind collection reference v2_payment pada kas harian bersama; sale partial atau paid bila DP=total. DP transfer: paid tetap nol; buat transfer pending beserta bank_account_code dan bukti foto sebesar DP, tanpa bank/laci/penurunan AR sebelum verifikasi KS11. Label metode sale tetap credit.",
+      "evidence": "app/Services/V2/Operations.php:470",
       "tables": {
         "v2_sales": "create",
         "v2_invoices": "create",
         "v2_payments": "create,update",
+        "v2_payment_proofs": "create",
         "v2_shift_movements": "create",
         "chart_of_accounts": "read",
         "journal_entries": "create",
@@ -643,8 +669,8 @@
       "label": "Pilihan kirim membuat surat jalan prepared, bukan otomatis dispatch",
       "actor": "Admin/kasir; operasi pengiriman downstream terpisah",
       "before": "Pada checkout yang sama, fulfillment=delivery wajib destination; pickup tidak memerlukan dokumen kirim. Ini pilihan terpisah dari tiga metode pembayaran, bukan kelanjutan khusus kredit/transfer.",
-      "after": "Buat v2_deliveries terkait sale_id, nomor SJ, destination, status prepared; pickup tidak membuat delivery. Checkout mengembalikan sale_id, invoice_id, total, paid, change, status dan delivery_number. Surat jalan diserahkan ke alur downstream POST /v2/deliveries/{id}/dispatch, tidak dibuktikan sebagai prasyarat tutup shift atau otomatis terkirim/lunas. Controller checkout tidak memasukkan vehicle_id/driver_name ke data tervalidasi meski service memiliki opsi tersebut.",
-      "evidence": "app/Services/V2/Operations.php:601",
+      "after": "Buat v2_deliveries terkait sale_id, nomor SJ, destination, status prepared; pickup tidak membuat delivery. Checkout mengembalikan sale_id, invoice_id, total, paid, change, status dan delivery_number. Surat jalan diserahkan ke alur downstream POST /v2/deliveries/{id}/dispatch, tidak dibuktikan sebagai prasyarat tutup kas harian atau otomatis terkirim/lunas.",
+      "evidence": "app/Services/V2/Operations.php:631",
       "tables": {
         "v2_deliveries": "create,update",
         "v2_sales": "read"
@@ -652,16 +678,17 @@
     },
     {
       "id": "KS10",
-      "label": "Lanjutan piutang: penerimaan cash atau pengajuan transfer",
+      "label": "Lanjutan piutang: penerimaan tunai atau pengajuan transfer berbukti",
       "actor": "Admin/kasir",
-      "before": "Untuk AR yang belum lunas dari sale terkait: POST /v2/invoices/{id}/payments membawa amount, method cash|transfer, idempotency_key, reference opsional, seen_payment_id dan confirm_duplicate opsional. Role admin/cashier; invoice dikunci, nominal positif tidak melebihi sisa; method main ditolak untuk AR. Replay dicek aktor/hash; penanda pembayaran lebih baru meminta konfirmasi bila disediakan.",
-      "after": "Transfer membuat payment pending shift_id null tanpa mengubah AR/sale/laci hingga KS11. Cash wajib shift open milik penerima saat ini: payment posted, DR1101/CR1103, mutasi in collection pada shift penerimaan, invoice.paid bertambah dan sale partial/paid. Shift penerimaan bisa berbeda dari shift checkout; jangan menghubungkan penerimaan ini ke rekap shift penjualan lama tanpa kecocokan shift_id mutasi.",
-      "evidence": "app/Services/V2/Operations.php:668",
+      "before": "Untuk AR yang belum lunas dari sale terkait: POST /v2/invoices/{id}/payments membawa amount, method cash|transfer, bank_account_code opsional (saat transfer), foto transfer_proof (wajib saat transfer AR), idempotency_key, reference opsional, seen_payment_id dan confirm_duplicate opsional. Role admin/cashier; invoice dikunci, nominal positif tidak melebihi sisa; method main ditolak untuk AR.",
+      "after": "Transfer membuat payment pending shift_id null dengan bank_account_code dan bukti foto di v2_payment_proofs tanpa mengubah AR/sale/laci hingga KS11. Cash wajib kas harian bersama aktif terbuka: payment posted, DR1101/CR1103, mutasi in collection pada kas harian aktif, invoice.paid bertambah dan sale partial/paid.",
+      "evidence": "app/Services/V2/Operations.php:700",
       "tables": {
         "v2_user_roles": "read",
         "users": "read",
         "v2_invoices": "read,update",
         "v2_payments": "read,create,update",
+        "v2_payment_proofs": "read,create",
         "v2_shifts": "read",
         "v2_sales": "update",
         "v2_shift_movements": "create",
@@ -672,11 +699,11 @@
     },
     {
       "id": "KS11",
-      "label": "Verifikasi atau tolak transfer pada invoice penjualan",
+      "label": "Verifikasi (dengan opsi koreksi rekening bank) atau tolak transfer piutang",
       "actor": "Admin aktif",
-      "before": "POST /v2/payments/{id}/approve untuk payment pending terkait AR; POST /v2/payments/{id}/reject membawa reason 5–1000 karakter. Ini dua alternatif terhadap payment yang sama, bukan tahap approve lalu reject.",
-      "after": "Approve mengunci invoice/payment, posted replay tanpa menulis, status lain selain pending/proposed ditolak; nominal positif dan tidak melebihi sisa. Untuk receivable hanya transfer: jurnal DR1102/CR1103, payment posted + approved_by/journal_entry_id, invoice.paid bertambah dan sale diperbarui partial/paid. Tidak ada mutasi laci. Reject hanya pending/proposed: payment rejected beserta alasan/resolved_by/at; invoice, sale, stok dan jurnal penjualan tidak dibalik. Pending transfer tidak harus selesai sebelum shift ditutup karena shift_id null.",
-      "evidence": "app/Services/V2/Operations.php:811",
+      "before": "Admin dapat membuka bukti foto lewat GET /v2/payments/{id}/proof lalu memanggil POST /v2/payments/{id}/approve (opsional membawa bank_account_code untuk mengoreksi rekening bank tujuan tanpa menolak) atau POST /v2/payments/{id}/reject dengan reason 5–1000 karakter.",
+      "after": "Approve mengunci invoice/payment, posted replay tanpa menulis, status selain pending/proposed ditolak; nominal positif dan tidak melebihi sisa. Bila admin mengirim bank_account_code, kode rekening divalidasi lewat BankAccounts::resolve dan diperbarui pada v2_payments sebelum posting. Untuk receivable hanya transfer: jurnal DR rekening bank terpilih (bawaan 1102)/CR 1103, payment posted + approved_by/journal_entry_id, invoice.paid bertambah dan sale partial/paid. Reject menandai rejected beserta alasan/audit tanpa membalik invoice/stok.",
+      "evidence": "app/Services/V2/Operations.php:856",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -690,10 +717,10 @@
     },
     {
       "id": "KS12",
-      "label": "Ambil rekap penutupan dari shift yang masih open",
-      "actor": "Admin atau kasir pemilik shift",
-      "before": "Dialog Tutup shift memanggil GET /v2/shifts/{id}/closing-summary. ShiftClosingSummary::build memastikan peran aktif, mengunci shift; id tidak ada 404, kasir bukan pemilik 403, status bukan open ditolak validasi. Admin boleh melihat shift orang lain.",
-      "after": "Read-only: hitung jumlah/total nota v2_sales.shift_id dan kelompok payment_method cash/transfer/credit, terlepas lunas/menunggu. Hitung laci dari opening_cash + seluruh movement in − movement out; rincian sale/collection/other in dan supplier/other out. Hanya payment method cash status proposed shift_id yang sama dihitung sebagai pending_drawer_payments; transfer pending bukan pending laci dan jumlah pending bukan pengurang expected. Kembalikan scope shift serta fingerprint, tidak menulis jurnal atau saldo bank/Kas Utama.",
+      "label": "Ambil rekap penutupan dari kas harian yang masih open",
+      "actor": "Admin (seluruh penjualan kas harian); kasir hanya penjualan sendiri",
+      "before": "Dialog Tutup kas harian memanggil GET /v2/shifts/{id}/closing-summary. ShiftClosingSummary::build memastikan peran aktif, mengunci shift; id tidak ada 404, kasir pada shift non-shared bukan pemilik 403, status bukan open ditolak validasi.",
+      "after": "Read-only: hitung jumlah/total nota v2_sales.shift_id (dibatasi user_id untuk kasir, seluruh kasir untuk admin) dan kelompok payment_method cash/transfer/credit. Hitung laci bersama dari opening_cash + seluruh movement in − movement out; rincian sale/collection/other in dan supplier/other out. Hanya payment method cash status proposed shift_id yang sama dihitung sebagai pending_drawer_payments. Kembalikan scope store/shift, sales_scope, serta fingerprint.",
       "evidence": "app/Services/V2/ShiftClosingSummary.php:19",
       "tables": {
         "users": "read",
@@ -706,20 +733,20 @@
     },
     {
       "id": "KS13",
-      "label": "Bandingkan uang fisik dengan perkiraan laci",
-      "actor": "Kasir pemilik atau admin",
-      "before": "Rekap berhasil dimuat ke form tutup shift; UI menyimpan fingerprint dan cash.expected. Pengguna menghitung uang fisik nyata dan mengisi counted; angka otomatis bukan uang fisik yang diisikan otomatis.",
-      "after": "UI menampilkan total nota per metode dan kas awal/masuk/keluar/seharusnya; pending tunai diperlihatkan sebagai peringatan. BigInt menghitung sen: counted−expected; tampil Cocok, Selisih lebih atau kurang. Ini hanya perbandingan klien, keputusan akhir tetap closeShift. Saat form dikirim POST /v2/shifts/{id}/close membawa counted dan fingerprint atau null; UI tetap mengizinkan tutup ketika fetch rekap gagal.",
-      "evidence": "resources/views/v2/workspace.blade.php:713",
+      "label": "Bandingkan uang fisik laci dengan perkiraan rekap",
+      "actor": "Admin",
+      "before": "Rekap berhasil dimuat ke form tutup kas harian; UI menyimpan fingerprint dan cash.expected. Admin menghitung uang fisik nyata di laci dan mengisi counted; angka otomatis tidak diisikan sebagai uang fisik.",
+      "after": "UI menampilkan total nota per metode dan kas awal/masuk/keluar/seharusnya; pending tunai diperlihatkan sebagai peringatan. BigInt menghitung sen: counted−expected; tampil Cocok, Selisih lebih atau kurang. Saat form dikirim POST /v2/shifts/{id}/close membawa counted dan fingerprint atau null; UI tetap mengizinkan tutup ketika fetch rekap gagal.",
+      "evidence": "resources/views/v2/workspace.blade.php:670",
       "tables": {}
     },
     {
       "id": "KS14",
-      "label": "Periksa rekap kedaluwarsa di bawah kunci shift",
-      "actor": "Server",
-      "before": "POST /v2/shifts/{id}/close: counted wajib string/tidak negatif; fingerprint nullable ukuran 64 dan bila ada wajib hex kecil 64 karakter. Role server admin/cashier; shift harus ada/open dan kasir harus pemilik (admin boleh lintas kasir).",
-      "after": "closeShift mengunci shift lalu membandingkan hash jika fingerprint diberikan. Hash memuat status/modal, mutasi laci berurutan, id/metode/total sale, dan id pengajuan cash proposed pada shift. Perubahan snapshot menghasilkan penolakan “Rekap sudah berubah ... tutup ulang” tanpa menutup. Fingerprint opsional, jadi klien tanpa token atau fetch gagal tidak mendapat penjaga snapshot ini; closeShift tetap menghitung expected terbaru sendiri.",
-      "evidence": "app/Services/V2/Operations.php:132",
+      "label": "Periksa otorisasi admin dan rekap kedaluwarsa di bawah kunci shift",
+      "actor": "Server atas admin",
+      "before": "POST /v2/shifts/{id}/close: counted wajib string/tidak negatif; fingerprint nullable ukuran 64 hex kecil. Role server wajib admin; shift harus ada dan berstatus open.",
+      "after": "closeShift mengunci shift lalu membandingkan hash jika fingerprint diberikan. Hash memuat status/modal, mutasi laci berurutan, id/metode/total sale, dan id pengajuan cash proposed pada shift. Perubahan snapshot menghasilkan penolakan “Rekap sudah berubah ... tutup ulang” tanpa menutup. Fingerprint opsional; closeShift tetap menghitung expected terbaru sendiri.",
+      "evidence": "app/Services/V2/Operations.php:144",
       "tables": {
         "v2_shifts": "read",
         "v2_sales": "read",
@@ -731,11 +758,11 @@
     },
     {
       "id": "KS15",
-      "label": "Tutup shift: cocok menjadi closed, selisih menjadi review",
-      "actor": "Admin atau kasir pemilik shift",
-      "before": "Shift masih open dan lolos KS14, counted uang fisik nonnegatif. Tidak terdapat guard yang mewajibkan semua cash proposed/transfer pending diselesaikan dulu.",
-      "after": "Server menjumlah v2_shift_movements pada shift: expected=opening_cash+in−out; difference=counted−expected. Nol -> closed, selain nol -> review. Simpan expected_cash, counted_cash, difference, status, closed_at, hapus open_user_id; hasil JSON mengembalikan expected/counted/difference/status. Tidak ada jurnal selisih, pemindahan kas, pembalikan sale atau perubahan payment pada closeShift. Review bukan open, sehingga tidak dapat menjadi shift jual aktif ataupun asal carry sebelum diresolusi.",
-      "evidence": "app/Services/V2/Operations.php:158",
+      "label": "Tutup kas harian: cocok menjadi closed, selisih menjadi review",
+      "actor": "Admin aktif",
+      "before": "Kas harian masih open dan lolos KS14, counted uang fisik nonnegatif. Tidak terdapat guard yang mewajibkan semua cash proposed/transfer pending diselesaikan dulu.",
+      "after": "Server menjumlah v2_shift_movements pada shift: expected=opening_cash+in−out; difference=counted−expected. Nol -> closed, selain nol -> review. Simpan expected_cash, counted_cash, difference, status, closed_by, closed_at, hapus open_user_id dan store_open_key; hasil JSON mengembalikan expected/counted/difference/status. Tidak ada jurnal selisih atau pemindahan dana otomatis ke bank (setor ke bank dicatat terpisah lewat Pindah Dana JL9).",
+      "evidence": "app/Services/V2/Operations.php:170",
       "tables": {
         "v2_shifts": "read,update",
         "v2_shift_movements": "read"
@@ -743,11 +770,11 @@
     },
     {
       "id": "KS16",
-      "label": "Resolusi selisih oleh admin dan carry ke shift berikutnya",
-      "actor": "Admin aktif; kasir membuka shift berikutnya sendiri",
-      "before": "Shift review tampil pada Pemeriksaan selisih shift. POST /v2/shifts/{id}/resolve membawa reason 5–1000 karakter; Operations::resolveShift mewajibkan admin, trim alasan dan kunci baris shift.",
-      "after": "Review -> closed dengan reviewed_by, reviewed_at dan review_note; expected/count/difference historis tidak diganti dan tidak ada jurnal koreksi otomatis. Pemanggilan ulang closed oleh admin dan alasan identik no-op; status lain/closed dengan alasan lain ditolak. Setelah closed, kasir pemilik dapat memakai counted_cash sebagai sumber carry/both pada pembukaan baru KS02 dengan penjaga sekali pakai; bukan otomatis dipindahkan ketika resolve.",
-      "evidence": "app/Services/V2/Operations.php:211",
+      "label": "Resolusi selisih kas harian oleh admin dan carry ke hari berikutnya",
+      "actor": "Admin aktif",
+      "before": "Kas harian berstatus review tampil pada Pemeriksaan selisih kas harian. POST /v2/shifts/{id}/resolve membawa reason 5–1000 karakter; Operations::resolveShift mewajibkan admin, trim alasan dan kunci baris shift.",
+      "after": "Review -> closed dengan reviewed_by, reviewed_at dan review_note; expected/count/difference historis tidak diganti dan tidak ada jurnal koreksi otomatis. Pemanggilan ulang closed oleh admin dan alasan identik no-op; status lain/closed dengan alasan lain ditolak. Setelah closed, admin dapat memakai counted_cash sebagai sumber carry/both pada pembukaan kas harian tanggal berikutnya (KS02) dengan penjaga sekali pakai.",
+      "evidence": "app/Services/V2/Operations.php:224",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -774,7 +801,7 @@
       "actor": "Admin atau kasir pemilik sale_id pengiriman; selainnya 403",
       "before": "POST /v2/deliveries/{id}/dispatch → WorkspaceController::dispatch → DeliveryTrips::dispatch. ID pengiriman, driver_id, vehicle_id sah; baris aktor dan pengiriman dikunci; DeliveryTrips::access memeriksa kepemilikan.",
       "after": "Penugasan dicek/dicatat; status sent dan dispatched_by/at tersimpan. Kirim ulang status sent dengan identitas sama tidak berefek; pengiriman received ditolak. Tidak mengurangi stok lagi dan tidak membuat jurnal.",
-      "evidence": "app/Services/V2/DeliveryTrips.php:34",
+      "evidence": "app/Services/V2/DeliveryTrips.php:35",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -790,7 +817,7 @@
       "actor": "Admin atau kasir pemilik sale_id pengiriman; selainnya 403",
       "before": "POST /v2/deliveries/{id}/receive → WorkspaceController::receiveDelivery → DeliveryTrips::receive. delivery_id yang sama harus sent; aktor/pengiriman dikunci dan akses diperiksa.",
       "after": "Status received dan received_by/at tersimpan. Terima ulang received tidak berefek; prepared ditolak karena belum dikirim. Ini penerimaan pelanggan, BUKAN penerimaan stok supplier; tidak menulis stok/jurnal/pembayaran.",
-      "evidence": "app/Services/V2/DeliveryTrips.php:70",
+      "evidence": "app/Services/V2/DeliveryTrips.php:71",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -800,11 +827,11 @@
     },
     {
       "id": "PG4",
-      "label": "Catat biaya perjalanan langsung",
+      "label": "Catat biaya perjalanan langsung (tunai laci atau rekening bank)",
       "actor": "Admin V2",
-      "before": "POST /v2/trips → WorkspaceController::trip → SupplyTrips::trip. Kendaraan/sopir aktif, tanggal sah, tujuan wajib bila tanpa delivery_id; fuel_cost/allowance tidak negatif dan total positif; method cash atau transfer; idempotency_key wajib. Bila terkait pengiriman, identitas harus cocok.",
-      "after": "v2_trips posted; jurnal DR 6101 beban perjalanan, CR 1101 tunai atau 1102 bank. Cash memerlukan shift admin terbuka, saldo laci cukup, mutasi out adjustment; transfer tanpa mutasi laci. Keduanya memeriksa saldo akun. Replay muatan identik mengembalikan hasil tersimpan; kunci dipakai muatan berbeda ditolak. Tidak mengubah stok; beban ini bukan pengurang langsung pendapatan ongkir 4102.",
-      "evidence": "app/Services/V2/SupplyTrips.php:250",
+      "before": "POST /v2/trips → WorkspaceController::trip → SupplyTrips::trip. Kendaraan/sopir aktif, tanggal sah, tujuan wajib bila tanpa delivery_id; fuel_cost/allowance tidak negatif dan total positif; method cash atau transfer (bank_account_code opsional, default 1102); idempotency_key wajib.",
+      "after": "v2_trips posted; jurnal DR 6101 beban perjalanan, CR 1101 tunai atau rekening bank aktif terpilih. Cash memerlukan kas harian bersama terbuka, saldo laci cukup, mutasi out adjustment; transfer tanpa mutasi laci. Keduanya memeriksa saldo akun. Replay muatan identik mengembalikan hasil tersimpan; tidak mengubah stok dan bukan pengurang pendapatan ongkir 4102.",
+      "evidence": "app/Services/V2/SupplyTrips.php:296",
       "tables": {
         "v2_trips": "create,update",
         "v2_deliveries": "read,update",
@@ -822,11 +849,11 @@
     },
     {
       "id": "PG5",
-      "label": "Keluarkan uang muka sopir",
+      "label": "Keluarkan uang muka sopir (tunai laci atau rekening bank)",
       "actor": "Admin V2",
-      "before": "POST /v2/driver-advances → WorkspaceController::advance → DeliveryTrips::advance. Nominal positif, method cash/transfer, driver/vehicle valid; delivery_id opsional dengan identitas cocok; idempotency_key wajib. Cash wajib shift admin dan saldo laci cukup; akun 1191 aktif dan saldo sumber cukup.",
-      "after": "Uang muka status open dan referensi jurnal tersimpan; DR 1191 aset uang muka, CR 1101 atau 1102. Cash menulis mutasi out pada shift admin; transfer tidak. Belum membebankan 6101 saat uang muka keluar. Replay sama tidak mengeluarkan uang dua kali.",
-      "evidence": "app/Services/V2/DeliveryTrips.php:104",
+      "before": "POST /v2/driver-advances → WorkspaceController::advance → DeliveryTrips::advance. Nominal positif, method cash/transfer (bank_account_code opsional, default 1102), driver/vehicle valid; delivery_id opsional dengan identitas cocok; idempotency_key wajib. Cash wajib kas harian bersama terbuka dan saldo laci cukup; akun 1191 aktif dan saldo sumber cukup.",
+      "after": "Uang muka status open dan referensi jurnal tersimpan; DR 1191 aset uang muka, CR 1101 atau rekening bank aktif terpilih. Cash menulis mutasi out pada kas harian bersama; transfer tidak. Belum membebankan 6101 saat uang muka keluar. Replay sama tidak mengeluarkan uang dua kali.",
+      "evidence": "app/Services/V2/DeliveryTrips.php:105",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -847,8 +874,8 @@
       "label": "Periksa biaya aktual dan sisa uang muka",
       "actor": "Admin V2",
       "before": "POST /v2/driver-advances/{id}/settle → WorkspaceController::settle → DeliveryTrips::settle. Advance yang sama dikunci; harus ada dan belum settled; fuel_cost dan allowance tidak negatif, actual tidak melebihi advance.amount.",
-      "after": "Refund dihitung amount - actual. Sisa positif wajib refund_received=true dan refund_method cash/transfer; tunai kembali memerlukan shift admin penerima terbuka. Biaya aktual lebih besar ditolak, bukan otomatis menambah pengeluaran. Gagal validasi menggagalkan transaksi tanpa settlement.",
-      "evidence": "app/Services/V2/DeliveryTrips.php:259",
+      "after": "Refund dihitung amount - actual. Sisa positif wajib refund_received=true dan refund_method cash/transfer (dengan refund_bank_account_code opsional bila transfer); tunai kembali memerlukan kas harian bersama terbuka. Biaya aktual lebih besar ditolak, bukan otomatis menambah pengeluaran.",
+      "evidence": "app/Services/V2/DeliveryTrips.php:278",
       "tables": {
         "users": "read",
         "v2_user_roles": "read",
@@ -863,8 +890,8 @@
       "label": "Posting pertanggungjawaban dan kunci settled",
       "actor": "Admin V2, transaksi settle yang lolos PG6",
       "before": "Advance ID sama; actual dan refund sudah diverifikasi dalam transaksi yang sama. Ini kelanjutan internal settle, bukan endpoint baru atau biaya trip kedua.",
-      "after": "Buat v2_driver_advance_settlements settled. DR 6101 sebesar aktual positif + DR kas/bank sebesar refund positif; CR 1191 sebesar seluruh uang muka. Kaitkan jurnal lalu advance.status=settled. Refund cash menulis mutasi in pada shift admin penerima; bukan wajib shift pengaju awal. Tidak membuat v2_trips kedua. Replay key+muatan sama mengembalikan hasil; key baru untuk advance settled ditolak.",
-      "evidence": "app/Services/V2/DeliveryTrips.php:290",
+      "after": "Buat v2_driver_advance_settlements settled. DR 6101 sebesar aktual positif + DR 1101 atau rekening bank pengembalian sebesar refund positif; CR 1191 sebesar seluruh uang muka. Kaitkan jurnal lalu advance.status=settled. Refund cash menulis mutasi in pada kas harian bersama. Tidak membuat v2_trips kedua.",
+      "evidence": "app/Services/V2/DeliveryTrips.php:309",
       "tables": {
         "v2_driver_advance_settlements": "create,update",
         "v2_driver_advances": "update",
@@ -879,7 +906,7 @@
       "id": "JL1",
       "label": "Validasi dan posting jurnal dari transaksi",
       "actor": "Service transaksi V2, bukan tombol jurnal bebas",
-      "before": "Operations, SupplyTrips, DeliveryTrips atau OpeningBalances memanggil Ledger::post dengan reference_type/reference_id, tanggal opsional, keterangan, minimal dua baris akun; debit/kredit berupa string desimal atau integer, bukan float/bool.",
+      "before": "Operations, SupplyTrips, DeliveryTrips, OperatingExpenses atau OpeningBalances memanggil Ledger::post dengan reference_type/reference_id, tanggal opsional, keterangan, minimal dua baris akun; debit/kredit berupa string desimal atau integer, bukan float/bool.",
       "after": "Tolak referensi/tanggal/akun/nilai tidak sah, baris dua sisi sekaligus, nol, total nol atau debit tidak sama kredit. Dalam transaksi kunci akun aktif urut kode; akun hilang menggagalkan posting, tidak dibuat otomatis. Simpan journal_entries dan journal_entry_lines dengan nama akun dari COA. Rollback mengikuti transaksi pemanggil bila gagal.",
       "evidence": "app/Services/V2/Ledger.php:19",
       "tables": {
@@ -890,10 +917,10 @@
     },
     {
       "id": "JL2",
-      "label": "Baca laporan operasional harian",
-      "actor": "Admin seluruh data; kasir hanya shift/penjualan/pembayaran sendiri",
-      "before": "GET /v2?date=YYYY-MM-DD atau workspace root V2 → WorkspaceController::index → ReportsDocuments::daily. Tanggal harus sah. Hari bisnis penjualan/laci menggunakan tanggal opened_at shift; bukan semua nota dengan created_at hari itu.",
-      "after": "Baca seluruh penjualan dalam shift terpilih, pisahkan pendapatan barang/diskon/ongkir; expected=opening+seluruh in-seluruh out. Collections hanya in jenis sale/collection, bukan seluruh penjualan kredit/transfer. Counted/difference null bila belum dihitung. Bank posted memakai tanggal jurnal; pending/proposed memakai tanggal pengajuan. Laporan read-only, tidak menutup periode/jurnal.",
+      "label": "Baca laporan operasional harian (termasuk rincian per rekening bank)",
+      "actor": "Admin seluruh data; kasir hanya penjualan/pembayaran sendiri + laci kas harian bersama",
+      "before": "GET /v2?date=YYYY-MM-DD atau workspace root V2 → WorkspaceController::index → ReportsDocuments::daily. Tanggal harus sah. Hari bisnis penjualan/laci menggunakan tanggal opened_at kas harian.",
+      "after": "Baca seluruh penjualan dalam kas harian terpilih, pisahkan pendapatan barang/diskon/ongkir; expected=opening+seluruh in-seluruh out. Collections hanya in jenis sale/collection. Counted/difference null bila belum dihitung. Bank posted memakai tanggal jurnal; pending/proposed memakai tanggal pengajuan, dan dirinci per rekening bank aktif/historis pada bank.by_account. Laporan read-only, tidak menutup periode/jurnal.",
       "evidence": "app/Services/V2/ReportsDocuments.php:41",
       "tables": {
         "v2_user_roles": "read",
@@ -902,16 +929,17 @@
         "v2_shift_movements": "read",
         "v2_payments": "read",
         "v2_invoices": "read",
-        "journal_entries": "read"
+        "journal_entries": "read",
+        "chart_of_accounts": "read"
       }
     },
     {
       "id": "JL3",
       "label": "Buka nota dan surat jalan penjualan",
-      "actor": "Admin atau kasir pemilik penjualan; selainnya 403",
+      "actor": "Admin atau kasir aktif",
       "before": "GET /v2/documents/{id}/{kind}, kind=receipt atau delivery → WorkspaceController::document → ReportsDocuments::document. v2_sales.id harus ada; jenis delivery memerlukan v2_deliveries terkait sale_id sama.",
       "after": "Baca snapshot sale/items beserta pelanggan dan pengiriman untuk cetak; hitung goods_net=total-delivery_fee dari snapshot. Tidak mengubah stok, status pengiriman, piutang atau jurnal; membuka surat jalan bukan otomatis dispatch/receive.",
-      "evidence": "app/Services/V2/ReportsDocuments.php:177",
+      "evidence": "app/Services/V2/ReportsDocuments.php:209",
       "tables": {
         "v2_user_roles": "read",
         "v2_sales": "read",
@@ -922,16 +950,17 @@
     },
     {
       "id": "JL4",
-      "label": "Baca buku jurnal dan feed pembaruan",
+      "label": "Baca buku jurnal, rincian saldo kas/rekening bank, dan feed pembaruan",
       "actor": "Admin ketika V2 cutover aktif; rute legacy hanya GET",
-      "before": "GET /journals atau /journals/feed → JournalController::index/feed. V2Cutover.php:28 mengizinkan arsip legacy hanya admin+GET jika v2.enabled. Filter tanggal, sumber, kata kunci, after_id divalidasi.",
-      "after": "Baca header dan baris jurnal tersimpan; saldo kas/bank dari AccountBalanceService; feed after_id membaca jurnal lebih baru, tidak menulis jurnal. POST penyesuaian/saldo-awal legacy ditolak saat cutover, walaupun handler lama masih ada di source. Ini batas V2, bukan jaminan rute lama hilang.",
-      "evidence": "app/Http/Controllers/JournalController.php:18",
+      "before": "GET /journals atau /journals/feed → JournalController::index/feed. V2Cutover.php:28 mengizinkan arsip legacy hanya admin+GET jika v2.enabled. Filter tanggal, sumber, akun, after_id divalidasi.",
+      "after": "Baca header dan baris jurnal tersimpan; saldo Kas 1101 dan saldo per Rekening Bank aktif dihitung melalui AccountBalanceService dan BankAccounts::balancesByAccount; feed after_id membaca jurnal lebih baru tanpa menulis jurnal. Penyesuaian saldo dan pindah dana di V2 dijalankan lewat endpoint V2 khusus (JL9).",
+      "evidence": "app/Http/Controllers/JournalController.php:19",
       "tables": {
         "journal_entries": "read",
         "journal_entry_lines": "read",
         "chart_of_accounts": "read",
-        "opening_balances": "read"
+        "opening_balances": "read",
+        "v2_opening_batches": "read"
       }
     },
     {
@@ -940,7 +969,7 @@
       "actor": "Admin melalui GET /reports/profit-loss saat V2 aktif",
       "before": "ReportController::profitLoss memvalidasi start_date/end_date dan urutan tanggal; AccountingReportService::generateProfitAndLoss membaca journal_entries.transaction_date dalam rentang, bukan status invoice atau uang fisik.",
       "after": "Kelompokkan 4xxx pendapatan, 5xxx HPP, 6xxx beban, 7xxx penghasilan lain, 8xxx beban lain. Pendapatan=kredit-debit; beban=debit-kredit. Laba bersih=pendapatan-HPP-beban+penghasilan lain-beban lain. Semua perhitungan BigDecimal; keluaran HTML/JSON atau CSV terpisah, tanpa menulis saldo atau menutup buku.",
-      "evidence": "app/Services/AccountingReportService.php:95",
+      "evidence": "app/Services/AccountingReportService.php:96",
       "tables": {
         "journal_entries": "read",
         "journal_entry_lines": "read",
@@ -952,8 +981,8 @@
       "label": "Hitung neraca per tanggal dan keseimbangan",
       "actor": "Admin melalui GET /reports/balance-sheet saat V2 aktif",
       "before": "ReportController::balanceSheet memvalidasi as_of_date (default tanggal server). AccountingReportService::generateBalanceSheet mengagregasi jurnal sampai tanggal tersebut; saldo aset debet-kredit dan kewajiban/ekuitas kredit-debet.",
-      "after": "Tambahkan laba sampai as_of_date sebagai laba ditahan pada sisi ekuitas. is_balanced mensyaratkan aset=kewajiban+ekuitas+laba DAN setiap jurnal tidak kosong serta debit=kredit (journalsAreBalanced). Hanya pembacaan, bukan membuat jurnal penutup, neraca saldo baru, atau approval bisnis.",
-      "evidence": "app/Services/AccountingReportService.php:229",
+      "after": "Tambahkan laba sampai as_of_date sebagai laba ditahan pada sisi ekuitas. is_balanced mensyaratkan aset=kewajiban+ekuitas+laba DAN setiap jurnal tidak kosong serta debit=kredit (journalsAreBalanced). Hanya pembacaan, bukan membuat jurnal penutup atau approval bisnis.",
+      "evidence": "app/Services/AccountingReportService.php:230",
       "tables": {
         "journal_entries": "read",
         "journal_entry_lines": "read",
@@ -962,15 +991,48 @@
     },
     {
       "id": "JL7",
-      "label": "Hitung arus kas dan rekonsiliasi kas-bank",
+      "label": "Hitung arus kas dan rekonsiliasi kas serta semua rekening bank",
       "actor": "Admin melalui GET /reports/cash-flow saat V2 aktif",
-      "before": "ReportController::cashFlow memvalidasi rentang; AccountingReportService::generateCashFlow hanya memperhitungkan akun 1101 dan 1102. Saldo awal sebelum start_date, saldo akhir sampai end_date, arus periode dari jurnal terkait.",
-      "after": "Kelompok operasi/investasi/pendanaan menurut reference_type lalu akun lawan. Perpindahan internal kas↔bank dengan netCash nol dilewati dari arus bersih. Cek saldo awal+perubahan bersih=saldo akhir DAN jumlah rincian akun=saldo akhir. is_reconciled bukan bukti uang fisik cocok dan bukan pemisahan brankas vs setiap laci, karena sama-sama dapat memakai 1101.",
-      "evidence": "app/Services/AccountingReportService.php:303",
+      "before": "ReportController::cashFlow memvalidasi rentang; AccountingReportService::generateCashFlow memperhitungkan akun Kas 1101 dan seluruh Rekening Bank dari BankAccounts::cashAndBankCodes(false). Saldo awal sebelum start_date, saldo akhir sampai end_date.",
+      "after": "Kelompok operasi/investasi/pendanaan menurut reference_type lalu akun lawan. Perpindahan internal kas↔bank maupun antar rekening bank dengan netCash nol otomatis dilewati dari arus bersih. Cek saldo awal+perubahan bersih=saldo akhir DAN jumlah rincian semua akun kas/bank=saldo akhir. is_reconciled bukan bukti uang fisik laci cocok.",
+      "evidence": "app/Services/AccountingReportService.php:304",
       "tables": {
         "journal_entries": "read",
         "journal_entry_lines": "read",
         "chart_of_accounts": "read"
+      }
+    },
+    {
+      "id": "JL8",
+      "label": "Catat pengeluaran operasional V2 (Kas Utama atau Rekening Bank)",
+      "actor": "Admin aktif",
+      "before": "POST /v2/expenses (throttle:30,1) → OperatingExpenseController::store → OperatingExpenses::post. Wajib tanggal <= hari ini, akun beban operasional aktif (bukan 5101/5201/6201), sumber cash (1101) atau bank (rekening bank aktif, bawaan 1102), nominal > 0 skala 2. Tidak memerlukan kas harian terbuka, tetapi saldo sumber di buku besar harus cukup.",
+      "after": "Mengunci akun beban & sumber, memverifikasi saldo via AccountBalanceService::assertSufficient, menyimpan expenses (EXP-YYYYMMDD-######, bank_account_code bila bank) lalu memposting jurnal terkunci melalui Ledger::post (DR akun beban / CR 1101 atau rekening bank terpilih). Halaman GET /expenses mendukung filter sumber termasuk per rekening bank (bank:<kode>).",
+      "evidence": "app/Services/V2/OperatingExpenses.php:27",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "chart_of_accounts": "read",
+        "expenses": "create,update",
+        "journal_entries": "create",
+        "journal_entry_lines": "read,create"
+      }
+    },
+    {
+      "id": "JL9",
+      "label": "Penyesuaian saldo dan pindah dana Kas/Bank V2 dengan konfirmasi password",
+      "actor": "Admin aktif",
+      "before": "POST /v2/journals/adjustments (CashBankAdjustmentController::store → CashBankAdjustments::post) untuk koreksi saldo Kas 1101 atau Rekening Bank aktif ke target_balance; POST /v2/journals/transfers (CashBankTransferController::store → CashBankTransfers::post) untuk pindah dana langsung antar 1101 dan/atau Rekening Bank aktif. Keduanya throttle:30,1, mewajibkan admin, konfirmasi password akun, dan pembukuan sudah dimulai.",
+      "after": "Penyesuaian mengecek saldo kas/bank hasil tidak negatif dan membuat jurnal reference_type=adjustment seimbang tanpa mengubah saldo awal. Pindah dana mengecek saldo sumber cukup via assertSufficient dan membuat jurnal reference_type=cash_bank_transfer (DR tujuan / CR sumber); pada Laporan Arus Kas perpindahan internal ini menghasilkan arus bersih nol.",
+      "evidence": "app/Services/V2/CashBankTransfers.php:32",
+      "tables": {
+        "users": "read",
+        "v2_user_roles": "read",
+        "chart_of_accounts": "read",
+        "journal_entries": "read,create",
+        "journal_entry_lines": "read,create",
+        "v2_opening_batches": "read",
+        "opening_balances": "read"
       }
     }
   ],
@@ -988,12 +1050,12 @@
     {
       "from": "AM05",
       "to": "AM02",
-      "label": "Perubahan role/status/password mengubah versi pengguna yang dibandingkan middleware"
+      "label": "Perubahan role/status/password/username mengubah versi pengguna yang dibandingkan middleware"
     },
     {
       "from": "AM06",
       "to": "AM07",
-      "label": "Master dengan kind dan ID yang sama dapat diubah/diarsip"
+      "label": "Master dengan kind dan ID yang sama dapat diubah/diarsip/diaktifkan kembali"
     },
     {
       "from": "AM06",
@@ -1117,17 +1179,17 @@
     },
     {
       "to": "KS02",
-      "label": "Aktor berwenang membuka shift sendiri",
+      "label": "Admin membuka kas harian bersama toko (sekali per tanggal)",
       "from": "KS01"
     },
     {
       "to": "KS04",
-      "label": "Shift open milik aktor menjadi prasyarat checkout",
+      "label": "Kas harian bersama open menjadi prasyarat checkout semua kasir",
       "from": "KS02"
     },
     {
       "to": "KS04",
-      "label": "Konfirmasi final mengirim POST sales",
+      "label": "Konfirmasi final mengirim POST sales (dan foto bukti bila transfer)",
       "from": "KS03"
     },
     {
@@ -1182,7 +1244,7 @@
     },
     {
       "to": "KS12",
-      "label": "Shift open boleh direkap meskipun belum ada penjualan",
+      "label": "Kas harian open boleh direkap meskipun belum ada penjualan",
       "from": "KS02"
     },
     {
@@ -1197,12 +1259,12 @@
     },
     {
       "to": "KS12",
-      "label": "DP cash menambah collection pada shift checkout yang sama",
+      "label": "DP cash menambah collection pada kas harian yang sama",
       "from": "KS08"
     },
     {
       "to": "KS12",
-      "label": "Hanya collection cash pada shift penerimaan yang sama menambah laci rekap",
+      "label": "Hanya collection cash pada kas harian yang sama menambah laci rekap",
       "from": "KS10"
     },
     {
@@ -1212,17 +1274,17 @@
     },
     {
       "to": "KS14",
-      "label": "Counted dan token opsional dikirim ke close",
+      "label": "Counted dan token opsional dikirim admin ke close",
       "from": "KS13"
     },
     {
       "to": "KS12",
-      "label": "Jika stale: muat ulang rekap shift yang sama sebelum kirim kembali",
+      "label": "Jika stale: muat ulang rekap kas harian yang sama sebelum kirim kembali",
       "from": "KS14"
     },
     {
       "to": "KS15",
-      "label": "Lolos snapshot opsional dan guard shift open",
+      "label": "Lolos snapshot opsional dan guard kas harian open",
       "from": "KS14"
     },
     {
@@ -1232,12 +1294,12 @@
     },
     {
       "to": "KS02",
-      "label": "Jika closed dan milik aktor: dapat menjadi asal carry sekali",
+      "label": "Jika closed: dapat menjadi asal carry sekali pada tanggal berikutnya",
       "from": "KS15"
     },
     {
       "to": "KS02",
-      "label": "Setelah resolved closed: dapat menjadi asal carry sekali",
+      "label": "Setelah resolved closed: dapat menjadi asal carry sekali pada tanggal berikutnya",
       "from": "KS16"
     },
     {
@@ -1278,7 +1340,22 @@
     {
       "from": "JL1",
       "to": "JL7",
-      "label": "Hanya jurnal dengan akun kas 1101/bank 1102 yang memengaruhi arus kas"
+      "label": "Jurnal yang menyentuh akun Kas 1101 atau Rekening Bank memengaruhi arus kas"
+    },
+    {
+      "from": "JL8",
+      "to": "JL1",
+      "label": "OperatingExpenses::post memanggil Ledger::post reference_type operating_expense"
+    },
+    {
+      "from": "JL9",
+      "to": "JL4",
+      "label": "Jurnal penyesuaian dan pindah dana tampil di buku jurnal serta memperbarui saldo kas/bank"
+    },
+    {
+      "from": "JL9",
+      "to": "JL7",
+      "label": "Pindah dana kas↔bank/antar-bank tetap seimbang dan arus bersihnya nol pada arus kas"
     },
     {
       "from": "RP07",
@@ -1298,7 +1375,7 @@
     {
       "from": "RP07",
       "to": "JL1",
-      "label": "SupplyTrips::receive memanggil Ledger::post v2_receipt dengan receipt_id final"
+      "label": "SupplyTrips::receive memanggil Ledger::post v2_receipt dengan receipt_id final (termasuk ongkir bila ada)"
     },
     {
       "from": "RP10",
@@ -1313,17 +1390,17 @@
     {
       "from": "RP14",
       "to": "JL1",
-      "label": "postPayable sumber cash memposting jurnal v2_payment dan mutasi shift pemohon"
+      "label": "postPayable sumber cash memposting jurnal v2_payment dan mutasi kas harian"
     },
     {
       "from": "RP15",
       "to": "JL1",
-      "label": "postPayable sumber transfer memposting jurnal v2_payment, bukan AR transfer pending"
+      "label": "postPayable sumber transfer memposting jurnal v2_payment dari rekening bank aktif terpilih"
     },
     {
       "from": "RP16",
       "to": "JL1",
-      "label": "Approve AR transfer memposting jurnal untuk payment_id terverifikasi"
+      "label": "Approve AR transfer memposting jurnal untuk payment_id terverifikasi ke rekening bank terpilih"
     },
     {
       "from": "RP17",
@@ -1351,6 +1428,11 @@
       "label": "Pembukaan V2 memanggil Ledger::post dengan batch_id pembukaan"
     },
     {
+      "from": "AM17",
+      "to": "JL7",
+      "label": "Akun bertanda is_bank_account aktif di COA dibaca BankAccounts pada pembayaran, pengeluaran, laporan harian, dan arus kas"
+    },
+    {
       "from": "KS05",
       "to": "JL3",
       "label": "sale_id dan snapshot item hasil checkout dibaca endpoint documents untuk sale yang sama"
@@ -1358,54 +1440,43 @@
     {
       "from": "KS02",
       "to": "JL2",
-      "label": "Laporan harian memilih shift lewat tanggal opened_at; shift kosong sah tanpa nota"
+      "label": "Laporan harian memilih kas harian lewat tanggal opened_at; kas harian kosong sah tanpa nota"
     }
   ],
   "unknowns": [
     "Peta ini bukan spesifikasi, SOP baru, atau rujukan untuk menyesuaikan kode. Sumber kebenaran adalah berkas PHP/Blade working tree. Bila berbeda, kode menang; telusuri ulang narasi dan bukti sebelum menerbitkan ulang.",
-    "Cakupan dominan: akses/akun, master-relasi, impor XLSX, pembukaan awal, draf/final penerimaan, AP/AR/pembayaran, checkout tunai/transfer/kredit, pengiriman, biaya/uang muka, rekap/tutup shift, jurnal dan tiga laporan keuangan. Alur independen tetap terpisah; daftar modul bukan urutan runtime wajib.",
-    "Belum dipetakan end-to-end: provisioning akun pertama/COA lewat command V2Prepare, migrasi/upgrade/deploy, seluruh alur legacy ketika V2 nonaktif, demo-setup, stok opname legacy, expenses legacy, seluruh perhitungan dashboard/insight/monitor dan seluruh detail JavaScript UI. Source dipantau perubahan untuk meminta telaah, bukan disamakan dengan sudah dianalisis.",
-    "Tidak membaca .env, seed berisi identitas/kredensial, dump, database atau data operasional. Tidak menjalankan kode aplikasi, Artisan, migrasi, tes aplikasi, atau dependensi aplikasi. Helper dokumentasi baru hanya membaca sumber dan menulis ke docx/.",
-    "Pemeriksa sinkron membandingkan SHA-256 sumber dalam cakupan app PHP, routes PHP, migrations PHP, resources views/JS/CSS, bootstrap/app.php, config/v2.php serta composer.json/package.json. Penambahan/penghapusan juga diperiksa. Konfigurasi runtime, vendor, .env, DB dan perubahan di luar cakupan tidak dideteksi.",
-    "Kode bukti adalah cuplikan langsung yang diambil ulang dari berkas dan nomor baris saat build, bukan pseudocode atau hasil rekonstruksi. Potongan tidak mencakup setiap baris validasi; baca berkas sumber penuh untuk detail. Nilai rahasia/identitas yang tidak relevan sengaja tidak dikutip.",
-    "Cek sinkron mendeteksi drift sumber, model/resep dan artefak, tetapi tidak membuktikan seluruh klaim semantik. Jika sumber berubah, build biasa ditolak sampai alur ditelusuri kembali dan operator secara eksplisit mengakui hasil telaah. Jangan memakai flag penerimaan hanya agar cek menjadi hijau.",
-    "Pembukaan stok sekali dan penerimaan supplier adalah jalur menambah persediaan yang berbeda. Master stok nol tidak wajib melalui saldo awal untuk dapat menerima barang; pembukaan awal mensyaratkan sistem bersih sehingga tidak boleh dipaksakan sesudah transaksi berjalan.",
-    "Keadaan runtime/deployment tidak diverifikasi dalam tugas dokumentasi ini. Commit dasar saja tidak cukup mengidentifikasi sumber: hash working tree juga mencakup perubahan lokal belum commit.",
-    "03-akses-master-awal: Analisis statis source workspace saat dibaca, termasuk perubahan lokal yang belum commit. Tidak menjalankan aplikasi, tes, Artisan, migrasi, dependency, query DB atau browser; status operasi runtime belum terverifikasi. Tidak membaca .env, dump, data operasional atau kredensial.",
-    "03-akses-master-awal: Nilai V2_ENABLED aktual, konfigurasi session driver, keberadaan tabel sessions, akun admin aktif, COA dan kebersihan data pembukaan tidak diperiksa; config default bukan bukti lingkungan produksi.",
-    "03-akses-master-awal: Cakupan hanya autentikasi/role, endpoint master/relations/customer lookup, XLSX dan pembukaan V2. Provisioning akun pertama/COA (V2Prepare), demo setup, bridge legacy, alur transaksi, UI dan semua migrasi tidak ditelusuri menyeluruh.",
-    "03-akses-master-awal: Batas keamanan method: OpeningBalances::requireAdmin memeriksa role saja (bukan join users aktif); jaminan akun aktif untuk rute web datang dari EnsureActiveAccount. Pemanggil service di luar HTTP belum diaudit.",
-    "03-akses-master-awal: Tidak ditemukan endpoint aktivasi ulang master pada routes/v2.php; update master mempertahankan status arsip. Jangan menyimpulkan tombol UI Arsipkan memiliki undo hanya dari label dokumentasi lain.",
-    "03-akses-master-awal: Pratinjau saldo awal dan posting berhubungan payload/domain, tetapi server tidak mengikat posting ke hasil preview; karena itu tidak dibuat edge wajib preview→post. Template juga bukan prasyarat server untuk upload.",
-    "03-akses-master-awal: AM01 dan AM04 tables berfokus pada entitas aplikasi; persistensi session/rate limiter bergantung konfigurasi driver yang tidak dibaca. Penghapusan sessions pada AM05 kondisional keberadaan tabel.",
-    "03-akses-master-awal: Proofs adalah cuplikan lokasi kode maksimal 18 baris, bukan salinan kode atau pengujian runtime. Validasi rinci lain tetap berada dalam metode bersangkutan: MasterData::parseXlsxFile/readHeaders, OpeningBalances::validateAndNormalize dan Ledger::post.",
-    "02-penerimaan-pembayaran: Analisis statis current working tree saja; tidak menjalankan aplikasi, artisan, tes, browser, membaca env, database atau rahasia. Keberadaan tabel/migrasi terpasang, akun COA aktif, saldo, sesi, locking lintas koneksi dan hasil runtime tidak diverifikasi.",
-    "02-penerimaan-pembayaran: Cakupan hanya penerimaan supplier V2 dan pembayaran invoice. Asal invoice receivable dari checkout/saldo awal serta proses shift/saldo awal tidak ditelusuri end-to-end; invoice yang sudah ada adalah input pembayaran. Ritase, pengiriman, uang muka, transaksi V1 dan laporan di luar cakupan.",
-    "02-penerimaan-pembayaran: Tidak ditemukan rute koreksi/retur penerimaan final dalam routes/v2.php yang dibaca; SupplyTrips::voidReceipt selalu menolak. Proses koreksi yang disebut pesan error bukan implementasi yang tersedia pada jalur ini. Tidak ada panah cancelled -> confirm atau final -> draft.",
-    "02-penerimaan-pembayaran: Ketidaksesuaian nama: POST /v2/receipts sekarang menyimpan draf, bukan receipt posted. PHPDoc sebelum SupplyTrips::voidReceipt masih menjanjikan pembatalan/reversal dan prasyarat stok; badan method 437..443 tidak menulis apa pun.",
-    "02-penerimaan-pembayaran: UI workspace.blade.php 55..56 menimpa sourceLabel sumber pembayaran dengan peta sumber shift; tampilan sumber pembayaran pada baris 283 dapat menjadi tanda kosong walau method tersimpan benar. Ini temuan statis, belum diamati di browser.",
-    "02-penerimaan-pembayaran: Draf edit tidak memperbarui request_hash awal (ReceiptDrafts.php 29..41). Replay create dengan kunci/hash awal mengembalikan keadaan draf saat ini, bukan snapshot awal; retry create memakai payload hasil edit dengan kunci lama akan gagal hash. Tidak disimpulkan sebagai perubahan kebijakan.",
-    "02-penerimaan-pembayaran: Guard duplicate_payment opsional: pemanggil tanpa seen_payment_id atau dengan confirm_duplicate melewatinya. Pending/proposed tidak menambah invoice.paid sehingga beberapa pengajuan dapat berjumlah lebih dari sisa; approve memeriksa ulang sisa dan bisa gagal. Ini bukan reservasi utang/piutang.",
-    "02-penerimaan-pembayaran: ReceiptDrafts::requireAdmin dan SupplyTrips::requireAdmin hanya membaca role, berbeda dari Operations::role yang juga memeriksa users.is_active. Jalur web memiliki EnsureActiveAccount (bootstrap/app.php 15, middleware 13..27); keamanan pemanggilan service di luar web tidak dibuktikan.",
-    "02-penerimaan-pembayaran: Pembatas kepemilikan berlaku pada daftar pembayaran kasir (WorkspaceController 53), tetapi daftar invoice dan collect tidak memfilter owner. Aktor tidak disimpulkan dari label menu. Pembayaran supplier cash menggunakan laci pemohon, bukan laci penyetuju; main dan transfer dapat menyimpan shift_id tanpa memakai laci.",
-    "02-penerimaan-pembayaran: Proofs ialah rentang kutipan langsung yang dapat dibaca builder, maksimal 18 baris/rentang dan 3 rentang/langkah. Bukti diprioritaskan pada guard serta writes; tidak semua baris validasi atau dependency ditampilkan. JSON tidak memuat salinan source, data operasional, atau nilai rahasia.",
-    "01-kasir-shift: Cakupan hanya V2 Kasir, AR penjualan sebagai dampak/lajutan langsung, dan lifecycle shift beserta rekap. Bukti berasal dari working tree saat inspeksi, termasuk perubahan lokal yang belum committed; bukan spesifikasi desain.",
+    "Cakupan dominan: akses/akun (username/email), master-relasi (termasuk aktivasi ulang), Bagan Akun & multi-rekening bank, impor XLSX, pembukaan awal, draf/final penerimaan + ongkir pembelian, AP/AR/pembayaran + foto bukti transfer, checkout tunai/transfer/kredit + jatuh tempo, pengiriman, biaya/uang muka, kas harian bersama (buka/rekap/tutup/resolusi), pengeluaran operasional, penyesuaian & pindah dana kas/bank, jurnal dan tiga laporan keuangan.",
+    "Belum dipetakan end-to-end: provisioning akun pertama/COA lewat command V2Prepare, migrasi/upgrade/deploy, seluruh alur legacy ketika V2 nonaktif, demo-setup, stok opname legacy, seluruh perhitungan dashboard/insight/monitor dan seluruh detail JavaScript UI.",
+    "Tidak membaca .env, seed berisi identitas/kredensial, dump, database atau data operasional. Helper dokumentasi hanya membaca sumber dan menulis ke docx/.",
+    "Pemeriksa sinkron membandingkan SHA-256 sumber dalam cakupan app PHP, routes PHP, migrations PHP, resources views/JS/CSS, bootstrap/app.php, config/v2.php serta composer.json/package.json. Penambahan/penghapusan juga diperiksa.",
+    "Kode bukti adalah cuplikan langsung yang diambil ulang dari berkas dan nomor baris saat build, bukan pseudocode. Nilai rahasia/identitas yang tidak relevan sengaja tidak dikutip.",
+    "Cek sinkron mendeteksi drift sumber, model/resep dan artefak, tetapi tidak membuktikan seluruh klaim semantik. Jika sumber berubah, build biasa ditolak sampai alur ditelusuri kembali dan operator secara eksplisit mengakui hasil telaah.",
+    "Pembukaan stok sekali dan penerimaan supplier adalah jalur menambah persediaan yang berbeda. Pembukaan awal mensyaratkan sistem bersih sehingga tidak boleh dipaksakan sesudah transaksi berjalan.",
+    "03-akses-master-awal: Analisis statis source workspace saat dibaca. Tidak menjalankan aplikasi, tes, Artisan, migrasi, query DB atau browser; status operasi runtime tidak diverifikasi di sini.",
+    "03-akses-master-awal: Nilai V2_ENABLED aktual, konfigurasi session driver, keberadaan tabel sessions, dan kebersihan data pembukaan tidak dibaca dari .env atau database.",
+    "03-akses-master-awal: OpeningBalances::requireAdmin memeriksa role saja; jaminan akun aktif untuk rute web datang dari EnsureActiveAccount.",
+    "03-akses-master-awal: Pratinjau saldo awal dan posting berhubungan payload/domain, tetapi server tidak mengikat posting ke hasil preview; karena itu tidak dibuat edge wajib preview→post.",
+    "03-akses-master-awal: Proofs adalah cuplikan lokasi kode tanpa menyalin identitas/rahasia literal; alias admin pada AuthController::login tidak dikutip baris email statisnya.",
+    "02-penerimaan-pembayaran: Analisis statis current working tree saja; tidak menjalankan aplikasi, artisan, tes, browser, membaca env, database atau rahasia. Keberadaan migrasi terpasang, akun COA aktif, saldo, dan locking lintas koneksi tidak diverifikasi di sini.",
+    "02-penerimaan-pembayaran: Tidak ditemukan rute koreksi/retur penerimaan final dalam routes/v2.php yang dibaca; SupplyTrips::voidReceipt selalu menolak. Tidak ada panah cancelled -> confirm atau final -> draft.",
+    "02-penerimaan-pembayaran: Ketidaksesuaian nama: POST /v2/receipts menyimpan draf, bukan receipt posted. PHPDoc lama sebelum SupplyTrips::voidReceipt masih menjelaskan reversal tetapi badan method 610..617 selalu menolak.",
+    "02-penerimaan-pembayaran: Draf edit tidak memperbarui request_hash awal (ReceiptDrafts.php 29..47). Replay create dengan kunci/hash awal mengembalikan keadaan draf saat ini.",
+    "02-penerimaan-pembayaran: Guard duplicate_payment opsional: pemanggil tanpa seen_payment_id atau dengan confirm_duplicate melewatinya. Pending/proposed tidak mereservasi sisa utang/piutang sehingga approve memeriksa ulang sisa.",
+    "02-penerimaan-pembayaran: ReceiptDrafts::requireAdmin dan SupplyTrips::requireAdmin membaca v2_user_roles; jaminan akun aktif pada rute web datang dari EnsureActiveAccount.",
+    "01-kasir-shift: Cakupan hanya V2 Kasir, AR penjualan sebagai dampak/lanjutan langsung, dan lifecycle kas harian bersama beserta rekap. Bukti berasal dari working tree saat inspeksi; bukan spesifikasi desain.",
     "01-kasir-shift: Inspeksi statis saja: tidak menjalankan aplikasi, Artisan, tes, browser atau query database; tidak membaca .env, data bisnis ataupun rahasia. Tidak menyertifikasi konfigurasi v2.enabled aktif, migrasi terpasang, saldo runtime, izin aktual atau konkurensi nyata.",
-    "01-kasir-shift: Rekap ini per shift, bukan tutup buku/periode akuntansi, bukan omzet harian atau kas fisik gabungan seluruh toko. Total nota cash/transfer/credit bukan jumlah penerimaan bank/laci dan tidak memisahkan DP ke kelompok omzet lain.",
-    "01-kasir-shift: Pembayaran supplier dan operasi kas lain di luar scope dapat memengaruhi movement laci atau daftar cash proposed; paket hanya membaca dampaknya pada rekap. Pending cash proposed tidak diblokir oleh closeShift; keberhasilan posting sumber laci setelah shift tidak open harus ditelusuri terpisah di postPayable.",
+    "01-kasir-shift: Rekap ini per kas harian bersama, bukan tutup buku/periode akuntansi. Total nota cash/transfer/credit bukan jumlah penerimaan bank/laci dan tidak memisahkan DP ke kelompok omzet lain.",
+    "01-kasir-shift: Pembayaran supplier dan operasi kas lain di luar scope dapat memengaruhi movement laci atau daftar cash proposed; paket hanya membaca dampaknya pada rekap. Pending cash proposed tidak diblokir oleh closeShift.",
     "01-kasir-shift: Token rekap opsional; UI secara eksplisit mengizinkan menutup meski fetch rekap gagal. Fingerprint bukan bukti fisik uang dan bukan versi semua field invoice/payment: hash memakai field snapshot yang disebutkan di KS14.",
-    "01-kasir-shift: Carry tidak menghapus/mengurangi counted_cash historis shift asal dan openShift tidak memposting jurnal modal. Validitas pembatasan balapan/idempotensi bergantung pula pada skema/mesin database; tidak diuji runtime dalam tugas ini.",
-    "01-kasir-shift: Delivery hanya pointer prepared dan endpoint dispatch; proses dispatch/terima barang, penagihan penuh lintas modul, retur/void, penutupan periode, laporan keuangan serta isi cetak nota tidak ditelusuri di paket ini.",
-    "01-kasir-shift: Controller checkout menerima daftar field tervalidasi tanpa vehicle_id/driver_name walaupun service mendukungnya; jangan menganggap UI checkout mengirim assignment kendaraan/sopir. Tidak mengubah kode untuk menutup keterbatasan tersebut.",
+    "01-kasir-shift: Carry tidak menghapus/mengurangi counted_cash historis shift asal dan openShift tidak memposting jurnal modal. Setor uang tunai dari kas ke rekening bank dicatat terpisah lewat Pindah Dana (JL9).",
+    "01-kasir-shift: Controller checkout menerima daftar field tervalidasi tanpa vehicle_id/driver_name walaupun service mendukungnya; penugasan kendaraan/sopir dilakukan saat dispatch pengiriman.",
     "04-pengiriman-perjalanan: Biaya perjalanan langsung dan uang muka adalah jalur independen; kode tidak mewajibkan setiap pengiriman memiliki biaya atau uang muka. Tidak dibuat panah palsu dispatch → advance → trip.",
-    "04-pengiriman-perjalanan: Penyelesaian uang muka dengan aktual melebihi advance ditolak eksplisit. Mekanisme menambah kekurangan tidak didukung di metode settle ini (DeliveryTrips.php:269-270).",
+    "04-pengiriman-perjalanan: Penyelesaian uang muka dengan aktual melebihi advance ditolak eksplisit. Mekanisme menambah kekurangan tidak didukung di metode settle ini (DeliveryTrips.php:288-290).",
     "04-pengiriman-perjalanan: Tidak ada klaim bahwa sopir adalah akun login atau pelanggan mengonfirmasi sendiri: guard server dispatch/receive hanya admin atau kasir pemilik penjualan.",
     "04-pengiriman-perjalanan: Analisis ini membaca sumber statis. Tidak menjalankan pengiriman nyata, tidak membaca saldo, transaksi, atau penugasan operasional.",
-    "04-pengiriman-perjalanan: Indeks CRUD bersifat ringkasan akses jalur yang dicatat beserta helper langsung; bukan inventaris seluruh query aplikasi.",
     "05-jurnal-laporan: Tidak dibuat panah laporan harian → laba-rugi → neraca → arus kas sebagai urutan wajib. Masing-masing membaca sumber data berbeda; laporan operasional dan laporan jurnal bukan total yang otomatis identik.",
-    "05-jurnal-laporan: Pemetaan laporan keuangan dibatasi service perhitungan, controller akses/input, jurnal baca dan CSV. Tidak mengklaim audit nominal aktual, kesesuaian seluruh akun historis, atau validasi fiskal.",
-    "05-jurnal-laporan: V2Cutover hanya membatasi rute legacy ketika config v2.enabled aktif. Nilai konfigurasi runtime tidak dibaca dari .env atau aplikasi; dokumen memaparkan cabang kode, bukan sertifikasi deployment aktif.",
-    "05-jurnal-laporan: AccountAdjustmentService dan OpeningBalanceService legacy masih ada, tetapi POST legacy tidak menjadi alur aktif pada cutover. Tidak disarankan sebagai jalan pintas koreksi final V2.",
-    "05-jurnal-laporan: Renderer memeriksa nomor baris dan kesamaan keluaran. Kebenaran seluruh aturan tetap memerlukan penelusuran manusia; hash perubahan bukan pembuktian perilaku runtime."
+    "05-jurnal-laporan: Pemetaan laporan keuangan dibatasi service perhitungan, controller akses/input, jurnal baca dan CSV. Tidak mengklaim audit nominal aktual atau validasi fiskal.",
+    "05-jurnal-laporan: V2Cutover hanya membatasi rute legacy ketika config v2.enabled aktif. Nilai konfigurasi runtime tidak dibaca dari .env atau aplikasi.",
+    "05-jurnal-laporan: AccountAdjustmentService dan OpeningBalanceService legacy masih ada untuk mode non-cutover, tetapi di V2 aktif penyesuaian dan pindah dana berjalan melalui /v2/journals/adjustments dan /v2/journals/transfers (JL9)."
   ]
 }

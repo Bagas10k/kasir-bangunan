@@ -80,10 +80,9 @@
 <section class="card" aria-labelledby="receipt-heading">
 <h2 id="receipt-heading">Penerimaan barang berutang <x-ui.info-tip key="draf_penerimaan" label="Keterangan draf dan konfirmasi final penerimaan"/></h2>
 <p class="note">Simpan sebagai draf dahulu. Stok, HPP, dan utang supplier baru berubah saat penerimaan dikonfirmasi dan dikunci.</p>
-<p class="note">Pilih barang di daftar Perlu restok; supplier diisi otomatis bila hanya satu. Satu penerimaan tetap untuk satu supplier.</p>
 <form id="receipt-form" novalidate>
-@include('v2.receipt-restock')
-<div class="row">
+<fieldset class="rc-info">
+    <legend>Info penerimaan</legend>
     <div class="field">
         <label for="rc-supplier">Supplier</label>
         <select id="rc-supplier" name="supplier_id" required>
@@ -101,18 +100,19 @@
         <label for="rc-nota">No. nota supplier <span class="rc-opt">(opsional)</span></label>
         <input id="rc-nota" name="supplier_invoice_number" type="text" maxlength="64" autocomplete="off" placeholder="Nomor di nota/faktur supplier">
     </div>
-</div>
+</fieldset>
+@include('v2.receipt-restock')
 <fieldset class="rc-items">
     <legend class="lbl">Barang diterima <x-ui.info-tip key="hpp_penerimaan" label="Keterangan HPP satuan pembelian"/></legend>
     <div class="rc-head" aria-hidden="true"><span>Barang</span><span>Jumlah</span><span>HPP satuan</span><span>Nilai</span><span></span></div>
     <div id="receipt-items"></div>
     <div class="rc-foot">
-        <button type="button" class="secondary" id="receipt-add">Tambah barang</button>
+        <button type="button" class="secondary" id="receipt-add">+ Tambah barang manual</button>
         <p class="rc-total" role="status" aria-live="polite"><span id="rc-count">0 barang</span><strong id="rc-sum">Rp 0</strong></p>
     </div>
 </fieldset>
 <p class="note">HPP satuan dipakai untuk nilai persediaan, bukan harga jual.</p>
-<fieldset class="row" @disabled(!($freightReady ?? false))>
+<fieldset class="rc-freight" @disabled(!($freightReady ?? false)) @if(!($freightReady ?? false)) hidden @endif>
     <legend>Ongkir pembelian (beban, bukan HPP) <x-ui.info-tip key="ongkir_penerimaan" label="Keterangan ongkir pembelian"/></legend>
     <div class="field"><label for="rc-freight">Ongkir</label><input id="rc-freight" name="freight_amount" data-money inputmode="decimal" value="0" maxlength="30"></div>
     <div class="field"><label for="rc-freight-method">Pembayaran ongkir</label><select id="rc-freight-method" name="freight_method"><option value="supplier">Ikut tagihan supplier</option><option value="cash">Kas harian</option><option value="bank">Bank</option></select></div>
@@ -196,20 +196,20 @@
 <template id="receipt-tpl">
 <div class="rc-row">
     <div class="field">
-        <label class="sr" data-label>Barang</label>
+        <label class="rc-field-label" data-label>Barang</label>
         <select data-name="product_id" required data-pick-placeholder="Cari nama atau SKU barang">
             <option value="">— pilih barang —</option>
         </select>
     </div>
     <div class="field">
-        <label class="sr" data-label>Jumlah</label>
+        <label class="rc-field-label" data-label>Jumlah</label>
         <input data-name="quantity" type="text" inputmode="decimal" maxlength="30" placeholder="jumlah" required>
     </div>
     <div class="field">
-        <label class="sr" data-label>HPP satuan</label>
+        <label class="rc-field-label" data-label>HPP satuan</label>
         <input data-name="unit_cost" type="text" data-money data-money-scale="4" inputmode="decimal" maxlength="30" placeholder="HPP satuan" required>
     </div>
-    <output class="rc-value" data-line-total>Rp 0</output>
+    <div class="rc-line-value"><span class="rc-field-label">Subtotal</span><output class="rc-value" data-line-total>Rp 0</output></div>
     <button type="button" class="secondary rc-remove" data-remove aria-label="Hapus baris barang">×</button>
 </div>
 </template>
@@ -666,7 +666,14 @@ if (receipt) {
     });
     receipt.addEventListener('reset', () => queueMicrotask(() => { receiptSupplier = receipt.elements.supplier_id.value; }));
     const renumber = () => Array.from(box.children).forEach((row, i) => {
-        row.querySelectorAll('[data-name]').forEach(el => { el.setAttribute('aria-label', labels[el.dataset.name] + ' baris ' + (i + 1)); });
+        row.querySelectorAll('[data-name]').forEach(el => {
+            const field = el.closest('.field'), control = field.querySelector('.ui-pick-input') || el;
+            const label = labels[el.dataset.name] + ' baris ' + (i + 1);
+            control.id = 'rc-item-' + (i + 1) + '-' + el.dataset.name;
+            field.querySelector('label').htmlFor = control.id;
+            el.setAttribute('aria-label', label);
+            control.setAttribute('aria-label', label);
+        });
     });
     // Nilai per baris dan ringkasan di bawah: angka dipakai untuk membaca, server tetap menghitung ulang.
     const rupiah = value => 'Rp ' + Math.round(value).toLocaleString('id-ID');
@@ -702,7 +709,6 @@ if (receipt) {
         node.querySelector('[data-remove]').addEventListener('click', () => { node.remove(); renumber(); recalc(); });
         box.append(node);
         filterProducts(node);
-        renumber();
         const productSelect = node.querySelector('[data-name=product_id]');
         node.querySelector('[data-name=unit_cost]').addEventListener('input', event => { event.target.dataset.costEdited = '1'; });
         if (window.uiPick) {
@@ -713,6 +719,7 @@ if (receipt) {
                 onPick: item => { const cost = node.querySelector('[data-name=unit_cost]'); cost.placeholder = rupiah(Number(item.cost) || 0); cost.title = 'HPP saat ini ' + cost.placeholder; node.dataset.label = item.label; node.dataset.meta = item.meta || ''; node.dataset.cost = item.cost ?? ''; fillReceiptCost(node, item.cost); recalc(); }
             });
         }
+        renumber();
         recalc();
         if (focus) { (node.querySelector('.ui-pick-input') || node.querySelector('select')).focus(); }
         return node;
@@ -740,8 +747,6 @@ if (receipt) {
         cost.placeholder = rupiah(Number(product.cost) || 0); cost.title = 'HPP saat ini ' + cost.placeholder;
         fillReceiptCost(row, product.cost);
         recalc();
-        row.querySelector('[data-name=quantity]').focus();
-        row.scrollIntoView?.({block:'nearest',behavior:'instant'});
         return 'added';
     }
     receipt._addRestockProduct = addRestockProduct;

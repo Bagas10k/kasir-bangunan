@@ -1,5 +1,5 @@
 <section id="receipt-restock" class="rr-panel" aria-labelledby="rr-title" data-url="{{ route('v2.receipts.restock-products') }}" data-link-url="{{ route('v2.receipts.product-supplier') }}">
-    <div class="rr-heading"><div><h3 id="rr-title">Perlu restok</h3><p class="note">Pilih barang seperti katalog. Supplier mengikuti barang; jumlah dan HPP diisi sesuai barang yang datang.</p></div><button type="button" class="secondary" data-restock-refresh>Perbarui</button></div>
+    <div class="rr-heading"><div><h3 id="rr-title">Rekomendasi stok</h3><p class="note">Tambahkan barang satu per satu. Supplier terisi otomatis jika hanya ada satu pilihan.</p></div><button type="button" class="secondary" data-restock-refresh>Perbarui</button></div>
     <div class="rr-tools">
         <div class="rr-search" role="search"><label class="sr" for="rr-search">Cari kebutuhan restok</label><input type="search" id="rr-search" data-restock-search maxlength="100" autocomplete="off" placeholder="Cari nama atau SKU"><button type="button" class="secondary" data-restock-search-button>Cari</button></div>
     </div>

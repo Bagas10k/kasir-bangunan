@@ -10,6 +10,8 @@ class Element {
     append(...nodes){this.children.push(...nodes);}
     replaceChildren(...nodes){this.children=nodes;}
     setAttribute(k,v){this.attributes[k]=v;}
+    getAttribute(k){return this.attributes[k]??null;}
+    removeAttribute(k){delete this.attributes[k];}
     addEventListener(type,fn){this.listeners[type]=fn;}
     add(option){this.children.push(option);}
     dispatchEvent(){}
@@ -35,10 +37,29 @@ function setup(){
     vm.runInNewContext(source,{document,location:{href:'http://example.test/'},URL,AbortController,fetch:(url,options)=>{requests.push({url,options});return respond(url);},
         MutationObserver:class{observe(){}},queueMicrotask,window:{},crypto:{randomUUID:()=>String(requests.length)},Option:class{constructor(text,value){this.textContent=text;this.value=value;}},Event:class{}});
     return {root,form,supplier,items,nodes,chips,requests,respond:fn=>respond=fn,
-        click:dataset=>root.listeners.click({target:{closest:()=>({dataset,focus(){}})}})};
+        click:dataset=>root.listeners.click({target:{closest:()=>dataset.restockProduct
+            ? nodes.results.children.flatMap(row=>row.children).find(node=>node.dataset.restockProduct===dataset.restockProduct)
+            : Object.assign(new Element(),{dataset})}})};
 }
 const product={id:4,name:'<img onerror=bad()> Sintetis',sku:'SYN-4',unit:'sak',stock:'0',minimum:'2',cost:'20',status:'out',suppliers:[{id:7,name:'Supplier Sintetis'}]};
 const data=(rows=[product],page=1)=>({results:rows,total:21,page,last_page:2,counts:{critical:21,out:20,low:1}});
+test('added recommendations stay focusable but cannot add the same product again',async()=>{
+    const app=setup();await flush();
+    app.respond(async()=>({ok:true,json:async()=>data()}));
+    await app.nodes.refresh.listeners.click();
+    let additions=0;
+    app.form._addRestockProduct=()=>{
+        additions++;
+        app.items.children.push({querySelector:()=>({value:'4'})});
+        return 'added';
+    };
+    const button=app.nodes.results.children[0].children.at(-1);
+    app.click({restockProduct:'4'});
+    assert.equal(button.disabled,false);
+    assert.equal(button.getAttribute('aria-disabled'),'true');
+    app.click({restockProduct:'4'});
+    assert.equal(additions,1);
+});
 test('list loads store-wide before supplier selection and search only issues a read',async()=>{
     const app=setup();await flush();
     assert.equal(app.requests.length,1);

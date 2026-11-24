@@ -119,16 +119,17 @@ window.BusinessDiagram = (() => {
     return figure(svg,(stages.some(s=>s.current===false)?'Sumber berubah: diagram ini perlu ditinjau ulang. ':'')+'Diagram proses · klik tahap untuk membuka penjelasannya. Pilihan yang tidak diambil bukan tahap wajib.',532);
   }
   function overview(select){
-    const slug='flow-system',svg=canvas(slug,'Alur utama Kasir Bangunan','Barang masuk menambah stok dan utang supplier; penjualan memakai stok dan membuat pembayaran atau piutang. Pengiriman dipilih terpisah; hasil dibaca dalam rekap.',1104,744);
+    const slug='flow-system',svg=canvas(slug,'Alur utama Kasir Bangunan','Barang masuk menambah stok dan utang supplier; penjualan memakai stok dan membuat pembayaran atau piutang. Pengiriman dipilih terpisah; pengeluaran, rekening bank, pindah dana, dan hasil dibaca dalam rekap.',1104,744);
     const nodes=[
-      {id:'barang-masuk',title:'Barang masuk',subtitle:'Admin: draf → konfirmasi',x:40,y:40,w:272,h:112},
+      {id:'barang-masuk',title:'Barang masuk',subtitle:'Admin: draf → konfirmasi + ongkir',x:40,y:40,w:272,h:112},
       {id:'stock',title:'Stok tersedia',subtitle:'Penerimaan final menambah stok',x:416,y:40,w:272,h:112,focal:true},
-      {id:'penjualan',title:'Penjualan',subtitle:'Kasir/admin; shift wajib terbuka',x:792,y:40,w:272,h:112},
-      {id:'supplier',title:'Utang → bayar supplier',subtitle:'Kas Utama / Bank / Laci shift',x:40,y:304,w:272,h:112},
+      {id:'penjualan',title:'Penjualan',subtitle:'Kasir/admin; kas harian terbuka',x:792,y:40,w:272,h:112},
+      {id:'supplier',title:'Utang → bayar supplier',subtitle:'Kas Utama / Rekening Bank / Laci',x:40,y:304,w:272,h:112},
       {id:'pengiriman',title:'Pengiriman (jika dipilih)',subtitle:'Disiapkan → Dikirim → Diterima',x:416,y:304,w:272,h:112},
-      {id:'piutang',title:'Pembayaran / piutang',subtitle:'Tunai / transfer / kredit',x:792,y:304,w:272,h:112},
-      {id:'shift',title:'Rekap dan tutup shift',subtitle:'Bandingkan dengan uang fisik',x:792,y:568,w:272,h:112},
-      {id:'laporan',title:'Jurnal dan laporan',subtitle:'Baca hasil; tidak menutup periode',x:40,y:568,w:272,h:112}
+      {id:'piutang',title:'Pembayaran / piutang',subtitle:'Tunai / transfer + bukti / kredit',x:792,y:304,w:272,h:112},
+      {id:'laporan',title:'Jurnal dan laporan',subtitle:'Per rekening bank; baca saja',x:40,y:568,w:272,h:112},
+      {id:'keuangan-kas',title:'Pengeluaran & kas/bank',subtitle:'Biaya, COA bank, pindah dana',x:416,y:568,w:272,h:112},
+      {id:'shift',title:'Kas harian (buka & tutup)',subtitle:'Admin: rekap & cek fisik laci',x:792,y:568,w:272,h:112}
     ];
     connector(svg,slug,[[312,96],[416,96]],'STOK MASUK',[364,65]);
     connector(svg,slug,[[688,96],[792,96]],'STOK CUKUP',[740,65]);
@@ -136,9 +137,11 @@ window.BusinessDiagram = (() => {
     connector(svg,slug,[[928,152],[928,304]],'BAYAR / AR',[1004,230]);
     connector(svg,slug,[[792,116],[736,116],[736,248],[552,248],[552,304]],'JIKA KIRIM',[600,221],true);
     connector(svg,slug,[[928,416],[928,568]],'MUTASI LACI',[1010,500],true);
+    connector(svg,slug,[[792,624],[688,624]],'SETOR / KAS',[740,596],true);
+    connector(svg,slug,[[416,624],[312,624]],'JURNAL',[364,596]);
     connector(svg,slug,[[176,416],[176,568]],'JURNAL',[242,500]);
     for(const n of nodes)node(svg,n,n.id==='stock'?()=>select('barang-masuk'):select);
-    return figure(svg,'Hubungan proses utama, bukan kewajiban menjalankan semuanya berurutan. Stok juga dapat berasal dari saldo awal; laporan membaca banyak transaksi, tidak hanya pembayaran supplier.');
+    return figure(svg,'Hubungan proses utama, bukan kewajiban menjalankan semuanya berurutan. Stok juga dapat berasal dari saldo awal; laporan membaca seluruh jurnal termasuk pengeluaran, rekening bank, dan pindah dana.');
   }
   return {journey,overview};
 })();

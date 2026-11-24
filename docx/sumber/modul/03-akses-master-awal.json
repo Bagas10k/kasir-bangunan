@@ -1,13 +1,13 @@
 {
-  "title": "Akses akun, persiapan master, impor dan saldo awal — jejak sumber V2",
+  "title": "Akses akun, persiapan master, bagan akun, impor dan saldo awal — jejak sumber V2",
   "steps": [
     {
       "id": "AM01",
-      "label": "Masuk dan keluar sesi",
+      "label": "Masuk dengan username atau email, dan keluar sesi",
       "actor": "Tamu / pengguna login",
-      "before": "GET/POST /login hanya guest; POST dibatasi throttle:10,1. Input email berupa email valid atau alias admin, password wajib; limiter identitas+IP menolak setelah 5 kegagalan selama jendela 60 detik.",
-      "after": "Auth::attempt mensyaratkan users.is_active; berhasil meregenerasi sesi, menyimpan pasangan id/auth_version, menghapus intended URL dan menuju pos.index (/). Gagal kembali ke login tanpa password. POST /logout (auth) logout, invalidasi sesi dan regenerasi token. Alias admin dipetakan ke email statis dalam sumber, bukan pencarian username umum.",
-      "evidence": "app/Http/Controllers/AuthController.php:126",
+      "before": "GET/POST /login hanya guest; POST dibatasi throttle:10,1. Input identitas berupa username pendek, email valid, atau alias admin, password wajib; limiter identitas+IP menolak setelah 5 kegagalan selama jendela 60 detik.",
+      "after": "Jika input bukan format email dan bukan alias admin, autentikasi diarahkan ke kolom users.username; Auth::attempt mensyaratkan users.is_active. Berhasil meregenerasi sesi, menyimpan pasangan id/auth_version, menghapus intended URL dan menuju pos.index (/). POST /logout (auth) logout, invalidasi sesi dan regenerasi token.",
+      "evidence": "app/Http/Controllers/AuthController.php:149",
       "tables": {
         "users": "read"
       }
@@ -29,7 +29,7 @@
       "label": "Batasi arsip legacy saat cutover",
       "actor": "Middleware web / admin atau kasir",
       "before": "config/v2.php:2 menetapkan enabled dari V2_ENABLED dengan default false; nilai runtime tidak dibaca. Bila aktif, demo-setup ditolak 404. Jalur v2, login, logout, up dan root memiliki pengecualian eksplisit.",
-      "after": "Untuk jalur legacy lain yang sudah terautentikasi, hanya admin dengan metode GET lolos; kasir atau metode tulis ditolak 403 oleh server. Root diteruskan; PosController::index mendelegasikan ke workspace bila enabled. Tidak menyatakan cutover sedang aktif pada instalasi ini.",
+      "after": "Untuk jalur legacy lain yang sudah terautentikasi, hanya admin dengan metode GET lolos; kasir atau metode tulis ditolak 403 oleh server. Root diteruskan; PosController::index mendelegasikan ke workspace bila enabled.",
       "evidence": "app/Http/Middleware/V2Cutover.php:12",
       "tables": {
         "users": "read",
@@ -38,11 +38,11 @@
     },
     {
       "id": "AM04",
-      "label": "Baca dan buat akun login",
+      "label": "Baca dan buat akun login (username dan/atau email)",
       "actor": "Admin aktif",
-      "before": "GET /v2/accounts dan POST /v2/accounts memerlukan auth dan admin aktif. POST throttle:20,1; name/email wajib max255; password terkonfirmasi 12–128; role admin/cashier dan is_active boolean wajib.",
-      "after": "Daftar memakai users LEFT JOIN v2_user_roles tanpa hash dan respons no-store. Pembuatan mengunci role, memeriksa ulang admin aktif dan email lower(trim) unik; membuat users dengan password hash/auth_version=1, role dan audit create secara atomik, respons 201. Email bentrok menjadi validasi. Akun login bukan v2_parties(kind=employee).",
-      "evidence": "app/Http/Controllers/V2/AccountController.php:55",
+      "before": "GET/POST /v2/accounts memerlukan auth dan admin aktif. POST throttle:20,1; name wajib max255; minimal salah satu dari username (3–32 karakter huruf kecil/angka/._-, bukan admin) atau email valid wajib; password terkonfirmasi 12–128; role admin/cashier dan is_active boolean wajib.",
+      "after": "Daftar memakai users LEFT JOIN v2_user_roles tanpa hash dan respons no-store. Pembuatan mengunci role, memeriksa ulang admin aktif serta keunikan username/email lower(trim); membuat users dengan password hash/auth_version=1, role dan audit create secara atomik, respons 201. Akun login bukan v2_parties(kind=employee).",
+      "evidence": "app/Http/Controllers/V2/AccountController.php:57",
       "tables": {
         "users": "create,read",
         "v2_user_roles": "create,read",
@@ -53,9 +53,9 @@
       "id": "AM05",
       "label": "Ubah akun tanpa memutus kendali admin",
       "actor": "Admin aktif",
-      "before": "PUT /v2/accounts/{id} numerik, throttle:20,1; payload name/email/role/is_active wajib, password opsional terkonfirmasi 12–128. Transaksi mengunci role/aktor/target; target hilang 404, aktor tidak sah 403.",
-      "after": "Dilarang nonaktif/demosi diri sendiri dan admin aktif terakhir (422). Shift target berstatus open melarang perubahan role/nonaktif. Email harus unik. users dan role diperbarui, audit update dibuat. HANYA perubahan role/status/password menaikkan auth_version, memutar remember_token serta menghapus sesi DB jika tabel sessions ada; perubahan nama/email saja tidak menaikkan versi.",
-      "evidence": "app/Http/Controllers/V2/AccountController.php:142",
+      "before": "PUT /v2/accounts/{id} numerik, throttle:20,1; payload name/role/is_active wajib, minimal salah satu username/email tetap terisi, password opsional terkonfirmasi 12–128. Transaksi mengunci role/aktor/target; target hilang 404, aktor tidak sah 403.",
+      "after": "Dilarang nonaktif/demosi diri sendiri dan admin aktif terakhir (422). Shift target berstatus open melarang perubahan role/nonaktif. Username dan email harus unik. users dan role diperbarui, audit update dibuat. Perubahan role, status, password, ATAU username menaikkan auth_version, memutar remember_token serta menghapus sesi DB jika tabel sessions ada.",
+      "evidence": "app/Http/Controllers/V2/AccountController.php:147",
       "tables": {
         "users": "read,update",
         "v2_user_roles": "create,read,update",
@@ -68,9 +68,9 @@
       "id": "AM06",
       "label": "Baca dan buat master dasar",
       "actor": "Admin aktif",
-      "before": "GET/POST /v2/master/{kind}: kind product/customer/supplier/employee/vehicle; kind tidak dikenal pada dua handler ini 404. Validasi text wajib dan batas panjang, angka nonnegatif; SKU/kode/plat tidak boleh sudah ada.",
+      "before": "GET/POST /v2/master/{kind}: kind product/customer/supplier/employee/vehicle; kind tidak dikenal 404. Validasi text wajib dan batas panjang, angka nonnegatif; SKU/kode/plat tidak boleh sudah ada.",
       "after": "GET membaca maksimal 100 record terbaru per kind, produk disertai supplier. POST atomik membuat produk stok 0, kendaraan status active atau pihak is_active=true; produk melalui resolusi satuan/kategori dan supplier. Customer price_tier hanya retail/contractor; contractor_price positif atau null. Employee hanya master pihak, tidak membuat users/role atau akses login.",
-      "evidence": "app/Services/V2/MasterData.php:95",
+      "evidence": "app/Services/V2/MasterData.php:96",
       "tables": {
         "products": "create,read",
         "vehicles": "create,read",
@@ -81,11 +81,11 @@
     },
     {
       "id": "AM07",
-      "label": "Ubah atau arsip master tanpa hapus riwayat",
+      "label": "Ubah, arsip, atau aktifkan kembali master tanpa hapus riwayat",
       "actor": "Admin aktif",
-      "before": "PUT/PATCH /v2/master/{kind}/{id} numerik; service memeriksa admin/kind dan mengunci record terikat kind. ID hilang atau input tidak valid menghasilkan pesan 422 melalui WorkspaceController::run.",
-      "after": "PUT tidak mengganti kind/stok/status arsip; field numerik tertentu, notes dan tier yang tidak dikirim dipertahankan. HPP produk tidak boleh berubah bila stok nonzero atau ada stock_movements. PATCH hanya menonaktifkan (kendaraan status inactive, lainnya is_active=false), tanpa hard delete; tidak ada guard larangan arsip berdasar pemakaian di metode ini.",
-      "evidence": "app/Services/V2/MasterData.php:136",
+      "before": "PUT/PATCH /v2/master/{kind}/{id} dan PATCH /v2/master/{kind}/{id}/activate numerik; service memeriksa admin/kind dan mengunci record terikat kind.",
+      "after": "PUT tidak mengganti kind/stok/status arsip; HPP produk tidak boleh berubah bila stok nonzero atau ada stock_movements. PATCH arsip menonaktifkan (kendaraan status inactive, lainnya is_active=false) tanpa hard delete; PATCH activate memulihkan kembali dari arsip (active/is_active=true) dengan riwayat utuh.",
+      "evidence": "app/Services/V2/MasterData.php:137",
       "tables": {
         "products": "read,update",
         "vehicles": "read,update",
@@ -97,10 +97,10 @@
     },
     {
       "id": "AM08",
-      "label": "Kelola satuan dan kategori",
+      "label": "Kelola satuan dan kategori (termasuk aktivasi ulang)",
       "actor": "Admin aktif",
-      "before": "POST/PUT/PATCH /v2/relations/{kind}[/{id}] membatasi kind driver/unit/category dan ID numerik. Untuk unit/category: name wajib dengan batas 32/50 dan unik dalam type.",
-      "after": "Membuat product_options aktif; rename memperbarui teks unit/category pada products yang terhubung ID. Arsip hanya is_active=false; pemakaian produk tidak menghalangi arsip dan relasi lama tidak dihapus. Jenis/ID tidak cocok ditolak. Pembuatan atau penggantian pilihan produk baru perlu opsi aktif, sedangkan tautan produk yang sudah sama tetap sah setelah opsi diarsip.",
+      "before": "POST/PUT/PATCH /v2/relations/{kind}[/{id}] dan PATCH /v2/relations/{kind}/{id}/activate membatasi kind driver/unit/category dan ID numerik. Untuk unit/category: name wajib dengan batas 32/50 dan unik dalam type.",
+      "after": "Membuat product_options aktif; rename memperbarui teks unit/category pada products yang terhubung ID. Arsip menyetel is_active=false tanpa menghapus relasi lama; activate memulihkan is_active=true. Pilihan produk baru wajib opsi aktif, sedangkan tautan lama tetap sah walau opsi diarsip.",
       "evidence": "app/Services/V2/MasterRelations.php:31",
       "tables": {
         "product_options": "create,read,update",
@@ -111,9 +111,9 @@
       "id": "AM09",
       "label": "Kelola sopir terpisah dari akun login",
       "actor": "Admin aktif",
-      "before": "Rute relations driver memakai MasterRelations. kind internal/external wajib; code unik. Internal wajib merujuk v2_parties employee aktif yang belum dipakai sopir lain; external tidak boleh employee_id dan wajib nama.",
-      "after": "Create/PUT menyimpan v2_drivers, internal memakai nama employee; saat PUT menuju external employee_id dikosongkan. PATCH menonaktifkan sopir, tidak menghapus. Driver resolver menolak sopir nonaktif/pegawai internal nonaktif. Tidak ada pembuatan users/role pada alur ini.",
-      "evidence": "app/Services/V2/MasterRelations.php:179",
+      "before": "Rute relations driver memakai MasterRelations (store/update/archive/activate). kind internal/external wajib; code unik. Internal wajib merujuk v2_parties employee aktif yang belum dipakai sopir lain; external tidak boleh employee_id dan wajib nama.",
+      "after": "Create/PUT menyimpan v2_drivers, internal memakai nama employee; saat PUT menuju external employee_id dikosongkan. PATCH menonaktifkan atau mengaktifkan kembali sopir tanpa menghapus. Driver resolver menolak sopir nonaktif/pegawai internal nonaktif. Tidak ada pembuatan users/role pada alur ini.",
+      "evidence": "app/Services/V2/MasterRelations.php:192",
       "tables": {
         "v2_drivers": "create,read,update",
         "v2_parties": "read"
@@ -124,8 +124,8 @@
       "label": "Validasi tautan produk ke opsi dan supplier",
       "actor": "Admin melalui create/update produk",
       "before": "Payload product menerima unit_id/category_id atau nama teks; supplier_ids array ID unik dan primary_supplier_id opsional. Dipanggil dalam transaksi MasterData::store/update, bukan endpoint mandiri.",
-      "after": "Teks opsi baru dapat membuat product_options saat write saja; pilihan baru harus aktif, tautan opsi lama boleh tetap walau arsip. Supplier baru harus kind supplier aktif; supplier terarsip yang sudah tertaut boleh dipertahankan. Primary harus anggota daftar. Jika field supplier tidak dikirim, tautan tidak diubah; replace menghapus lalu membuat ulang link, hanya-primary memperbarui is_primary. Kesalahan membatalkan transaksi master.",
-      "evidence": "app/Services/V2/MasterRelations.php:100",
+      "after": "Teks opsi baru dapat membuat product_options saat write saja; pilihan baru harus aktif, tautan opsi lama boleh tetap walau arsip. Supplier baru harus kind supplier aktif; supplier terarsip yang sudah tertaut boleh dipertahankan. Primary harus anggota daftar. Kesalahan membatalkan transaksi master.",
+      "evidence": "app/Services/V2/MasterRelations.php:113",
       "tables": {
         "product_options": "create,read",
         "v2_parties": "read",
@@ -137,7 +137,7 @@
       "label": "Cari atau buat pelanggan dari kasir",
       "actor": "Admin / kasir aktif",
       "before": "GET /v2/customers/search menerima q wajib string max255; role admin/cashier. POST /v2/customers/resolve menerima name wajib string max255, service menormalkan spasi dan mensyaratkan panjang 2–255.",
-      "after": "Search di bawah 2 karakter kosong; hanya customer aktif, nama mengandung term atau kode berawalan term, default maksimal 8. Resolve memakai kecocokan nama case-insensitive: customer aktif dikembalikan, terarsip ditolak 422; bila belum ada dibuat kode CUS berurutan aktif. Tidak menyentuh uang/stok/jurnal dan tidak membuka master umum untuk kasir.",
+      "after": "Search di bawah 2 karakter kosong; hanya customer aktif, nama mengandung term atau kode berawalan term, default maksimal 8. Resolve memakai kecocokan nama case-insensitive: customer aktif dikembalikan, terarsip ditolak 422; bila belum ada dibuat kode CUS berurutan aktif. Tidak menyentuh uang/stok/jurnal.",
       "evidence": "app/Services/V2/CustomerLookup.php:48",
       "tables": {
         "v2_parties": "create,read"
@@ -149,7 +149,7 @@
       "actor": "Admin aktif",
       "before": "GET /v2/templates/{kind}; MasterData mensyaratkan admin. Hanya product/customer/supplier/employee/vehicle; driver/unit/category secara eksplisit tidak tersedia.",
       "after": "Menghasilkan XLSX header sesuai columns(kind), sebagai unduhan private/no-store tanpa mutasi master. Template produk berisi sku,name,unit,category,cost_price,selling_price,min_stock; tidak menyediakan stok awal atau tautan supplier.",
-      "evidence": "app/Services/V2/MasterData.php:354",
+      "evidence": "app/Services/V2/MasterData.php:374",
       "tables": {
         "users": "read",
         "v2_user_roles": "read"
@@ -160,8 +160,8 @@
       "label": "Pratinjau impor dan simpan batch tervalidasi",
       "actor": "Admin aktif",
       "before": "POST /v2/imports/{kind}/preview dengan file wajib max2048 KB. Parser XLSX memeriksa header lengkap tanpa kolom asing/duplikat/stok-saldo; batas 1000 baris, ZIP 100 entri/10MB, menolak path tidak aman, macro, formula dan external reference.",
-      "after": "Validasi kolom/angka dan duplikasi key dalam file maupun DB. Gagal memberi errors dan batch_id=null tanpa menulis master; berhasil menyimpan v2_import_batches status preview, rows normalisasi dan actor_id, lalu mengembalikan batch_id/count serta maksimal 100 baris. Preview bukan read-only total: ada tulis batch, namun tidak membuat product_options/master.",
-      "evidence": "app/Services/V2/MasterData.php:363",
+      "after": "Validasi kolom/angka dan duplikasi key dalam file maupun DB. Gagal memberi errors dan batch_id=null tanpa menulis master; berhasil menyimpan v2_import_batches status preview, rows normalisasi dan actor_id, lalu mengembalikan batch_id/count serta maksimal 100 baris.",
+      "evidence": "app/Services/V2/MasterData.php:383",
       "tables": {
         "v2_import_batches": "create",
         "products": "read",
@@ -174,8 +174,8 @@
       "label": "Commit batch impor milik sendiri",
       "actor": "Admin pemilik batch",
       "before": "POST /v2/import-batches/{id}/commit, ID numerik; requireAdmin dan lock v2_import_batches. Batch hilang 422; actor_id berbeda 403.",
-      "after": "Batch committed dikembalikan idempoten tanpa insert ulang. Batch belum committed dibaca rows/kind lalu tiap baris masuk MasterData::store untuk revalidasi aturan terbaru. Seluruh insert dan perubahan status committed satu transaksi; bentrok/perubahan opsi setelah preview menggagalkan seluruh commit. Produk impor tetap stok 0, tanpa jurnal/faktur awal.",
-      "evidence": "app/Services/V2/MasterData.php:451",
+      "after": "Batch committed dikembalikan idempoten tanpa insert ulang. Batch belum committed dibaca rows/kind lalu tiap baris masuk MasterData::store untuk revalidasi aturan terbaru. Seluruh insert dan perubahan status committed satu transaksi; produk impor tetap stok 0, tanpa jurnal/faktur awal.",
+      "evidence": "app/Services/V2/MasterData.php:471",
       "tables": {
         "v2_import_batches": "read,update",
         "products": "create,read",
@@ -188,8 +188,8 @@
       "id": "AM15",
       "label": "Pratinjau saldo awal sistem bersih",
       "actor": "Admin dengan sesi aktif",
-      "before": "POST /v2/opening-balances/preview meneruskan payload date,reference,cash,bank,inventory,receivables,payables. requireAdmin membaca role; web middleware menegakkan akun aktif. Dilarang bila sudah ada batch pembukaan, journal_entries, stok produk nonzero atau v2_invoices.",
-      "after": "Tanpa mutasi DB: normalisasi desimal, tanggal valid, referensi max50, kas/bank/qty/HPP nonnegatif; produk harus ada dan tidak duplikat. Piutang butuh customer aktif, utang supplier aktif, nomor faktur unik termasuk antar kedua kelompok, amount positif dan due_date valid. Ringkasan serta rancangan jurnal mengimbangi selisih aset-utang ke ekuitas 3101; pembukaan kosong ditolak.",
+      "before": "POST /v2/opening-balances/preview meneruskan payload date,reference,cash,bank,inventory,receivables,payables. Dilarang bila sudah ada batch pembukaan, journal_entries, stok produk nonzero atau v2_invoices.",
+      "after": "Tanpa mutasi DB: normalisasi desimal, tanggal valid, referensi max50, kas/bank/qty/HPP nonnegatif; produk harus ada dan tidak duplikat. Piutang butuh customer aktif, utang supplier aktif, nomor faktur unik, amount positif dan due_date valid. Ringkasan serta rancangan jurnal mengimbangi selisih aset-utang ke ekuitas 3101.",
       "evidence": "app/Services/V2/OpeningBalances.php:60",
       "tables": {
         "v2_user_roles": "read",
@@ -204,8 +204,8 @@
       "id": "AM16",
       "label": "Posting saldo awal sekali, atomik dan immutable",
       "actor": "Admin dengan sesi aktif",
-      "before": "POST /v2/opening-balances dengan payload pembukaan; idempotency_key string 8–100 dan array inventory/receivables/payables masing-masing max1000 pada controller. Service mengulangi validasi preview dan mengunci batch singleton, akun modal serta produk. Tidak mewajibkan token/batch hasil preview.",
-      "after": "Jika batch sudah ada, key DAN hash payload sama mengembalikan idempotent_ok; selain itu ditolak sebagai immutable. Posting membuat v2_opening_batches, jurnal seimbang melalui Ledger, memperbarui stok/HPP dan stock_movements, membuat faktur receivable/payable open paid=0 tanpa sale/receipt palsu, menautkan journal_entry_id. Akun COA terpakai harus aktif/ada; gagal membatalkan transaksi. Tidak tersedia edit/reset saldo awal di routes/v2.php.",
+      "before": "POST /v2/opening-balances dengan payload pembukaan; idempotency_key string 8–100 dan array inventory/receivables/payables masing-masing max1000 pada controller. Service mengulangi validasi preview dan mengunci batch singleton, akun modal serta produk.",
+      "after": "Jika batch sudah ada, key DAN hash payload sama mengembalikan idempotent_ok; selain itu ditolak sebagai immutable. Posting membuat v2_opening_batches, jurnal seimbang melalui Ledger, memperbarui stok/HPP dan stock_movements, membuat faktur receivable/payable open paid=0 tanpa sale/receipt palsu. Tidak tersedia edit/reset saldo awal di routes/v2.php.",
       "evidence": "app/Services/V2/OpeningBalances.php:84",
       "tables": {
         "v2_user_roles": "read",
@@ -217,6 +217,20 @@
         "chart_of_accounts": "read",
         "journal_entries": "create,read",
         "journal_entry_lines": "create"
+      }
+    },
+    {
+      "id": "AM17",
+      "label": "Kelola Bagan Akun (COA) dan tandai Rekening Bank aktif",
+      "actor": "Admin aktif",
+      "before": "POST /v2/chart-of-accounts, PUT /v2/chart-of-accounts/{id}, PATCH /v2/chart-of-accounts/{id}/archive (throttle:30,1, admin wajib). Kode akun wajib cocok dengan jenis akun dan saldo normalnya. Penanda is_bank_account hanya sah untuk akun Aset bersaldo normal Debet yang bukan akun inti non-bank; 1102 wajib tetap aktif dan bertanda Rekening Bank.",
+      "after": "Menambah, memperbarui, atau mengarsipkan akun pada chart_of_accounts tanpa hard delete; akun yang sudah dipakai jurnal tidak boleh diubah kode/jenis/saldo normalnya dan akun inti sistem tidak boleh diubah kodenya atau diarsip. Setiap akun aktif bertanda is_bank_account=true (bersama 1102) dibaca terpusat lewat BankAccounts dan otomatis tersedia sebagai pilihan Rekening Bank pada Kasir, Tagihan, Verifikasi, Pengeluaran, Perjalanan, Ongkir Penerimaan, Penyesuaian/Pindah Dana, Laporan Harian, dan Arus Kas.",
+      "evidence": "app/Http/Controllers/ChartOfAccountController.php:139",
+      "tables": {
+        "chart_of_accounts": "create,read,update",
+        "journal_entry_lines": "read",
+        "v2_user_roles": "read",
+        "users": "read"
       }
     }
   ],
@@ -234,12 +248,12 @@
     {
       "from": "AM05",
       "to": "AM02",
-      "label": "Perubahan role/status/password mengubah versi pengguna yang dibandingkan middleware"
+      "label": "Perubahan role/status/password/username mengubah versi pengguna yang dibandingkan middleware"
     },
     {
       "from": "AM06",
       "to": "AM07",
-      "label": "Master dengan kind dan ID yang sama dapat diubah/diarsip"
+      "label": "Master dengan kind dan ID yang sama dapat diubah/diarsip/diaktifkan kembali"
     },
     {
       "from": "AM06",
@@ -268,35 +282,32 @@
     }
   ],
   "unknowns": [
-    "Analisis statis source workspace saat dibaca, termasuk perubahan lokal yang belum commit. Tidak menjalankan aplikasi, tes, Artisan, migrasi, dependency, query DB atau browser; status operasi runtime belum terverifikasi. Tidak membaca .env, dump, data operasional atau kredensial.",
-    "Nilai V2_ENABLED aktual, konfigurasi session driver, keberadaan tabel sessions, akun admin aktif, COA dan kebersihan data pembukaan tidak diperiksa; config default bukan bukti lingkungan produksi.",
-    "Cakupan hanya autentikasi/role, endpoint master/relations/customer lookup, XLSX dan pembukaan V2. Provisioning akun pertama/COA (V2Prepare), demo setup, bridge legacy, alur transaksi, UI dan semua migrasi tidak ditelusuri menyeluruh.",
-    "Batas keamanan method: OpeningBalances::requireAdmin memeriksa role saja (bukan join users aktif); jaminan akun aktif untuk rute web datang dari EnsureActiveAccount. Pemanggil service di luar HTTP belum diaudit.",
-    "Tidak ditemukan endpoint aktivasi ulang master pada routes/v2.php; update master mempertahankan status arsip. Jangan menyimpulkan tombol UI Arsipkan memiliki undo hanya dari label dokumentasi lain.",
-    "Pratinjau saldo awal dan posting berhubungan payload/domain, tetapi server tidak mengikat posting ke hasil preview; karena itu tidak dibuat edge wajib preview→post. Template juga bukan prasyarat server untuk upload.",
-    "AM01 dan AM04 tables berfokus pada entitas aplikasi; persistensi session/rate limiter bergantung konfigurasi driver yang tidak dibaca. Penghapusan sessions pada AM05 kondisional keberadaan tabel.",
-    "Proofs adalah cuplikan lokasi kode maksimal 18 baris, bukan salinan kode atau pengujian runtime. Validasi rinci lain tetap berada dalam metode bersangkutan: MasterData::parseXlsxFile/readHeaders, OpeningBalances::validateAndNormalize dan Ledger::post."
+    "Analisis statis source workspace saat dibaca. Tidak menjalankan aplikasi, tes, Artisan, migrasi, query DB atau browser; status operasi runtime tidak diverifikasi di sini.",
+    "Nilai V2_ENABLED aktual, konfigurasi session driver, keberadaan tabel sessions, dan kebersihan data pembukaan tidak dibaca dari .env atau database.",
+    "OpeningBalances::requireAdmin memeriksa role saja; jaminan akun aktif untuk rute web datang dari EnsureActiveAccount.",
+    "Pratinjau saldo awal dan posting berhubungan payload/domain, tetapi server tidak mengikat posting ke hasil preview; karena itu tidak dibuat edge wajib preview→post.",
+    "Proofs adalah cuplikan lokasi kode tanpa menyalin identitas/rahasia literal; alias admin pada AuthController::login tidak dikutip baris email statisnya."
   ],
   "proofs": [
     {
       "step_id": "AM01",
       "path": "app/Http/Controllers/AuthController.php",
-      "start": 128,
-      "end": 145,
-      "label": "Validasi identitas dan limiter"
+      "start": 151,
+      "end": 164,
+      "label": "Normalisasi identitas dan rate limiter"
     },
     {
       "step_id": "AM01",
       "path": "app/Http/Controllers/AuthController.php",
-      "start": 160,
-      "end": 171,
-      "label": "Akun aktif dan cap sesi"
+      "start": 184,
+      "end": 195,
+      "label": "Akun aktif, regenerasi sesi dan cap auth_version"
     },
     {
       "step_id": "AM01",
       "path": "app/Http/Controllers/AuthController.php",
-      "start": 177,
-      "end": 183,
+      "start": 201,
+      "end": 208,
       "label": "Logout dan invalidasi"
     },
     {
@@ -309,8 +320,8 @@
     {
       "step_id": "AM02",
       "path": "app/Services/V2/Operations.php",
-      "start": 34,
-      "end": 48,
+      "start": 35,
+      "end": 50,
       "label": "Peran aktif dan requireRole"
     },
     {
@@ -344,155 +355,148 @@
     {
       "step_id": "AM04",
       "path": "app/Http/Controllers/V2/AccountController.php",
-      "start": 65,
+      "start": 66,
       "end": 82,
-      "label": "Validasi dan recheck aktor"
+      "label": "Validasi username/email dan kunci role"
     },
     {
       "step_id": "AM04",
       "path": "app/Http/Controllers/V2/AccountController.php",
       "start": 91,
       "end": 108,
-      "label": "Pembuatan user dan role"
+      "label": "Keunikan identitas dan pembuatan user"
     },
     {
       "step_id": "AM04",
       "path": "app/Http/Controllers/V2/AccountController.php",
-      "start": 110,
-      "end": 126,
+      "start": 113,
+      "end": 125,
       "label": "Audit pembuatan akun"
     },
     {
       "step_id": "AM05",
       "path": "app/Http/Controllers/V2/AccountController.php",
-      "start": 185,
-      "end": 202,
-      "label": "Larangan self-demotion dan hitung admin"
+      "start": 199,
+      "end": 216,
+      "label": "Larangan self-demotion dan hitung admin aktif"
     },
     {
       "step_id": "AM05",
       "path": "app/Http/Controllers/V2/AccountController.php",
-      "start": 203,
-      "end": 219,
+      "start": 217,
+      "end": 234,
       "label": "Admin terakhir dan shift terbuka"
     },
     {
       "step_id": "AM05",
       "path": "app/Http/Controllers/V2/AccountController.php",
-      "start": 264,
-      "end": 279,
+      "start": 276,
+      "end": 291,
       "label": "Invalidasi versi kondisional dan update"
     },
     {
       "step_id": "AM06",
       "path": "app/Services/V2/MasterData.php",
-      "start": 95,
-      "end": 112,
+      "start": 96,
+      "end": 111,
       "label": "Admin, kind dan keunikan"
     },
     {
       "step_id": "AM06",
       "path": "app/Services/V2/MasterData.php",
-      "start": 113,
-      "end": 128,
+      "start": 112,
+      "end": 129,
       "label": "Efek create master tanpa stok awal"
-    },
-    {
-      "step_id": "AM06",
-      "path": "app/Services/V2/MasterData.php",
-      "start": 240,
-      "end": 257,
-      "label": "Kolom produk dan kendaraan"
     },
     {
       "step_id": "AM07",
       "path": "app/Services/V2/MasterData.php",
-      "start": 173,
-      "end": 186,
+      "start": 176,
+      "end": 188,
       "label": "HPP terkunci dan pembaruan"
     },
     {
       "step_id": "AM07",
       "path": "app/Services/V2/MasterData.php",
-      "start": 191,
-      "end": 205,
+      "start": 192,
+      "end": 208,
       "label": "Arsip bukan delete"
     },
     {
       "step_id": "AM07",
       "path": "app/Services/V2/MasterData.php",
-      "start": 210,
-      "end": 220,
-      "label": "Sumber lock HPP"
+      "start": 211,
+      "end": 227,
+      "label": "Aktivasi kembali dari arsip"
     },
     {
       "step_id": "AM08",
       "path": "app/Services/V2/MasterRelations.php",
       "start": 31,
-      "end": 42,
+      "end": 44,
       "label": "Create relasi admin"
     },
     {
       "step_id": "AM08",
       "path": "app/Services/V2/MasterRelations.php",
-      "start": 61,
-      "end": 78,
+      "start": 63,
+      "end": 80,
       "label": "Rename cascade dan arsip"
     },
     {
       "step_id": "AM08",
       "path": "app/Services/V2/MasterRelations.php",
-      "start": 118,
-      "end": 124,
-      "label": "Pengecualian tautan opsi yang telah ada"
+      "start": 82,
+      "end": 93,
+      "label": "Aktivasi ulang relasi"
     },
     {
       "step_id": "AM09",
       "path": "app/Services/V2/MasterRelations.php",
-      "start": 179,
-      "end": 196,
+      "start": 192,
+      "end": 209,
       "label": "Jenis sopir dan employee"
     },
     {
       "step_id": "AM09",
       "path": "app/Services/V2/MasterRelations.php",
-      "start": 208,
-      "end": 225,
+      "start": 217,
+      "end": 234,
       "label": "Employee aktif dan keunikan sopir"
     },
     {
       "step_id": "AM09",
       "path": "app/Services/V2/MasterRelations.php",
-      "start": 83,
-      "end": 96,
+      "start": 96,
+      "end": 110,
       "label": "Resolver sopir memeriksa status"
     },
     {
       "step_id": "AM10",
       "path": "app/Services/V2/MasterRelations.php",
-      "start": 105,
-      "end": 122,
+      "start": 118,
+      "end": 135,
       "label": "Resolusi opsi aktif atau tautan lama"
     },
     {
       "step_id": "AM10",
       "path": "app/Services/V2/MasterRelations.php",
-      "start": 145,
-      "end": 159,
+      "start": 159,
+      "end": 173,
       "label": "Primary dan supplier aktif"
     },
     {
       "step_id": "AM10",
       "path": "app/Services/V2/MasterRelations.php",
-      "start": 162,
-      "end": 175,
+      "start": 175,
+      "end": 190,
       "label": "Penggantian tautan versus primary saja"
     },
     {
       "step_id": "AM11",
       "path": "app/Http/Controllers/V2/WorkspaceController.php",
-      "start": 259,
-      "end": 272,
+      "start": 439,
+      "end": 453,
       "label": "Rute pencarian dan resolve serta izin"
     },
     {
@@ -512,64 +516,64 @@
     {
       "step_id": "AM12",
       "path": "app/Services/V2/MasterData.php",
-      "start": 50,
-      "end": 56,
+      "start": 51,
+      "end": 59,
       "label": "Kolom template per kind"
     },
     {
       "step_id": "AM12",
       "path": "app/Services/V2/MasterData.php",
-      "start": 354,
-      "end": 360,
+      "start": 374,
+      "end": 381,
       "label": "Gerbang dan pembuatan template"
     },
     {
       "step_id": "AM12",
       "path": "app/Services/V2/MasterData.php",
-      "start": 501,
-      "end": 506,
+      "start": 521,
+      "end": 527,
       "label": "Larangan XLSX relation kind"
     },
     {
       "step_id": "AM13",
       "path": "app/Http/Controllers/V2/WorkspaceController.php",
-      "start": 371,
-      "end": 376,
+      "start": 621,
+      "end": 627,
       "label": "Upload dan admin"
     },
     {
       "step_id": "AM13",
       "path": "app/Services/V2/MasterData.php",
-      "start": 414,
-      "end": 431,
+      "start": 434,
+      "end": 449,
       "label": "Bentrok DB menolak batch"
     },
     {
       "step_id": "AM13",
       "path": "app/Services/V2/MasterData.php",
-      "start": 432,
-      "end": 448,
+      "start": 451,
+      "end": 468,
       "label": "Persistensi batch preview"
     },
     {
       "step_id": "AM14",
       "path": "app/Services/V2/MasterData.php",
-      "start": 451,
-      "end": 468,
+      "start": 471,
+      "end": 488,
       "label": "Kunci batch dan kepemilikan"
     },
     {
       "step_id": "AM14",
       "path": "app/Services/V2/MasterData.php",
-      "start": 475,
-      "end": 489,
+      "start": 499,
+      "end": 517,
       "label": "Commit melalui store secara atomik"
     },
     {
       "step_id": "AM14",
       "path": "app/Services/V2/MasterData.php",
-      "start": 111,
-      "end": 125,
+      "start": 112,
+      "end": 127,
       "label": "Aturan insert produk stok nol"
     },
     {
@@ -613,6 +617,27 @@
       "start": 211,
       "end": 225,
       "label": "Faktur piutang tanpa penjualan palsu"
+    },
+    {
+      "step_id": "AM17",
+      "path": "app/Http/Controllers/ChartOfAccountController.php",
+      "start": 160,
+      "end": 179,
+      "label": "Simpan akun COA beserta penanda Rekening Bank"
+    },
+    {
+      "step_id": "AM17",
+      "path": "app/Http/Controllers/ChartOfAccountController.php",
+      "start": 262,
+      "end": 277,
+      "label": "Aturan penanda Rekening Bank dan perlindungan akun inti"
+    },
+    {
+      "step_id": "AM17",
+      "path": "app/Services/V2/BankAccounts.php",
+      "start": 73,
+      "end": 87,
+      "label": "Resolusi terpusat rekening bank aktif"
     }
   ]
 }

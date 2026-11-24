@@ -9,11 +9,11 @@ Batas penting: draf belum mengubah stok; final penerimaan menambah stok/utang ta
 
 ## Penjualan
 
-Ada pelanggan yang akan membeli barang dan kasir mempunyai shift terbuka.
+Ada pelanggan yang akan membeli barang dan kas harian bersama toko sudah dibuka admin.
 
 ```mermaid
 flowchart TD
-    n0["Siapkan sesi kasir"]
+    n0["Pastikan kas harian bersama sudah dibuka"]
     n1["Masukkan barang dan pelanggan"]
     n2{"Pilih cara pelanggan membayar"}
     n3{"Tentukan barang diambil atau dikirim"}
@@ -21,21 +21,21 @@ flowchart TD
     n0 --> n1
     n1 --> n2
     n2 -->|"Tunai"| n3
-    n2 -->|"Transfer"| n3
-    n2 -->|"Kredit / uang muka"| n3
+    n2 -->|"Transfer (pilih Rekening Bank + foto bukti)"| n3
+    n2 -->|"Kredit / uang muka (+ jatuh tempo opsional)"| n3
     n3 -->|"Diambil sendiri"| n4
     n3 -->|"Dikirim toko"| n4
 ```
 
 | Tahap | Pelaku | Bukti sumber |
 | --- | --- | --- |
-| Siapkan sesi kasir | Kasir atau admin | app/Services/V2/Operations.php:51-132; app/Http/Controllers/V2/WorkspaceController.php:296-320 |
-| Masukkan barang dan pelanggan | Kasir atau admin | resources/views/v2/pos-cashier.blade.php:17-30; resources/views/v2/pos-cashier-script.blade.php:155-167; resources/views/v2/workspace.blade.php:581-598; app/Http/Controllers/V2/WorkspaceController.php:296-320; app/Services/V2/Operations.php:279-633 |
-| Pilih cara pelanggan membayar | Kasir atau admin | app/Services/V2/Operations.php:279-633 |
-| Tentukan barang diambil atau dikirim | Kasir atau admin | app/Services/V2/Operations.php:279-633; routes/v2.php:16-19 |
-| Tinjau lalu konfirmasi penjualan | Kasir atau admin; sistem menyimpan | resources/views/v2/pos-cashier.blade.php:17-30; resources/views/v2/pos-cashier-script.blade.php:155-167; resources/views/v2/workspace.blade.php:581-598; app/Services/V2/Operations.php:279-633; app/Services/V2/Ledger.php:19-131 |
+| Pastikan kas harian bersama sudah dibuka | Admin membuka; semua kasir memakai bersama | app/Services/V2/Operations.php:52-142; app/Http/Controllers/V2/WorkspaceController.php:493-530; app/Services/V2/Operations.php:289-659; app/Services/V2/Operations.php:1032-1040 |
+| Masukkan barang dan pelanggan | Kasir atau admin | resources/views/v2/pos-cashier.blade.php:17-34; resources/views/v2/pos-cashier-script.blade.php:179-190; resources/views/v2/workspace.blade.php:532-548; app/Http/Controllers/V2/WorkspaceController.php:493-530; app/Services/V2/Operations.php:289-659; app/Services/V2/Operations.php:1032-1040 |
+| Pilih cara pelanggan membayar | Kasir atau admin | app/Services/V2/Operations.php:289-659; app/Services/V2/Operations.php:1072-1079 |
+| Tentukan barang diambil atau dikirim | Kasir atau admin | app/Services/V2/Operations.php:289-659; routes/v2.php:31-35 |
+| Tinjau lalu konfirmasi penjualan | Kasir atau admin; sistem menyimpan | resources/views/v2/pos-cashier.blade.php:17-34; resources/views/v2/pos-cashier-script.blade.php:179-190; resources/views/v2/workspace.blade.php:532-548; app/Services/V2/Operations.php:289-659; app/Services/V2/Operations.php:1072-1079; app/Services/V2/Ledger.php:19-131 |
 
-Hasil: Nota tersimpan, stok sudah berkurang; pembayaran dan pengiriman mengikuti pilihan transaksi.
+Hasil: Nota tersimpan, stok sudah berkurang; pembayaran, bukti transfer, jatuh tempo kredit, dan pengiriman mengikuti pilihan transaksi.
 
 ## Barang masuk
 
@@ -44,11 +44,11 @@ Barang dari supplier akan dicatat sebagai penerimaan toko.
 ```mermaid
 flowchart TD
     n0["Pilih supplier dan barang yang diterima"]
-    n1["Catat jumlah, harga beli, dan nota"]
+    n1["Catat jumlah, harga beli, nota, dan ongkir pembelian opsional"]
     n2["Simpan sebagai draf penerimaan"]
     n3{"Periksa draf: ubah, batalkan, atau konfirmasi"}
-    n4["Konfirmasi final: stok dan utang resmi dicatat"]
-    n5["Penerimaan final terkunci; pembayaran proses terpisah"]
+    n4["Konfirmasi final: stok, HPP, ongkir, dan utang resmi dicatat"]
+    n5["Penerimaan final terkunci; pembayaran barang proses terpisah"]
     n0 --> n1
     n1 --> n2
     n2 --> n3
@@ -61,14 +61,14 @@ flowchart TD
 
 | Tahap | Pelaku | Bukti sumber |
 | --- | --- | --- |
-| Pilih supplier dan barang yang diterima | Admin | app/Services/V2/SupplyTrips.php:391-423; app/Services/V2/MasterRelations.php:100-128; app/Services/V2/MasterRelations.php:131-177 |
-| Catat jumlah, harga beli, dan nota | Admin | app/Services/V2/ReceiptDrafts.php:16-46; app/Services/V2/ReceiptDrafts.php:102-155 |
-| Simpan sebagai draf penerimaan | Admin | app/Services/V2/ReceiptDrafts.php:16-46; app/Services/V2/ReceiptDrafts.php:102-155; app/Http/Controllers/V2/WorkspaceController.php:34-218 |
-| Periksa draf: ubah, batalkan, atau konfirmasi | Admin | app/Services/V2/ReceiptDrafts.php:16-46; app/Services/V2/ReceiptDrafts.php:174-182; resources/views/v2/sprint2.blade.php:787-799; app/Services/V2/ReceiptDrafts.php:76-95; app/Services/V2/ReceiptDrafts.php:184-192; app/Services/V2/ReceiptDrafts.php:49-73 |
-| Konfirmasi final: stok dan utang resmi dicatat | Admin mengonfirmasi; sistem membukukan | app/Services/V2/ReceiptDrafts.php:49-73; app/Services/V2/SupplyTrips.php:40-242 |
-| Penerimaan final terkunci; pembayaran proses terpisah | Admin | app/Services/V2/SupplyTrips.php:433-440; app/Services/V2/SupplyTrips.php:40-242; app/Services/V2/ReceiptDrafts.php:49-73; app/Services/V2/Operations.php:639-782 |
+| Pilih supplier dan barang yang diterima | Admin | app/Services/V2/SupplyTrips.php:448-483; app/Http/Controllers/V2/WorkspaceController.php:668-673; app/Services/V2/MasterRelations.php:113-141; app/Services/V2/MasterRelations.php:144-190 |
+| Catat jumlah, harga beli, nota, dan ongkir pembelian opsional | Admin | app/Services/V2/ReceiptDrafts.php:17-51; app/Http/Controllers/V2/WorkspaceController.php:634-639; app/Services/V2/SupplyTrips.php:620-651 |
+| Simpan sebagai draf penerimaan | Admin | app/Services/V2/ReceiptDrafts.php:17-51; app/Http/Controllers/V2/WorkspaceController.php:634-639; app/Services/V2/SupplyTrips.php:620-651; app/Http/Controllers/V2/WorkspaceController.php:39-157; app/Services/V2/Operations.php:35-43 |
+| Periksa draf: ubah, batalkan, atau konfirmasi | Admin | app/Services/V2/ReceiptDrafts.php:17-51; app/Services/V2/ReceiptDrafts.php:191-199; resources/views/v2/sprint2.blade.php:873-891; app/Services/V2/ReceiptDrafts.php:85-104; app/Services/V2/ReceiptDrafts.php:201-209; app/Services/V2/ReceiptDrafts.php:54-82; app/Http/Controllers/V2/WorkspaceController.php:646-652; app/Services/V2/SupplyTrips.php:42-288 |
+| Konfirmasi final: stok, HPP, ongkir, dan utang resmi dicatat | Admin mengonfirmasi; sistem membukukan | app/Services/V2/ReceiptDrafts.php:54-82; app/Http/Controllers/V2/WorkspaceController.php:646-652; app/Services/V2/SupplyTrips.php:42-288 |
+| Penerimaan final terkunci; pembayaran barang proses terpisah | Admin | app/Services/V2/SupplyTrips.php:610-617; app/Http/Controllers/V2/WorkspaceController.php:660-665; app/Services/V2/SupplyTrips.php:42-288; app/Services/V2/ReceiptDrafts.php:54-82; app/Services/V2/Operations.php:665-823; app/Http/Controllers/V2/WorkspaceController.php:532-545; app/Services/V2/Operations.php:1131-1143 |
 
-Hasil: Setelah konfirmasi final, stok dan harga pokok diperbarui, dokumen penerimaan serta tagihan supplier tersimpan.
+Hasil: Setelah konfirmasi final, stok dan harga pokok diperbarui, ongkir pembelian (bila ada) dibebankan, dan tagihan supplier tersimpan.
 
 ## Bayar supplier
 
@@ -82,23 +82,23 @@ flowchart TD
     n3{"Admin memeriksa pengajuan kasir"}
     n4["Pembayaran tercatat; cek sisa utang"]
     n0 --> n1
-    n1 -->|"Kas Utama"| n2
-    n1 -->|"Bank Utama"| n2
-    n1 -->|"Laci shift"| n2
+    n1 -->|"Kas Utama (1101)"| n2
+    n1 -->|"Rekening Bank aktif"| n2
+    n1 -->|"Laci kas harian"| n2
     n2 -->|"Admin yang mencatat"| n4
     n2 -->|"Kasir yang mencatat"| n3
-    n3 -->|"Setujui"| n4
+    n3 -->|"Setujui (bisa koreksi Rekening Bank)"| n4
     end0(["Cabang selesai"])
     n3 -->|"Tolak"| end0
 ```
 
 | Tahap | Pelaku | Bukti sumber |
 | --- | --- | --- |
-| Pilih tagihan dan nominal pembayaran | Admin atau kasir | app/Services/V2/Operations.php:639-782 |
-| Tentukan uang diambil dari mana | Admin atau kasir | app/Services/V2/Operations.php:639-782; app/Services/V2/Operations.php:855-928 |
-| Siapa yang mencatat pembayaran? | Admin atau kasir | app/Services/V2/Operations.php:639-782; app/Services/V2/Operations.php:855-928 |
-| Admin memeriksa pengajuan kasir | Admin | app/Services/V2/Operations.php:784-848; app/Services/V2/Operations.php:245-277 |
-| Pembayaran tercatat; cek sisa utang | Sistem | app/Services/V2/Operations.php:639-782; app/Services/V2/Operations.php:855-928; app/Services/V2/Operations.php:784-848 |
+| Pilih tagihan dan nominal pembayaran | Admin atau kasir | app/Services/V2/Operations.php:665-823; app/Http/Controllers/V2/WorkspaceController.php:532-545; app/Services/V2/Operations.php:1131-1143 |
+| Tentukan uang diambil dari mana | Admin atau kasir | app/Services/V2/Operations.php:665-823; app/Services/V2/Operations.php:912-994; app/Services/V2/Operations.php:996-1008 |
+| Siapa yang mencatat pembayaran? | Admin atau kasir | app/Services/V2/Operations.php:665-823; app/Services/V2/Operations.php:912-994; app/Services/V2/Operations.php:996-1008 |
+| Admin memeriksa pengajuan kasir | Admin | app/Services/V2/Operations.php:825-905; app/Services/V2/Operations.php:912-994; app/Services/V2/Operations.php:255-287; app/Http/Controllers/V2/WorkspaceController.php:603-612 |
+| Pembayaran tercatat; cek sisa utang | Sistem | app/Services/V2/Operations.php:665-823; app/Services/V2/Operations.php:912-994; app/Services/V2/Operations.php:996-1008; app/Services/V2/Operations.php:825-905 |
 
 Hasil: Jika pembayaran diposting, utang berkurang dan uang sumber terpilih berkurang; pengajuan yang ditolak tidak mengubah saldo.
 
@@ -109,25 +109,25 @@ Ada tagihan pelanggan terbuka dari penjualan atau saldo awal.
 ```mermaid
 flowchart TD
     n0["Pilih pelanggan dan tagihan yang dibayar"]
-    n1{"Terima tunai atau catat transfer"}
-    n2{"Admin memutuskan transfer menunggu"}
+    n1{"Terima tunai atau catat transfer berbukti"}
+    n2{"Admin memeriksa foto bukti &amp; memutuskan transfer"}
     n3["Perbarui lunas atau sisa piutang"]
     n0 --> n1
     n1 -->|"Uang tunai diterima"| n3
-    n1 -->|"Transfer dilaporkan"| n2
-    n2 -->|"Transfer disetujui"| n3
+    n1 -->|"Transfer dilaporkan (+ rekening bank &amp; foto bukti)"| n2
+    n2 -->|"Transfer disetujui (bisa koreksi Rekening Bank)"| n3
     end0(["Cabang selesai"])
     n2 -->|"Transfer ditolak"| end0
 ```
 
 | Tahap | Pelaku | Bukti sumber |
 | --- | --- | --- |
-| Pilih pelanggan dan tagihan yang dibayar | Kasir atau admin | app/Services/V2/Operations.php:639-782 |
-| Terima tunai atau catat transfer | Kasir atau admin | app/Services/V2/Operations.php:639-782 |
-| Admin memutuskan transfer menunggu | Admin | app/Services/V2/Operations.php:784-848; app/Services/V2/Operations.php:245-277 |
-| Perbarui lunas atau sisa piutang | Sistem | app/Services/V2/Operations.php:639-782; app/Services/V2/Operations.php:784-848 |
+| Pilih pelanggan dan tagihan yang dibayar | Kasir atau admin | app/Services/V2/Operations.php:665-823; app/Http/Controllers/V2/WorkspaceController.php:532-545; app/Services/V2/Operations.php:1131-1143 |
+| Terima tunai atau catat transfer berbukti | Kasir atau admin | app/Services/V2/Operations.php:665-823 |
+| Admin memeriksa foto bukti & memutuskan transfer | Admin | app/Services/V2/Operations.php:825-905; app/Services/V2/Operations.php:255-287; app/Http/Controllers/V2/WorkspaceController.php:603-612 |
+| Perbarui lunas atau sisa piutang | Sistem | app/Services/V2/Operations.php:665-823; app/Services/V2/Operations.php:825-905 |
 
-Hasil: Piutang berkurang setelah uang tunai dicatat atau transfer disetujui, bukan saat transfer baru diajukan.
+Hasil: Piutang berkurang setelah uang tunai dicatat atau transfer disetujui admin, bukan saat transfer baru diajukan.
 
 ## Pengiriman barang
 
@@ -144,21 +144,21 @@ flowchart TD
 
 | Tahap | Pelaku | Bukti sumber |
 | --- | --- | --- |
-| Buka surat jalan yang disiapkan | Admin atau kasir pemilik penjualan | app/Services/V2/Operations.php:279-633; routes/v2.php:16-19; app/Services/V2/ReportsDocuments.php:179-264 |
-| Tetapkan sopir/kendaraan lalu kirim | Admin atau kasir pemilik penjualan | app/Services/V2/TransportAssignment.php:35-63; app/Services/V2/TransportAssignment.php:24-32; app/Services/V2/DeliveryTrips.php:34-67 |
-| Catat bahwa kiriman sudah diterima | Admin atau kasir pemilik penjualan | app/Services/V2/DeliveryTrips.php:70-96 |
+| Buka surat jalan yang disiapkan | Admin atau kasir pemilik penjualan | app/Services/V2/Operations.php:289-659; routes/v2.php:31-35; app/Services/V2/ReportsDocuments.php:209-291 |
+| Tetapkan sopir/kendaraan lalu kirim | Admin atau kasir pemilik penjualan | app/Services/V2/TransportAssignment.php:35-63; app/Services/V2/TransportAssignment.php:24-32; app/Services/V2/DeliveryTrips.php:35-68; app/Services/V2/DeliveryTrips.php:388-401 |
+| Catat bahwa kiriman sudah diterima | Admin atau kasir pemilik penjualan | app/Services/V2/DeliveryTrips.php:71-97 |
 
 Hasil: Pengiriman berstatus Diterima, dengan catatan petugas dan waktu; pembayaran tetap alur terpisah.
 
-## Buka dan tutup shift
+## Kas harian (buka & tutup)
 
-Kasir mulai atau mengakhiri sesi kerja.
+Toko mulai berjualan hari ini atau mengakhiri hari kerja.
 
 ```mermaid
 flowchart TD
-    n0["Buka shift sendiri dan catat modal laci"]
+    n0["Admin buka kas harian bersama dan catat modal laci"]
     n1["Lihat rekap otomatis sebelum menutup"]
-    n2{"Hitung uang fisik dan bandingkan"}
+    n2{"Admin hitung uang fisik laci dan bandingkan"}
     n3["Admin menyelesaikan pemeriksaan selisih"]
     n0 --> n1
     n1 --> n2
@@ -169,12 +169,12 @@ flowchart TD
 
 | Tahap | Pelaku | Bukti sumber |
 | --- | --- | --- |
-| Buka shift sendiri dan catat modal laci | Kasir atau admin | app/Services/V2/Operations.php:51-132 |
-| Lihat rekap otomatis sebelum menutup | Kasir pemilik shift atau admin | app/Services/V2/ShiftClosingSummary.php:19-118; resources/views/v2/workspace.blade.php:713-725; resources/views/v2/workspace.blade.php:745-755; resources/views/v2/workspace.blade.php:508-512 |
-| Hitung uang fisik dan bandingkan | Kasir pemilik shift atau admin | resources/views/v2/workspace.blade.php:713-725; resources/views/v2/workspace.blade.php:745-755; resources/views/v2/workspace.blade.php:508-512; app/Services/V2/Operations.php:134-194 |
-| Admin menyelesaikan pemeriksaan selisih | Admin | app/Services/V2/Operations.php:214-243; resources/views/v2/sprint2.blade.php:58-72; app/Services/V2/Operations.php:134-194; app/Services/V2/Operations.php:784-848 |
+| Admin buka kas harian bersama dan catat modal laci | Admin | app/Services/V2/Operations.php:52-142 |
+| Lihat rekap otomatis sebelum menutup | Admin (seluruh kasir); kasir hanya rincian penjualannya | app/Services/V2/ShiftClosingSummary.php:19-121; resources/views/v2/workspace.blade.php:670-684; resources/views/v2/workspace.blade.php:702-714; resources/views/v2/workspace.blade.php:457-462 |
+| Admin hitung uang fisik laci dan bandingkan | Admin | resources/views/v2/workspace.blade.php:670-684; resources/views/v2/workspace.blade.php:702-714; resources/views/v2/workspace.blade.php:457-462; app/Services/V2/Operations.php:144-204; app/Services/V2/Operations.php:207-222; app/Services/V2/Operations.php:52-142 |
+| Admin menyelesaikan pemeriksaan selisih | Admin | app/Services/V2/Operations.php:224-253; resources/views/v2/sprint2.blade.php:58-75; app/Services/V2/Operations.php:144-204; app/Services/V2/Operations.php:52-142; app/Services/V2/Operations.php:825-905; app/Services/V2/Operations.php:912-994 |
 
-Hasil: Shift ditutup dengan catatan uang seharusnya, uang fisik, serta selisih jika ada.
+Hasil: Kas harian ditutup dengan catatan uang seharusnya, uang fisik, serta selisih jika ada; setor ke bank dilakukan lewat Pindah Dana.
 
 ## Biaya dan uang muka sopir
 
@@ -193,21 +193,46 @@ flowchart TD
 
 | Tahap | Pelaku | Bukti sumber |
 | --- | --- | --- |
-| Catat biaya langsung ATAU berikan uang muka | Admin | app/Services/V2/SupplyTrips.php:250-383; app/Services/V2/DeliveryTrips.php:104-214 |
-| Isi biaya aktual setelah uang muka digunakan | Admin | app/Services/V2/DeliveryTrips.php:222-362 |
-| Konfirmasi sisa uang kembali dan selesaikan | Admin | app/Services/V2/DeliveryTrips.php:222-362 |
+| Catat biaya langsung ATAU berikan uang muka | Admin | app/Services/V2/SupplyTrips.php:296-440; app/Services/V2/DeliveryTrips.php:105-226 |
+| Isi biaya aktual setelah uang muka digunakan | Admin | app/Services/V2/DeliveryTrips.php:234-385 |
+| Konfirmasi sisa uang kembali dan selesaikan | Admin | app/Services/V2/DeliveryTrips.php:234-385 |
 
 Hasil: Biaya langsung tercatat, atau uang muka diselesaikan dengan rincian biaya aktual dan sisa yang kembali.
 
+## Pengeluaran & kelola kas/bank
+
+Ada biaya operasional toko, kebutuhan menambah rekening bank baru, setor/tarik/transfer antar kas-bank, atau koreksi saldo.
+
+```mermaid
+flowchart TD
+    n0["Catat pengeluaran operasional toko"]
+    n1["Kelola Bagan Akun &amp; tambah Rekening Bank baru"]
+    n2{"Pindah dana Kas/Bank atau sesuaikan saldo"}
+    n0 --> n1
+    n1 --> n2
+    end0(["Cabang selesai"])
+    n2 -->|"Pindah dana (Kas ↔ Bank / Antar-Bank)"| end0
+    end1(["Cabang selesai"])
+    n2 -->|"Penyesuaian saldo Kas/Bank"| end1
+```
+
+| Tahap | Pelaku | Bukti sumber |
+| --- | --- | --- |
+| Catat pengeluaran operasional toko | Admin aktif | app/Services/V2/OperatingExpenses.php:27-131; app/Http/Controllers/V2/OperatingExpenseController.php:14-53; app/Services/V2/Ledger.php:19-131 |
+| Kelola Bagan Akun & tambah Rekening Bank baru | Admin aktif | app/Http/Controllers/ChartOfAccountController.php:139-189; app/Http/Controllers/ChartOfAccountController.php:262-277; app/Services/V2/BankAccounts.php:73-87 |
+| Pindah dana Kas/Bank atau sesuaikan saldo | Admin aktif (konfirmasi kata sandi) | app/Services/V2/CashBankTransfers.php:32-150; app/Services/V2/CashBankAdjustments.php:35-138; app/Services/V2/Ledger.php:19-131 |
+
+Hasil: Pengeluaran atau perpindahan/penyesuaian tercatat dengan jurnal seimbang dan terkunci; rekening bank baru langsung aktif di semua form pembayaran.
+
 ## Persiapan toko
 
-Data dasar atau akses yang diperlukan transaksi belum tersedia.
+Data dasar, akun, atau rekening yang diperlukan transaksi belum tersedia.
 
 ```mermaid
 flowchart TD
     n0["Pastikan pengguna mempunyai akses yang tepat"]
-    n1["Siapkan produk, pihak, dan tautannya"]
-    n2["Jika banyak data, gunakan pratinjau impor"]
+    n1["Siapkan produk, pihak, relasi, dan Bagan Akun"]
+    n2["Jika banyak data, gunakan pratinjau impor XLSX"]
     n3["Jika mulai pembukuan dari saldo lama, tinjau saldo awal"]
     n0 --> n1
     n1 -->|"Opsional"| n2
@@ -216,12 +241,12 @@ flowchart TD
 
 | Tahap | Pelaku | Bukti sumber |
 | --- | --- | --- |
-| Pastikan pengguna mempunyai akses yang tepat | Admin | app/Http/Controllers/AuthController.php:126-176; app/Http/Middleware/EnsureActiveAccount.php:11-30; bootstrap/app.php:14-16; app/Http/Controllers/V2/AccountController.php:57-145; app/Http/Controllers/V2/AccountController.php:147-333; app/Services/V2/MasterRelations.php:179-202; app/Services/V2/MasterRelations.php:204-212; app/Services/V2/MasterRelations.php:83-97 |
-| Siapkan produk, pihak, dan tautannya | Admin | app/Services/V2/MasterData.php:95-130; app/Services/V2/MasterData.php:240-277; app/Services/V2/MasterData.php:136-188; app/Services/V2/MasterData.php:191-207; app/Services/V2/MasterData.php:210-221; app/Services/V2/MasterRelations.php:31-44; app/Services/V2/MasterRelations.php:46-67; app/Services/V2/MasterRelations.php:100-128; app/Services/V2/MasterRelations.php:179-202; app/Services/V2/MasterRelations.php:204-212; app/Services/V2/MasterRelations.php:83-97; app/Services/V2/MasterRelations.php:131-177 |
-| Jika banyak data, gunakan pratinjau impor | Admin | app/Services/V2/MasterData.php:354-361; app/Services/V2/MasterData.php:50-58; app/Services/V2/MasterData.php:501-507; app/Services/V2/MasterData.php:363-449; app/Services/V2/MasterData.php:451-499; app/Services/V2/MasterData.php:95-130 |
+| Pastikan pengguna mempunyai akses yang tepat | Admin | app/Http/Controllers/AuthController.php:149-199; app/Http/Controllers/AuthController.php:201-208; app/Http/Middleware/EnsureActiveAccount.php:11-30; app/Services/V2/Operations.php:35-43; bootstrap/app.php:14-16; app/Http/Controllers/V2/AccountController.php:57-145; app/Http/Controllers/V2/AccountController.php:147-333; app/Services/V2/MasterRelations.php:192-215; app/Services/V2/MasterRelations.php:217-225; app/Services/V2/MasterRelations.php:96-110 |
+| Siapkan produk, pihak, relasi, dan Bagan Akun | Admin | app/Services/V2/MasterData.php:96-131; app/Services/V2/MasterData.php:137-189; app/Services/V2/MasterData.php:192-208; app/Services/V2/MasterData.php:211-227; app/Services/V2/MasterRelations.php:31-44; app/Services/V2/MasterRelations.php:46-67; app/Services/V2/MasterRelations.php:82-93; app/Services/V2/MasterRelations.php:192-215; app/Services/V2/MasterRelations.php:217-225; app/Services/V2/MasterRelations.php:96-110; app/Services/V2/MasterRelations.php:113-141; app/Services/V2/MasterRelations.php:144-190; app/Http/Controllers/ChartOfAccountController.php:139-189; app/Http/Controllers/ChartOfAccountController.php:262-277; app/Services/V2/BankAccounts.php:73-87 |
+| Jika banyak data, gunakan pratinjau impor XLSX | Admin | app/Services/V2/MasterData.php:374-381; app/Services/V2/MasterData.php:51-59; app/Services/V2/MasterData.php:521-527; app/Services/V2/MasterData.php:383-469; app/Http/Controllers/V2/WorkspaceController.php:621-627; app/Services/V2/MasterData.php:471-519; app/Services/V2/MasterData.php:96-131 |
 | Jika mulai pembukuan dari saldo lama, tinjau saldo awal | Admin | app/Services/V2/OpeningBalances.php:60-75; app/Services/V2/OpeningBalances.php:261-292; app/Services/V2/OpeningBalances.php:84-254 |
 
-Hasil: Barang, pelanggan/supplier, opsi, serta akses siap dipakai sesuai peran; stok tidak dikarang dari master.
+Hasil: Barang, pelanggan/supplier, opsi, rekening bank, serta akses siap dipakai sesuai peran; stok tidak dikarang dari master.
 
 ## Rekap dan pembukuan
 
@@ -229,7 +254,7 @@ Ada kegiatan operasional atau jurnal yang ingin dibaca hasilnya.
 
 ```mermaid
 flowchart TD
-    n0["Baca rekap kegiatan toko"]
+    n0["Baca rekap harian dan rincian per Rekening Bank"]
     n1{"Telusuri dampak transaksi di pembukuan"}
     end0(["Cabang selesai"])
     n1 -->|"Buku jurnal"| end0
@@ -243,8 +268,8 @@ flowchart TD
 
 | Tahap | Pelaku | Bukti sumber |
 | --- | --- | --- |
-| Baca rekap kegiatan toko | Admin seluruh cakupan; kasir milik sendiri | app/Services/V2/ReportsDocuments.php:42-177; app/Services/V2/ShiftClosingSummary.php:19-118 |
-| Telusuri dampak transaksi di pembukuan | Admin | app/Services/V2/Ledger.php:19-131; app/Http/Controllers/JournalController.php:18-34; app/Http/Middleware/V2Cutover.php:12-31; app/Http/Controllers/JournalController.php:36-46; app/Services/AccountingReportService.php:95-187; app/Services/AccountingReportService.php:37-59; app/Services/AccountingReportService.php:229-297; app/Services/AccountingReportService.php:193-223; app/Services/AccountingReportService.php:303-686 |
+| Baca rekap harian dan rincian per Rekening Bank | Admin seluruh cakupan; kasir penjualan sendiri + laci bersama | app/Services/V2/ReportsDocuments.php:41-207; app/Services/V2/ShiftClosingSummary.php:19-121 |
+| Telusuri dampak transaksi di pembukuan | Admin | app/Services/V2/Ledger.php:19-131; app/Http/Controllers/JournalController.php:19-55; app/Http/Middleware/V2Cutover.php:12-31; app/Services/AccountingReportService.php:96-188; app/Services/AccountingReportService.php:38-60; app/Services/AccountingReportService.php:230-298; app/Services/AccountingReportService.php:194-224; app/Services/AccountingReportService.php:304-688 |
 
 Hasil: Rekap dan laporan menampilkan hasil baca data; membuka laporan tidak membuat transaksi atau menutup periode.
 
