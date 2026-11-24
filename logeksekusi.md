@@ -1823,3 +1823,11 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
 - **Pelaksana**: OpenCode / GPT-6.2 Sol. `resources/views/journals/index.blade.php`: tema `uf-dialog` mengunci `padding-bottom` isi popup ke 0 dengan `!important` ber-Id ganda, sehingga ruang bawah dipasang pada elemen terakhir isi (`margin-bottom`) plus `safe-area` di layar sempit; grid isian menjadi satu kolom pada ≤640 px.
 - **Verifikasi**: Chromium headless dengan CSS asli (`ui-dna`, token, gaya jurnal) 1000 px dan 500/390 px (exit 0): jarak tombol terakhir ke tepi bawah isi 23 px, tanpa overflow; satu kolom di layar sempit. PHPUnit terfokus 21/21 (237 asersi, exit 0); Node 179/179 (exit 0).
 - **Batas**: Hanya CSS popup jurnal; tidak mengubah form, endpoint, atau data. Belum push/deploy.
+
+## 2026-11-24 — Rilis a548100 (detail data, master staf, popup pembukuan) ke produksi
+- Pelaksana: Hermes atas permintaan pengguna. Dua commit dari pekerjaan pengguna: 5eca6b9 (detail data, master staf, popup pembukuan) dan a548100 (ruang bawah popup pindah dana/penyesuaian). Tanpa migrasi baru.
+- Tes sebelum deploy: PHP649 kasus,641 lulus/8 dilewati; Node180/180.
+- Push origin feat/cash-flow-role-hierarchy aae2a03..a548100. Deploy: bundle → fetch → build `tbg01_app:release-a548100` → pending check "No pending migrations" → maintenance → cutover app+worker → aset public/build → nginx reload → maintenance dibuka.
+- Verifikasi: app healthy, worker running, image release-a548100; log storage dapat ditulis www-data; origin login200, publik login200; log app tanpa error.
+- Catatan data: `journal_entries` bertambah dari 4 menjadi 5. Deploy ini tidak menulis jurnal; penambahan berasal dari aktivitas pengguna di aplikasi (indikasi penyesuaian saldo yang sebelumnya 500 kini berhasil).
+- Repo server `deploy-v2` di a548100; bundle, log build, dan build.old dibersihkan. Rollback tersedia ke `release-8cf80a1`.
