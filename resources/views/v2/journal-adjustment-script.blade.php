@@ -7,10 +7,10 @@ if(!root)return;
 
 function feedback(message){
     const box=root.querySelector('[data-journal-feedback]');
-    if(box){box.textContent=message;box.hidden=false;}
+    if(box){box.textContent=message;box.hidden=false;box.focus?.({preventScroll:true});}
 }
 
-function bind(node){
+function bind(node,openFromHash=false){
     for(const id of ['#adjustment-form','#transfer-form']){
         const form=node.querySelector(id);
         if(!form)continue;
@@ -18,6 +18,26 @@ function bind(node){
             event.preventDefault();
             return save(form);
         });
+    }
+    for(const dialog of node.querySelectorAll('dialog.journal-popup')){
+        const opener=node.querySelector('[data-journal-open="'+dialog.id+'"]');
+        const open=()=>{
+            if(dialog.open)return;
+            dialog.showModal();
+            (dialog.querySelector('select:not([disabled])')||dialog.querySelector('.popup-close'))?.focus({preventScroll:true});
+        };
+        const close=()=>{
+            if(!dialog.querySelector('form[data-busy]'))dialog.close();
+        };
+        opener?.addEventListener('click',open);
+        for(const button of dialog.querySelectorAll('[data-journal-close]'))button.addEventListener('click',close);
+        dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
+        dialog.addEventListener('close',()=>{
+            const password=dialog.querySelector('input[type=password]');
+            if(password)password.value='';
+            opener?.focus({preventScroll:true});
+        });
+        if(openFromHash&&!node.closest('[data-remote-content]')&&location.hash==='#'+dialog.id)open();
     }
 }
 
@@ -73,6 +93,7 @@ async function save(form){
         document.dispatchEvent(new CustomEvent('ui-remote:changed',{detail:{url:root.dataset.refreshUrl}}));
         if(document.querySelector(selector)!==root)return;
         if(password)password.value='';
+        form.closest('dialog')?.close();
         const message=data.message||'Penyesuaian saldo tersimpan.';
         try{
             await refresh(message);
@@ -91,6 +112,6 @@ async function save(form){
     }
 }
 
-bind(root);
+bind(root,true);
 })();
 </script>

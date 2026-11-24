@@ -34,7 +34,7 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class WorkspaceController extends Controller
 {
-    public function __construct(private Operations $operations) {}
+    public function __construct(private Operations $operations, private OpeningBalances $openingBalances) {}
 
     public function index(Request $request)
     {
@@ -43,6 +43,7 @@ class WorkspaceController extends Controller
             return redirect()->route('pos.index', $request->query());
         }
 
+        $openingState = $role === 'admin' ? $this->openingBalances->availability() : null;
         $shifts = DB::table('v2_shifts as s')->leftJoin('users as u', 'u.id', '=', 's.user_id')
             ->when($role !== 'admin', fn ($q) => $q->where(fn ($visible) => $visible->where('s.is_shared', true)->orWhere('s.user_id', $request->user()->id)))
             ->orderByDesc('s.id')->limit(30)->get(['s.*', 'u.name as user_name']);
@@ -153,7 +154,7 @@ class WorkspaceController extends Controller
         $bankAccounts = $bankService->active();
         $bankAccountNames = $bankService->nameMap(false);
 
-        return view('v2.workspace', compact('activeStoreShift', 'todayCashDay', 'adminSummary', 'role', 'shifts', 'reviewShifts', 'invoices', 'invoiceFilters', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'customerInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'receiptDrafts', 'draftProducts', 'receiptFinalAudit', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters', 'recentSales', 'freightReady', 'freightAccounts', 'bankAccounts', 'bankAccountNames'));
+        return view('v2.workspace', compact('activeStoreShift', 'todayCashDay', 'adminSummary', 'role', 'shifts', 'reviewShifts', 'invoices', 'invoiceFilters', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'customerInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'receiptDrafts', 'draftProducts', 'receiptFinalAudit', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters', 'recentSales', 'freightReady', 'freightAccounts', 'bankAccounts', 'bankAccountNames', 'openingState'));
     }
 
     public function dashboardPeriod(Request $request): JsonResponse
@@ -259,7 +260,23 @@ class WorkspaceController extends Controller
         ])->header('Cache-Control', 'private, no-store');
     }
 
-    private function historyData(Request $request): array
+    public function customerActivity(Request $request, int $id): JsonResponse
+    {
+        $this->operations->requireRole($request->user()->id, ['admin']);
+        abort_unless(DB::table('v2_parties')->where('id', $id)->where('kind', 'customer')->exists(), 404);
+        $filters = $request->validate([
+            'history_period' => 'sometimes|in:day,week,month',
+            'history_page' => 'sometimes|integer|min:1|max:100000',
+        ]);
+        $request->query->set('history_period', $filters['history_period'] ?? 'week');
+        $data = $this->historyData($request, $id);
+
+        return response()->json([
+            'html' => view('v2.customer-activity-results', $data)->render(),
+        ])->header('Cache-Control', 'private, no-store');
+    }
+
+    private function historyData(Request $request, ?int $customerId = null): array
     {
         foreach (['sale_search', 'sale_method', 'start_date', 'end_date', 'history_per_page', 'history_page', 'history_shift', 'history_period'] as $param) {
             if ($request->has($param) && is_array($request->query($param))) {
@@ -331,6 +348,9 @@ class WorkspaceController extends Controller
             ->selectSub(fn ($q) => $q->from('v2_payments as pending')->whereColumn('pending.invoice_id', 'invoice.id')->where('pending.status', 'pending')->selectRaw('count(*)'), 'pending_count')
             ->selectSub($hasDeliverySub, 'has_delivery');
 
+        if ($customerId !== null) {
+            $historyQuery->where('v2_sales.customer_id', $customerId);
+        }
         if ($saleSearch !== '') {
             $historyQuery->where(fn ($q) => $q->where('v2_sales.number', 'like', '%'.$saleSearch.'%')->orWhere('buyer.name', 'like', '%'.$saleSearch.'%'));
         }

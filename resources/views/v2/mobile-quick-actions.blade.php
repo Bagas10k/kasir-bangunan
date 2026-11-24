@@ -5,32 +5,39 @@
     Tidak tampil di halaman Kasir (bar keranjang sudah menjadi aksi utama).
 --}}
 <style>
-.mqa{position:fixed;z-index:70;inset-inline:var(--ui-space-group);bottom:calc(var(--ui-space-group) + env(safe-area-inset-bottom));max-inline-size:var(--ui-quick-actions-max-width);margin-inline:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:8px;border-radius:999px;background:var(--ui-green-2);box-shadow:0 16px 40px -18px var(--ui-cart-backdrop);font-family:var(--font-body,system-ui,sans-serif);box-sizing:border-box}
-.mqa[hidden]{display:none!important}
-.mqa button{display:grid;place-items:center;justify-self:center;width:48px;height:48px;min-width:48px;min-height:48px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--ui-green-soft);font:inherit;line-height:0;cursor:pointer;touch-action:manipulation;transition:transform .12s ease;box-sizing:border-box}
+.mqa-dock{flex:none;padding:var(--ui-space-control) var(--ui-space-group) calc(var(--ui-space-group) + env(safe-area-inset-bottom));background:var(--ui-canvas)}
+.mqa-dock[hidden]{display:none!important}
+.mqa{position:relative;max-inline-size:var(--ui-quick-actions-max-width);margin-inline:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:var(--ui-space-control);border-radius:999px;background:var(--ui-green-2);box-shadow:0 12px 24px -16px var(--ui-cart-backdrop);font-family:var(--font-body,system-ui,sans-serif);box-sizing:border-box;isolation:isolate}
+.mqa-track{position:absolute;inset:var(--ui-space-control);pointer-events:none;z-index:-1}
+.mqa-indicator{display:grid;place-items:center;inline-size:calc(100% / 3);block-size:100%;transform:translateX(calc(var(--mqa-slot,0) * 100%));transition:transform var(--ui-morph-duration) var(--ui-morph-easing)}
+.mqa-spot{inline-size:var(--mqa-touch);block-size:var(--mqa-touch);border-radius:50%;background:var(--ui-lime)}
+.mqa button{display:grid;place-items:center;justify-self:center;width:var(--mqa-touch);height:var(--mqa-touch);min-width:var(--mqa-touch);min-height:var(--mqa-touch);padding:0;border:0;border-radius:50%;background:transparent;color:var(--ui-green-soft);font:inherit;line-height:0;cursor:pointer;touch-action:manipulation;transition:transform .12s ease,color var(--ui-morph-duration) var(--ui-morph-easing);box-sizing:border-box}
 .mqa button svg{width:22px;height:22px;flex:none;pointer-events:none}
-.mqa button.is-active{background:var(--ui-lime);color:var(--ui-green-2)}
+.mqa button.is-active{color:var(--ui-green-2)}
 .mqa button:active{transform:scale(.94)}
 .mqa button:focus-visible{outline:2px solid var(--ui-lime);outline-offset:3px}
-@media(max-width:900px){body.mqa-on main.main-content{padding-bottom:calc(84px + env(safe-area-inset-bottom))}}
-@media(min-width:901px){.mqa{display:none!important}}
-@media(prefers-reduced-motion:reduce){.mqa button{transition:none!important}}
-@media print{.mqa{display:none!important}}
-@media(max-width:900px){
- body:has(dialog[open]) #mobile-quick-actions,
- body:has(.modal-overlay.open) #mobile-quick-actions,
- body:has(main :is(input,select,textarea):focus) #mobile-quick-actions,
- body.pm-cart-open #mobile-quick-actions,
- body.sidebar-open #mobile-quick-actions{display:none!important}
+@media screen and (max-width:900px){
+ html body.mqa-on{display:flex;flex-direction:column;height:100dvh;min-height:0;overflow:hidden}
+ html body.mqa-on>.main-topbar{flex:none}
+ html body.mqa-on>main.main-content{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior-y:contain;scroll-padding-block:var(--ui-space-section)}
+ body:has(dialog[open]) .mqa-dock,
+ body:has(.modal-overlay.open) .mqa-dock,
+ body:has(main :is(input,select,textarea):focus) .mqa-dock,
+ body.pm-cart-open .mqa-dock,
+ body.sidebar-open .mqa-dock{display:none!important}
 }
+@media(width > 900px){.mqa-dock{display:none!important}}
+@media(prefers-reduced-motion:reduce){.mqa button,.mqa-indicator{transition:none!important}}
+@media print{.mqa-dock{display:none!important}}
 </style>
-<div class="mqa" id="mobile-quick-actions" role="toolbar" aria-label="Aksi cepat" hidden></div>
+<div class="mqa-dock" hidden><div class="mqa" id="mobile-quick-actions" role="group" aria-label="Aksi cepat"><div class="mqa-track" aria-hidden="true"><span class="mqa-indicator"><span class="mqa-spot"></span></span></div></div></div>
 <script>
 (()=>{
 'use strict';
 const bar=document.getElementById('mobile-quick-actions');
 const nav=document.querySelector('.nav');
 if(!bar||!nav)return;
+const dock=bar.parentElement,spot=bar.querySelector('.mqa-spot'),main=document.querySelector('main.main-content');
 const role=nav.dataset.role==='admin'?'admin':'cashier';
 const icons={
  cart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 7H6"/></svg>',
@@ -57,11 +64,21 @@ for(const action of actions){
  button.addEventListener('click',()=>run(action,button));
  bar.append(button);
 }
+let activeTask, activeIndex=0;
 function sync(){
  const task=document.body.dataset.activeTask||'';
  const show=mobile()&&task!==''&&task!=='kasir';
- bar.hidden=!show;document.body.classList.toggle('mqa-on',show);
+ const wasVisible=!dock.hidden&&dock.getClientRects().length>0;
+ dock.hidden=!show;document.body.classList.toggle('mqa-on',show);
+ if(activeTask!==task){if(main)main.scrollTop=0;activeTask=task;}
  const match=actions.find(item=>item.task===task),activeKey=match?match.key:actions[0].key;
+ const nextIndex=actions.findIndex(item=>item.key===activeKey);
+ bar.style.setProperty('--mqa-slot',nextIndex);
+ if(wasVisible&&show&&nextIndex!==activeIndex&&!reduced()&&spot.animate){
+  spot.getAnimations().forEach(animation=>animation.cancel());
+  spot.animate([{transform:'none'},{transform:'scale(1.24,.88)',offset:.4},{transform:'none'}],{duration:parseFloat(getComputedStyle(bar).getPropertyValue('--ui-morph-duration')),easing:'ease-in-out'});
+ }
+ activeIndex=nextIndex;
  for(const button of bar.querySelectorAll('button')){
   const on=button.dataset.quickAction===activeKey;
   button.classList.toggle('is-active',on);

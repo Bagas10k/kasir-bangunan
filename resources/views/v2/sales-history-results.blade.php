@@ -1,4 +1,9 @@
-<p class="note" data-history-scope>Transaksi {{ $historyFilters['start_date'] !== '' && $historyFilters['start_date'] === $historyFilters['end_date'] ? \Illuminate\Support\Carbon::parse($historyFilters['start_date'])->locale('id')->translatedFormat('j M Y') : ($historyFilters['start_date'] !== '' || $historyFilters['end_date'] !== '' ? 'sesuai rentang tanggal' : 'seluruh tanggal') }} · semua petugas</p>
+@php
+    $scope = $historyFilters['start_date'] !== '' && $historyFilters['start_date'] === $historyFilters['end_date']
+        ? \Illuminate\Support\Carbon::parse($historyFilters['start_date'])->locale('id')->translatedFormat('j M Y')
+        : ($historyFilters['start_date'] !== '' || $historyFilters['end_date'] !== '' ? 'sesuai rentang tanggal yang dipilih' : 'seluruh tanggal');
+@endphp
+<div class="history-scope" data-history-scope><x-ui.info-tip :text="'Transaksi '.$scope.' · semua petugas.'" label="Cakupan riwayat penjualan"/></div>
 @if($historySales->isEmpty())
 <p class="note" id="history-empty">Belum ada transaksi pada rentang ini.</p>
 @else

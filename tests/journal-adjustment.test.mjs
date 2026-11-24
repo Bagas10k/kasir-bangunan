@@ -10,12 +10,23 @@ function setup() {
     const error = { hidden: true, textContent: '', focus() { this.focused = true; } };
     const password = { value: 'password' };
     const button = { disabled: false };
+    const opener = {listeners: {}, addEventListener(type, fn) { this.listeners[type] = fn; }, focus() { this.focused = true; }};
+    const close = {listeners: {}, addEventListener(type, fn) { this.listeners[type] = fn; }};
+    const dialog = {
+        id: 'adjustment-panel', open: false, listeners: {},
+        showModal() { this.open = true; },
+        close() { this.open = false; this.listeners.close?.(); },
+        addEventListener(type, fn) { this.listeners[type] = fn; },
+        querySelector: selector => selector === 'input[type=password]' ? password : (selector === 'form[data-busy]' && form.dataset.busy ? form : null),
+        querySelectorAll: () => [close],
+    };
     const form = {
         dataset: {}, action: 'http://example.test/v2/journals/adjustments',
         values: { account_code: '1101', target_balance: '1000.00', description: 'Koreksi kas', password: 'password', _token: 'synthetic-csrf' },
         listeners: {}, reportValidity: () => true, focused: false,
         elements: { namedItem: name => name === 'password' ? password : (name === '_token' ? { value: 'synthetic-csrf' } : null) },
         querySelector: () => error, querySelectorAll: () => [button],
+        closest: () => dialog,
         addEventListener(type, fn) { this.listeners[type] = fn; },
         setAttribute() {}, removeAttribute() {}, focus() { this.focused = true; },
     };
@@ -24,7 +35,9 @@ function setup() {
         return {
             dataset: { refreshUrl: 'http://example.test/journals?start_date=2026-11-01&per_page=25' },
             box,
-            querySelector: selector => selector === '#adjustment-form' ? document.currentForm : (selector === '[data-journal-feedback]' ? box : null),
+            querySelector: selector => selector === '#adjustment-form' ? document.currentForm : (selector === '[data-journal-feedback]' ? box : (selector.startsWith('[data-journal-open=') ? opener : null)),
+            querySelectorAll: () => [dialog],
+            closest: () => null,
             replaceWith(next) { document.root = next; },
         };
     }
@@ -49,11 +62,22 @@ function setup() {
     };
     vm.runInNewContext(source, context);
     return {
-        form, button, error, password, document, requests,
+        form, button, error, password, document, requests, opener, dialog, close,
         submit: () => form.listeners.submit({ preventDefault() {} }),
         respond: fn => { responder = fn; },
     };
 }
+
+test('journal modal closes without posting and clears the confirmation password', () => {
+    const app = setup();
+    app.opener.listeners.click();
+    assert.equal(app.dialog.open, true);
+    app.close.listeners.click();
+    assert.equal(app.dialog.open, false);
+    assert.equal(app.password.value, '');
+    assert.equal(app.opener.focused, true);
+    assert.equal(app.requests.length, 0);
+});
 
 test('adjustment saves with CSRF then refreshes only the journal summary without losing the applied filter', async () => {
     const app = setup();

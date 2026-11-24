@@ -551,6 +551,7 @@ Berkas: `partials/table-filter-styles.blade.php` (kedua cangkang), `partials/fil
 - Pil tidak tampil di halaman Kasir (bar keranjang tetap utama). Disembunyikan saat dialog/modal, lembar keranjang, drawer sidebar, atau kolom teks fokus; konten utama diberi ruang bawah. Desktop menyembunyikan pil.
 - Visual: satu permukaan pil **hijau gelap**, tiga ikon garis tanpa label terlihat, tombol48px, lingkaran **lime** pada aksi aktif/utama dengan ikon hijau gelap. `role=toolbar`, `aria-label` per aksi, fokus terlihat, reduced-motion tanpa transisi; desktop menyembunyikan pil. Tombol lama di halaman tetap ada sebagai cadangan.
 - Pil dipusatkan di bawah dengan batas lebar **400 px** (`--ui-quick-actions-max-width`) dan jarak tepi 12 px pada ponsel; safe-area tetap dihormati.
+- Penanda lime bergeser dan sedikit meregang saat aksi aktif berpindah; *reduced motion* langsung ke posisi baru. Pil menempati area bawah sendiri agar konten dan tombol halaman tidak tertutup.
 
 ## 61. Tabel Pengeluaran responsif
 
@@ -560,3 +561,12 @@ Berkas: `partials/table-filter-styles.blade.php` (kedua cangkang), `partials/fil
 ## 62. Dialog Penerimaan barang
 
 - Info penerimaan, rekomendasi stok, barang terpilih, dan ongkir dipisahkan secara visual. Bila ruang form sempit, gunakan kartu dengan label Jumlah/HPP, subtotal, dan hapus; bila lebar, gunakan baris sejajar. Penambahan rekomendasi tidak memindahkan fokus ke isian jumlah.
+
+## 63. Dialog saldo awal pembukuan
+
+- Tampilkan status sebelum membuka form. Input dasar selalu terlihat; stok, piutang, dan utang menjadi bagian opsional yang bisa dibuka per kategori. Input menyusun diri menjadi satu kolom bila ruang sempit. Pratinjau terpisah menampilkan Rupiah rata kanan dan membedakan **Ubah isian** dari **Posting saldo awal**.
+
+## 64. Rincian data dan aksi pembukuan
+
+- Popup baca-saja memakai padding yang konsisten serta judul kelompok yang menjelaskan konteks angka: identitas/stok, harga/margin, saldo, atau riwayat. Riwayat penerimaan merangkum jumlah jenis barang di tabel; per produk, jumlah dan HPP tampil sejajar di popup.
+- Jurnal menampilkan dua aksi terpisah: perpindahan uang dan koreksi saldo buku. Isian ada di popup; pemberitahuan jurnal baru hanya tampil jika ada aktivitas baru.

@@ -188,10 +188,14 @@
                         @endif
                         <td data-label="Status"><x-ui.status :status="$isActive ? 'active' : ($kind === 'vehicle' ? 'inactive' : 'archived')"/></td>
                         <td class="ui-actions">
-                            @if($kind === 'product')
-                                <button type="button" class="btn-action-pill" data-open-popup="popup-detail-product-{{ $record->id }}" aria-label="Detail {{ $recordName }}">Detail</button>
-                                @include('v2.master-product-detail')
-                            @endif
+                             @if($kind === 'product')
+                                 <button type="button" class="btn-action-pill" data-open-popup="popup-detail-product-{{ $record->id }}" aria-label="Detail {{ $recordName }}">Detail</button>
+                                 @include('v2.master-product-detail')
+                             @elseif($kind === 'customer')
+                                 <button type="button" class="btn-action-pill" data-customer-detail="{{ route('v2.customers.activity', $record->id) }}" data-detail-name="{{ $recordName }}" data-detail-code="{{ $record->code }}" aria-haspopup="dialog">Detail</button>
+                             @elseif($kind === 'supplier' || $kind === 'vehicle')
+                                 <button type="button" class="btn-action-pill" data-insight="{{ $kind }}" data-insight-id="{{ $record->id }}" data-insight-name="{{ $recordName }}" data-insight-meta="{{ $kind === 'supplier' ? 'Kode '.$record->code : $record->vehicle_type }}" aria-haspopup="dialog">Detail</button>
+                             @endif
                             <button type="button" class="btn-action-pill btn-action-edit" data-open-popup="popup-edit-{{ $kind }}-{{ $record->id }}" aria-label="Ubah {{ $recordName }}">Ubah</button>
                             @if($isActive)
                             <form method="POST" action="{{ route('v2.master.archive', ['kind' => $kind, 'id' => $record->id]) }}" data-master-form data-method="PATCH">

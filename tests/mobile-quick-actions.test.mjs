@@ -27,7 +27,9 @@ test('tampilan mengikuti referensi: ikon saja, pil gelap, lingkaran lime untuk a
     assert.match(source, /button\.innerHTML=icons\[action\.icon\]\|\|''/);
     assert.doesNotMatch(source, /'<span>'\+action\.label/);
     assert.match(source, /\.mqa\{[^}]*background:var\(--ui-green-2\)/);
-    assert.match(source, /\.mqa button\.is-active\{background:var\(--ui-lime\);color:var\(--ui-green-2\)\}/);
+    assert.match(source, /\.mqa-spot\{[^}]*background:var\(--ui-lime\)/);
+    assert.match(source, /transition:transform var\(--ui-morph-duration\)/);
+    assert.match(source, /spot\.animate/);
     assert.match(source, /button\.classList\.toggle\('is-active',on\)/);
     assert.match(source, /const match=actions\.find\(item=>item\.task===task\),activeKey=match\?match\.key:actions\[0\]\.key/);
     assert.match(source, /if\(on&&match\)button\.setAttribute\('aria-current','page'\)/);
@@ -35,11 +37,12 @@ test('tampilan mengikuti referensi: ikon saja, pil gelap, lingkaran lime untuk a
 
 test('pil hilang di Kasir, saat modal, keranjang, sidebar, dan keyboard', () => {
     assert.match(source, /task!=='kasir'/);
-    assert.match(source, /@media\(min-width:901px\)\{\.mqa\{display:none!important\}\}/);
-    assert.match(source, /body:has\(dialog\[open\]\) #mobile-quick-actions/);
-    assert.match(source, /body:has\(\.modal-overlay\.open\) #mobile-quick-actions/);
-    assert.match(source, /body\.pm-cart-open #mobile-quick-actions/);
-    assert.match(source, /body\.sidebar-open #mobile-quick-actions/);
-    assert.match(source, /body:has\(main :is\(input,select,textarea\):focus\) #mobile-quick-actions/);
-    assert.match(source, /padding-bottom:calc\(84px \+ env\(safe-area-inset-bottom\)\)/);
+    assert.match(source, /@media\(width > 900px\)\{\.mqa-dock\{display:none!important\}\}/);
+    assert.match(source, /body:has\(dialog\[open\]\) \.mqa-dock/);
+    assert.match(source, /body:has\(\.modal-overlay\.open\) \.mqa-dock/);
+    assert.match(source, /body\.pm-cart-open \.mqa-dock/);
+    assert.match(source, /body\.sidebar-open \.mqa-dock/);
+    assert.match(source, /body:has\(main :is\(input,select,textarea\):focus\) \.mqa-dock/);
+    assert.match(source, /body\.mqa-on>main\.main-content\{[^}]*overflow:auto/);
+    assert.match(source, /\.mqa-dock\{flex:none;[^}]*env\(safe-area-inset-bottom\)/);
 });

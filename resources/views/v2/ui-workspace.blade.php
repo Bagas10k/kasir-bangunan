@@ -5,7 +5,7 @@ const navigation=document.querySelector('.nav');
 const links=Array.from(navigation?.querySelectorAll('[data-task]')||[]);
 const host=document.querySelector('#task-panels');
 if(!host||!links.length)return;
-const groups={kasir:['#kasir','#h-sales'],tagihan:['#tagihan','#h-verify','#reject-heading'],pengiriman:['#pengiriman','#trip-heading','#uang-muka-sopir','#h-deliveries'],'master-product':['#master-section-product'],'master-customer':['#master-section-customer'],'master-supplier':['#master-section-supplier'],'master-employee':['#master-section-staff','#master-section-employee','#master-section-driver'],'master-vehicle':['#master-section-vehicle'],penerimaan:['#receipt-heading','#receipt-drafts','#receipt-history'],shift:['#h-shift','#review-heading','#opening-heading'],laporan:['#laporan']};
+const groups={kasir:['#kasir','#h-sales'],tagihan:['#tagihan','#h-verify','#reject-heading'],pengiriman:['#delivery-start','#pengiriman','#trip-heading','#uang-muka-sopir','#h-deliveries'],'master-product':['#master-section-product'],'master-customer':['#master-section-customer'],'master-supplier':['#master-section-supplier'],'master-employee':['#master-section-staff','#master-section-employee','#master-section-driver'],'master-vehicle':['#master-section-vehicle'],penerimaan:['#receipt-heading','#receipt-drafts','#receipt-history'],shift:['#h-shift','#review-heading','#opening-heading'],laporan:['#laporan']};
 const text={kasir:['Kasir','Pilih barang di katalog, lalu lanjutkan pembayaran.'],tagihan:['Tagihan & pembayaran','Piutang pelanggan, utang supplier, dan pemeriksaan pembayaran.'],pengiriman:['Pengiriman & sopir','Surat jalan, status pengiriman, dan biaya perjalanan.'],'master-product':['Produk','Katalog barang: satuan, kategori, harga jual, stok minimum, dan supplier.'],'master-customer':['Pelanggan','Opsional saat penjualan; kasir boleh mengetik nama pembeli langsung.'],'master-supplier':['Supplier','Pemasok barang. Tekan nama supplier untuk melihat produk dan riwayat transaksinya.'],'master-employee':['Karyawan & sopir','Satu daftar staf toko; kolom posisi menandai siapa yang bertugas sebagai sopir.'],'master-vehicle':['Mobil','Armada pengiriman. Tekan nomor polisi untuk melihat riwayat pemakaian dan sopirnya.'],penerimaan:['Penerimaan barang','Catat barang masuk dan tagihan supplier melalui formulir penerimaan.'],shift:['Kas harian','Satu catatan laci per tanggal, uang fisik, dan pemeriksaan selisih.'],laporan:['Laporan harian','Tunai, transfer terverifikasi, dan transfer menunggu dipisahkan.']};
 groups.akun=['#login-accounts'];text.akun=['Akun Login','Kelola akun Admin dan Kasir; terpisah dari master karyawan.'];
 const panels=new Map();
@@ -181,7 +181,15 @@ function bindRemote(key,panel){
   if(url.origin!==location.origin||link.hasAttribute('download')||/csv|print/i.test(url.pathname+url.search))continue;
   const owner=links.find(item=>item.dataset.remote&&new URL(item.dataset.remote,location.href).pathname===url.pathname);
   if(!owner)continue;
-  link.addEventListener('click',event=>{event.preventDefault();select(owner.dataset.task);if(url.search||remoteState.get(owner.dataset.task)!==url.toString())loadRemote(owner.dataset.task,url.toString(),{force:true});});
+  link.addEventListener('click',async event=>{
+   event.preventDefault();select(owner.dataset.task);
+   if(link.hasAttribute('data-journal-page')||url.search||remoteState.get(owner.dataset.task)!==url.toString()){
+    await loadRemote(owner.dataset.task,url.toString(),{force:true});
+    if(link.hasAttribute('data-journal-page')&&active===key&&remoteState.get(key)===url.toString()){
+     const heading=panel.querySelector('#journal-activity');heading?.scrollIntoView({block:'start',behavior:'instant'});heading?.focus({preventScroll:true});
+    }
+   }
+  });
  }
 }
 // Menu gabungan (data-tabs) memiliki beberapa panel; satu tautan sidebar menjadi pemiliknya.
@@ -260,6 +268,8 @@ function popup(node,title,label,{wide=false,toolbar=null}={}){
 // POS keeps the approved catalogue/cart workflow; only its payment steps are popups.
 const wholeSections=[['#receipt-heading','Catat barang masuk','Tambah penerimaan'],['#trip-heading','Biaya ritase sopir','Catat biaya ritase'],['#opening-heading','Saldo awal pembukuan','Isi saldo awal']];
 for(const [selector,title,label]of wholeSections){const section=document.querySelector(selector)?.closest('section');if(!section)continue;
+ if(selector==='#opening-heading'&&!section.querySelector('#opening-form'))continue;
+ if(selector==='#trip-heading'&&document.querySelector('[data-delivery-ritase]')){popup(section,title,label,{toolbar:document.querySelector('[data-delivery-ritase]')});continue;}
  // Penerimaan: tombol pembuka langsung di kepala kartu Riwayat (rancangan 'Penerimaan barang'), tanpa kartu terpisah.
  const history=selector==='#receipt-heading'?(document.querySelector('#receipt-drafts')||document.querySelector('#receipt-history')):null;
  if(history){history.classList.add('has-head-action');const opened=popup(section,title,'+ Catat penerimaan',{toolbar:history,wide:true});if(opened){opened.button.classList.add('card-head-action');opened.button.dataset.receiptNew='1';const sub=document.createElement('p');sub.className='popup-sub';sub.textContent=section.querySelector('.note')?.textContent.trim()||'';if(sub.textContent){opened.dialog.querySelector('.popup-titles').append(sub);const dup=section.querySelector('.note');if(dup)dup.hidden=true;}}continue;}const shell=document.createElement('section');shell.className='card';const h=document.createElement('h2');h.textContent=title;const note=section.querySelector('.note')?.cloneNode(true);section.before(shell);shell.append(h);if(note)shell.append(note);popup(section,title,label,{toolbar:shell});}
@@ -283,7 +293,7 @@ document.addEventListener('click', e => {
     const id = trigger.getAttribute('data-open-popup');
     const dialog = document.getElementById(id);
     if (dialog && typeof dialog.showModal === 'function') {
-      dialog._openerTrigger = trigger;
+       dialog._openerTrigger = trigger.closest('td')?.querySelector('.ui-actions-toggle') || trigger;
       dialog.showModal();
       // Fokus ke kolom wajib pertama yang masih kosong (kode sudah terisi otomatis), bukan kolom pertama.
       const fields = Array.from(dialog.querySelectorAll('input:not([type=hidden]):not([type=radio]):not([type=file]):not([disabled]):not([readonly]),textarea:not([disabled])')).filter(el => el.getClientRects().length);
@@ -353,7 +363,7 @@ function enhanceCollect(form,result){
 function popupForms(root){for(const form of root.querySelectorAll(root===document?'main form':'form')){
   if(form.hidden||form.id==='form-checkout'||form.closest('dialog')||(form.getAttribute('method')||'').toLowerCase()==='get')continue;
  if(!form.querySelector('input:not([type=hidden]),select,textarea'))continue;
- const submit=form.querySelector('button[type=submit],button:not([type])');const label=form.dataset.popupTitle||(form.id==='form-open'?'Buka shift':(submit?.textContent.trim()||'Isi formulir'));const contextEl=form.querySelector('h3,p:not([data-error]):not([data-ok])');const context=contextEl?.tagName==='H3'&&contextEl.textContent.trim()!==label?contextEl.textContent.trim():'';if(contextEl?.tagName==='H3'&&contextEl.textContent.trim()===label)contextEl.classList.add('sr');const result=popup(form,label,label);if(result&&context){const note=document.createElement('p');note.className='popup-sub';note.textContent=context;result.dialog.querySelector('.popup-titles').append(note);}
+  const submit=form.querySelector('button[type=submit],button:not([type])');const label=form.dataset.popupTitle||(form.id==='form-open'?'Buka shift':(submit?.textContent.trim()||'Isi formulir'));const contextEl=form.querySelector('h3,p:not([data-error]):not([data-ok])');const context=contextEl?.tagName==='H3'&&contextEl.textContent.trim()!==label?contextEl.textContent.trim():'';if(contextEl?.tagName==='H3'&&contextEl.textContent.trim()===label)contextEl.classList.add('sr');const toolbar=form.closest('#uang-muka-sopir')&&form.hasAttribute('data-transport-form')?document.querySelector('[data-delivery-advance]'):null;const result=popup(form,label,label,{toolbar});if(result&&context){const note=document.createElement('p');note.className='popup-sub';note.textContent=context;result.dialog.querySelector('.popup-titles').append(note);}
  if(result&&form.id==='form-open'){result.button.dataset.cashDayOpen='1';result.button.hidden=form.dataset.openAllowed==='0';if(result.button.hidden)result.button.style.setProperty('display','none','important');}
  if(result&&form.matches('.form-collect'))enhanceCollect(form,result);
 }}

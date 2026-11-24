@@ -45,7 +45,7 @@ test('dialog rincian memakai daftar fakta, bukan kartu KPI, dan tanpa blok riway
     assert.match(insights, /class="insight-facts"/);
     assert.doesNotMatch(insights, /data-insight-history-block/);
     assert.ok(insights.indexOf('data-supplier-activity') < insights.indexOf('data-insight-list'));
-    assert.match(insights, /class="insight-section"/);
+    assert.match(insights, /class="detail-section"/);
     assert.match(insights, /class="insight-range"/);
 });
 

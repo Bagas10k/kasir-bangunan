@@ -117,7 +117,7 @@ Pada layar ≤900px tersedia pil aksi cepat di tengah bawah, maksimal tiga tombo
 - **Admin**: Buat orderan (Kasir + fokus pencarian katalog), Barang masuk (Penerimaan + dialog Catat penerimaan), Pengeluaran (halaman pengeluaran + modal Catat pengeluaran).
 - **Kasir**: Kasir (fokus katalog), Riwayat (Riwayat penjualan), Status bayar (Status pembayaran).
 
-Pil tidak tampil di halaman Kasir karena bar keranjang sudah menjadi aksi utama. Setiap aksi satu ketukan dan memakai kontrol/form yang sudah ada; tidak ada alur baru. Pil disembunyikan saat dialog/modal terbuka, lembar keranjang, drawer sidebar, atau kolom teks sedang fokus; konten utama diberi ruang bawah agar baris terakhir tidak tertutup. Desktop ≥901px tidak menampilkan pil. Tombol lama di dalam halaman tetap tersedia sebagai cadangan.
+Pil tidak tampil di halaman Kasir karena bar keranjang sudah menjadi aksi utama. Setiap aksi satu ketukan dan memakai kontrol/form yang sudah ada; tidak ada alur baru. Penanda aktif bergeser dan berubah bentuk secara halus, atau berpindah langsung jika *reduced motion* aktif. Pil punya area sendiri di bawah konten: konten bergulir di atasnya, bukan di belakangnya. Pil disembunyikan saat dialog/modal terbuka, lembar keranjang, drawer sidebar, kolom isian fokus, atau mencetak. Desktop di atas 900 px tidak menampilkan pil.
 
 ---
 
@@ -650,7 +650,7 @@ Kode: `ReceiptDrafts::save/confirm/cancel`, `SupplyTrips::receive`. Menu: **Oper
 5. Draf ditandai `confirmed`, ditautkan ke penerimaan final, serta disimpan siapa dan kapan yang mengonfirmasi. Pengulangan konfirmasi yang sama tidak menambah stok atau jurnal lagi. Kegagalan posting menggagalkan seluruh transaksi dan draf tetap belum dikonfirmasi.
 6. Pembayaran dilakukan terpisah melalui Tagihan (bagian 8.3). Draf belum punya tagihan, sehingga belum bisa dibayar.
 
-Riwayat penerimaan menampilkan 50 dokumen final terakhir dan total nilai per halaman. Simpan/perbarui/konfirmasi/batalkan draf memperbarui data di tempat tanpa muat ulang penuh.
+Riwayat penerimaan menampilkan 50 dokumen final terakhir dan total nilai per halaman. Kolom Produk menampilkan jumlah jenis barang dan contoh produk pertama; pencarian tetap mencakup semua produk. **Aksi → Detail** menampilkan jumlah dan HPP setiap produk dalam satu tabel, serta ringkasan nilai barang dan ongkir terpisah. Simpan/perbarui/konfirmasi/batalkan draf memperbarui data di tempat tanpa muat ulang penuh.
 
 ### 11.3 Kunci final dan data lama
 
@@ -681,7 +681,9 @@ Memerlukan migrasi aditif `2026_11_23_173947_add_freight_to_v2_receipts.php` pad
 
 ## 12. Master data
 
-Halaman **Karyawan & sopir** menampilkan satu daftar gabungan; pembungkus dialog karyawan/sopir tidak lagi dirender sebagai kartu kosong. Dialog tambah/edit/impor tetap tersedia. **Jenis mobil** pada tambah/ubah berupa dropdown Pick-up, Truk engkel, Truk double dan Dump truck; nilai jenis lama di luar daftar tetap muncul sebagai opsi tersimpan agar tidak berubah saat menyimpan edit lain.
+Halaman **Karyawan & sopir** menampilkan satu daftar gabungan. Tombol **Tambah karyawan** dan **Tambah sopir** membuka form; sopir dapat berupa karyawan tertaut atau sopir luar. **Aksi → Detail** menampilkan identitas, peran, dan status. Setelah data baru dimuat ke daftar, dialog ubahnya juga ditambahkan tanpa memuat ulang ruang kerja. **Jenis mobil** pada tambah/ubah berupa dropdown Pick-up, Truk engkel, Truk double dan Dump truck; nilai jenis lama tetap tersedia saat menyunting.
+
+**Aksi → Detail pelanggan** menampilkan nota transaksi pelanggan itu saja, termasuk tanggal, metode pembayaran, total, dan sisa tagihan. Periode Harian/Mingguan/Bulanan masing-masing berarti hari ini, 7 hari terakhir, dan 30 hari terakhir, termasuk hari ini. Admin dapat membuka dokumen nota dari daftar.
 
 Kode: `MasterData`, `MasterRelations`, `FormCatalog`. Menu: **Master data** (admin).
 
@@ -779,7 +781,7 @@ Setelah diposting, saldo awal **tidak bisa diubah**. Selalu periksa pratinjau se
 | Piutang awal (opsional) | Per pelanggan: nomor faktur, jumlah, jatuh tempo |
 | Utang awal (opsional) | Per supplier: nomor faktur, jumlah, jatuh tempo |
 
-Saat ini persediaan, piutang, dan utang diisi dalam format JSON di form (lihat bagian 21).
+Kartu menampilkan status **siap diisi**, **sudah diposting** (dengan tanggal dan referensi), atau alasan saldo awal tidak tersedia. Form hanya tampil saat siap diisi. Kas dan bank yang kosong dihitung Rp 0. Tambahkan stok, piutang, atau utang melalui baris opsional, dengan memilih produk/pelanggan/supplier menurut nama. Tekan **Periksa saldo awal** untuk melihat ringkasan Rupiah dan modal awal dari server tanpa menyimpan. Pilih **Ubah isian** atau **Posting saldo awal**; perubahan isian harus diperiksa lagi. Koreksi kas/bank setelah pembukuan berjalan dilakukan lewat **Penyesuaian Saldo**, bukan saldo awal baru.
 
 ### 13.3 Jurnal saldo awal
 
@@ -911,7 +913,7 @@ Kode: `AdminSummary` + `MonitorMetrics` + `PosDashboard`.
 
 ### 15.4 Jurnal umum
 
-Semua jurnal beserta barisnya, bisa disaring. Ada status pembaruan otomatis setiap 10 detik. Admin, baca saja.
+Jurnal Umum menampilkan maksimal 25 entri per halaman, beserta baris debit dan kreditnya. Gunakan **Aktivitas lebih lama/baru** untuk membuka riwayat; filter tanggal, sumber, dan akun tetap terbawa. Pada halaman terbaru tanpa filter, pemberitahuan muncul hanya bila ada aktivitas baru; **Perbarui aktivitas** memuatnya. Daftar yang sedang dibaca tidak ditambah otomatis. Mencetak lewat browser tidak memuat halaman riwayat lain. **Pindah dana** dan **Penyesuaian saldo** dibuka lewat popup terpisah; keduanya tetap memakai konfirmasi kata sandi dan jurnal yang sama.
 
 ### 15.5 Laba rugi
 
@@ -1095,7 +1097,6 @@ Daftar ini jujur tentang apa yang belum ditangani sistem. Butir bertanda **[cek 
 7. **Jatuh tempo penjualan kredit bersifat opsional.** Kasir dapat mengisi tanggal jatuh tempo saat checkout kredit; bila dikosongkan, tagihan tidak memiliki batas jatuh tempo.
 8. **Biaya perjalanan melebihi uang muka belum didukung.** Selisih lebih harus dicatat terpisah, padahal jalur pengeluaran terpisah belum ada (lihat butir 4).
 9. **Penerimaan barang selalu kredit.** Pembelian tunai dicatat sebagai utang lalu dibayar lewat pengajuan pembayaran supplier.
-10. **Form saldo awal V2 memakai JSON** untuk persediaan, piutang, dan utang, sehingga sulit diisi orang awam.
 11. **Dua pola kode pelanggan**: `CUS-` (dibuat dari kasir) dan `PLG-` (dari form master).
 12. **Jenis harga (eceran/kontraktor) belum tampil** di riwayat transaksi dan cetak nota, walaupun sudah tersimpan.
 13. **Laporan harian memakai tanggal shift dibuka.** Shift yang melewati tengah malam dihitung ke tanggal buka.
@@ -1118,6 +1119,9 @@ Daftar ini jujur tentang apa yang belum ditangani sistem. Butir bertanda **[cek 
 
 | Tanggal | Perubahan |
 |---|---|
+| 2026-11-24 | Detail master dan penerimaan dikelompokkan menurut konteks; pelanggan mendapat riwayat berperiode. Katalog Kasir baku Tersedia, periode riwayat digabung dengan filter, dan aksi biaya sopir dikelompokkan di atas. Isian Pindah Dana dan Penyesuaian Saldo dibuka lewat popup. |
+| 2026-11-24 | Pil aksi mobile mendapat animasi morph dan area bawah terpisah. Jurnal Umum dibatasi 25 entri per halaman, filter tetap terbawa, dan aktivitas baru hanya memunculkan pemberitahuan. |
+| 2026-11-24 | Saldo awal pembukuan menampilkan status sebelum form dibuka, rincian opsional per baris tanpa JSON, dan pratinjau Rupiah terpisah sebelum posting (bagian 13). |
 | 2026-11-24 | Daftar Pengeluaran memakai gaya tabel operasional bersama, termasuk kartu berlabel di ponsel. Pil aksi bawah dipusatkan dengan lebar maksimal 400 px (bagian 1.2 dan 1.5). |
 | 2026-11-24 | Pil aksi cepat mobile (maks 3) bergaya pil hijau gelap ikon-saja dengan lingkaran lime untuk aksi aktif: admin Buat orderan/Barang masuk/Pengeluaran; kasir Kasir/Riwayat/Status bayar; tampil ≤900px, disembunyikan di Kasir, modal, keranjang, sidebar, kolom fokus (bagian1.5). |
 | 2026-11-24 | Penambahan alur **Pindah Dana (Kas ↔ Bank / Antar-Bank)** (`POST /v2/journals/transfers`), koreksi rekening bank tujuan saat verifikasi pembayaran admin, rincian per rekening bank di Laporan Harian & filter sumber Pengeluaran (`bank:<kode>`), serta input **jatuh tempo opsional** pada penjualan kredit di Kasir (Bagian 14.5, 21). |

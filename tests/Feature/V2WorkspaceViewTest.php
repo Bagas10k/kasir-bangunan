@@ -60,7 +60,19 @@ class V2WorkspaceViewTest extends TestCase
         DB::table('v2_deliveries')->where('sale_id', $sale['sale_id'])->update(['vehicle_id' => $vehicle, 'driver_id' => $driver, 'driver_name' => 'Karyawan Sintetis Alpha']);
         $otherCashier = User::factory()->create(['name' => 'Kasir Sintetis Gamma']);
         DB::table('v2_user_roles')->insert(['user_id' => $otherCashier->id, 'role' => 'cashier', 'created_at' => now(), 'updated_at' => now()]);
-        $ops->checkout($otherCashier->id, ['items' => [['product_id' => $product, 'quantity' => '2']], 'delivery_fee' => '0', 'payment_method' => 'cash', 'paid_amount' => '200', 'fulfillment' => 'pickup', 'idempotency_key' => 'synthetic-other-cashier-sale']);
+        $otherSale = $ops->checkout($otherCashier->id, ['items' => [['product_id' => $product, 'quantity' => '2']], 'delivery_fee' => '0', 'payment_method' => 'cash', 'paid_amount' => '200', 'fulfillment' => 'pickup', 'idempotency_key' => 'synthetic-other-cashier-sale']);
+        $activityUrl = route('v2.customers.activity', $customer);
+        $saleNumber = DB::table('v2_sales')->where('id', $sale['sale_id'])->value('number');
+        $otherNumber = DB::table('v2_sales')->where('id', $otherSale['sale_id'])->value('number');
+        $activity = $this->actingAs($admin)->getJson($activityUrl.'?history_period=day')->assertOk()->json('html');
+        $this->assertStringContainsString($saleNumber, $activity);
+        $this->assertStringNotContainsString($otherNumber, $activity);
+        DB::table('v2_sales')->where('id', $sale['sale_id'])->update(['created_at' => now()->subDays(10)]);
+        $this->assertStringNotContainsString($saleNumber, $this->getJson($activityUrl.'?history_period=week')->assertOk()->json('html'));
+        $this->assertStringContainsString($saleNumber, $this->getJson($activityUrl.'?history_period=month')->assertOk()->json('html'));
+        $this->getJson(route('v2.customers.activity', $supplier))->assertNotFound();
+        $this->actingAs($cashier)->getJson($activityUrl)->assertForbidden();
+        DB::table('v2_sales')->where('id', $sale['sale_id'])->update(['created_at' => now()]);
         if (getenv('V2_PREVIEW_DIR') && getenv('V2_PREVIEW_DEMO')) {
             // Fixture pratinjau saja: tambahkan data contoh master agar tampilan form dan relasi terlihat penuh.
             app(DemoData::class)->seed($admin->id);
@@ -118,6 +130,11 @@ class V2WorkspaceViewTest extends TestCase
             $this->assertSame($role === 'admin' ? 8 : 6, preg_match_all('/<th\b/', $paymentPanel[1] ?? ''));
             if ($role === 'admin') {
                 $response->assertSee('data-default-task="ringkasan"', false)
+                    ->assertSee('data-open-popup="popup-add-employee"', false)
+                    ->assertSee('data-open-popup="popup-add-driver"', false)
+                    ->assertSee('staff-detail-employee-'.$employee, false)
+                    ->assertSee('data-customer-detail=', false)
+                    ->assertSee('receipt-detail-'.$receiptId, false)
                     ->assertSee('id="admin-overview"', false)
                     ->assertSee('data-task="persetujuan"', false)
                     ->assertSee('data-menu-group="keuangan"', false)
@@ -183,10 +200,10 @@ class V2WorkspaceViewTest extends TestCase
             }
             $response->assertSee('name="driver_id"', false)->assertDontSee('name="driver_name"', false);
             if ($role === 'admin') {
-                // Riwayat penerimaan per barang: kolom rancangan, dua barang dalam satu nota, qty desimal tanpa nol berlebih.
-                $response->assertSeeInOrder(['Nomor dan pemasok', 'Produk', 'Tipe', 'Qty', 'HPP satuan', 'Total'])
+                // Riwayat ringkas; jumlah dan HPP terikat pada baris masing-masing produk di popup.
+                $response->assertSeeInOrder(['Nomor dan pemasok', 'Produk', 'Tipe', 'Total', '2 jenis barang', 'Detail penerimaan', 'Jumlah', 'HPP satuan'])
                     ->assertSee('RCV-SYN-001')->assertSee('Pemasok: Pemasok Sintetis Beta')
-                    ->assertSee('2,5 <small>unit</small>', false)->assertSee('Akun 2101 · Utang supplier')
+                    ->assertSee('2,5 unit')->assertSee('Akun 2101 · Utang supplier')
                     ->assertSee('data-ui-noun="penerimaan"', false);
             }
             $previewDir = getenv('V2_PREVIEW_DIR');
@@ -196,6 +213,12 @@ class V2WorkspaceViewTest extends TestCase
                 }
                 // Static synthetic fixture only. Network mutations are blocked by the preview server.
                 file_put_contents($previewDir.'/'.$role.'.html', $response->getContent());
+                if ($role === 'admin') {
+                    config(['v2.enabled' => true]);
+                    $journal = $this->get(route('journals.index', ['partial' => 1]))->assertOk();
+                    file_put_contents($previewDir.'/journal.html', $journal->getContent());
+                    config(['v2.enabled' => false]);
+                }
             }
         }
     }

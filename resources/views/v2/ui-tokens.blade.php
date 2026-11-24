@@ -15,7 +15,7 @@
   --ui-weight-medium:600;--ui-weight-strong:700;--ui-leading-tight:1.35;--ui-leading-body:1.5;--ui-stroke:1px;
   --ui-detail-column-min:12rem;--ui-detail-summary-min:8rem;
   --ui-cart-width:34rem;--ui-cart-bar-width:32.5rem;--ui-cart-layer:120;
-  --ui-quick-actions-max-width:400px;
+  --ui-quick-actions-max-width:400px;--mqa-touch:3rem;
   --ui-cart-backdrop:rgba(9,30,18,.55);
   --ui-cart-list-min:6rem;
   --ui-catalog-product-width:40%;--ui-catalog-detail-width:20%;

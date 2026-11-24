@@ -41,6 +41,7 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::post('/import-batches/{id}/commit', [WorkspaceController::class, 'importCommit'])->whereNumber('id')->name('imports.commit');
     Route::get('/suppliers/{id}/products', [WorkspaceController::class, 'supplierProducts'])->whereNumber('id')->name('suppliers.products');
     Route::get('/suppliers/{id}/activity', [SupplierActivityController::class, 'index'])->whereNumber('id')->middleware('throttle:60,1')->name('suppliers.activity');
+    Route::get('/customers/{id}/activity', [WorkspaceController::class, 'customerActivity'])->whereNumber('id')->middleware('throttle:60,1')->name('customers.activity');
     Route::get('/suppliers/{id}/statement', [SupplierActivityController::class, 'statement'])->whereNumber('id')->middleware('throttle:30,1')->name('suppliers.statement');
     Route::get('/receipts/restock-products', [WorkspaceController::class, 'restockProducts'])->name('receipts.restock-products');
     Route::post('/receipts/product-supplier', [WorkspaceController::class, 'linkReceiptSupplier'])->middleware('throttle:30,1')->name('receipts.product-supplier');

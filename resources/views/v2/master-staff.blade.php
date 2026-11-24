@@ -14,12 +14,16 @@
             'position' => $employee->notes ?: 'Staf toko',
             'phone' => $driver->phone ?? null,
             'driver_code' => $driver->code ?? null,
+            'driver_active' => $driver ? (bool) $driver->is_active : null,
+            'notes' => $driver->notes ?? null,
             'is_active' => (bool) $employee->is_active,
         ];
     })->concat($staffDrivers->where('kind', 'external')->map(fn ($driver) => (object) [
         'kind' => 'driver', 'id' => $driver->id, 'code' => $driver->code, 'name' => $driver->name,
         'role' => 'driver-external', 'position' => 'Sopir luar', 'phone' => $driver->phone,
         'driver_code' => $driver->code, 'is_active' => (bool) $driver->is_active,
+        'driver_active' => null,
+        'notes' => $driver->notes,
     ]))->values();
     $staffMetrics = $metrics ?? null;
     $staffCards = $staffMetrics === null
@@ -40,7 +44,7 @@
 
     <x-ui.toolbar search="Cari nama, kode, atau posisi" label="Cari karyawan atau sopir" :chips="['Semua' => 'all', 'Karyawan' => 'role:staff,driver-internal', 'Sopir' => 'role:driver-internal,driver-external', 'Diarsipkan' => 'active:0']">
         <button type="button" class="btn-add-master" data-open-popup="popup-add-employee">Tambah karyawan</button>
-        <button type="button" class="btn-import-master" data-open-popup="popup-add-driver">Tambah sopir luar</button>
+        <button type="button" class="btn-import-master" data-open-popup="popup-add-driver">Tambah sopir</button>
     </x-ui.toolbar>
 
     <div class="ui-table-wrap scroll master-table-scroll" data-ui-table tabindex="0" role="region" aria-label="Daftar karyawan dan sopir">
@@ -58,6 +62,28 @@
                     <td data-label="Telepon" class="ui-nowrap">{{ $staff->phone ?: '—' }}</td>
                     <td data-label="Status"><x-ui.status :status="$staff->is_active ? 'active' : 'archived'"/></td>
                     <td class="ui-actions">
+                        @php $staffDialog = 'staff-detail-'.$staff->kind.'-'.$staff->id; @endphp
+                        <button type="button" class="btn-action-pill" data-open-popup="{{ $staffDialog }}" aria-haspopup="dialog">Detail</button>
+                        <dialog class="input-dialog uf-dialog" id="{{ $staffDialog }}" aria-labelledby="{{ $staffDialog }}-title">
+                            <div class="popup-heading">
+                                <div><h2 id="{{ $staffDialog }}-title">Detail {{ $staff->kind === 'driver' ? 'sopir' : 'karyawan' }}</h2><p class="uf-dialog-sub">{{ $staff->name }} · {{ $staff->code }}</p></div>
+                                <button type="button" class="popup-close secondary" data-close-dialog aria-label="Tutup detail staf">×</button>
+                            </div>
+                            <div class="popup-content detail-content">
+                                <section class="detail-section">
+                                    <h3>Identitas dan penugasan</h3>
+                                    <dl class="detail-facts">
+                                        <div><dt>Peran</dt><dd>{{ $positionLabel[$staff->role] }}</dd></div>
+                                        <div><dt>Posisi</dt><dd>{{ $staff->position }}</dd></div>
+                                        <div><dt>Status</dt><dd><x-ui.status :status="$staff->is_active ? 'active' : 'archived'"/></dd></div>
+                                        <div><dt>Telepon sopir</dt><dd>{{ $staff->phone ?: '—' }}</dd></div>
+                                        @if($staff->driver_code)<div><dt>Kode sopir</dt><dd>{{ $staff->driver_code }}</dd></div>@endif
+                                        @if($staff->driver_active !== null)<div><dt>Status penugasan sopir</dt><dd><x-ui.status :status="$staff->driver_active ? 'active' : 'archived'"/></dd></div>@endif
+                                        @if($staff->notes)<div><dt>Catatan sopir</dt><dd>{{ $staff->notes }}</dd></div>@endif
+                                    </dl>
+                                </section>
+                            </div>
+                        </dialog>
                         <button type="button" class="btn-action-pill btn-action-edit" data-open-popup="popup-edit-{{ $staff->kind }}-{{ $staff->id }}" aria-label="Ubah {{ $staff->name }}">Ubah</button>
                         @if($staff->is_active)
                         <form method="POST" action="{{ $staff->kind === 'employee' ? route('v2.master.archive', ['kind' => 'employee', 'id' => $staff->id]) : route('v2.relations.archive', ['kind' => 'driver', 'id' => $staff->id]) }}" data-master-form data-method="PATCH">

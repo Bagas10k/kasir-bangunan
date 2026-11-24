@@ -1,3 +1,12 @@
+@if($role === 'admin')
+<section class="card" id="delivery-start" aria-labelledby="delivery-start-title">
+    <h2 id="delivery-start-title">Biaya perjalanan sopir</h2>
+    <div class="detail-facts delivery-actions">
+        <div><h3>Ritase langsung</h3><p class="note">Biaya perjalanan sudah diketahui dan tidak memakai uang muka.</p><div data-delivery-ritase></div></div>
+        <div><h3>Uang muka sopir</h3><p class="note">Berikan dana sebelum berangkat, lalu catat realisasi dari daftar uang muka.</p><div data-delivery-advance></div></div>
+    </div>
+</section>
+@endif
 <section class="card" id="pengiriman" aria-labelledby="h-pengiriman">
 <h2 id="h-pengiriman">Daftar pengiriman</h2>
 <p class="note">Surat jalan dari penjualan yang dikirim. Kirim barang setelah memilih mobil dan sopir, lalu catat saat barang diterima.</p>
@@ -35,7 +44,7 @@
 </div>
 </section>
 @if($role==='admin')
-<section class="card" id="uang-muka-sopir"><h2>Uang muka dan realisasi sopir <x-ui.info-tip key="uang_muka_sopir" label="Keterangan uang muka sopir"/></h2><p class="note">Uang muka belum menjadi biaya. Realisasi mencatat biaya satu kali; sisa wajib benar-benar diterima kembali. Biaya melebihi uang muka belum didukung dalam formulir ini.</p>
+<section class="card" id="uang-muka-sopir"><h2>Uang muka yang perlu direalisasi <x-ui.info-tip key="uang_muka_sopir" label="Keterangan uang muka sopir"/></h2><p class="note">Setelah sopir kembali, buka aksi realisasi pada baris uang muka yang sesuai.</p>
 <form class="driver-form" action="{{ route('v2.driver-advances.store') }}" data-key data-transport-form>
     <label>Surat jalan<select name="delivery_id"><option value="">Tanpa tautan</option>@foreach($transportDeliveries as $d)<option value="{{ $d->id }}" data-vehicle="{{ $d->vehicle_id }}" data-driver="{{ $d->driver_id }}" data-destination="{{ $d->destination }}">{{ $d->number }} · {{ $d->destination }}</option>@endforeach</select></label>
     <label>Mobil<select name="vehicle_id" required><option value="">Pilih mobil</option>@foreach($vehicles as $vehicle)<option value="{{ $vehicle->id }}">{{ $vehicle->license_plate }}</option>@endforeach</select></label>
@@ -44,7 +53,6 @@
     <p class="note">Surat jalan mengisi tujuan dan penugasan yang sudah tercatat. Bila belum ditugaskan, pilih mobil dan sopir; pilihan disimpan bersama surat jalan.</p>
     <label>Tanggal<input type="date" name="date" value="{{ now()->toDateString() }}" required></label><label>Uang muka<input name="amount" data-money inputmode="decimal" required></label><label>Sumber<select name="method"><option value="cash">Kas shift admin</option><option value="transfer">Bank</option></select></label><label data-bank-account-field hidden>Rekening bank<select name="bank_account_code" disabled>@foreach(($bankAccounts ?? collect([(object)['account_code' => '1102', 'account_name' => 'Rekening Bank']])) as $bankAcc)<option value="{{ $bankAcc->account_code }}">{{ $bankAcc->account_code }} · {{ $bankAcc->account_name }}</option>@endforeach</select></label><button>Bayarkan uang muka</button><p class="err" data-error hidden></p>
 </form>
-<h3 class="ui-subhead">Uang muka yang belum direalisasi</h3>
 <div class="ui-table-wrap scroll" tabindex="0" role="region" aria-label="Uang muka sopir terbuka">
 <table class="ui-table">
 <caption class="sr">Uang muka sopir yang belum direalisasi</caption>

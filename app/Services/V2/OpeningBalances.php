@@ -4,11 +4,8 @@ namespace App\Services\V2;
 
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
-use DateTimeImmutable;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use InvalidArgumentException;
 
 /**
  * Layanan Saldo Awal V2.
@@ -33,10 +30,15 @@ class OpeningBalances
     public const SINGLETON_KEY = 1;
 
     private const CASH_ACCOUNT = '1101';
+
     private const BANK_ACCOUNT = '1102';
+
     private const AR_ACCOUNT = '1103';
+
     private const INVENTORY_ACCOUNT = '1301';
+
     private const AP_ACCOUNT = '2101';
+
     private const EQUITY_ACCOUNT = '3101';
 
     /**
@@ -53,8 +55,8 @@ class OpeningBalances
     /**
      * Pratinjau saldo awal tanpa mutasi basis data.
      *
-     * @param int $actor ID pengguna
-     * @param array<string, mixed> $data Payload saldo awal
+     * @param  int  $actor  ID pengguna
+     * @param  array<string, mixed>  $data  Payload saldo awal
      * @return array<string, mixed>
      */
     public function preview(int $actor, array $data): array
@@ -77,8 +79,8 @@ class OpeningBalances
     /**
      * Eksekusi posting saldo awal V2 secara atomik dan idempotent.
      *
-     * @param int $actor ID pengguna
-     * @param array<string, mixed> $data Payload saldo awal
+     * @param  int  $actor  ID pengguna
+     * @param  array<string, mixed>  $data  Payload saldo awal
      * @return array<string, mixed>
      */
     public function post(int $actor, array $data): array
@@ -173,7 +175,7 @@ class OpeningBalances
             $journalId = Ledger::post(
                 'v2_opening_balance',
                 $batchId,
-                'Saldo awal pembukaan sistem V2 (' . $normalized['reference'] . ')',
+                'Saldo awal pembukaan sistem V2 ('.$normalized['reference'].')',
                 $normalized['journal_lines'],
                 $normalized['date']
             );
@@ -202,7 +204,7 @@ class OpeningBalances
                     'reference_id' => $batchId,
                     'quantity_delta' => $qty,
                     'balance_after' => $qty,
-                    'notes' => 'Saldo awal stok V2: ' . $normalized['reference'],
+                    'notes' => 'Saldo awal stok V2: '.$normalized['reference'],
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -260,47 +262,51 @@ class OpeningBalances
      */
     private function assertSystemCanAcceptOpening(): void
     {
-        // 1. Cek apakah v2_opening_batches sudah ada
-        if (DB::table('v2_opening_batches')->exists()) {
-            throw ValidationException::withMessages([
-                'opening_balance' => 'Saldo awal V2 sudah pernah diposting dan bersifat sekali pakai (singleton).',
-            ]);
+        $state = $this->availability();
+        if ($state['status'] !== 'ready') {
+            throw ValidationException::withMessages([$state['field'] => $state['message']]);
+        }
+    }
+
+    /** @return array{status:'ready'}|array{status:'blocked', field:string, message:string}|array{status:'posted', field:string, message:string, date:string, reference:string} */
+    public function availability(): array
+    {
+        $batch = DB::table('v2_opening_batches')->where('singleton_key', self::SINGLETON_KEY)->first(['date', 'reference']);
+        if ($batch) {
+            return [
+                'status' => 'posted',
+                'field' => 'opening_balance',
+                'message' => 'Saldo awal sudah diposting.',
+                'date' => $batch->date,
+                'reference' => $batch->reference,
+            ];
         }
 
-        // 2. Cek apakah ada jurnal di journal_entries
-        $journalCount = DB::table('journal_entries')->count();
-        if ($journalCount > 0) {
-            throw ValidationException::withMessages([
-                'journal' => 'Tidak dapat memposting saldo awal: jurnal transaksi keuangan sudah ada dalam sistem.',
-            ]);
+        if (DB::table('journal_entries')->exists()) {
+            return ['status' => 'blocked', 'field' => 'journal', 'message' => 'Jurnal transaksi sudah ada.'];
         }
 
-        // 3. Cek apakah ada stok produk yang bernilai bukan nol
-        $hasNonZeroStock = DB::table('products')->where('stock_quantity', '!=', 0)->exists();
-        if ($hasNonZeroStock) {
-            throw ValidationException::withMessages([
-                'inventory' => 'Tidak dapat memposting saldo awal: stok produk telah terisi sebelum saldo awal dibuka.',
-            ]);
+        if (DB::table('products')->where('stock_quantity', '!=', 0)->exists()) {
+            return ['status' => 'blocked', 'field' => 'inventory', 'message' => 'Stok produk sudah terisi.'];
         }
 
-        // 4. Cek apakah sudah ada faktur V2
         if (DB::table('v2_invoices')->exists()) {
-            throw ValidationException::withMessages([
-                'invoices' => 'Tidak dapat memposting saldo awal: data faktur V2 sudah ada.',
-            ]);
+            return ['status' => 'blocked', 'field' => 'invoices', 'message' => 'Tagihan sudah tercatat.'];
         }
+
+        return ['status' => 'ready'];
     }
 
     /**
      * Validasi format dan normalisasi semua nilai angka ke exact string decimal.
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     private function validateAndNormalize(array $data): array
     {
         $date = trim((string) ($data['date'] ?? ''));
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !checkdate((int) substr($date, 5, 2), (int) substr($date, 8, 2), (int) substr($date, 0, 4))) {
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || ! checkdate((int) substr($date, 5, 2), (int) substr($date, 8, 2), (int) substr($date, 0, 4))) {
             throw ValidationException::withMessages(['date' => 'Tanggal saldo awal wajib berformat YYYY-MM-DD yang valid.']);
         }
 
@@ -328,7 +334,7 @@ class OpeningBalances
 
         // Parse Inventory
         $rawInventory = $data['inventory'] ?? [];
-        if (!is_array($rawInventory)) {
+        if (! is_array($rawInventory)) {
             throw ValidationException::withMessages(['inventory' => 'Data persediaan harus berupa array.']);
         }
 
@@ -338,7 +344,7 @@ class OpeningBalances
 
         foreach ($rawInventory as $idx => $item) {
             $productId = (int) ($item['product_id'] ?? 0);
-            if ($productId <= 0 || !DB::table('products')->where('id', $productId)->exists()) {
+            if ($productId <= 0 || ! DB::table('products')->where('id', $productId)->exists()) {
                 throw ValidationException::withMessages(["inventory.{$idx}.product_id" => "Produk ID {$productId} tidak ditemukan."]);
             }
             if (isset($seenProductIds[$productId])) {
@@ -370,7 +376,7 @@ class OpeningBalances
 
         // Parse Receivables (Piutang)
         $rawAr = $data['receivables'] ?? [];
-        if (!is_array($rawAr)) {
+        if (! is_array($rawAr)) {
             throw ValidationException::withMessages(['receivables' => 'Data piutang harus berupa array.']);
         }
 
@@ -380,7 +386,7 @@ class OpeningBalances
 
         foreach ($rawAr as $idx => $ar) {
             $partyId = isset($ar['party_id']) && $ar['party_id'] !== null ? (int) $ar['party_id'] : null;
-            if ($partyId === null || !DB::table('v2_parties')->where('id', $partyId)->where('kind', 'customer')->where('is_active', true)->exists()) {
+            if ($partyId === null || ! DB::table('v2_parties')->where('id', $partyId)->where('kind', 'customer')->where('is_active', true)->exists()) {
                 throw ValidationException::withMessages(["receivables.{$idx}.party_id" => "Pihak/pelanggan ID {$partyId} tidak ditemukan."]);
             }
 
@@ -399,7 +405,7 @@ class OpeningBalances
             }
 
             $dueDate = isset($ar['due_date']) && $ar['due_date'] !== null ? trim((string) $ar['due_date']) : null;
-            if ($dueDate !== null && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate) || !checkdate((int) substr($dueDate, 5, 2), (int) substr($dueDate, 8, 2), (int) substr($dueDate, 0, 4)))) {
+            if ($dueDate !== null && (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate) || ! checkdate((int) substr($dueDate, 5, 2), (int) substr($dueDate, 8, 2), (int) substr($dueDate, 0, 4)))) {
                 throw ValidationException::withMessages(["receivables.{$idx}.due_date" => 'Jatuh tempo piutang tidak valid.']);
             }
 
@@ -414,7 +420,7 @@ class OpeningBalances
 
         // Parse Payables (Utang)
         $rawAp = $data['payables'] ?? [];
-        if (!is_array($rawAp)) {
+        if (! is_array($rawAp)) {
             throw ValidationException::withMessages(['payables' => 'Data utang harus berupa array.']);
         }
 
@@ -423,7 +429,7 @@ class OpeningBalances
 
         foreach ($rawAp as $idx => $ap) {
             $partyId = isset($ap['party_id']) && $ap['party_id'] !== null ? (int) $ap['party_id'] : null;
-            if ($partyId === null || !DB::table('v2_parties')->where('id', $partyId)->where('kind', 'supplier')->where('is_active', true)->exists()) {
+            if ($partyId === null || ! DB::table('v2_parties')->where('id', $partyId)->where('kind', 'supplier')->where('is_active', true)->exists()) {
                 throw ValidationException::withMessages(["payables.{$idx}.party_id" => "Pihak/supplier ID {$partyId} tidak ditemukan."]);
             }
 
@@ -442,7 +448,7 @@ class OpeningBalances
             }
 
             $dueDate = isset($ap['due_date']) && $ap['due_date'] !== null ? trim((string) $ap['due_date']) : null;
-            if ($dueDate !== null && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate) || !checkdate((int) substr($dueDate, 5, 2), (int) substr($dueDate, 8, 2), (int) substr($dueDate, 0, 4)))) {
+            if ($dueDate !== null && (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDate) || ! checkdate((int) substr($dueDate, 5, 2), (int) substr($dueDate, 8, 2), (int) substr($dueDate, 0, 4)))) {
                 throw ValidationException::withMessages(["payables.{$idx}.due_date" => 'Jatuh tempo utang tidak valid.']);
             }
 

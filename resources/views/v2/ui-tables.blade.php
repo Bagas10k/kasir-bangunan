@@ -22,7 +22,7 @@ for(const wrap of wrappers){
   const isFirstInPanel=panel.querySelector('[data-ui-table]')===wrap;
   const tiles=isFirstInPanel?Array.from(panel.querySelectorAll('[data-ui-filter]')):[];
   // Teks yang dicari: isi sel tanpa formulir/dialog (agar kata di dalam popup tidak ikut cocok).
-  const index=list=>new Map(list.map(r=>{let t='';for(const c of r.cells){const copy=c.cloneNode(true);copy.querySelectorAll('dialog,form,template').forEach(n=>n.remove());t+=' '+copy.textContent;}return [r,norm(t)];}));
+   const index=list=>new Map(list.map(r=>{let t=r.dataset.uiSearchText||'';for(const c of r.cells){const copy=c.cloneNode(true);copy.querySelectorAll('dialog,form,template').forEach(n=>n.remove());t+=' '+copy.textContent;}return [r,norm(t)];}));
   let text=index(rows);
   const state={q:'',filter:null,page:1,size:10};
   const colspan=table.tHead?.rows[0]?.cells.length||1;

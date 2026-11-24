@@ -11,49 +11,7 @@
     @include('v2.relation-master', ['kind' => $relationKind, 'title' => $relationTitle, 'records' => $relationRecords[$relationKind] ?? collect(), 'dialogsOnly' => $relationKind === 'driver'])
 @endforeach
 
-<section class="card" aria-labelledby="opening-heading">
-<h2 id="opening-heading">Saldo awal pembukuan</h2>
-<p class="note">Hanya untuk instalasi kosong. Periksa pratinjau, lalu konfirmasi posting saldo awal yang seimbang dan tidak dapat diulang. Data operasional lama tidak ditimpa.</p>
-<form id="opening-form" action="{{ route('v2.openings.store') }}" novalidate>
-<div class="row">
-    <div class="field">
-        <label for="ob-date">Tanggal saldo awal</label>
-        <input id="ob-date" type="date" name="date" value="{{ now()->toDateString() }}" required>
-    </div>
-    <div class="field">
-        <label for="ob-cash">Kas awal (tunai)</label>
-        <input id="ob-cash" name="cash" type="text" data-money inputmode="decimal" autocomplete="off" maxlength="30" placeholder="0" required>
-    </div>
-    <div class="field">
-        <label for="ob-bank">Bank awal</label>
-        <input id="ob-bank" name="bank" type="text" data-money inputmode="decimal" autocomplete="off" maxlength="30" placeholder="0" required>
-    </div>
-    <div class="field">
-        <label for="ob-ref">Referensi / catatan</label>
-        <input id="ob-ref" name="reference" type="text" maxlength="255" autocomplete="off" placeholder="mis. catatan berita acara">
-    </div>
-</div>
-<details style="margin:8px 0 12px">
-    <summary>Rincian opsional: persediaan, piutang, utang</summary>
-    <p class="note">Isi sebagai array JSON bila ada. Kosongkan bila belum ada; server tetap memvalidasi angka.</p>
-    <div class="field">
-        <label for="ob-inventory">Persediaan awal (JSON array)</label>
-        <textarea id="ob-inventory" name="inventory" data-label="Persediaan awal" rows="3" placeholder='[{"product_id":1,"quantity":"10","unit_cost":"65000"}]'></textarea>
-    </div>
-    <div class="field">
-        <label for="ob-receivables">Piutang awal (JSON array)</label>
-        <textarea id="ob-receivables" name="receivables" data-label="Piutang awal" rows="3" placeholder='[{"party_id":1,"number":"AR-AWAL-001","amount":"250000"}]'></textarea>
-    </div>
-    <div class="field">
-        <label for="ob-payables">Utang awal (JSON array)</label>
-        <textarea id="ob-payables" name="payables" data-label="Utang awal" rows="3" placeholder='[{"party_id":2,"number":"AP-AWAL-001","amount":"400000"}]'></textarea>
-    </div>
-</details>
-<p><button type="submit">Periksa saldo awal</button></p>
-<p data-error class="err" tabindex="-1" hidden></p>
-<p data-ok class="ok" hidden></p>
-</form>
-</section>
+@include('v2.opening-form')
 
 <section class="card" aria-labelledby="review-heading">
 <h2 id="review-heading">Pemeriksaan selisih kas harian</h2>
@@ -153,7 +111,7 @@
 <div class="ui-table-wrap scroll" data-ui-table data-ui-noun="penerimaan" tabindex="0" role="region" aria-label="Riwayat penerimaan barang">
 <table class="ui-table">
 <caption class="sr">Riwayat penerimaan barang</caption>
-<thead><tr><th scope="col">Tanggal</th><th scope="col">Nomor dan pemasok</th><th scope="col">Produk</th><th scope="col">Tipe</th><th scope="col" class="ui-num">Qty</th><th scope="col" class="ui-num">HPP satuan</th><th scope="col" class="ui-num">Total</th><th scope="col">Aksi</th></tr></thead>
+<thead><tr><th scope="col">Tanggal</th><th scope="col">Nomor dan pemasok</th><th scope="col">Produk</th><th scope="col">Tipe</th><th scope="col" class="ui-num">Total</th><th scope="col" class="ui-actions">Aksi</th></tr></thead>
 <tbody>
 @forelse($receiptHistory as $receipt)
 @php [$payKey, $payLabel] = $receiptPay[$receipt->credit_account ?? ''] ?? ['other', (string) ($receipt->credit_account ?? '—')]; @endphp
@@ -163,22 +121,20 @@
     $account = (string) ($receipt->credit_account ?? '');
 @endphp
 @php $voided = $receipt->voided_at !== null; @endphp
-<tr data-pay="{{ $payKey }}" data-type="{{ $receipt->receipt_type }}" data-amount="{{ $voided ? '0' : $receipt->total_amount }}" @class(['rh-void' => $voided])>
+<tr data-pay="{{ $payKey }}" data-type="{{ $receipt->receipt_type }}" data-ui-search-text="{{ $lines->pluck('product_name')->implode(' ') }}" data-amount="{{ $voided ? '0' : $receipt->total_amount }}" @class(['rh-void' => $voided])>
 <td data-label="Tanggal" class="ui-nowrap rh-date">{{ \Carbon\Carbon::parse($receipt->receipt_date)->locale('id')->translatedFormat('d M Y') }}</td>
 <td data-label="Nomor" class="ui-primary rh-number">{{ $receipt->receipt_number ?: '#'.$receipt->id }}<span class="ui-sub">{{ $receipt->supplier_name ? 'Pemasok: '.$receipt->supplier_name : ($receipt->receipt_type === 'opening' ? 'Stok awal gudang' : 'Tanpa pemasok') }}@if(! empty($receipt->supplier_invoice_number))<span class="rh-ref"> · Nota {{ $receipt->supplier_invoice_number }}</span>@endif
 @if($receipt->notes)<span class="rh-ref"> · {{ \Illuminate\Support\Str::limit($receipt->notes, 40) }}</span>@endif</span></td>
-<td data-label="Produk" class="rh-lines rh-product">@forelse($lines as $line)<span>{{ $line->product_name }}</span>@empty<span class="ui-muted">—</span>@endforelse</td>
+<td data-label="Produk" class="rh-product">@if($lines->isNotEmpty())<strong>{{ $lines->count() }} jenis barang</strong><span class="ui-sub">{{ $lines->first()->product_name }}@if($lines->count() > 1) + {{ $lines->count() - 1 }} lainnya @endif</span>@else<span class="ui-muted">—</span>@endif</td>
 <td data-label="Tipe" class="rh-type">@if($voided)<span class="ui-badge ui-badge--bad">Dibatalkan</span><span class="ui-sub rh-void-note">{{ \Carbon\Carbon::parse($receipt->voided_at)->locale('id')->translatedFormat('d M Y H:i') }}{{ $receipt->voided_by_name ? ' · '.$receipt->voided_by_name : '' }} · {{ $receipt->void_reason }}</span>@else<span class="ui-badge ui-badge--{{ $typeTone }}">{{ $typeLabel }}</span>@endif<span class="ui-sub" data-tip="{{ $payLabel }}">Akun {{ $account !== '' ? $account : '—' }} · {{ $payLabel }}</span></td>
-<td data-label="Qty" class="ui-num rh-lines">@forelse($lines as $line)<span>{{ $qty($line->quantity) }} <small>{{ $line->product_unit }}</small></span>@empty<span>—</span>@endforelse</td>
-<td data-label="HPP satuan" class="ui-num rh-lines">@forelse($lines as $line)<span>{{ \App\Services\V2\Money::display($line->unit_cost) }}</span>@empty<span>—</span>@endforelse</td>
 <td data-label="Total" class="ui-num rh-total"><strong>{{ \App\Services\V2\Money::display($receipt->total_amount) }}</strong>@if(\Brick\Math\BigDecimal::of((string) ($receipt->freight_amount ?? '0'))->isPositive())<span class="ui-sub">Nilai barang</span><span class="ui-sub">Ongkir {{ \App\Services\V2\Money::display($receipt->freight_amount) }} · {{ ['supplier'=>'Utang supplier','cash'=>'Kas','bank'=>'Bank'][$receipt->freight_method] ?? '—' }}</span>@endif</td>
-<td data-label="Aksi" class="ui-actions">@if ($voided)<span class="ui-muted">Dibatalkan sebelumnya</span>@else<span class="ui-badge ui-badge--ok">Dikonfirmasi</span><span class="ui-sub">Terkunci · tidak dapat dibatalkan biasa</span>
-@php $finalAudit = ($receiptFinalAudit ?? collect())->get($receipt->id); @endphp
-@if ($finalAudit)<span class="ui-sub">{{ $finalAudit->confirmed_by_name }} · {{ \Carbon\Carbon::parse($finalAudit->confirmed_at)->format('d/m/Y H:i') }}</span>@endif
-@endif</td>
+<td data-label="Aksi" class="ui-actions">
+    <button type="button" class="btn-action-pill" data-open-popup="receipt-detail-{{ $receipt->id }}">Detail</button>
+    @include('v2.receipt-history-detail')
+</td>
 </tr>
 @empty
-<tr data-ui-empty-static><td colspan="8" class="ui-empty"><strong>Belum ada penerimaan barang.</strong>Tekan "Catat penerimaan" untuk mencatat barang masuk pertama.</td></tr>
+<tr data-ui-empty-static><td colspan="6" class="ui-empty"><strong>Belum ada penerimaan barang.</strong>Tekan "Catat penerimaan" untuk mencatat barang masuk pertama.</td></tr>
 @endforelse
 </tbody>
 </table>
@@ -550,57 +506,7 @@ document.querySelectorAll('input.master-instant-search').forEach(input => {
     });
 });
 
-const opening = document.querySelector('#opening-form');
-if (opening) {
-    opening.dataset.key = key();
-    let reviewed=null;
-    opening.addEventListener('submit', async e => {
-        e.preventDefault();
-        if (opening.dataset.busy) { return; }
-        const error = opening.querySelector('[data-error]');
-        const okBox = opening.querySelector('[data-ok]');
-        const fail = msg => {
-            if (okBox) { okBox.hidden = true; }
-            error.textContent = msg;
-            error.hidden = false;
-        };
-        const parseList = name => {
-            const el = opening.elements[name];
-            const raw = (el.value || '').trim();
-            if (raw === '') { return []; }
-            let parsed;
-            try { parsed = JSON.parse(raw); } catch (err) { throw new Error(el.dataset.label + ' bukan JSON yang sah.'); }
-            if (!Array.isArray(parsed)) { throw new Error(el.dataset.label + ' harus berupa array JSON.'); }
-            return parsed;
-        };
-        const payload = {
-            idempotency_key: opening.dataset.key,
-            date: opening.elements.date.value,
-            cash: opening.elements.cash.value.trim(),
-            bank: opening.elements.bank.value.trim(),
-            reference: (opening.elements.reference.value || '').trim() || null
-        };
-        if (!payload.date) { fail('Tanggal saldo awal wajib diisi.'); return; }
-        if (payload.cash === '' || payload.bank === '') { fail('Kas dan bank wajib diisi, boleh 0.'); return; }
-        try {
-            payload.inventory = parseList('inventory');
-            payload.receivables = parseList('receivables');
-            payload.payables = parseList('payables');
-        } catch (err) { fail(err.message); return; }
-        const fingerprint=JSON.stringify(payload);
-        const button=opening.querySelector('button[type="submit"]');
-        if(reviewed!==fingerprint){
-            const preview=await send(opening,@json(route('v2.openings.preview')),payload,false,button);
-            if(preview){reviewed=fingerprint;okBox.textContent='Pratinjau: '+JSON.stringify(preview.summary)+'. Belum diposting. Periksa lalu tekan Konfirmasi posting.';okBox.hidden=false;button.textContent='Konfirmasi posting saldo awal';}
-            return;
-        }
-        const saved = await send(opening, opening.action, payload, false, button);
-        if (saved && okBox) {
-            okBox.textContent = 'Saldo awal sudah diposting oleh server. Simpan nomor batch ini; pembukaan tidak dapat diulang.';
-            okBox.hidden = false;
-        }
-    });
-}
+@include('v2.opening-form-script')
 
 const receipt = document.querySelector('#receipt-form');
 if (receipt) {

@@ -161,7 +161,7 @@ function renderCatalogPager(total,pages,start,count){
 catPrev.addEventListener('click',()=>{if(catalogPage>1){catalogPage-=1;filter(true);}});
 catNext.addEventListener('click',()=>{catalogPage+=1;filter(true);});
 catPages.addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(b){catalogPage=Number(b.dataset.page);filter(true);}});
-search.addEventListener('input',filter);category.addEventListener('change',filter);stock.addEventListener('change',filter);document.querySelector('#catalog-reset').addEventListener('click',()=>{search.value='';category.value='';stock.value='all';filter();search.focus();});search.addEventListener('keydown',e=>{if(e.key==='Enter'){const button=document.querySelector('#products-tbody tr:not([hidden]) [data-add-product]');if(button){e.preventDefault();button.click();search.select();}}});
+ search.addEventListener('input',filter);category.addEventListener('change',filter);stock.addEventListener('change',filter);document.querySelector('#catalog-reset').addEventListener('click',()=>{search.value='';category.value='';stock.value='available';filter();search.focus();});search.addEventListener('keydown',e=>{if(e.key==='Enter'){const button=document.querySelector('#products-tbody tr:not([hidden]) [data-add-product]:not(:disabled)');if(button){e.preventDefault();button.click();search.select();}}});
 function openPay(){
  if(!rows().length||!valid||saved)return;
  if(document.getElementById('store-shift-state')?.dataset.posShiftState!=='open'){

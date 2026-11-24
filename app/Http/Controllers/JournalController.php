@@ -7,9 +7,11 @@ use App\Services\AccountBalanceService;
 use App\Services\OpeningBalanceService;
 use App\Services\V2\BankAccounts;
 use Brick\Math\BigDecimal;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -19,7 +21,15 @@ class JournalController extends Controller
     public function index(Request $request, OpeningBalanceService $openingService, AccountBalanceService $balances, BankAccounts $bankService): View
     {
         $filters = $this->validatedFilters($request);
-        $entries = $this->entries($filters);
+        $cursorToken = $request->validate(['cursor' => 'nullable|string|max:160'])['cursor'] ?? null;
+        $cursor = Cursor::fromEncoded($cursorToken);
+        $position = $cursor?->toArray() ?? [];
+        abort_if($cursorToken !== null && (! is_int($position['id'] ?? null) || ! is_bool($position['_pointsToNextItems'] ?? null)), 422, 'Tautan halaman jurnal tidak valid.');
+        $page = $this->journalQuery($filters)->orderByDesc('id')->cursorPaginate(25, ['*'], 'cursor', $cursor)->appends($filters);
+        $entries = $this->entryDetails($page->getCollection());
+        $olderJournalUrl = $page->nextPageUrl();
+        $newerJournalUrl = $page->previousPageUrl();
+        $watchJournal = $page->cursor() === null && array_filter($filters) === [];
         $opening = $openingService->current();
         if (config('v2.enabled')) {
             $v2Opening = DB::table('v2_opening_batches')->where('singleton_key', 1)->first();
@@ -50,15 +60,19 @@ class JournalController extends Controller
             : $adjustmentAccounts;
 
         return view('journals.index', compact(
-            'entries', 'opening', 'cashOpening', 'bankOpening', 'cashBalance', 'bankBalance', 'bankAccounts', 'sources', 'filters', 'adjustmentAccounts', 'counterAccounts', 'hasJournals'
+            'entries', 'olderJournalUrl', 'newerJournalUrl', 'watchJournal', 'opening', 'cashOpening', 'bankOpening', 'cashBalance', 'bankBalance', 'bankAccounts', 'sources', 'filters', 'adjustmentAccounts', 'counterAccounts', 'hasJournals'
         ));
     }
 
     public function feed(Request $request): JsonResponse
     {
-        $validated = $request->validate(['after_id' => 'nullable|integer|min:0']);
+        $validated = $request->validate(['after_id' => 'nullable|integer|min:0', 'check' => 'sometimes|boolean']);
         $afterId = (int) ($validated['after_id'] ?? 0);
-        $entries = $this->entries(['after_id' => $afterId], 25, $afterId > 0);
+        $query = $this->journalQuery(['after_id' => $afterId]);
+        if ($request->boolean('check')) {
+            return response()->json(['has_new' => $query->exists()], 200, ['Cache-Control' => 'no-store, private']);
+        }
+        $entries = $this->entryDetails($query->orderBy('id', $afterId > 0 ? 'asc' : 'desc')->limit(25)->get());
 
         return response()->json([
             'entries' => $entries,
@@ -128,9 +142,9 @@ class JournalController extends Controller
         ]);
     }
 
-    private function entries(array $filters, int $limit = 25, bool $ascending = false): Collection
+    private function journalQuery(array $filters): Builder
     {
-        $query = DB::table('journal_entries')
+        return DB::table('journal_entries')
             ->when(! empty($filters['start_date']), fn ($q) => $q->whereDate('transaction_date', '>=', $filters['start_date']))
             ->when(! empty($filters['end_date']), fn ($q) => $q->whereDate('transaction_date', '<=', $filters['end_date']))
             ->when(! empty($filters['source']), fn ($q) => $q->where('reference_type', $filters['source']))
@@ -142,11 +156,10 @@ class JournalController extends Controller
             }))
             ->when(! empty($filters['after_id']), fn ($q) => $q->where('id', '>', (int) $filters['after_id']));
 
-        $headers = $query
-            ->orderBy('id', $ascending ? 'asc' : 'desc')
-            ->limit(min(max($limit, 1), 50))
-            ->get();
+    }
 
+    private function entryDetails(Collection $headers): Collection
+    {
         if ($headers->isEmpty()) {
             return collect();
         }

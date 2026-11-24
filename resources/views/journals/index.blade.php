@@ -52,41 +52,38 @@
     .opening-row strong { color:var(--text-main); font-family:var(--font-mono); font-variant-numeric:tabular-nums; text-align:right; }
     .ledger-filter {
         display: grid;
-        grid-template-columns: repeat(2, minmax(130px, 1fr)) minmax(160px, 1.2fr) minmax(140px, 1fr) auto;
-        grid-template-areas: "start end source account actions";
+        grid-template-columns: repeat(auto-fit,minmax(min(100%,var(--ui-detail-summary-min)),1fr));
         align-items: end;
-        gap: 12px;
-        margin-bottom: 16px;
-        padding: 14px;
-        background: #fbfdfc;
-        border: 1px solid var(--border-card, #e5e7eb);
-        border-radius: 12px;
+        gap: var(--ui-space-group);
+        margin-bottom: var(--ui-space-section);
+        padding: var(--ui-space-section);
+        background: var(--ui-canvas);
+        border: var(--ui-stroke) solid var(--ui-line-soft);
+        border-radius: var(--ui-radius);
     }
     .ledger-filter .form-group {
         margin: 0;
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        gap: 5px;
+        gap: var(--ui-space-tight);
         min-width: 0;
     }
     .ledger-filter .form-group label {
-        color: var(--text-caption, #526359);
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: .02em;
+        color: var(--ui-ink-2);
+        font-size: var(--ui-t-caption);
+        font-weight: var(--ui-weight-strong);
         white-space: nowrap;
         margin: 0;
     }
     .ledger-filter .form-control {
-        min-height: 38px;
-        height: 38px;
-        padding: 6px 10px;
-        font-size: 12px;
-        border-radius: 8px;
-        border: 1px solid var(--border-control, #d9e2dc);
-        background: #ffffff;
-        color: var(--text-main, #1c2826);
+        min-height: var(--ui-tap);
+        padding: var(--ui-space-control) var(--ui-space-group);
+        font-size: var(--ui-t-label);
+        border-radius: var(--ui-radius);
+        border: var(--ui-stroke) solid var(--ui-line);
+        background: var(--ui-surface);
+        color: var(--ui-ink);
         width: 100%;
         box-sizing: border-box;
     }
@@ -95,22 +92,19 @@
         outline: none;
         box-shadow: 0 0 0 2px rgba(45, 106, 79, .12);
     }
-    .ledger-filter-start { grid-area: start; }
-    .ledger-filter-end { grid-area: end; }
-    .ledger-filter-source { grid-area: source; }
-    .ledger-filter-account { grid-area: account; }
+    .ledger-filter-title{grid-column:1/-1;margin:0;font-size:var(--ui-t-label);font-weight:var(--ui-weight-strong)}
     .ledger-filter-actions {
-        grid-area: actions;
+        grid-column: 1/-1;
         display: flex;
-        gap: 8px;
+        justify-content: flex-end;
+        gap: var(--ui-space-control);
         align-items: center;
         margin: 0;
     }
     .ledger-filter-actions > * { white-space: nowrap; }
     .ledger-filter .btn,
     .ledger-filter .btn-secondary {
-        min-height: 38px;
-        height: 38px;
+        min-height: var(--ui-tap);
         padding: 6px 16px;
         font-size: 12px;
         font-weight: 600;
@@ -146,42 +140,21 @@
     .journal-table .amount { text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
     .journal-total td { font-weight:800; border-top:1px solid var(--border-card); background:var(--mint-surface); }
     .journal-empty { text-align:center; padding:34px 18px; color:var(--text-muted); }
-    .feed-note { display:flex; align-items:center; gap:8px; color:var(--text-caption); font-size:11px; margin-top:12px; }
-    .feed-dot { width:7px; height:7px; border-radius:50%; background:var(--primary); }
+    .feed-note:not([hidden]){display:flex;flex-wrap:wrap;align-items:center;gap:var(--ui-space-control);margin-block:var(--ui-space-group);padding:var(--ui-space-group);border-radius:var(--ui-radius);background:var(--ui-green-soft);color:var(--ui-green)}
+    .journal-page-links { display:flex; flex-wrap:wrap; align-items:center; gap:var(--ui-space-control); margin-top:var(--ui-space-section); }
+    @media print { .journal-page-links,.feed-note,.ledger-filter { display:none!important; } }
     @media(max-width:900px) {
         .opening-panel { grid-template-columns:1fr; }
         .opening-form { grid-template-columns:1fr; }
-        .ledger-filter {
-            grid-template-columns: 1fr 1fr;
-            grid-template-areas:
-                "start end"
-                "source account"
-                "actions actions";
-        }
         .balance-strip { grid-template-columns:1fr; }
     }
     @media(max-width:640px) {
         .ledger-heading { flex-direction:column; }
-        .ledger-filter {
-            grid-template-columns: minmax(0, 1fr);
-            grid-template-areas: "start" "end" "source" "account" "actions";
-            gap: 10px;
-            padding: 12px;
-        }
-        .ledger-filter-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            width: 100%;
-        }
         .ledger-filter .btn,
         .ledger-filter .btn-secondary {
-            min-height: 40px;
-            height: 40px;
-            width: 100%;
+            flex: 1;
         }
         .journal-head { grid-template-columns:1fr; gap:7px; }
-        .journal-table th:nth-child(2), .journal-table td:nth-child(2) { display:none; }
     }
     @media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; transition:none !important; } }
 </style>
@@ -191,7 +164,6 @@
         <h1>Jurnal Umum</h1>
         <p>Pantau saldo dan riwayat jurnal pembukuan.</p>
     </div>
-    <div class="ledger-status" id="feed-status">Pembaruan otomatis · 10 detik</div>
 </header>
 
 @if($errors->has('opening_balance'))
@@ -219,14 +191,16 @@
 </section>
 
 @if($v2Writes)
-<details class="card adjustment-panel" id="transfer-panel">
-    <summary class="adjustment-summary">
-        <span><strong id="transfer-title">Pindah dana (Kas ↔ Bank / Antar-Bank)</strong><small>Setor kas tunai ke bank, tarik tunai, atau pindah saldo antar rekening bank.</small></span>
-        <span class="adjustment-toggle" aria-hidden="true">+</span>
-    </summary>
-    <div class="adjustment-content">
-    <h2 class="section-title">Pindah Dana Kas &amp; Bank</h2>
-    <p class="section-copy">Pilih akun sumber, akun tujuan, dan nominal. Jurnal seimbang dibuat otomatis tanpa memengaruhi laba rugi atau arus kas bersih.</p>
+<section class="card journal-tools" aria-labelledby="journal-tools-title">
+    <h2 class="section-title" id="journal-tools-title">Kelola saldo Kas &amp; Bank</h2>
+    <div class="journal-tools-grid">
+        <div><h3>Pindah dana</h3><p class="note">Setor, tarik, atau pindahkan uang antar rekening. Bukan pengeluaran.</p><button class="btn" type="button" data-journal-open="transfer-panel" aria-haspopup="dialog" aria-controls="transfer-panel">Pindah dana</button></div>
+        <div><h3>Penyesuaian saldo</h3><p class="note">Koreksi saldo buku jika tidak sama dengan saldo yang sebenarnya.</p><button class="btn btn-secondary" type="button" data-journal-open="adjustment-panel" aria-haspopup="dialog" aria-controls="adjustment-panel">Sesuaikan saldo</button></div>
+    </div>
+</section>
+<dialog class="input-dialog uf-dialog journal-popup" id="transfer-panel" aria-labelledby="transfer-title">
+    <div class="popup-heading"><div><h2 id="transfer-title">Pindah dana</h2><p class="uf-dialog-sub">Kas ke Bank, Bank ke Kas, atau antar rekening.</p></div><button class="popup-close secondary" type="button" data-journal-close aria-label="Tutup pindah dana">×</button></div>
+    <div class="popup-content">
     <form id="transfer-form" method="POST" action="{{ route('v2.journals.transfers.store') }}">
         @csrf
         <p class="err" data-adjustment-error role="alert" tabindex="-1" hidden></p>
@@ -240,19 +214,25 @@
         <p class="adjustment-hint">Saldo akun sumber tidak boleh menjadi negatif. Jurnal terkunci permanen setelah disimpan.</p>
         <div class="adjustment-confirm">
             <div class="form-group"><label for="transfer-password">Password login untuk konfirmasi</label><input class="form-control" id="transfer-password" name="password" type="password" autocomplete="current-password" placeholder="Masukkan password Anda" required></div>
-            <div class="adjustment-actions"><button class="btn btn-secondary" type="button" onclick="document.getElementById('transfer-panel').open = false; document.getElementById('transfer-password').value = ''; document.querySelector('#transfer-panel > summary').focus();">Batal</button><button class="btn" type="submit" @disabled($adjustmentAccounts->count() < 2)>Pindahkan dana</button></div>
+            <div class="adjustment-actions"><button class="btn btn-secondary" type="button" data-journal-close>Batal</button><button class="btn" type="submit" @disabled($adjustmentAccounts->count() < 2)>Pindahkan dana</button></div>
         </div>
     </form>
     </div>
-</details>
+</dialog>
 @endif
 
+@if($v2Writes)
+<dialog class="input-dialog uf-dialog journal-popup" id="adjustment-panel" aria-labelledby="adjustment-title">
+    <div class="popup-heading"><div><h2 id="adjustment-title">Penyesuaian saldo</h2><p class="uf-dialog-sub">Koreksi saldo Kas atau Bank tanpa mengubah jurnal lama.</p></div><button class="popup-close secondary" type="button" data-journal-close aria-label="Tutup penyesuaian saldo">×</button></div>
+    <div class="popup-content">
+@else
 <details class="card adjustment-panel" id="adjustment-panel" @if($errors->any() && !$errors->has('opening_balance')) open @endif>
     <summary class="adjustment-summary">
         <span><strong id="adjustment-title">Sesuaikan saldo</strong><small>Saldo awal go-live atau koreksi akun.</small></span>
         <span class="adjustment-toggle" aria-hidden="true">+</span>
     </summary>
     <div class="adjustment-content">
+@endif
     <h2 class="section-title">Jurnal Penyesuaian Saldo <x-ui.info-tip text="Mengoreksi saldo Kas (1101) atau Bank (1102) ke angka tujuan tanpa mengubah saldo awal yang sudah terkunci." title="Jurnal Penyesuaian" label="Keterangan jurnal penyesuaian"/></h2>
     <p class="section-copy">Isi saldo tujuan. Selisihnya otomatis masuk ke akun lawan.</p>
     <form id="adjustment-form" method="POST" action="{{ $adjustmentAction }}">
@@ -261,7 +241,7 @@
         <div class="adjustment-grid">
             <div class="form-group"><label for="adjustment-account">Akun yang disesuaikan</label><select class="form-control" id="adjustment-account" name="account_code" data-native-select required><option value="">Pilih akun</option>@foreach($adjustmentAccounts as $account)<option value="{{ $account->account_code }}" @selected(old('account_code') === $account->account_code)>{{ $account->account_code }} — {{ $account->account_name }} ({{ $account->normal_balance === 'credit' ? 'Kredit' : 'Debet' }})</option>@endforeach</select></div>
             <div class="form-group"><label for="adjustment-target">Saldo tujuan (Rp)</label><input class="form-control" id="adjustment-target" name="target_balance" type="number" step="0.01" min="0" placeholder="0,00" value="{{ old('target_balance') }}" required aria-describedby="adjustment-help"></div>
-            <div class="form-group"><label for="adjustment-counter">Akun lawan</label><select class="form-control" id="adjustment-counter" name="counter_account_code" data-native-select required><option value="">Pilih akun lawan</option>@foreach($counterAccounts as $account)<option value="{{ $account->account_code }}" @selected(old('counter_account_code') === $account->account_code)>{{ $account->account_code }} — {{ $account->account_name }}</option>@endforeach</select></div>
+            <div class="form-group"><label for="adjustment-counter">Akun pencatat selisih</label><select class="form-control" id="adjustment-counter" name="counter_account_code" data-native-select required><option value="">Pilih akun pencatat selisih</option>@foreach($counterAccounts as $account)<option value="{{ $account->account_code }}" @selected(old('counter_account_code') === $account->account_code)>{{ $account->account_code }} — {{ $account->account_name }}</option>@endforeach</select></div>
             <div class="form-group"><label for="adjustment-date">Tanggal</label><input class="form-control" id="adjustment-date" type="date" name="transaction_date" value="{{ old('transaction_date', now()->toDateString()) }}" required></div>
             <div class="form-group adjustment-wide"><label for="adjustment-description">Alasan koreksi</label><input class="form-control" id="adjustment-description" name="description" maxlength="200" value="{{ old('description') }}" placeholder="Mis. selisih hitung kas pagi" required></div>
         </div>
@@ -271,12 +251,22 @@
         @if($adjustmentAccounts->isEmpty())<p class="section-copy">Belum ada akun aktif. Siapkan dahulu melalui <a href="{{ route('coa.index') }}">Bagan Akun</a>.</p>@endif
         <div class="adjustment-confirm">
             <div class="form-group"><label for="adjustment-password">Password login untuk konfirmasi</label><input class="form-control" id="adjustment-password" name="password" type="password" autocomplete="current-password" placeholder="Masukkan password Anda" required></div>
-            <div class="adjustment-actions"><button class="btn btn-secondary" type="button" onclick="document.getElementById('adjustment-panel').open = false; document.getElementById('adjustment-password').value = ''; document.querySelector('#adjustment-panel > summary').focus();">Batal</button><button class="btn" type="submit" @disabled($adjustmentAccounts->isEmpty())>Simpan penyesuaian</button></div>
+            <div class="adjustment-actions"><button class="btn btn-secondary" type="button" @if($v2Writes) data-journal-close @else onclick="document.getElementById('adjustment-panel').open = false; document.getElementById('adjustment-password').value = ''; document.querySelector('#adjustment-panel > summary').focus();" @endif>Batal</button><button class="btn" type="submit" @disabled($adjustmentAccounts->isEmpty())>Simpan penyesuaian</button></div>
         </div>
     </form>
     </div>
-</details>
+@if($v2Writes)</dialog>@else</details>@endif
 <style>
+    .journal-tools-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--ui-detail-column-min)),1fr));gap:var(--ui-space-section)}
+    .journal-tools-grid>div{padding:var(--ui-space-section);background:var(--ui-canvas);border:var(--ui-stroke) solid var(--ui-line-soft);border-radius:var(--ui-radius)}
+    .journal-tools-grid h3{margin:0;font-size:var(--ui-t-body);color:var(--ui-ink)}
+    .journal-tools-grid button{min-height:var(--ui-tap)}
+    html body dialog.journal-popup{width:min(var(--ui-cart-width),calc(100% - 2 * var(--ui-space-group)));max-height:calc(100dvh - 2 * var(--ui-space-group));margin:auto;padding:0;border:0;border-radius:var(--ui-radius);background:var(--ui-surface);color:var(--ui-ink)}
+    html body dialog.journal-popup .popup-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--ui-space-group);padding:var(--ui-space-section);background:var(--ui-green-2);color:var(--ui-surface)}
+    html body dialog.journal-popup .popup-heading h2{margin:0;color:var(--ui-lime);font-size:var(--ui-h2)}
+    html body dialog.journal-popup .popup-content{padding:var(--ui-space-section)}
+    .journal-popup .popup-content>.section-title{display:none}
+    .journal-popup .uf-dialog-sub{margin:0}
     .adjustment-panel { margin-bottom:16px; padding:0; overflow:hidden; }
     .adjustment-summary { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 20px; min-height:44px; cursor:pointer; list-style:none; }
     .adjustment-summary::-webkit-details-marker { display:none; }
@@ -372,12 +362,13 @@
 <section class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
         <div>
-            <h2 class="section-title">Aktivitas Perpindahan Nilai</h2>
-            <p class="section-copy" style="margin-bottom:0;">Setiap blok adalah satu transaksi yang harus memiliki total debit dan kredit sama.</p>
+            <h2 class="section-title" id="journal-activity" tabindex="-1">Aktivitas Perpindahan Nilai</h2>
+            <p class="section-copy" style="margin-bottom:0;">{{ $entries->count() }} entri di halaman ini · maksimal 25 entri per halaman.</p>
         </div>
     </div>
 
-    <form method="GET" action="{{ route('journals.index') }}" class="ledger-filter">
+    <form method="GET" action="{{ route('journals.index') }}" class="ledger-filter" data-filter-inline>
+        <p class="ledger-filter-title">Saring aktivitas jurnal</p>
         <div class="form-group ledger-filter-start">
             <label for="start_date">Dari Tanggal</label>
             <input class="form-control" id="start_date" name="start_date" type="date" value="{{ $filters['start_date'] ?? '' }}">
@@ -405,6 +396,12 @@
         </div>
     </form>
 
+    @if ($watchJournal ?? false)
+        <div class="feed-note" hidden>
+            <span id="feed-note-text" role="status"></span>
+            <a data-journal-page href="{{ route('journals.index') }}">Perbarui aktivitas</a>
+        </div>
+    @endif
     <div class="journal-stack" id="journal-stack" data-latest-id="{{ (int) ($entries->max('id') ?? 0) }}">
         @forelse($entries as $entry)
         <article class="journal-entry" data-entry-id="{{ $entry['id'] }}">
@@ -437,71 +434,47 @@
             <div class="journal-empty">Belum ada aktivitas jurnal pada filter ini.</div>
         @endforelse
     </div>
-    <div class="feed-note"><span class="feed-dot" aria-hidden="true"></span><span id="feed-note-text">Catatan terbaru diperiksa saat halaman aktif.</span></div>
+    @if (($newerJournalUrl ?? null) || ($olderJournalUrl ?? null))
+        <nav class="journal-page-links" aria-label="Halaman jurnal">
+            @if ($newerJournalUrl)<a class="btn btn-secondary" data-journal-page href="{{ $newerJournalUrl }}">Aktivitas lebih baru</a>@endif
+            @if ($olderJournalUrl)<a class="btn btn-secondary" data-journal-page href="{{ $olderJournalUrl }}">Aktivitas lebih lama</a>@endif
+        </nav>
+    @endif
 </section>
 
+@if ($watchJournal ?? false)
 <script>
 (function () {
     const stack = document.getElementById('journal-stack');
-    const status = document.getElementById('feed-status');
     const note = document.getElementById('feed-note-text');
-    if (!stack || !window.fetch) return;
-
-    const sourceLabels = @json($sourceLabels);
-    const money = value => {
-        const raw = String(value ?? '0').trim();
-        const negative = raw.startsWith('-');
-        const clean = negative ? raw.slice(1) : raw;
-        const [wholeRaw, fractionRaw = ''] = clean.split('.');
-        const whole = (wholeRaw || '0').replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-        return `${negative ? '-' : ''}${whole},${(fractionRaw + '00').slice(0, 2)}`;
-    };
-    const isPositiveMoney = value => {
-        const raw = String(value ?? '0').trim();
-        return !raw.startsWith('-') && !/^0*(?:\.0*)?$/.test(raw);
-    };
-    const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
-    const render = entry => {
-        const rows = entry.lines.map(line => `<tr><td><span class="sku-code">${escapeHtml(line.account_code)}</span></td><td>${escapeHtml(line.account_name)}</td><td class="amount">${isPositiveMoney(line.debit) ? money(line.debit) : '—'}</td><td class="amount">${isPositiveMoney(line.credit) ? money(line.credit) : '—'}</td></tr>`).join('');
-        const date = entry.transaction_date.split('-').reverse().join('/');
-        return `<article class="journal-entry" data-entry-id="${entry.id}"><header class="journal-head"><div class="journal-date">${date}</div><div class="journal-desc"><strong>${escapeHtml(entry.description)}</strong><span>${escapeHtml(sourceLabels[entry.reference_type] || entry.reference_type.replaceAll('_', ' '))} · #${entry.id}</span></div><div class="balance-state">${entry.is_balanced ? 'Seimbang' : 'Tidak Seimbang'}</div></header><div style="overflow-x:auto"><table class="journal-table"><thead><tr><th>Kode</th><th>Nama Akun</th><th style="text-align:right">Debit (Rp)</th><th style="text-align:right">Kredit (Rp)</th></tr></thead><tbody>${rows}<tr class="journal-total"><td colspan="2">Total</td><td class="amount">${money(entry.total_debit)}</td><td class="amount">${money(entry.total_credit)}</td></tr></tbody></table></div></article>`;
-    };
+    if (!stack || !note) return;
+    let pending = false;
+    const timer = setInterval(refreshFeed, 10000);
 
     async function refreshFeed() {
-        if (document.hidden) return;
+        if (pending || document.hidden || !stack.getClientRects().length) return;
+        pending = true;
         try {
-            const after = Number(stack.dataset.latestId || 0);
-            const response = await fetch(`{{ route('journals.feed') }}?after_id=${after}`, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const payload = await response.json();
-            if (payload.entries.length) {
-                stack.querySelector('.journal-empty')?.remove();
-                // All server fields are escaped in render(); only fixed ledger markup reaches this sink.
-                payload.entries.forEach(entry => stack.insertAdjacentHTML('afterbegin', render(entry)));
-                stack.dataset.latestId = String(payload.latest_id);
-                note.textContent = `${payload.entries.length} aktivitas baru dimuat tanpa memuat ulang halaman.`;
-            } else {
-                note.textContent = 'Tidak ada aktivitas baru. Pemeriksaan terakhir berhasil.';
+            const url = new URL(@json(route('journals.feed')), location.href);
+            url.searchParams.set('after_id', stack.dataset.latestId || '0');
+            url.searchParams.set('check', '1');
+            const response = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+            if (!response.ok) throw new Error();
+            const {has_new: hasNew} = await response.json();
+            if (hasNew) {
+                note.textContent = 'Ada aktivitas jurnal baru.';
+                note.parentElement.hidden = false;
+                clearInterval(timer);
             }
-            status.textContent = 'Terhubung · pembaruan 10 detik'; status.classList.remove('is-offline');
-        } catch (error) {
-            status.textContent = 'Terputus · coba lagi otomatis'; status.classList.add('is-offline');
-            note.textContent = 'Feed gagal diperiksa; data yang sudah tampil tetap aman.';
+        } catch {
+            // The current list remains usable; the next poll can retry.
+        } finally {
+            pending = false;
         }
     }
-
-    let timer = setInterval(refreshFeed, 10000);
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            clearInterval(timer);
-            timer = null;
-        } else {
-            refreshFeed();
-            if (!timer) timer = setInterval(refreshFeed, 10000);
-        }
-    });
 })();
 </script>
+@endif
 @if($v2Writes)
     @include('v2.journal-adjustment-script')
 @endif

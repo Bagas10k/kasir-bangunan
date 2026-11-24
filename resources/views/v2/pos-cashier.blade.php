@@ -7,7 +7,7 @@
     <div class="pos-catalog-pane"><section class="card pos-catalog-card" aria-labelledby="catalog-heading">
         <div class="pos-catalog-head"><h2 id="catalog-heading">Katalog Produk Material</h2>
         <div class="pos-search-wrapper" role="search"><label for="pos-product-search">Cari produk di katalog</label><div class="pos-catalog-tools"><div class="pos-search-box"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></svg><input type="search" id="pos-product-search" placeholder="Ketik minimal 2 huruf nama atau SKU" autocomplete="off" aria-controls="products-tbody"><span class="search-kbd-hint">Pintasan: [/]</span></div>
-        <div class="catalog-filter-row"><div><label for="product-category-filter">Kelompok</label><select id="product-category-filter"><option value="">Semua kelompok</option>@foreach(collect($products)->pluck('category')->filter()->unique()->sort() as $category)<option value="{{ $category }}">{{ $category }}</option>@endforeach</select></div><div><label for="product-stock-filter">Kondisi stok</label><select id="product-stock-filter"><option value="all">Semua stok</option><option value="available">Tersedia</option><option value="low">Menipis</option><option value="out">Habis</option></select></div><button type="button" class="secondary" id="catalog-reset">Reset</button></div>
+        <div class="catalog-filter-row"><div><label for="product-category-filter">Kelompok</label><select id="product-category-filter"><option value="">Semua kelompok</option>@foreach(collect($products)->pluck('category')->filter()->unique()->sort() as $category)<option value="{{ $category }}">{{ $category }}</option>@endforeach</select></div><div><label for="product-stock-filter">Kondisi stok</label><select id="product-stock-filter"><option value="available" selected>Tersedia</option><option value="all">Semua stok</option><option value="low">Menipis</option><option value="out">Habis</option></select></div><button type="button" class="secondary" id="catalog-reset">Reset</button></div>
         </div><p id="product-search-status" data-live-skip class="note" aria-live="polite">Pilih produk untuk memasukkannya ke keranjang.</p></div></div>
         <div class="catalog-table-scroll" tabindex="0" role="region" aria-label="Katalog produk"><table id="products-table" data-live-skip class="ui-table"><caption class="sr">Katalog produk aktif</caption><thead><tr><th scope="col">Produk</th><th scope="col" class="ui-num">Stok</th><th scope="col" class="ui-num">Harga</th><th scope="col" class="ui-actions">Aksi</th></tr></thead><tbody id="products-tbody">
         {{-- Baris katalog dirender oleh pos-cashier-script dari data produk (bertahap, 40 per halaman). --}}
@@ -18,6 +18,7 @@
         <form id="form-checkout" action="{{ route('v2.sales.store') }}" novalidate>
             <!-- Informasi Pembeli / Pelanggan -->
             <div class="pos-buyer-card">
+                <div class="pos-buyer-field">
                 <div class="pos-buyer-header">
                     <label for="pos-customer-quick" class="pos-buyer-title">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -34,7 +35,9 @@
                 <div class="pos-buyer-meta">
                     <span id="pos-buyer-hint">Transaksi langsung kasir (ambil di toko). Penjualan kredit/tempo wajib memilih pelanggan terdaftar.</span>
                 </div>
-                <div class="pos-tier" role="radiogroup" aria-label="Harga"><span class="pos-tier-label" aria-hidden="true">Harga <x-ui.info-tip key="harga_tier_kasir" label="Keterangan tarif Eceran dan Kontraktor" :dark="true"/></span><button type="button" role="radio" data-tier="retail" aria-checked="true">Eceran</button><button type="button" role="radio" data-tier="contractor" aria-checked="false" tabindex="-1">Kontraktor</button></div>
+                </div>
+                <div class="pos-tier-field"><div class="pos-tier-caption">Jenis harga <x-ui.info-tip key="harga_tier_kasir" label="Keterangan tarif Eceran dan Kontraktor" :dark="true"/></div>
+                <div class="pos-tier" role="radiogroup" aria-label="Jenis harga"><button type="button" role="radio" data-tier="retail" aria-checked="true">Eceran</button><button type="button" role="radio" data-tier="contractor" aria-checked="false" tabindex="-1">Kontraktor</button></div></div>
             </div>
             <div class="pos-cart-section"><div class="cart-label"><strong>Keranjang Belanja</strong><span id="cart-item-count" data-live-skip>0 jenis item</span></div><div class="cart-table-scroll"><div class="cart-column-header"><span>Produk</span><span class="cart-column-quantity">Jumlah</span><span class="cart-column-subtotal">Subtotal</span><span class="sr-only">Aksi</span></div><div id="cart-empty-row" data-live-skip class="note cart-empty-message">Keranjang belanja kosong. Cari produk di katalog lalu pilih item untuk dimasukkan ke keranjang.</div><div id="items"></div></div></div>
             <button type="button" id="add-item" hidden>Tambah barang</button>

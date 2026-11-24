@@ -724,6 +724,7 @@
 })();
 </script>
 @include('v2.master-insights')
+@include('v2.customer-activity')
 @include('v2.ui-sidebar-js')
 @include('v2.ui-workspace')
 @include('v2.receipt-restock-script')

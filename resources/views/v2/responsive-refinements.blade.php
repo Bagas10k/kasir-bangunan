@@ -5,15 +5,8 @@ html body :is(.ui-dna-ops,#ui-dna-ops) .ui-monitor-head .ui-pill--ok{background:
 html body :is(.ui-dna-ops,#ui-dna-ops) .ui-monitor-head .ui-pill--warn{background:var(--ui-warn-bg);color:var(--ui-warn-ink)}
 html body :is(.ui-dna-ops,#ui-dna-ops) .ui-monitor-head .ui-pill--info{background:var(--ui-info-bg);color:var(--ui-info-ink)}
 html body :is(.ui-dna-ops,#ui-dna-ops) .ui-monitor-head .ui-pill--bad{background:var(--ui-bad-bg);color:var(--ui-bad-ink)}
-html body .product-detail-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--ui-space-group);margin:0 0 var(--ui-space-section)}
-html body .product-detail-facts>div{min-width:0;padding:var(--ui-space-group);border:var(--ui-stroke) solid var(--ui-line-soft);border-radius:var(--ui-radius);background:var(--ui-canvas)}
-html body .product-detail-facts dt{font-size:var(--ui-t-caption);color:var(--ui-ink-2)}
-html body .product-detail-facts dd{margin:var(--ui-space-tight) 0 0;font-size:var(--ui-t-label);font-weight:var(--ui-weight-medium);color:var(--ui-ink);overflow-wrap:anywhere;white-space:normal}
-html body .product-detail-facts .ui-num{font-variant-numeric:tabular-nums;text-align:right}
-html body .product-detail-facts .ui-sub{display:block;font-size:var(--ui-t-caption);font-weight:normal}
 html body .product-detail-suppliers{margin:0 0 var(--ui-space-section);padding-left:var(--ui-space-section);font-size:var(--ui-t-label)}
 html body .product-detail-suppliers li+li{margin-top:var(--ui-space-control)}
-@media(max-width:760px){html body .product-detail-facts{grid-template-columns:1fr}}
 @media(min-width:1180px){
  html body[data-active-task=ringkasan] main.wrap.main-content{padding:var(--ui-space-control) var(--ui-space-section)}
  html body #admin-overview.as-page{gap:var(--ui-space-control)}
@@ -122,10 +115,28 @@ html body #panel-kasir #kasir #store-shift-reminder[hidden]{display:none !import
 html body #panel-kasir #kasir #pd-custom-form[hidden]{display:none !important}
 html body #panel-kasir #kasir #pd-custom-status{font-size:var(--ui-t-caption);overflow-wrap:anywhere}
 html body #panel-kasir #kasir #pd-custom-status:empty{display:none}
-html body #sales-history .history-periods{display:flex;gap:var(--ui-space-control);flex-wrap:wrap;margin-block:var(--ui-space-section)}
+html body #history-filter-form .history-filter-bar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--ui-space-control)}
+html body #history-filter-form .history-periods{display:flex;gap:var(--ui-space-control);flex-wrap:wrap}
+html body #history-filter-form .history-filter-bar .sales-filter-actions{margin:0}
+html body #sales-history .history-scope{display:flex;justify-content:flex-end;align-items:center;margin-block:var(--ui-space-control)}
 html body #sales-history .history-periods button{min-height:var(--ui-tap);padding:var(--ui-space-control) var(--ui-space-section);border:var(--ui-stroke) solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-surface);color:var(--ui-green)}
 html body #sales-history .history-periods button[aria-pressed=true]{background:var(--ui-green);color:var(--ui-surface)}
 html body #insight-dialog .insight-content{display:grid;gap:var(--ui-space-section)}
+html body dialog.input-dialog .popup-content.detail-content{display:grid;gap:var(--ui-space-section);padding:var(--ui-space-section) var(--ui-space-panel);min-width:0;text-align:start;white-space:normal;overflow-wrap:anywhere}
+html body .detail-section{min-width:0;padding:var(--ui-space-section);border:var(--ui-stroke) solid var(--ui-line-soft);border-radius:var(--ui-radius);background:var(--ui-surface)}
+html body :is(.detail-section,.delivery-actions) h3{margin:0 0 var(--ui-space-group);font-size:var(--ui-t-body);color:var(--ui-ink)}
+.detail-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--ui-detail-summary-min)),1fr));gap:var(--ui-space-group);margin:0}
+.detail-facts>div{min-width:0;padding:var(--ui-space-group);border-radius:var(--ui-radius);background:var(--ui-canvas);overflow-wrap:anywhere}
+.detail-facts dt{color:var(--ui-ink-2);font-size:var(--ui-t-caption)}
+.detail-facts dd{margin:var(--ui-space-tight) 0 0;font-weight:var(--ui-weight-strong);font-variant-numeric:tabular-nums}
+.detail-facts .ui-sub{display:block;font-size:var(--ui-t-caption);font-weight:normal}
+.detail-actions{display:flex;gap:var(--ui-space-control);flex-wrap:wrap;margin-block-end:var(--ui-space-group)}
+.detail-actions button[aria-pressed=true]{background:var(--ui-green);color:var(--ui-surface)}
+.detail-results .ui-table-wrap,.detail-section .ui-table-wrap{max-inline-size:100%;overflow:auto}
+html body #panel-kasir #kasir #form-checkout>.pos-buyer-card{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--ui-detail-column-min)),1fr));gap:var(--ui-space-group);align-items:start}
+html body #panel-kasir #kasir #form-checkout>.pos-buyer-card .pos-combo-input{width:100%}
+html body #panel-kasir #kasir #form-checkout .pos-tier-caption{margin-bottom:var(--ui-space-control);font-size:var(--ui-t-label);font-weight:var(--ui-weight-strong);color:var(--ui-green-soft)}
+html body #panel-kasir #kasir #form-checkout .pos-tier-field .pos-tier{margin:0}
 html body #insight-dialog .insight-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;border:var(--ui-stroke) solid var(--ui-line-soft);border-radius:var(--ui-radius);overflow:hidden;background:var(--ui-surface)}
 html body #insight-dialog .insight-facts>div{min-width:0;padding:8px 10px;border-left:var(--ui-stroke) solid var(--ui-line-soft)}
 html body #insight-dialog .insight-facts>div:first-child{border-left:0}
@@ -152,6 +163,8 @@ html body #insight-dialog .supplier-activity-table :is(th,td){padding:var(--ui-s
 html body #insight-dialog .supplier-activity-table .ui-sub{display:block;font-size:var(--ui-t-caption);overflow-wrap:anywhere}
 html body #insight-dialog .supplier-activity-pages{display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-control);margin-block:var(--ui-space-section);flex-wrap:wrap}
 @media(max-width:640px){
+    html body dialog.input-dialog .popup-content.detail-content{padding:var(--ui-space-group)}
+    html body .detail-section{padding:var(--ui-space-group)}
     html body #insight-dialog .insight-facts{grid-template-columns:repeat(2,minmax(0,1fr))}
     html body #insight-dialog .insight-facts>div:nth-child(odd){border-left:0}
     html body #insight-dialog .insight-facts>div:nth-child(n+3){border-top:var(--ui-stroke) solid var(--ui-line-soft)}

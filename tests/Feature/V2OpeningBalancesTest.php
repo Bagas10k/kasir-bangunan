@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\V2\Money;
 use App\Services\V2\OpeningBalances;
+use Brick\Math\BigDecimal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -87,7 +89,7 @@ class V2OpeningBalancesTest extends TestCase
     {
         $this->accounts();
         $cashier = $this->actor('cashier');
-        $service = new OpeningBalances();
+        $service = new OpeningBalances;
 
         $payload = [
             'date' => '2026-10-30',
@@ -114,6 +116,37 @@ class V2OpeningBalancesTest extends TestCase
         $this->assertDatabaseCount('journal_entries', 0);
     }
 
+    public function test_workspace_offers_opening_only_while_bookkeeping_is_empty(): void
+    {
+        $this->accounts();
+        $admin = $this->actor('admin');
+        $this->actingAs($admin)->get(route('v2.index'))->assertOk()
+            ->assertSee('id="opening-form"', false)
+            ->assertSee('Tambah stok awal')
+            ->assertDontSee('JSON array');
+
+        $product = $this->product('OPEN-1', 'Produk Sintetis', '1');
+        $this->get(route('v2.index'))->assertOk()
+            ->assertSee('Stok produk sudah terisi.')
+            ->assertDontSee('id="opening-form"', false);
+
+        DB::table('products')->where('id', $product)->update(['stock_quantity' => '0']);
+        (new OpeningBalances)->post($admin->id, [
+            'date' => '2026-10-30',
+            'reference' => 'PEMBUKAAN-UJI',
+            'cash' => '1000000.00',
+            'idempotency_key' => 'opening-workspace-state',
+        ]);
+        $this->get(route('v2.index'))->assertOk()
+            ->assertSee('Saldo awal sudah diposting.')
+            ->assertSee('PEMBUKAAN-UJI')
+            ->assertDontSee('id="opening-form"', false);
+
+        $this->actingAs($this->actor('cashier'))->get(route('v2.index'))->assertOk()
+            ->assertDontSee('<h2 id="opening-heading">', false)
+            ->assertDontSee('PEMBUKAAN-UJI');
+    }
+
     public function test_preview_returns_balanced_calculation_without_writing(): void
     {
         $this->accounts();
@@ -122,7 +155,7 @@ class V2OpeningBalancesTest extends TestCase
         $custParty = $this->party('customer', 'CUST-001', 'Pelanggan Sintetis Alpha');
         $suppParty = $this->party('supplier', 'SUPP-001', 'Supplier Sintetis Alpha');
 
-        $service = new OpeningBalances();
+        $service = new OpeningBalances;
 
         $data = [
             'date' => '2026-10-30',
@@ -167,7 +200,7 @@ class V2OpeningBalancesTest extends TestCase
         $custParty = $this->party('customer', 'CUST-002', 'Pelanggan Sintetis Beta');
         $suppParty = $this->party('supplier', 'SUPP-002', 'Supplier Sintetis Beta');
 
-        $service = new OpeningBalances();
+        $service = new OpeningBalances;
 
         $data = [
             'date' => '2026-10-30',
@@ -195,13 +228,13 @@ class V2OpeningBalancesTest extends TestCase
         $batch = DB::table('v2_opening_batches')->first();
         $this->assertSame(OpeningBalances::SINGLETON_KEY, $batch->singleton_key);
         $this->assertSame('SALDO-AWAL-OCTOBER', $batch->reference);
-        $this->assertSame('10000000.00', (string) \App\Services\V2\Money::value((string) $batch->cash_amount, 2));
-        $this->assertSame('50000000.00', (string) \App\Services\V2\Money::value((string) $batch->bank_amount, 2));
-        $this->assertSame('15000000.00', (string) \App\Services\V2\Money::value((string) $batch->inventory_amount, 2));
-        $this->assertSame('5000000.00', (string) \App\Services\V2\Money::value((string) $batch->ar_amount, 2));
-        $this->assertSame('8000000.00', (string) \App\Services\V2\Money::value((string) $batch->ap_amount, 2));
+        $this->assertSame('10000000.00', (string) Money::value((string) $batch->cash_amount, 2));
+        $this->assertSame('50000000.00', (string) Money::value((string) $batch->bank_amount, 2));
+        $this->assertSame('15000000.00', (string) Money::value((string) $batch->inventory_amount, 2));
+        $this->assertSame('5000000.00', (string) Money::value((string) $batch->ar_amount, 2));
+        $this->assertSame('8000000.00', (string) Money::value((string) $batch->ap_amount, 2));
         // Total Assets = 10M + 50M + 15M + 5M = 80M. Liabilities = 8M. Equity = 72M
-        $this->assertSame('72000000.00', (string) \App\Services\V2\Money::value((string) $batch->equity_amount, 2));
+        $this->assertSame('72000000.00', (string) Money::value((string) $batch->equity_amount, 2));
         $this->assertSame('credit', $batch->equity_direction);
 
         // Check Balanced Journal
@@ -213,21 +246,21 @@ class V2OpeningBalancesTest extends TestCase
         $totalDebit = '0.00';
         $totalCredit = '0.00';
         foreach ($lines as $line) {
-            $totalDebit = (string) \Brick\Math\BigDecimal::of($totalDebit)->plus((string) $line->debit)->toScale(2);
-            $totalCredit = (string) \Brick\Math\BigDecimal::of($totalCredit)->plus((string) $line->credit)->toScale(2);
+            $totalDebit = (string) BigDecimal::of($totalDebit)->plus((string) $line->debit)->toScale(2);
+            $totalCredit = (string) BigDecimal::of($totalCredit)->plus((string) $line->credit)->toScale(2);
         }
         $this->assertSame($totalDebit, $totalCredit);
         $this->assertSame('80000000.00', $totalDebit);
 
         // Check Product Stock & Movement
         $prod = DB::table('products')->where('id', $prodId)->first();
-        $this->assertSame('10.0000', (string) \App\Services\V2\Money::value((string) $prod->stock_quantity, 4));
-        $this->assertSame('1500000.0000', (string) \App\Services\V2\Money::value((string) $prod->cost_price, 4));
+        $this->assertSame('10.0000', (string) Money::value((string) $prod->stock_quantity, 4));
+        $this->assertSame('1500000.0000', (string) Money::value((string) $prod->cost_price, 4));
 
         $movement = DB::table('stock_movements')->where('product_id', $prodId)->first();
         $this->assertSame('v2_opening_balance', $movement->reference_type);
-        $this->assertSame('10.0000', (string) \App\Services\V2\Money::value((string) $movement->quantity_delta, 4));
-        $this->assertSame('10.0000', (string) \App\Services\V2\Money::value((string) $movement->balance_after, 4));
+        $this->assertSame('10.0000', (string) Money::value((string) $movement->quantity_delta, 4));
+        $this->assertSame('10.0000', (string) Money::value((string) $movement->balance_after, 4));
 
         // Check V2 Invoices created with NO sales/receipts (not fake sales)
         $this->assertDatabaseCount('v2_sales', 0);
@@ -236,14 +269,14 @@ class V2OpeningBalancesTest extends TestCase
         $arInv = DB::table('v2_invoices')->where('number', 'INV-AR-001')->first();
         $this->assertSame('receivable', $arInv->direction);
         $this->assertNull($arInv->sale_id);
-        $this->assertSame('5000000.00', (string) \App\Services\V2\Money::value((string) $arInv->amount, 2));
-        $this->assertSame('0.00', (string) \App\Services\V2\Money::value((string) $arInv->paid, 2));
+        $this->assertSame('5000000.00', (string) Money::value((string) $arInv->amount, 2));
+        $this->assertSame('0.00', (string) Money::value((string) $arInv->paid, 2));
         $this->assertSame('open', $arInv->status);
 
         $apInv = DB::table('v2_invoices')->where('number', 'BILL-AP-001')->first();
         $this->assertSame('payable', $apInv->direction);
         $this->assertNull($apInv->receipt_id);
-        $this->assertSame('8000000.00', (string) \App\Services\V2\Money::value((string) $apInv->amount, 2));
+        $this->assertSame('8000000.00', (string) Money::value((string) $apInv->amount, 2));
         $this->assertSame('open', $apInv->status);
     }
 
@@ -251,7 +284,7 @@ class V2OpeningBalancesTest extends TestCase
     {
         $this->accounts();
         $admin = $this->actor('admin');
-        $service = new OpeningBalances();
+        $service = new OpeningBalances;
 
         $data = [
             'date' => '2026-10-30',
@@ -296,7 +329,7 @@ class V2OpeningBalancesTest extends TestCase
             ['journal_entry_id' => $journalId, 'account_code' => '4101', 'account_name' => 'Pendapatan', 'debit' => 0, 'credit' => 1000, 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        $service = new OpeningBalances();
+        $service = new OpeningBalances;
         $data = [
             'date' => '2026-10-30',
             'idempotency_key' => 'idemp-legacy-clash',
@@ -314,7 +347,7 @@ class V2OpeningBalancesTest extends TestCase
         // Existing non-zero stock
         $this->product('EXIST-01', 'Batu Bata Merah', '500.0000', '1000.0000');
 
-        $service = new OpeningBalances();
+        $service = new OpeningBalances;
         $data = [
             'date' => '2026-10-30',
             'idempotency_key' => 'idemp-stock-clash',

@@ -114,6 +114,19 @@ dialog.input-dialog.uf-dialog-wide{width:min(780px,calc(100vw - 32px));max-width
   dialog.input-dialog.uf-dialog,dialog.input-dialog.uf-dialog-wide{width:calc(100vw - 16px);max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
 }
 
+/* Saldo awal: baris opsional dan pratinjau menggunakan token ruang kerja. */
+#opening-form .ob-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--ui-detail-column-min)),1fr));gap:var(--ui-space-group)}
+#opening-form .ob-grid>.field{margin:0;min-width:0}
+#opening-form .ob-section{padding:var(--ui-space-group);margin-block-end:var(--ui-space-control);border:var(--ui-stroke) solid var(--ui-line);border-radius:var(--ui-radius)}
+#opening-form summary{cursor:pointer;font-weight:var(--ui-weight-medium)}
+#opening-form :is(.ob-row,[data-opening-add]){margin-block-start:var(--ui-space-group)}
+#opening-form .ob-row{padding:var(--ui-space-group);border:var(--ui-stroke) solid var(--ui-line-soft);border-radius:var(--ui-radius);background:var(--ui-canvas)}
+#opening-form .ob-row>button{grid-column:1/-1;justify-self:start}
+#opening-form .ob-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:var(--ui-space-control);margin-block-start:var(--ui-space-section)}
+#opening-form :is(.ob-actions,.ob-section) button{min-height:var(--ui-tap)}
+#opening-form .ob-summary>div{display:flex;justify-content:space-between;gap:var(--ui-space-group);padding-block:var(--ui-space-control);border-block-end:var(--ui-stroke) solid var(--ui-line-soft)}
+#opening-form .ob-summary dd{margin:0;text-align:end;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;font-weight:var(--ui-weight-medium)}
+
 /* Adapt to the actual dialog width, not to the viewport. */
 #receipt-form{container-type:inline-size;--rc-compact-column:6rem;--rc-cost-column:8rem;--rc-value-column:7rem}
 html body #receipt-form :is(.rc-info,.rc-items,.rc-freight){min-width:0;margin:0 0 var(--ui-space-section);padding:var(--ui-space-group);border:var(--ui-stroke) solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-surface)}

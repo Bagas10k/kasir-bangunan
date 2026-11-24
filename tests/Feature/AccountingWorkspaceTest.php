@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\ExpenseService;
+use App\Services\InventoryReceiptService;
 use App\Services\OpeningBalanceService;
+use App\Services\RitaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -25,9 +27,42 @@ class AccountingWorkspaceTest extends TestCase
     {
         return User::create([
             'name' => 'Synthetic Accounting Operator',
-            'email' => 'accounting_' . uniqid() . '@example.test',
+            'email' => 'accounting_'.uniqid().'@example.test',
             'password' => bcrypt('test-password'),
         ]);
+    }
+
+    public function test_journal_pages_keep_the_filter_and_do_not_shift_when_a_new_entry_arrives(): void
+    {
+        $user = $this->user();
+        $insert = static fn (int $id, string $source) => DB::table('journal_entries')->insert([
+            'reference_type' => $source,
+            'reference_id' => $id,
+            'description' => "Entri sintetis {$id}",
+            'transaction_date' => '2026-10-01',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        for ($i = 1; $i <= 26; $i++) {
+            $insert($i, 'sale');
+        }
+        $insert(100, 'expense');
+
+        $response = $this->actingAs($user)->get(route('journals.index', ['source' => 'sale']))->assertOk();
+        $firstPage = $response->viewData('entries');
+        $this->assertCount(25, $firstPage);
+        $response->assertSee('Aktivitas lebih lama')->assertDontSee('Entri sintetis 100');
+        $olderUrl = $response->viewData('olderJournalUrl');
+        $this->assertStringContainsString('source=sale', $olderUrl);
+
+        $insert(101, 'sale');
+        $older = $this->get($olderUrl)->assertOk();
+        $this->assertSame(['Entri sintetis 1'], $older->viewData('entries')->pluck('description')->all());
+        $older->assertSee('Aktivitas lebih baru')->assertDontSee('Entri sintetis 101');
+        $this->getJson(route('journals.feed', ['after_id' => $firstPage->max('id'), 'check' => 1]))
+            ->assertExactJson(['has_new' => true]);
+        $this->get(route('journals.index', ['cursor' => base64_encode('{"_pointsToNextItems":true}')]))
+            ->assertUnprocessable();
     }
 
     public function test_opening_balance_is_editable_as_draft_then_posts_one_balanced_immutable_journal(): void
@@ -101,7 +136,7 @@ class AccountingWorkspaceTest extends TestCase
         ]);
 
         try {
-            app(\App\Services\InventoryReceiptService::class)->receive(
+            app(InventoryReceiptService::class)->receive(
                 [['product_id' => $productId, 'quantity' => '1', 'unit_cost' => '100.01']],
                 'purchase',
                 '1101'
@@ -112,7 +147,7 @@ class AccountingWorkspaceTest extends TestCase
         }
 
         try {
-            app(\App\Services\RitaseService::class)->recordRitase(
+            app(RitaseService::class)->recordRitase(
                 $vehicleId,
                 'Synthetic Driver',
                 'Synthetic Zone',

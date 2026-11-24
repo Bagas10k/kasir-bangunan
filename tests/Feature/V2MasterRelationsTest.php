@@ -70,8 +70,11 @@ class V2MasterRelationsTest extends TestCase
     public function test_internal_driver_uses_current_employee_name_and_is_archived_without_deletion(): void
     {
         $admin = $this->actor();
-        $employee = $this->party($admin, 'employee', 'SYN-EMP-01');
         $this->actingAs($admin);
+        $this->postJson(route('v2.master.store', 'employee'), [
+            'code' => 'SYN-EMP-01', 'name' => 'Pihak Sintetis SYN-EMP-01',
+        ])->assertOk();
+        $employee = (int) DB::table('v2_parties')->where('kind', 'employee')->where('code', 'SYN-EMP-01')->value('id');
 
         $id = $this->postJson(route('v2.relations.store', 'driver'), [
             'code' => 'SYN-DRV-01', 'kind' => 'internal', 'employee_id' => $employee,

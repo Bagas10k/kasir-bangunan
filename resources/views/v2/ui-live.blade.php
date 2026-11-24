@@ -114,6 +114,12 @@ function syncNode(oldEl,newEl){
   let at=0;
   for(const newKid of Array.from(newEl.children)){
     if(newKid.matches('script,style,template'))continue;
+    if(oldEl.hasAttribute('data-dialog-host')&&newKid.matches('dialog[id]')){
+      const existing=document.getElementById(newKid.id);
+      if(existing){syncNode(existing,newKid);}
+      else{const dialog=document.importNode(newKid,true);oldEl.append(dialog);runHooks(dialog);}
+      continue;
+    }
     const key=keyOf(newKid);
     let found=-1;for(let i=at;i<oldKids.length;i++){if(keyOf(oldKids[i])===key){found=i;break;}}
     if(found>=0){syncNode(oldKids[found],newKid);at=found+1;continue;}

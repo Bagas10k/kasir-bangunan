@@ -1789,3 +1789,32 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
 - Cutover: maintenance → migrasi produksi sebagai root (DONE, tanpa pending) → release override ke `release-8cf80a1` → app+worker dibuat ulang tanpa menyentuh mysql/nginx/tunnel → aset public/build disalin dari image → nginx reload → maintenance dibuka. Rollback disiapkan ke `release-edc62fd` (tidak terpakai) dan backup DB tersedia.
 - Verifikasi: app healthy + worker running pada release-8cf80a1; `is_bank_account` ada dan 1102=1; jumlah data user2/jurnal4/penjualan1 tidak berubah; `storage/logs` dapat ditulis www-data (perbaikan entrypoint tetap berlaku); log app tanpa error; origin login200, publik login200. Migrasi tercatat Ran batch9.
 - Repo server `deploy-v2` di 8cf80a1; bundle, log build, build.old, dan DB rehearsal dibersihkan.
+
+## [2026-11-24] - Sederhanakan Saldo awal pembukuan
+- **Pelaksana**: OpenCode / GPT-6.2 Sol.
+- **Perubahan**: `OpeningBalances` menyediakan status yang juga dipakai penjaga server; `WorkspaceController` hanya menyiapkannya untuk admin. `opening-form`, `opening-form-script`, `sprint2`, `ui-workspace`, dan `ui-forms-styles` mengganti JSON mentah dengan input biasa, rincian opsional, pratinjau Rupiah, dan konfirmasi terpisah. Pedoman desain dan dokumen sistem diperbarui.
+- **Verifikasi**: PHPUnit terfokus SQLite in-memory 13/13 (274 asersi, exit 0), termasuk status siap/terblokir/diposting dan akses kasir. Node 179/179 (exit 0). Chromium fixture Blade dengan respons sintetis pada 390/820 px (exit 0): kas/bank saja, rincian desimal, galat per baris, tinjau ulang setelah perubahan, dan simulasi konfirmasi tanpa jaringan. Pint serta `git diff --check` lolos untuk cakupan tugas.
+- **Batas**: Tidak memposting saldo awal atau mengubah data toko. Tidak ada migrasi, commit, push, atau deploy.
+
+## [2026-11-24] - Morph pil mobile dan halaman Jurnal Umum
+- **Pelaksana**: OpenCode / GPT-6.2 Sol.
+- **Perubahan**: `mobile-quick-actions`, `ui-tokens`, dan `ui-workspace` memberi kapsul penanda morph dan area terpisah. `JournalController` dan `journals/index` memakai paginasi 25 entri berbasis ID dengan filter yang tetap terbawa; pemeriksaan aktivitas baru hanya menampilkan pemberitahuan. Tes `AccountingWorkspaceTest` dan `mobile-quick-actions.test.mjs`, pedoman desain, serta dokumentasi diperbarui.
+- **Verifikasi**: Chromium sintetis 360/390/768/900/1024 px (exit 0): penanda bergerak dan sejajar, tombol terakhir dapat diketuk di atas kapsul, dialog/sidebar menyembunyikan pil, desktop tertutup. Node 179/179 (exit 0). PHPUnit SQLite in-memory 32/32, 386 asersi (exit 0), termasuk paginasi setelah entri baru dan penolakan kursor tak valid. Pint pada berkas PHP tugas lolos. Tidak menguji dialog cetak fisik.
+- **Batas**: Tidak mengubah data toko, isi jurnal, keranjang, atau formulir. Tidak ada migrasi, commit, push, atau deploy.
+
+## [2026-11-24] - Rincian data, aksi master, dan popup pembukuan
+- **Pelaksana**: OpenCode / GPT-6.2 Sol.
+- **Perubahan**:
+  - Master karyawan/sopir: tombol Tambah karyawan/Tambah sopir tetap ada, ditambah popup **Detail** (peran, posisi, status, telepon, kode sopir, status penugasan). `ui-live` sekarang menambahkan dialog ubah untuk baris baru pada host dialog, sehingga data baru langsung bisa diubah tanpa muat ulang.
+  - Pelanggan: tombol **Detail** baru dengan riwayat transaksi per pelanggan (`GET /v2/customers/{id}/activity`) dan periode Harian/Mingguan/Bulanan; hanya admin, data pelanggan lain tidak ikut.
+  - Popup detail: kelompok konteks (identitas/stok, harga/margin, ringkasan, riwayat) memakai `detail-section`/`detail-facts` dengan padding dan garis pemisah; label supplier/mobil dijelaskan konteksnya. Rincian tagihan supplier dan riwayat mobil kini berada dalam bagian bertajuk.
+  - Penerimaan: kolom Produk diringkas (jumlah jenis + contoh), Qty/HPP pindah ke popup Detail per penerimaan; pencarian memakai `data-ui-search-text` agar semua nama produk tetap terindeks.
+  - Kasir: filter stok baku **Tersedia**, Reset mengembalikan Tersedia, Enter tidak memilih produk habis; kartu pembeli disusun dua kolom (pelanggan + jenis harga).
+  - Riwayat penjualan: periode Harian/Mingguan/Bulanan sejajar dengan tombol filter; keterangan cakupan menjadi ikon tooltip.
+  - Pengiriman: aksi **Ritase langsung** dan **Uang muka sopir** dikelompokkan di kartu atas; form panjang pindah ke popup masing-masing, daftar uang muka terbuka tetap di bawah.
+  - Jurnal Umum: filter disusun ulang memakai token; **Pindah dana** dan **Penyesuaian saldo** kini popup bertema (`data-journal-open`), tetap memakai kata sandi, CSRF, dan endpoint yang sama; pemberitahuan aktivitas baru hanya tampil jika ada entri baru.
+- **Verifikasi**:
+  - Chromium headless fixture sintetis 390/850/1200 px (exit 0): 9 popup master/penerimaan/jurnal terbuka tanpa padding bocor atau overflow; detail pelanggan memuat periode Bulanan; kartu pengiriman tersedia; filter stok Tersedia; submit karyawan (`/v2/master/employee`) dan sopir (`/v2/relations/driver`) terkirim; tidak ada POST jurnal.
+  - PHPUnit terfokus SQLite in-memory 142/142, 1.038 asersi (exit 0), termasuk riwayat pelanggan per periode, akses kasir 403, dan tautan detail baru.
+  - Node 179/179 (exit 0); Pint lolos; token checker berkas baru 0 error; `git diff --check` tanpa temuan.
+- **Batas**: Tidak menyimpan data master, tidak memposting jurnal, tidak mengubah stok/draf toko, tidak ada migrasi/commit/deploy. Pratinjau cetak fisik belum diuji.
