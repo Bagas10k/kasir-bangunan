@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\AccountAdjustmentService;
 use App\Services\AccountBalanceService;
 use App\Services\OpeningBalanceService;
+use App\Services\V2\BankAccounts;
 use Brick\Math\BigDecimal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -15,7 +16,7 @@ use Illuminate\View\View;
 
 class JournalController extends Controller
 {
-    public function index(Request $request, OpeningBalanceService $openingService, AccountBalanceService $balances): View
+    public function index(Request $request, OpeningBalanceService $openingService, AccountBalanceService $balances, BankAccounts $bankService): View
     {
         $filters = $this->validatedFilters($request);
         $entries = $this->entries($filters);
@@ -36,18 +37,20 @@ class JournalController extends Controller
         $cashOpening = (string) ($opening->cash_amount ?? '0.00');
         $bankOpening = (string) ($opening->bank_amount ?? '0.00');
         $cashBalance = (string) $balances->balance('1101');
-        $bankBalance = (string) $balances->balance('1102');
+        $bankAccounts = $bankService->balancesByAccount($balances, true);
+        $bankBalance = (string) $bankService->totalBalance($balances, false);
         $sources = DB::table('journal_entries')->distinct()->orderBy('reference_type')->pluck('reference_type');
         $hasJournals = DB::table('journal_entries')->exists();
+        $adjustableCodes = $bankService->cashAndBankCodes(true);
         $adjustmentAccounts = DB::table('chart_of_accounts')->where('is_active', true)
-            ->when(config('v2.enabled'), fn ($query) => $query->whereIn('account_code', ['1101', '1102']))
+            ->when(config('v2.enabled'), fn ($query) => $query->whereIn('account_code', $adjustableCodes))
             ->orderBy('account_code')->get();
         $counterAccounts = config('v2.enabled')
             ? DB::table('chart_of_accounts')->where('is_active', true)->orderBy('account_code')->get()
             : $adjustmentAccounts;
 
         return view('journals.index', compact(
-            'entries', 'opening', 'cashOpening', 'bankOpening', 'cashBalance', 'bankBalance', 'sources', 'filters', 'adjustmentAccounts', 'counterAccounts', 'hasJournals'
+            'entries', 'opening', 'cashOpening', 'bankOpening', 'cashBalance', 'bankBalance', 'bankAccounts', 'sources', 'filters', 'adjustmentAccounts', 'counterAccounts', 'hasJournals'
         ));
     }
 

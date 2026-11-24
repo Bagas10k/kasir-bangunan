@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\V2\BankAccounts;
 use App\Services\V2\Operations;
 use App\Support\SafeLog;
 use Brick\Math\BigDecimal;
@@ -10,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -55,7 +57,10 @@ class ChartOfAccountController extends Controller
             ->when(($filters['usage'] ?? null) === 'unused', fn ($query) => $query->whereNotExists(
                 fn ($lines) => $lines->selectRaw('1')->from('journal_entry_lines')->whereColumn('journal_entry_lines.account_code', 'chart_of_accounts.account_code')
             ))
-            ->select('id', 'account_code', 'account_name', 'account_type', 'normal_balance', 'is_active')
+            ->select(array_merge(
+                ['id', 'account_code', 'account_name', 'account_type', 'normal_balance', 'is_active'],
+                Schema::hasColumn('chart_of_accounts', 'is_bank_account') ? ['is_bank_account'] : []
+            ))
             ->orderBy('account_code')
             ->paginate($perPage)
             ->setPath(route('coa.index'))
@@ -83,6 +88,7 @@ class ChartOfAccountController extends Controller
                 ? $credit->minus($debit)
                 : $debit->minus($credit))->toScale(2);
             $account->is_system = in_array($account->account_code, self::SYSTEM_ACCOUNTS, true);
+            $account->is_bank_account = (bool) ($account->is_bank_account ?? false) || $account->account_code === BankAccounts::DEFAULT_BANK;
         }
 
         $typeCounts = DB::table('chart_of_accounts')
@@ -139,6 +145,7 @@ class ChartOfAccountController extends Controller
             'account_type' => ['required', Rule::in(['asset', 'liability', 'equity', 'revenue', 'expense'])],
             'normal_balance' => ['required', Rule::in(['debit', 'credit']), $this->normalBalanceRule($request)],
             'is_active' => ['nullable', 'boolean'],
+            'is_bank_account' => ['nullable', 'boolean'],
         ], [
             'account_code.unique' => 'Kode akun ini sudah terdaftar. Gunakan kode unik lain.',
             'account_code.alpha_dash' => 'Kode akun hanya boleh memuat huruf, angka, tanda strip, atau garis bawah.',
@@ -150,18 +157,29 @@ class ChartOfAccountController extends Controller
             return $this->failure($request, 'Akun inti sistem wajib tetap aktif karena dipakai transaksi otomatis.', 'is_active');
         }
 
-        $id = DB::table('chart_of_accounts')->insertGetId([
-            'account_code' => trim($validated['account_code']),
+        $isBank = array_key_exists('is_bank_account', $validated)
+            ? (bool) $validated['is_bank_account']
+            : ($code === BankAccounts::DEFAULT_BANK);
+        if ($bankError = $this->bankFlagError($code, $validated['account_type'], $validated['normal_balance'], $isBank)) {
+            return $this->failure($request, $bankError, 'is_bank_account');
+        }
+
+        $row = [
+            'account_code' => $code,
             'account_name' => trim($validated['account_name']),
             'account_type' => $validated['account_type'],
             'normal_balance' => $validated['normal_balance'],
-            'is_active' => (bool) ($validated['is_active'] ?? true),
+            'is_active' => $active,
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ];
+        if (Schema::hasColumn('chart_of_accounts', 'is_bank_account')) {
+            $row['is_bank_account'] = $isBank;
+        }
+        $id = DB::table('chart_of_accounts')->insertGetId($row);
 
         if ($request->routeIs('v2.coa.*')) {
-            SafeLog::info('coa.created', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $code]);
+            SafeLog::info('coa.created', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $code, 'is_bank_account' => $isBank]);
             if ($request->expectsJson()) {
                 return response()->json(['message' => 'Akun '.$code.' berhasil ditambahkan.'], 201);
             }
@@ -186,6 +204,7 @@ class ChartOfAccountController extends Controller
             'account_type' => ['required', Rule::in(['asset', 'liability', 'equity', 'revenue', 'expense'])],
             'normal_balance' => ['required', Rule::in(['debit', 'credit']), $this->normalBalanceRule($request)],
             'is_active' => ['nullable', 'boolean'],
+            'is_bank_account' => ['nullable', 'boolean'],
         ]);
 
         return DB::transaction(function () use ($request, $id, $validated): JsonResponse|RedirectResponse {
@@ -202,6 +221,13 @@ class ChartOfAccountController extends Controller
                 return $this->failure($request, 'Akun inti sistem wajib tetap aktif karena dipakai transaksi otomatis.', 'is_active');
             }
 
+            $newIsBank = array_key_exists('is_bank_account', $validated)
+                ? (bool) $validated['is_bank_account']
+                : ((bool) ($account->is_bank_account ?? false) || $newCode === BankAccounts::DEFAULT_BANK);
+            if ($bankError = $this->bankFlagError($newCode, $validated['account_type'], $validated['normal_balance'], $newIsBank)) {
+                return $this->failure($request, $bankError, 'is_bank_account');
+            }
+
             $classificationChanged = $newCode !== $oldCode
                 || $validated['account_type'] !== $account->account_type
                 || $validated['normal_balance'] !== $account->normal_balance;
@@ -209,17 +235,21 @@ class ChartOfAccountController extends Controller
                 return $this->failure($request, 'Akun yang sudah digunakan di jurnal tidak boleh diubah kode, jenis, atau saldo normalnya.', 'account_code');
             }
 
-            DB::table('chart_of_accounts')->where('id', $id)->update([
+            $update = [
                 'account_code' => $newCode,
                 'account_name' => trim($validated['account_name']),
                 'account_type' => $validated['account_type'],
                 'normal_balance' => $validated['normal_balance'],
                 'is_active' => $newActive,
                 'updated_at' => now(),
-            ]);
+            ];
+            if (Schema::hasColumn('chart_of_accounts', 'is_bank_account')) {
+                $update['is_bank_account'] = $newIsBank;
+            }
+            DB::table('chart_of_accounts')->where('id', $id)->update($update);
 
             if ($request->routeIs('v2.coa.*')) {
-                SafeLog::info('coa.updated', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $newCode, 'is_active' => $newActive]);
+                SafeLog::info('coa.updated', ['actor_id' => $request->user()->id, 'account_id' => $id, 'account_code' => $newCode, 'is_active' => $newActive, 'is_bank_account' => $newIsBank]);
                 if ($request->expectsJson()) {
                     return response()->json(['message' => 'Akun '.$newCode.' berhasil diperbarui.']);
                 }
@@ -227,6 +257,23 @@ class ChartOfAccountController extends Controller
 
             return redirect()->route('coa.index')->with('success', 'Akun '.$newCode.' berhasil diperbarui.');
         });
+    }
+
+    private function bankFlagError(string $code, string $type, string $normalBalance, bool $isBank): ?string
+    {
+        if ($code === BankAccounts::DEFAULT_BANK && ! $isBank) {
+            return 'Akun 1102 (Bank utama) wajib tetap bertanda Rekening Bank.';
+        }
+        if ($isBank && $code !== BankAccounts::DEFAULT_BANK) {
+            if ($type !== 'asset' || $normalBalance !== 'debit') {
+                return 'Rekening bank harus berupa akun Aset bersaldo normal Debet.';
+            }
+            if (in_array($code, self::SYSTEM_ACCOUNTS, true)) {
+                return 'Akun inti non-bank tidak boleh ditandai sebagai rekening bank.';
+            }
+        }
+
+        return null;
     }
 
     public function archive(Request $request, int $id): JsonResponse|RedirectResponse

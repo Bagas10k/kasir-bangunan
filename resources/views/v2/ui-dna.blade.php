@@ -1114,7 +1114,10 @@ html :is(body#ui-dna-strong,body) :is(.ui-dna-master,#ui-dna-master) .ui-table t
 :is(dialog.uf-dialog,#u#u) .uf-affix input[data-ui-number]{flex:1 1 auto;min-width:0;height:44px !important;min-height:44px !important;margin:0 !important;padding:0 12px !important;border:0 !important;border-radius:0 !important;box-shadow:none !important;background:transparent !important;font-size:15px !important;font-weight:600;color:#102A1D !important;text-align:right}
 :is(dialog.uf-dialog,#u#u) .uf-affix input[data-ui-number][readonly]{background:#F4F6F5 !important;color:#5F7468 !important}
 :is(dialog.uf-dialog,#u#u) :is(.uf-pre,.uf-suf){display:flex;align-items:center;padding:0 12px !important;background:#F4F6F5 !important;color:#5F7468 !important;font-size:14px !important;font-weight:600}
+:is(dialog.uf-dialog,#u#u) .uf-margin-row{display:inline-flex;align-items:center;align-self:flex-start;gap:4px;margin-top:8px}
+:is(dialog.uf-dialog,#u#u) .uf-margin-row[hidden]{display:none}
 :is(dialog.uf-dialog,#u#u) .uf-margin{display:inline-flex;align-self:flex-start;margin-top:8px;padding:3px 10px;border-radius:999px;background:#E4F0E8;color:#14532D !important;font-size:12.5px !important;font-weight:700 !important}
+:is(dialog.uf-dialog,#u#u) .uf-margin-row .uf-margin{margin-top:0}
 :is(dialog.uf-dialog,#u#u) .uf-margin[data-tone=loss]{background:#FDE7E5;color:#9B1C1C !important}
 :is(dialog.uf-dialog,#u#u) .uf-margin:empty{display:none}
 :is(dialog.uf-dialog,#u#u) .uf-lock{margin-top:6px;font-size:12.5px;font-weight:600;color:#7A4B00}

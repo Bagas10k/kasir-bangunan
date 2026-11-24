@@ -78,7 +78,7 @@ Halaman Keuangan ditampilkan di dalam ruang kerja V2. Jurnal umum dan laporan te
 
 ### 1.2 Menu ruang kerja
 
-Saat kirim login, skeleton langsung menutupi formulir sambil menunggu pemeriksaan akun oleh server; bukan autentikasi optimistis. Setelah halaman tujuan diterima, skeleton workspace tampil selama susunan panel disiapkan. Panel Keuangan yang belum memiliki cache memakai skeleton bersama; data cache yang masih tersedia dapat langsung ditampilkan. Animasi menghormati reduced-motion. Error loading menampilkan pesan/fallback, tidak mengisi angka palsu. Password/session tidak disimpan dalam preferensi loading.
+Saat kirim login, skeleton langsung menutupi formulir sambil menunggu pemeriksaan akun oleh server; bukan autentikasi optimistis. Setelah halaman tujuan diterima, skeleton workspace tampil selama susunan panel disiapkan. Panel Keuangan yang belum memiliki cache memakai skeleton bersama; data cache yang masih tersedia dapat langsung ditampilkan. Blok skeleton memakai gradasi kilau yang bergerak dari kiri ke kanan (1,5 detik, berulang) plus denyut halus, sehingga terlihat proses masih berjalan. Animasi menghormati reduced-motion; saat reduced-motion aktif blok tampil statis tanpa kilau. Error loading menampilkan pesan/fallback, tidak mengisi angka palsu. Password/session tidak disimpan dalam preferensi loading.
 
 | Grup | Menu | Siapa |
 |---|---|---|
@@ -87,11 +87,27 @@ Saat kirim login, skeleton langsung menutupi formulir sambil menunggu pemeriksaa
 | Operasional | Penerimaan barang | Admin |
 | Operasional | Status pembayaran | Kasir, untuk memantau pembayaran yang diajukan sendiri |
 | Master data | Produk, Supplier & pelanggan, Karyawan & sopir, Mobil, Satuan & kategori | Admin |
-| Keuangan | Jurnal umum, Neraca, Laba rugi, Arus kas, Bagan akun (COA) | Admin |
+| Keuangan | Pengeluaran, Jurnal umum, Neraca, Laba rugi, Arus kas, Bagan akun (COA) | Admin |
 
 Halaman pertama setelah login: admin ke **Ringkasan**, kasir ke **Kasir**.
 
+Pil status di kepala ringkasan memakai gaya badge tema: latar lembut, titik warna, tanpa bingkai tebal — hijau untuk ok, kuning untuk peringatan, biru untuk info, merah lembut untuk masalah.
+
+Submenu gabungan (**Supplier/Pelanggan**, **Satuan/Kategori**) mengganti panel di tempat tanpa memuat ulang data atau memutar ulang animasi masuk; isinya memakai transisi opacity/geser singkat. Perpindahan menu sidebar tetap memakai animasi dan mengembalikan gulir ke atas.
+
+**Pengeluaran** (Keuangan, admin) membuka pencatatan biaya operasional toko yang tidak berasal dari penjualan, piutang, atau laci kasir. Akun beban dipilih dari COA aktif (di luar HPP/persediaan), sumber dana Kas Tunai (1101) atau salah satu Rekening Bank aktif (bawaan 1102 dan akun aset bertanda Rekening Bank di COA). Nominal diformat Rupiah saat diketik dan dikirim sebagai angka mentah. Simpan mengirim ke endpoint V2 `/v2/expenses` (bukan rute arsip lama yang menolak penulisan), memposting jurnal seimbang beban bertambah dan Kas/Bank terpilih berkurang, lalu jurnal dikunci. Tampilan memakai tema ruang kerja: kartu ringkas, empat fakta (total, transaksi, tunai, bank), filter tanggal/akun/sumber, dan tabel transaksi; daftar terakhir menampilkan sumber dana dan status Terkunci. Halaman ini tersedia sebagai panel workspace dan tetap dapat dibuka penuh lewat URL `/expenses`.
+
 Untuk kasir, menu "Kas & laporan" bernama "Shift & laporan saya" dan hanya berisi data miliknya sendiri.
+
+### 1.3 Aksi baris pada tabel
+
+Semua tabel ruang kerja V2 menampilkan kolom **Aksi** sebagai satu tombol tiga titik per baris; panel kecil berisi aksi asli baris itu (Detail, Ubah, Arsipkan, pembayaran, dokumen, dan seterusnya). Panel dibuka dengan klik, Enter/Space, atau panah bawah; Escape menutup dan mengembalikan fokus ke tombol; klik di luar, gulir, atau ubah ukuran jendela juga menutupnya. Hanya satu panel terbuka pada satu waktu, dan posisinya dijaga agar tetap di dalam layar.
+
+Kontrol dipindahkan apa adanya, bukan disalin: listener, nilai form, kunci idempotensi, dan dialog yang sudah menempel pada baris tetap bekerja. Dialog tetap berada di baris; panel hanya menampung pemicunya. Tanpa JavaScript, tombol aksi lama tetap tampil seperti semula. Tombol **+ Tambah** pada katalog Kasir sengaja tidak diubah menjadi tiga titik agar menambah barang tetap satu klik.
+
+### 1.4 Tooltip bersama
+
+Tooltip tunggal dipakai di ruang kerja V2, halaman laporan lama, dan halaman login. Sumber teks: `data-tip`, `title` lama (dibaca sekali saat hover/fokus lalu dikembalikan), atau teks terpotong (`data-tip-truncate`, hanya bila benar-benar terpotong). Muncul saat hover dengan jeda singkat dan saat fokus keyboard; Escape, blur, klik luar, gulir, atau ubah ukuran menutupnya. Posisi dijaga di dalam layar dan dibalik bila ruang tidak cukup. `aria-describedby` dipasang sementara. Navigasi/rail, kalender, dan `[data-tip-skip]` dikecualikan. Pada layar sentuh tooltip tidak menutupi tombol beraksi; teks terpotong tetap bisa dibaca lewat tip. Cetak menyembunyikan tooltip. Peringatan penting (checkout, pembayaran, arsip) tetap berupa teks, bukan tooltip.
 
 ---
 
@@ -408,7 +424,7 @@ Tabel Riwayat penjualan memiliki kolom **Nomor nota** dan **Pembeli** terpisah. 
 
 **Tanggal khusus Ringkasan Kasir:** selain tiga periode cepat pada7.9, tersedia rentang dari–sampai, lengkap, mulai≤akhir, tidak di masa depan, maksimal366hari. `GET /v2/sales/dashboard` hanya admin/kasir aktif; data tetap seluruh toko. Membaca rentang nyata dan pembanding tepat sebelumnya sepanjang jumlah hari yang sama, termasuk data lebih tua dari60hari. Sehari digambar per jam; beberapa hari per hari, di atas62hari dikelompokkan7hari dan di atas180hari30hari. Ringkasan/grafik/terlaris berubah bersama, stok tetap kondisi saat ini, lima penjualan terbaru dan tanggal menu lain tidak ikut difilter. Preferensi tersimpan terpisah. Refresh latar memakai rentang yang sudah diterapkan, bukan tanggal draft; gagal fetch dan respons usang tidak menghapus hasil/keranjang.
 
-Keranjang Kasir memakai bar mengambang pada desktop, tablet dan HP. Katalog menggunakan lebar penuh; **Lihat keranjang** membuka panel kanan di desktop/tablet atau lembar bawah di HP. Menutup panel atau berpindah menu tidak menghapus barang. Bar hanya muncul saat ada barang dan menu Kasir aktif. Kontrol jumlah, diskon, kosongkan dengan konfirmasi dua langkah, dan pembayaran tetap menggunakan formulir/perhitungan semula.
+Keranjang Kasir memakai bar mengambang pada desktop, tablet dan HP. Katalog menggunakan lebar penuh; **Lihat keranjang** membuka panel kanan di desktop/tablet atau lembar bawah di HP. Menutup panel atau berpindah menu tidak menghapus barang. Ringkasan lembar keranjang HP hanya menampilkan diskon bila ada lalu total; subtotal barang tidak diulang. Bar hanya muncul saat ada barang dan menu Kasir aktif. Kontrol jumlah, diskon, dan pembayaran tetap menggunakan formulir/perhitungan semula. Tidak ada tombol kosongkan keranjang massal; barang dihapus satu per satu.
 
 Daftar barang di dalam panel keranjang dapat digulir terpisah, termasuk melalui keyboard setelah area daftar difokuskan. Ringkasan dan tombol pembayaran berada di luar daftar sehingga tidak ikut bergulir bersama barang. Panel tetap memiliki gulir cadangan pada layar sangat pendek agar semua kontrol dapat dijangkau.
 
@@ -418,7 +434,7 @@ Angka KPI ringkasan Kasir ditween dari nilai periode sebelumnya saat ganti perio
 
 Tween juga meliputi angka dalam teks jumlah jenis/barang, subtotal barang, jumlah barang di pembayaran, label diskon, keterangan KPI dan kuantitas produk terlaris yang berubah. Bagian label tetap, angka akhir untuk transaksi tidak menunggu animasi. Tombol **Tanggal khusus** membuka panel mengambang ke samping dengan Dari/Sampai sejajar dan animasi sistem; bukan memperpanjang dashboard ke bawah. Jika sisi layar tidak cukup, panel menyesuaikan ke area yang muat. Tutup/Escape/klik luar atau pindah menu menutup panel tanpa menghapus tanggal yang diketik; kalender di dalamnya tetap dapat digunakan.
 
-Scrollbar keranjang dan katalog mengikuti warna tema. Pada HP, nama produk memakai satu baris area penuh (dapat membungkus), stok/harga dikelompokkan di bawah dan tombol tambah/kontrol jumlah berada pada baris tersendiri. Susunan daftar katalog tidak lagi dibatasi tinggi tabel desktop. Garis submenu mobile mengikuti pola desktop; pencarian di menu Kas harian/Shift mengikuti lebar layar dengan tinggi satu kontrol, tanpa mengubah cara pencarian atau filter bekerja.
+Scrollbar keranjang dan katalog mengikuti warna tema. Pada HP, nama produk memakai satu baris area penuh (dapat membungkus), stok/harga dikelompokkan di bawah dan tombol tambah/kontrol jumlah berada pada baris tersendiri. Susunan daftar katalog tidak lagi dibatasi tinggi tabel desktop. Garis submenu mobile mengikuti pola desktop; kolom pencarian tabel memakai lebar penuh satu baris sendiri di HP dengan tinggi satu kontrol, tanpa mengubah cara pencarian atau filter bekerja.
 
 - Menu **Kasir (POS)** tidak lagi memuat tabel riwayat panjang. Di area ringkasan **di atas keranjang**, kartu putih **Penjualan terbaru** berdampingan dengan **Produk terlaris**, dengan tinggi mengikuti isinya, bukan panjang keranjang. Isinya **5 penjualan terbaru seluruh toko**, tanpa filter tanggal riwayat: nama pembeli, atau Pelanggan umum bila kosong, dengan nomor nota kecil sebagai pembeda. Kartu hanya dirender sekali dan tetap tampil saat periode grafik diganti. Klik nama membuka Detail; tautan **Lihat semua penjualan** membuka menu **Operasional › Riwayat penjualan**. Di tablet grafik berada di atas dua kartu daftar; di HP kartu disusun ke bawah. Tidak mengunci tinggi halaman atau menyembunyikan kontrol untuk memaksakan tanpa gulir di HP.
 - Menu **Riwayat penjualan** memuat tabel lengkap: nota/pembeli (tanggal, jam dan petugas di bawahnya), metode, total, sisa tagihan, status, serta akses dokumen. Piutang yang berasal dari penjualan tetap melekat pada nota tersebut; cicilan tidak membuat penjualan kedua. Menu Tagihan tetap tersedia, termasuk utang supplier dan piutang saldo awal/migrasi tanpa nota penjualan.
@@ -426,6 +442,8 @@ Scrollbar keranjang dan katalog mengikuti warna tema. Pada HP, nama produk memak
 - Pencarian nomor nota/nama pembeli, metode, status (**Semua penjualan / Belum lunas / Dibayar sebagian / Lunas**), tanggal transaksi, dan jumlah baris10/25/50 diproses di server sebelum pagination. Belum lunas mencakup pembayaran sebagian. Sisa/status memakai saldo tagihan yang terkait, dan transfer pending diberi penanda **Menunggu verifikasi**, bukan dianggap lunas. Rentang atau satu batas tanggal boleh dipakai; mengosongkan kedua tanggal secara eksplisit mencari seluruh tanggal.
 - Dengan JavaScript aktif, filter, pilihan periode, Atur ulang dan pagination mengambil fragmen `GET /v2/sales/history` (authenticated, private/no-store) dan hanya mengganti hasil. Tautan fallback GET membuka `#riwayat-penjualan`. Filter tetap terpisah dari periode grafik, Tagihan dan laporan; tidak mengubah keranjang. Reset meminta rentang mingguan terbaru dari server,10 baris, serta pencarian/metode/status kosong. Tanggal manual menjadi periode khusus. Pembaruan uiLive mempertahankan filter terapan dan draft isian.
 - Tombol **Tanggal khusus** pada ringkasan Kasir langsung membuka kalender rentang bersama, tanpa popup perantara. Pilih awal/akhir lalu **Oke** untuk menerapkan; Tutup/Esc/klik luar membatalkan pilihan sementara. Validasi maksimal366hari dan batas hari ini tetap berlaku; lima penjualan terbaru serta tanggal menu lain tidak mengikuti rentang ini.
+- Perpindahan periode ringkasan Kasir memakai transisi grafik bersama: figur chart masuk dengan durasi token morph dan batang tumbuh dari nilai periode sebelumnya atau nol; reduced-motion melewati animasi. Tombol **Tanggal khusus** menampilkan rentang yang sudah diterapkan (misalnya 18 Nov – 24 Nov), status sukses dipersingkat, dan rentang yang sama tidak dimuat ulang; pembaruan uiLive tetap memuat ulang agar data segar.
+- Kartu diskon per baris keranjang membuka/menutup dengan morph tinggi dan isi (bukan muncul mendadak); isian memakai tinggi40px dan turun menjadi satu kolom pada layar sangat sempit. Ringkasan keranjang tetap menampilkan total dan diskon bila ada.
 - Chart Ringkasan admin dan Kasir, daftar produk terlaris, hasil katalog, serta angka ringkasan memakai animasi data bersama300ms. Pergantian periode membaca snapshot sebelumnya; pembaruan uiLive mengganti chart/daftar yang datanya berubah, bukan memutar ulang hasil identik. Angka canonical/aksesibel langsung hasil akhir, tidak mengubah pembukuan; reduced-motion menampilkan hasil langsung. Form tersembunyi tanggal khusus tidak membuat tombol tambahan **Isi formulir**.
 - **Ringkasan Admin** ditata padat agar informasi utama muat satu layar desktop: tindak lanjut, empat KPI, chart, terlaris dan status operasional tetap tersedia. Laptop pendek menampilkan Uang/Pengiriman/Stok sebagai ringkasan bernilai/status yang dapat dibuka lewat **Rincian**; membuka rincian boleh menambah gulir, tidak membuang informasi. Desktop tinggi membuka rincian langsung; ponsel tetap memakai gulir vertikal, bukan pemotongan isi. Perhitungan/periode/hak akses tidak berubah.
 - Navigasi membersihkan parameter workspace yang tidak relevan: **date** hanya ditampilkan pada menu Laporan harian; **master_kind** lama dan **partial** tidak dibawa ke alamat menu. Contoh produk cukup `/#master-product`. Saat kembali ke Laporan dalam halaman yang sama, URL memakai tanggal yang sudah diterapkan dari server, bukan tanggal yang masih diketik. Pembaruan uiLive tetap meminta tanggal laporan terapan secara internal agar laporan tidak diam-diam berganti ke hari ini. Path/subpath dan parameter lain yang tidak dikenal tetap dipertahankan; filter terapan menu dan isi form tidak direset. Setelah muat ulang tautan produk yang bersih, tanggal laporan yang tidak aktif kembali mengikuti default server; tautan Laporan sendiri tetap membawa tanggal.
@@ -459,10 +477,10 @@ Status tagihan: **Terbuka** (`open`) atau **Lunas** (`paid`). Sisa = nilai − s
 ### 8.3 Pembayaran utang supplier
 
 - Tombol di baris tagihan supplier: **Bayar ke supplier** (admin) atau **Ajukan pembayaran** (kasir).
-- **Sumber dana** yang dipilih di popup: **Kas Utama** (`main`, akun 1101), **Bank Utama** (`transfer`, akun 1102), atau **Laci shift** (`cash`, akun 1101 dengan uang laci shift yang sedang terbuka).
+- **Sumber dana** yang dipilih di popup: **Kas Utama** (`main`, akun 1101), **Bank Utama / Rekening Bank** (`transfer`, akun 1102 atau rekening bank aktif COA lewat `bank_account_code`), atau **Laci shift** (`cash`, akun 1101 dengan uang laci shift yang sedang terbuka).
 - **Admin**: pembayaran langsung tercatat (`posted`) dan mengurangi utang. Kas Utama dan Bank Utama memakai saldo toko, tidak memerlukan shift, dan tidak mengubah hitungan laci. Laci shift memakai uang laci shift admin sendiri (harus terbuka dan cukup) dan mencatat uang keluar di laci itu.
 - **Kasir**: dicatat sebagai **pengajuan** (`proposed`) tanpa jurnal dan baru mengurangi utang setelah admin menyetujui. Sumber Laci shift memakai shift toko yang aktif saat pengajuan; Kas Utama dan Bank Utama tidak perlu shift. Pengajuan laci pada shift yang sudah ditutup tidak boleh dipindah diam-diam ke shift berikutnya; ajukan ulang.
-- Saldo akun 1101/1102 tidak boleh menjadi negatif; jurnal debit 2101, kredit 1101 atau 1102.
+- Saldo akun 1101 atau rekening bank terpilih tidak boleh menjadi negatif; jurnal debit 2101, kredit 1101 atau rekening bank terpilih.
 - Nominal tidak boleh melebihi sisa tagihan. Kas Utama hanya untuk tagihan supplier, bukan pelunasan piutang pelanggan (piutang tetap Tunai/Transfer).
 
 ### 8.5 Penjaga entri dobel pembayaran
@@ -658,7 +676,7 @@ Halaman **Karyawan & sopir** menampilkan satu daftar gabungan; pembungkus dialog
 Kode: `MasterData`, `MasterRelations`, `FormCatalog`. Menu: **Master data** (admin).
 
 Aturan umum:
-- **Tidak ada penghapusan.** Data hanya bisa **diarsipkan**. Data arsip tidak muncul untuk transaksi baru, tetapi riwayat transaksinya tetap utuh. Arsip bisa diubah, tetapi tidak aktif kembali dengan sendirinya.
+- **Tidak ada penghapusan.** Data hanya bisa **diarsipkan**. Data arsip tidak muncul untuk transaksi baru, tetapi riwayat transaksinya tetap utuh. Arsip bisa diubah, tetapi tidak aktif kembali dengan sendirinya. Gunakan **Aktifkan kembali** pada aksi baris untuk memulihkannya; status dan riwayat lama tetap dipertahankan.
 - Kode/SKU/nomor polisi harus unik.
 - Kolom yang tidak dikirim saat mengubah data dipertahankan, tidak direset ke nol.
 - Form tambah mengisi kode berikutnya secara otomatis (`PRD-0001`, `PLG-0001`, `SUP-0001`, `KRY-0001`, `SPR-0001`), dan kode itu boleh diganti.
@@ -694,6 +712,8 @@ Daftar master menampilkan **Frekuensi belanja** (jumlah nota penjualan yang terh
 
 Kode, nama, catatan. Menekan nama supplier menampilkan produk yang dipasoknya dan riwayat transaksinya. Kolom "Utang berjalan" menunjukkan sisa utang ke supplier itu.
 
+Dialog rincian menampilkan strip fakta ringkas (utang berjalan ditonjolkan, lalu sudah dibayar, menunggu verifikasi, dan jumlah produk), **aktivitas tagihan dan pembayaran lebih dulu**, kemudian produk yang dipasok dengan peran Utama/Alternatif. Rentang aktivitas memakai dua tanggal, tombol Tampilkan, dan tautan cetak semua; tabel memakai badge status dan header lengket. Blok riwayat mati tidak lagi dirender. Tidak ada perubahan perhitungan/utang.
+
 Detail supplier khusus admin memuat aktivitas tagihan dan pembayaran berdasarkan **tanggal pencatatan**, default30hari terakhir, maksimal366hari sampai hari ini. Daftar20aktivitas per halaman, tanpa batas8aktivitas lama. Ringkasan membedakan tagihan, pembayaran terverifikasi, pengajuan menunggu dalam rentang, dan **utang berjalan saat ini** seluruh tanggal. Tagihan dibatalkan tidak menambah utang/ringkasan tagihan; aktivitasnya tetap dapat ditelusuri.
 
 **Cetak transaksi** mencetak satu aktivitas milik supplier tersebut; **Cetak semua dalam rentang** mencakup semua halaman pada rentang yang sudah diterapkan, bukan draft tanggal yang belum ditampilkan. Halaman cetak menyediakan Cetak/Simpan PDF, nomor tagihan, nominal, status, metode/referensi pembayaran. Ini rincian aktivitas, bukan bukti pembayaran atau saldo penutupan historis. Endpoint GET `suppliers/{id}/activity` dan `suppliers/{id}/statement` memeriksa admin aktif, lingkup supplier/entri, tanggal, dan memakai private/no-store. Tidak memposting stok, utang, pembayaran atau jurnal baru.
@@ -702,6 +722,7 @@ Detail supplier khusus admin memuat aktivitas tagihan dan pembayaran berdasarkan
 
 - Karyawan: kode, nama, catatan.
 - Sopir: jenis **karyawan toko** (terhubung ke data karyawan, nama mengikuti karyawan) atau **sopir luar**. Satu karyawan hanya bisa terdaftar sekali sebagai sopir.
+- Tidak ada hapus permanen. **Arsipkan** menyembunyikan karyawan/sopir dari pilihan baru (misalnya penugasan surat jalan), tetapi riwayat pengiriman tetap utuh. Data arsip masih dapat diubah dan tidak aktif kembali dengan sendirinya; gunakan **Aktifkan kembali** pada aksi baris untuk memulihkannya.
 
 ### 12.5 Mobil
 
@@ -817,6 +838,7 @@ Tidak membuat jurnal: buka/tutup shift, selisih shift, pengajuan bayar supplier,
 ### 14.4 Mengelola bagan akun (admin)
 
 - Admin dapat menambah akun secara manual, mengubah nama/status akun dan mengarsipkan akun non-inti dari menu Bagan akun. Kode harus unik; kelompok kode, klasifikasi dan saldo normal harus sesuai.
+- **Multi-rekening bank (`chart_of_accounts.is_bank_account`)**: akun Aset (`asset`) bersaldo normal Debet (`debit`) non-inti dapat ditandai sebagai **Rekening Bank** saat ditambah atau diubah di Bagan Akun. Akun inti `1102` selalu bertanda rekening bank dan tidak dapat dimatikan. Akun rekening bank aktif otomatis muncul pada pilihan rekening tujuan/sumber untuk transaksi Transfer/Bank di **Kasir (POS)**, **Tagihan & Pembayaran**, **Pengeluaran Operasional**, **Uang Muka/Realisasi Sopir**, **Biaya Ritase**, **Ongkir Penerimaan Barang**, **Penyesuaian Saldo**, **Ringkasan Admin**, dan **Laporan Arus Kas**. Jika parameter `bank_account_code` tidak dikirim, sistem otomatis memakai `1102`.
 - Form pada mode aktif memakai `POST /v2/chart-of-accounts`, `PUT /v2/chart-of-accounts/{id}` dan `PATCH /v2/chart-of-accounts/{id}/archive`. Ketiganya memeriksa admin di server dan memakai autentikasi, CSRF serta pembatasan frekuensi. Kasir dan akun tanpa peran ditolak.
 - Akun inti, termasuk1191,4102 dan6101, tidak boleh diubah nomornya atau dinonaktifkan, sekalipun belum pernah dipakai. Membuat akun inti dalam status tidak aktif juga ditolak.
 - Akun yang sudah dipakai jurnal tidak boleh diubah kode, jenis atau saldo normalnya. Nama boleh diperbarui; nama pada jurnal historis tetap snapshot lama. Akun non-inti boleh diarsipkan dan diaktifkan kembali melalui Ubah. Tidak ada penghapusan akun pada jalur V2.
@@ -829,7 +851,7 @@ Tidak membuat jurnal: buka/tutup shift, selisih shift, pengajuan bayar supplier,
 Kode: `CashBankAdjustments`. Menu: **Keuangan › Jurnal umum**, panel "Sesuaikan saldo".
 
 - Penyesuaian adalah koreksi **sesudah pembukuan dimulai**, bukan saldo awal kedua. Bila belum ada jurnal, batch saldo awal V2, atau saldo awal lama yang diposting, server menolak dan meminta admin memakai **Kas harian → Saldo awal pembukuan**.
-- Pada tahap ini hanya akun **1101 Kas** dan **1102 Bank** yang boleh menjadi akun yang disesuaikan. Akun lawan wajib aktif dan berbeda; akun lawan boleh akun mana pun yang aktif untuk menjaga jurnal tetap seimbang.
+- Pada tahap ini hanya akun **1101 Kas** dan akun **Rekening Bank aktif** (`1102` serta akun COA bertanda `is_bank_account`) yang boleh menjadi akun yang disesuaikan. Akun lawan wajib aktif dan berbeda; akun lawan boleh akun mana pun yang aktif untuk menjaga jurnal tetap seimbang.
 - Admin mengisi tanggal, saldo tujuan, akun lawan, alasan koreksi, dan **password login sendiri**. Password diperiksa di server dengan hash; password tidak disimpan, tidak dicatat di log, dan tidak dikembalikan ke browser.
 - Server menghitung selisih terhadap saldo buku besar saat itu dan hanya memposting selisihnya. Saldo awal yang sudah diposting, jurnal lama, stok, dan tagihan tidak diubah atau dihapus. Jurnal baru bertipe `adjustment` dan harus seimbang.
 - Penyesuaian tidak boleh membuat saldo Kas atau Bank menjadi negatif, termasuk bila akun lawannya adalah Kas/Bank. Selisih nol ditolak karena tidak ada yang perlu diposting.
@@ -870,7 +892,7 @@ Kode: `AdminSummary` + `MonitorMetrics` + `PosDashboard`.
 - **Perlu ditindaklanjuti**: transfer menunggu, shift dengan selisih, surat jalan siap dikirim (dan yang belum punya sopir), produk habis, produk menipis. Hanya butir yang jumlahnya lebih dari nol yang tampil.
 - **Ringkasan periode** (Hari ini / 7 hari / 30 hari): penjualan dan perbandingan dengan periode sebelumnya, ditambah kas di laci, piutang (dan yang lewat tempo), serta utang supplier. Saldo selalu per hari ini.
 - **Grafik penjualan** (per jam untuk Hari ini, per hari untuk 7/30 hari) dan **produk terlaris** (10 besar).
-- **Uang**: tunai di laci (shift terbuka), **bank terverifikasi = saldo akun 1102 di buku besar**, transfer menunggu, uang muka sopir terbuka, selisih kas bulan ini.
+- **Uang**: tunai di laci (shift terbuka), **bank terverifikasi = total saldo seluruh akun Rekening Bank di buku besar** (termasuk rincian per rekening bila lebih dari satu), transfer menunggu, uang muka sopir terbuka, selisih kas bulan ini.
 - **Pengiriman**: siap, dikirim, diterima hari ini, uang muka sopir terbuka, mobil aktif.
 - **Stok**: 5 produk yang paling perlu perhatian (habis dulu, lalu yang paling jauh di bawah minimum), dan nilai penerimaan bulan ini.
 
@@ -904,7 +926,7 @@ Kode: `generateBalanceSheet`. Per tanggal tertentu.
 
 ### 15.7 Arus kas
 
-Kode: `generateCashFlow`. Metode langsung, hanya dari jurnal yang menyentuh 1101 Kas dan 1102 Bank.
+Kode: `generateCashFlow`. Metode langsung, dari seluruh jurnal yang menyentuh `1101` Kas dan seluruh akun Rekening Bank (`1102` serta akun bertanda `is_bank_account`). Pemindahan dana internal antar-kas/bank menghasilkan arus kas bersih nol.
 
 - Kas awal = saldo Kas + Bank sebelum tanggal mulai. Kas akhir = saldo per tanggal akhir, dirinci per akun.
 - Perpindahan Kas ↔ Bank tidak dihitung sebagai arus masuk/keluar.
@@ -1083,6 +1105,14 @@ Daftar ini jujur tentang apa yang belum ditangani sistem. Butir bertanda **[cek 
 
 | Tanggal | Perubahan |
 |---|---|
+| 2026-11-24 | Dukungan **Multi-Rekening Bank** dari Bagan Akun (`chart_of_accounts.is_bank_account`, migrasi `2026_11_24_040733_add_multi_bank_account_support`, layanan `App\Services\V2\BankAccounts`): akun Aset non-inti bertanda Rekening Bank otomatis muncul sebagai pilihan rekening tujuan/sumber di Kasir (POS), Tagihan & Verifikasi Pembayaran, Pengeluaran Operasional, Uang Muka/Realisasi Sopir, Biaya Ritase, Ongkir Penerimaan, Penyesuaian Saldo, Ringkasan Admin, dan Laporan Arus Kas (`1102` tetap bawaan). |
+| 2026-11-24 | `AccountBalanceService::assertSufficient()` kini mengakui dimulainya pembukuan lewat `v2_opening_batches` maupun `journal_entries` (selaras dengan `CashBankAdjustments`), sehingga pengeluaran Kas/Bank V2 tidak tertolak karena tabel legacy `opening_balances` kosong. |
+| 2026-11-24 | Perbaikan menu **Pengeluaran** (`account_code` & `source` `cash`/`bank`, gaya modal mandiri di workspace, simpan AJAX tanpa muat ulang + toast, dan fix Reset filter `bindRemote`) serta penerapan sistem keterangan terpadu (**Info Toggletip**, **Rich Tooltip**, **Hover Card**, dan baris **Margin keuntungan** `BigDecimal` di Detail Produk) lintas menu Master, Operasional, Pengawasan, dan Keuangan. |
+| 2026-11-24 | Menu admin **Pengeluaran** (Keuangan) untuk biaya operasional di luar penjualan/piutang/kasir, tersimpan lewat endpoint V2 dan tampil dengan tema ruang kerja; submenu Supplier/Pelanggan dan Satuan/Kategori berganti tanpa memuat ulang dengan transisi ringan (bagian1.2). |
+| 2026-11-24 | Tooltip bersama di semua halaman; data arsip master/relasi dapat diaktifkan kembali; dialog rincian supplier/mobil memakai strip fakta ringkas dan aktivitas lebih dulu (bagian1.4/12.3/12.4). |
+| 2026-11-24 | Kartu diskon keranjang memakai morph, grafik Kasir bertransisi saat ganti periode, panel tanggal khusus menampilkan rentang terpakai dan tidak memuat ulang rentang yang sama (bagian7.10). |
+| 2026-11-24 | Nama supplier/mobil tidak lagi menambahkan karakter "›" buatan CSS pada nama aksesibel dan menandai dialognya; keterangan karyawan/sopir menjelaskan arsip tidak menghapus riwayat pengiriman (bagian12.3/12.4). |
+| 2026-11-24 | Kolom cari tabel memakai satu baris penuh di HP; pil status kepala monitor memakai warna badge tema; tombol kosongkan keranjang massal dan baris subtotal di lembar keranjang HP dihapus (bagian1.2/7.10). |
 | 2026-11-24 | URL menu tidak membawa tanggal laporan yang tidak relevan atau parameter master_kind/partial lama; tanggal terapan laporan dipertahankan saat pindah menu/uiLive tanpa menimpa draft (bagian7.10). |
 | 2026-11-24 | Kolom master produk menjadi SKU/nama/kategori/HPP/harga jual/stok+satuan/status/aksi, dengan detail baca-saja dan supplier terkait; HPP4desimal tetap utuh (bagian12.1). |
 | 2026-11-24 | Pisahkan riwayat selisih bulanan dan neto/jumlah pemeriksaan belum selesai semua tanggal; selisih lama tetap bisa diperiksa di luar30shift terbaru. Penyelesaian tidak menghapus nominal historis atau membuat jurnal (bagian6.4). |

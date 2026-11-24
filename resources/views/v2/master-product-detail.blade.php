@@ -1,3 +1,20 @@
+@php
+    $costDec = \Brick\Math\BigDecimal::of((string) ($record->cost_price ?? '0'));
+    $marginSummary = function ($priceValue) use ($costDec, $rp): string {
+        $sellDec = \Brick\Math\BigDecimal::of((string) ($priceValue ?? '0'));
+        $diff = $sellDec->minus($costDec);
+        $label = $diff->isNegative() ? 'Rugi ' : 'Untung ';
+        $amountText = $rp((string) $diff->abs());
+        if ($costDec->isPositive()) {
+            $pct = $diff->multipliedBy(100)->dividedBy($costDec, 1, \Brick\Math\RoundingMode::HalfUp);
+            $pctText = str_replace('.', ',', rtrim(rtrim((string) $pct, '0'), '.'));
+            return $label.$amountText.' ('.$pctText.'%)';
+        }
+        return $label.$amountText;
+    };
+    $retailMargin = $marginSummary($record->selling_price ?? '0');
+    $contractorMargin = ($record->contractor_price ?? null) !== null ? $marginSummary($record->contractor_price) : null;
+@endphp
 <dialog class="input-dialog uf-dialog uf-dialog-wide" id="popup-detail-product-{{ $record->id }}" aria-labelledby="title-detail-product-{{ $record->id }}">
     <div class="popup-heading">
         <div><h2 id="title-detail-product-{{ $record->id }}">Detail produk</h2><p class="uf-dialog-sub">{{ $record->name }} · {{ $record->sku }}</p></div>
@@ -9,9 +26,10 @@
             <div><dt>Nama produk</dt><dd>{{ $record->name }}</dd></div>
             <div><dt>Kategori</dt><dd>{{ $record->category ?: '—' }}</dd></div>
             <div><dt>Status</dt><dd><x-ui.status :status="$isActive ? 'active' : 'archived'"/></dd></div>
-            <div><dt>HPP / modal per {{ $record->unit }}</dt><dd class="ui-num">Rp {{ $decimalText($record->cost_price ?? '0') }}</dd></div>
+            <div><dt>HPP / modal per {{ $record->unit }} <button type="button" class="ui-info-btn" data-tip-key="harga_modal"></button></dt><dd class="ui-num">Rp {{ $decimalText($record->cost_price ?? '0') }}</dd></div>
             <div><dt>Harga jual per {{ $record->unit }}</dt><dd class="ui-num">{{ $rp($record->selling_price) }}</dd></div>
-            <div><dt>Harga kontraktor per {{ $record->unit }}</dt><dd class="ui-num">{{ $rp($record->contractor_price ?? $record->selling_price) }}@if(($record->contractor_price ?? null) === null)<span class="ui-sub">Mengikuti harga jual</span>@endif</dd></div>
+            <div><dt>Harga kontraktor per {{ $record->unit }} <button type="button" class="ui-info-btn" data-tip-key="harga_kontraktor"></button></dt><dd class="ui-num">{{ $rp($record->contractor_price ?? $record->selling_price) }}@if(($record->contractor_price ?? null) === null)<span class="ui-sub">Mengikuti harga jual</span>@endif</dd></div>
+            <div><dt>Margin keuntungan <button type="button" class="ui-info-btn" data-tip-key="margin_keuntungan"></button></dt><dd class="ui-num">{{ $retailMargin }}@if($contractorMargin)<span class="ui-sub">Kontraktor: {{ $contractorMargin }}</span>@endif</dd></div>
             <div><dt>Stok saat ini</dt><dd class="ui-num">{{ $decimalText($record->stock_quantity) }} {{ $record->unit }}</dd></div>
             <div><dt>Stok minimum</dt><dd class="ui-num">{{ $decimalText($record->min_stock ?? '0') }} {{ $record->unit }}</dd></div>
             <div><dt>Kondisi stok</dt><dd>{{ ['out' => 'Habis', 'low' => 'Menipis', 'ok' => 'Tersedia'][$stock] }}</dd></div>

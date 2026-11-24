@@ -1,6 +1,6 @@
-@extends('layouts.app')
-@include('partials.master-data-styles')
+@extends(request()->boolean('partial') ? 'layouts.partial' : 'layouts.app')
 @section('content')
+@include('expenses.theme-styles')
 @php
     $formatMoney = function ($value) {
         $decimal = \Brick\Math\BigDecimal::of((string) $value)->toScale(2, \Brick\Math\RoundingMode::HalfUp);
@@ -9,245 +9,250 @@
         $formatted = preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', $whole) . ',' . $fraction;
         return $negative ? '-' . $formatted : $formatted;
     };
+    $accountNames = collect($expenseAccounts ?? [])->pluck('account_name', 'account_code');
+    $selectedAccountCode = old('account_code', old('category'));
+    $selectedSource = old('source', old('payment_method') === 'transfer' ? 'bank' : (old('payment_method') ?: 'cash'));
+    $activeBankAccounts = collect($bankAccounts ?? []);
+    if ($activeBankAccounts->isEmpty()) {
+        $activeBankAccounts = collect([(object) ['account_code' => '1102', 'account_name' => 'Rekening Bank']]);
+    }
+    $selectedBankCode = old('bank_account_code', (string) $activeBankAccounts->first()->account_code);
+    $bankNamesMap = $bankAccountNames ?? $activeBankAccounts->pluck('account_name', 'account_code')->all();
+    $bankBalancesMap = $bankBalances ?? ['1102' => $bankBalance ?? '0.00'];
 @endphp
-<!-- Header Summary Card -->
-<div class="card" style="margin-bottom: 22px; padding: 22px 26px; border-left: 4px solid var(--primary);">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
-        <div>
-            <span class="badge" style="margin-bottom: 6px;">Biaya &amp; Pengeluaran Toko</span>
-            <h1 style="font-size: 20px; font-weight: 800; color: var(--primary-hover); margin: 0 0 4px 0; letter-spacing: -0.01em;">Pengeluaran Operasional</h1>
-            <p style="font-size: 13px; color: var(--text-muted); margin: 0; line-height: 1.5;">
-                Pencatatan kas keluar untuk operasional toko material. Setelah disimpan, jurnal dikunci agar riwayat keuangan tidak berubah diam-diam.
-            </p>
-        </div>
-        <div>
-            <button type="button" class="btn" onclick="openNewExpense()" style="padding: 9px 18px; font-size: 13.5px; font-weight: 600; box-shadow: 0 4px 14px rgba(45, 106, 79, 0.25);">+ Catat Pengeluaran Baru</button>
-        </div>
-    </div>
-</div>
+<div class="expenses-page" data-expense-root data-refresh-url="{{ route('expenses.index') }}">
+    @if(session('success'))
+        <div class="exp-alert exp-alert--ok" role="status">{{ session('success') }}</div>
+    @endif
+    <div class="exp-alert exp-alert--ok" data-expense-feedback role="status" aria-live="polite" hidden></div>
 
-<!-- Operational Summary Cards (Current Calendar Month) -->
-<div style="margin-bottom: 22px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <span style="font-size: 11px; font-weight: 700; color: var(--text-caption); text-transform: uppercase; letter-spacing: 0.05em;">Ringkasan Pengeluaran &middot; {{ $expenseSummary['period_label'] ?? 'Bulan Ini' }}</span>
-        <span class="badge" style="font-size: 11px;">Bulan Berjalan</span>
-    </div>
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
-        <div class="card" style="padding: 16px 20px; border: 1px solid var(--border-card); background: var(--surface);">
-            <span style="display: block; font-size: 10px; font-weight: 800; color: var(--text-caption); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;">Jumlah Pengeluaran</span>
-            <strong style="display: block; font-size: 20px; font-weight: 700; color: var(--text-main); font-family: var(--font-mono); font-variant-numeric: tabular-nums;">{{ $expenseSummary['count'] ?? 0 }}</strong>
-            <span style="display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px;">Transaksi tercatat</span>
+    <section class="exp-card exp-summary-card" aria-labelledby="exp-summary-heading">
+        <div class="exp-summary-head">
+            <div>
+                <h2 id="exp-summary-heading">Ringkasan Pengeluaran <x-ui.info-tip key="pengeluaran_operasional" label="Keterangan pengeluaran operasional"/></h2>
+                <p class="exp-summary-sub">Biaya operasional di luar penjualan, piutang, dan laci kasir. Jurnal dikunci setelah disimpan agar riwayat keuangan tidak berubah diam-diam.</p>
+            </div>
+            <button type="button" class="exp-btn exp-btn--primary" onclick="openNewExpense()">+ Catat pengeluaran</button>
         </div>
-        <div class="card" style="padding: 16px 20px; border: 1px solid var(--border-card); background: var(--surface); border-top: 3px solid var(--primary);">
-            <span style="display: block; font-size: 10px; font-weight: 800; color: var(--text-caption); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;">Total Uang Keluar</span>
-            <strong style="display: block; font-size: 20px; font-weight: 700; color: var(--primary-hover); font-family: var(--font-mono); font-variant-numeric: tabular-nums;">Rp {{ $formatMoney($expenseSummary['total'] ?? '0.00') }}</strong>
-            <span style="display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px;">Total beban operasional</span>
-        </div>
-        <div class="card" style="padding: 16px 20px; border: 1px solid var(--border-card); background: var(--surface);">
-            <span style="display: block; font-size: 10px; font-weight: 800; color: var(--text-caption); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;">Dibayar Tunai</span>
-            <strong style="display: block; font-size: 20px; font-weight: 700; color: var(--text-main); font-family: var(--font-mono); font-variant-numeric: tabular-nums;">Rp {{ $formatMoney($expenseSummary['cash'] ?? '0.00') }}</strong>
-            <span style="display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px;">Metode kas tunai</span>
-        </div>
-        <div class="card" style="padding: 16px 20px; border: 1px solid var(--border-card); background: var(--surface);">
-            <span style="display: block; font-size: 10px; font-weight: 800; color: var(--text-caption); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;">Dibayar Transfer</span>
-            <strong style="display: block; font-size: 20px; font-weight: 700; color: var(--text-main); font-family: var(--font-mono); font-variant-numeric: tabular-nums;">Rp {{ $formatMoney($expenseSummary['transfer'] ?? '0.00') }}</strong>
-            <span style="display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px;">Metode transfer bank</span>
-        </div>
-    </div>
-</div>
 
-<!-- Full-Width Data Table Card -->
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h2 style="margin: 0; border: none; padding: 0;">Daftar Pengeluaran Terakhir</h2>
-        <span class="badge">Audit Beban Kasir</span>
-    </div>
+        <div class="exp-facts">
+            <div class="exp-fact exp-fact--primary">
+                <span>Total uang keluar</span>
+                <strong>Rp {{ $formatMoney($expenseSummary['total'] ?? '0.00') }}</strong>
+                <small>Bulan berjalan</small>
+            </div>
+            <div class="exp-fact">
+                <span>Transaksi</span>
+                <strong>{{ $expenseSummary['count'] ?? 0 }}</strong>
+                <small>Catatan bulan ini</small>
+            </div>
+            <div class="exp-fact">
+                <span>Kas tunai</span>
+                <strong>Rp {{ $formatMoney($expenseSummary['cash'] ?? '0.00') }}</strong>
+                <small>Sumber 1101</small>
+            </div>
+            <div class="exp-fact">
+                <span>Transfer bank</span>
+                <strong>Rp {{ $formatMoney($expenseSummary['transfer'] ?? '0.00') }}</strong>
+                <small>{{ $activeBankAccounts->count() > 1 ? $activeBankAccounts->count().' rekening bank aktif' : 'Sumber 1102' }}</small>
+            </div>
+        </div>
+    </section>
 
-    <form method="GET" action="{{ route('expenses.index') }}" class="master-toolbar">
-        <div class="master-control">
-            <label for="expense-filter-start">Tanggal awal</label>
-            <input type="date" id="expense-filter-start" name="start_date" class="form-control" value="{{ request('start_date') }}">
+    <section class="exp-card" aria-labelledby="exp-list-heading">
+        <div class="exp-head">
+            <div>
+                <h2 id="exp-list-heading">Daftar pengeluaran</h2>
+                <p class="exp-summary-sub">10 transaksi terakhir · {{ $expenseSummary['period_label'] ?? 'bulan ini' }}</p>
+            </div>
+            <form method="GET" action="{{ route('expenses.index') }}" class="exp-filter">
+                <div class="field field-date-range">
+                    <label for="expense-filter-start">Tanggal pengeluaran</label>
+                    <input type="date" id="expense-filter-start" name="start_date" data-date-range-start="expense-filter-end" value="{{ request('start_date') }}">
+                    <input type="date" id="expense-filter-end" name="end_date" data-date-range-end aria-label="Sampai tanggal pengeluaran" value="{{ request('end_date') }}">
+                </div>
+                <div class="field">
+                    <label for="expense-filter-category">Akun beban</label>
+                    <select id="expense-filter-category" name="category">
+                        <option value="">Semua akun</option>
+                        @foreach($expenseCategories ?? [] as $expenseCategory)
+                            <option value="{{ $expenseCategory }}" @selected(request('category') === $expenseCategory)>{{ $expenseCategory }}{{ isset($accountNames[$expenseCategory]) ? ' · '.$accountNames[$expenseCategory] : '' }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="expense-filter-method">Sumber dana</label>
+                    <select id="expense-filter-method" name="payment_method">
+                        <option value="">Semua sumber</option>
+                        <option value="cash" @selected(request('payment_method') === 'cash')>Kas tunai</option>
+                        <option value="transfer" @selected(request('payment_method') === 'transfer')>Transfer bank</option>
+                    </select>
+                </div>
+                <div class="exp-filter-actions">
+                    <button type="submit" class="exp-btn exp-btn--primary">Terapkan</button>
+                    <a href="{{ route('expenses.index') }}" class="exp-btn">Reset</a>
+                </div>
+            </form>
         </div>
-        <div class="master-control">
-            <label for="expense-filter-end">Tanggal akhir</label>
-            <input type="date" id="expense-filter-end" name="end_date" class="form-control" value="{{ request('end_date') }}">
-        </div>
-        <div class="master-control">
-            <label for="expense-filter-category">Kategori</label>
-            <select id="expense-filter-category" name="category" class="form-control">
-                <option value="">Semua kategori</option>
-                @foreach($expenseCategories ?? [] as $expenseCategory)
-                    <option value="{{ $expenseCategory }}" @selected(request('category') === $expenseCategory)>{{ $expenseCategory }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="master-control">
-            <label for="expense-filter-method">Metode pembayaran</label>
-            <select id="expense-filter-method" name="payment_method" class="form-control">
-                <option value="">Semua metode</option>
-                <option value="cash" @selected(request('payment_method') === 'cash')>Kas tunai</option>
-                <option value="transfer" @selected(request('payment_method') === 'transfer')>Transfer bank</option>
-            </select>
-        </div>
-        <div class="master-toolbar-actions">
-            <a href="{{ route('expenses.index') }}" class="btn btn-secondary">Reset</a>
-            <button type="submit" class="btn">Terapkan</button>
-        </div>
-    </form>
 
-    <div>
-        <table class="master-table">
-            <thead>
-                <tr>
-                    <th style="width: 130px;">Nomor Voucher</th>
-                    <th style="width: 100px;">Tanggal</th>
-                    <th>Akun Beban / Kategori</th>
-                    <th>Keterangan</th>
-                    <th style="text-align: right; width: 150px;">Jumlah Nominal</th>
-                    <th style="width: 130px;">Aksi</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($expenses as $ex)
-                <tr>
-                    <td data-label="Nomor Voucher"><strong class="sku-code">{{ $ex->expense_number }}</strong></td>
-                    <td data-label="Tanggal" style="color: var(--text-caption); font-size: 12px;">{{ $ex->expense_date }}</td>
-                    <td data-label="Akun Beban"><span class="badge" style="font-size: 11px;">{{ $ex->category }}</span></td>
-                    <td data-label="Keterangan" style="color: var(--text-main);">{{ $ex->description ?? '-' }}</td>
-                    <td data-label="Jumlah Nominal" class="money" style="text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--primary-hover);">Rp {{ $formatMoney($ex->amount) }}</td>
-                    <td data-label="Aksi">
-                        @if($ex->journal_entry_id)
-                        <span class="badge" title="Jurnal terposting tidak boleh diubah atau dihapus">Terkunci</span>
-                        @else
-                        <button type="button" class="btn-action-edit"
-                            data-id="{{ $ex->id }}"
-                            data-category="{{ $ex->category }}"
-                            data-amount="{{ $ex->amount }}"
-                            data-description="{{ $ex->description ?? '' }}"
-                            data-method="{{ $ex->payment_method }}"
-                            onclick="editExpenseBtn(this)">Ubah</button>
-                        <form action="{{ route('expenses.destroy', $ex->id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Hapus draf pengeluaran ini?');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="btn-action-delete">Hapus</button>
-                        </form>
-                        @endif
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="6" style="text-align: center; color: var(--text-caption); padding: 32px;">Belum ada catatan pengeluaran operasional.</td>
-                </tr>
-                @endforelse
-            </tbody>
-        </table>
+        <div class="exp-table-wrap">
+            <table class="exp-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Nomor</th>
+                        <th scope="col">Tanggal</th>
+                        <th scope="col">Akun beban</th>
+                        <th scope="col">Keterangan</th>
+                        <th scope="col">Sumber</th>
+                        <th scope="col" style="text-align:right">Jumlah</th>
+                        <th scope="col">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($expenses as $ex)
+                        @php
+                            $accountLabel = isset($accountNames[$ex->category]) ? $ex->category.' · '.$accountNames[$ex->category] : $ex->category;
+                            $expBankCode = (string) ($ex->bank_account_code ?? '1102');
+                            $sourceLabel = $ex->payment_method === 'transfer'
+                                ? (isset($bankNamesMap[$expBankCode]) ? $expBankCode.' · '.$bankNamesMap[$expBankCode] : 'Transfer bank')
+                                : 'Kas tunai';
+                        @endphp
+                        <tr>
+                            <td data-label="Nomor" class="exp-code">{{ $ex->expense_number }}</td>
+                            <td data-label="Tanggal">{{ \Illuminate\Support\Carbon::parse($ex->expense_date)->locale('id')->translatedFormat('j M Y') }}</td>
+                            <td data-label="Akun beban">{{ $accountLabel }}</td>
+                            <td data-label="Keterangan">{{ $ex->description ?: '—' }}</td>
+                            <td data-label="Sumber"><span class="exp-badge exp-badge--mute">{{ $sourceLabel }}</span></td>
+                            <td data-label="Jumlah" class="exp-amount">Rp {{ $formatMoney($ex->amount) }}</td>
+                            <td data-label="Status">
+                                @if($ex->journal_entry_id)
+                                    <span class="exp-badge exp-badge--ok" data-tip="Jurnal pengeluaran sudah seimbang dan terkunci.">Terkunci</span>
+                                @else
+                                    <span class="exp-badge exp-badge--warn" data-tip="Belum memiliki jurnal di buku besar.">Belum dijurnal</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="7" class="exp-empty"><strong>Belum ada catatan pengeluaran operasional.</strong>Tekan "+ Catat pengeluaran" di atas untuk mencatat biaya baru.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div id="modal-expense" class="modal-overlay {{ $errors->any() ? 'open' : '' }}" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title-wrapper">
+                    <div>
+                        <h2 id="expense-modal-title" class="modal-title">Catat Pengeluaran Operasional</h2>
+                        <div class="exp-modal-sub">Beban operasional toko · mengurangi Kas/Bank</div>
+                    </div>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="closeModal('modal-expense')" aria-label="Tutup dialog">&times;</button>
+            </div>
+
+            <form action="{{ route('v2.expenses.store') }}" method="POST" id="expense-form" style="display:flex;flex-direction:column;flex:1;overflow:hidden;margin:0;">
+                @csrf
+                <div class="modal-body">
+                    <p class="exp-alert exp-alert--bad" data-expense-error role="alert" tabindex="-1" hidden></p>
+                    @if($errors->any())
+                        <p class="exp-alert exp-alert--bad" role="alert">{{ $errors->first() }}</p>
+                    @endif
+                    <div class="form-group">
+                        <label for="date">Tanggal</label>
+                        <input type="date" name="date" id="date" class="form-control" value="{{ old('date', now()->toDateString()) }}" max="{{ now()->toDateString() }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="category">Akun biaya / kategori <x-ui.info-tip key="pengeluaran_operasional" label="Keterangan akun biaya operasional"/></label>
+                        <select name="account_code" id="category" class="form-control" required>
+                            <option value="">-- Pilih akun biaya operasional --</option>
+                            @if(isset($expenseAccounts) && count($expenseAccounts) > 0)
+                                @foreach($expenseAccounts as $acc)
+                                    <option value="{{ $acc->account_code }}" @selected($selectedAccountCode === $acc->account_code)>{{ $acc->account_code }} - {{ $acc->account_name }}</option>
+                                @endforeach
+                            @else
+                                <option value="6101" @selected($selectedAccountCode === '6101')>6101 - Operasional Toko</option>
+                                <option value="6102" @selected($selectedAccountCode === '6102')>6102 - Listrik &amp; Air</option>
+                                <option value="6103" @selected($selectedAccountCode === '6103')>6103 - Pemeliharaan &amp; Perbaikan</option>
+                                <option value="6104" @selected($selectedAccountCode === '6104')>6104 - Perlengkapan &amp; ATK</option>
+                                <option value="6105" @selected($selectedAccountCode === '6105')>6105 - Gaji &amp; Upah Tenaga</option>
+                                <option value="6199" @selected($selectedAccountCode === '6199')>6199 - Lain-lain</option>
+                            @endif
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="amount">Nominal pengeluaran</label>
+                        <div class="exp-affix">
+                            <span class="exp-pre" aria-hidden="true">Rp</span>
+                            <input type="text" inputmode="decimal" name="amount" id="amount" class="form-control tabular-nums" placeholder="0" value="{{ old('amount') }}" required data-currency-input data-currency-scale="2">
+                        </div>
+                        <div class="exp-balance-hint">Pemisah ribuan muncul otomatis saat mengetik. Nominal tidak boleh melebihi saldo sumber dana.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label id="expense-source-label" for="payment_method">Sumber dana</label>
+                        <select name="source" id="payment_method" class="exp-source-native" data-native-select tabindex="-1" aria-hidden="true" required>
+                            <option value="cash" @selected($selectedSource === 'cash')>Kas tunai (1101)</option>
+                            <option value="bank" @selected($selectedSource === 'bank')>Transfer bank</option>
+                        </select>
+                        <div class="exp-seg" role="radiogroup" aria-labelledby="expense-source-label" data-expense-source-seg>
+                            <button type="button" role="radio" data-source-value="cash" aria-checked="{{ $selectedSource === 'cash' ? 'true' : 'false' }}" tabindex="{{ $selectedSource === 'cash' ? '0' : '-1' }}">Kas tunai (1101)</button>
+                            <button type="button" role="radio" data-source-value="bank" aria-checked="{{ $selectedSource === 'bank' ? 'true' : 'false' }}" tabindex="{{ $selectedSource === 'bank' ? '0' : '-1' }}">Transfer bank</button>
+                        </div>
+                        <div class="exp-balance-hint">
+                            Saldo Kas Tunai: <strong>Rp {{ $formatMoney($cashBalance) }}</strong>
+                            · Total Saldo Bank: <strong>Rp {{ $formatMoney($bankBalance) }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="form-group" data-expense-bank-field @if($selectedSource !== 'bank') hidden @endif>
+                        <label for="expense_bank_account">Rekening bank sumber dana</label>
+                        <select name="bank_account_code" id="expense_bank_account" class="form-control" @disabled($selectedSource !== 'bank')>
+                            @foreach($activeBankAccounts as $bankAcc)
+                                @php $bCode = (string) $bankAcc->account_code; @endphp
+                                <option value="{{ $bCode }}" @selected($selectedBankCode === $bCode)>{{ $bCode }} - {{ $bankAcc->account_name }} (Saldo Rp {{ $formatMoney($bankBalancesMap[$bCode] ?? '0.00') }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label for="description">Keterangan <span class="exp-opt">Opsional</span></label>
+                        <input type="text" name="description" id="description" class="form-control" maxlength="255" placeholder="Contoh: Pembelian token listrik toko" value="{{ old('description') }}">
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-expense')">Batal</button>
+                    <button type="submit" id="btn-submit-expense" class="btn">Simpan pengeluaran</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
 <script>
 function expenseModalReset() {
-    document.getElementById('expense-form').action = "{{ route('expenses.store') }}";
-    document.getElementById('expense-method').value = 'POST';
-    document.getElementById('category').value = '';
-    setCurrencyInput(document.getElementById('amount'), '');
-    document.getElementById('payment_method').value = 'cash';
-    document.getElementById('description').value = '';
-    document.getElementById('expense-modal-title').textContent = 'Catat Pengeluaran Operasional';
-    document.getElementById('btn-submit-expense').textContent = 'Simpan Pengeluaran';
+    var date = document.getElementById('date');
+    var cat = document.getElementById('category');
+    var amt = document.getElementById('amount');
+    var src = document.getElementById('payment_method');
+    var desc = document.getElementById('description');
+    var err = document.querySelector('#modal-expense [data-expense-error]');
+    if (date) date.value = '{{ now()->toDateString() }}';
+    if (cat) { cat.value = ''; cat.dispatchEvent(new Event('change', { bubbles: true })); }
+    if (amt && typeof window.setCurrencyInput === 'function') window.setCurrencyInput(amt, '');
+    else if (amt) amt.value = '';
+    if (src) { src.value = 'cash'; src.dispatchEvent(new Event('change', { bubbles: true })); }
+    if (desc) desc.value = '';
+    if (err) { err.hidden = true; err.textContent = ''; }
 }
 
 function openNewExpense() {
     expenseModalReset();
     openModal('modal-expense');
 }
-
-function editExpenseBtn(btn) {
-    document.getElementById('expense-form').action = "{{ url('/expenses') }}/" + btn.getAttribute('data-id');
-    document.getElementById('expense-method').value = 'PUT';
-    document.getElementById('category').value = btn.getAttribute('data-category');
-    setCurrencyInput(document.getElementById('amount'), btn.getAttribute('data-amount'));
-    document.getElementById('payment_method').value = btn.getAttribute('data-method');
-    document.getElementById('description').value = btn.getAttribute('data-description');
-    document.getElementById('expense-modal-title').textContent = 'Ubah Pengeluaran';
-    document.getElementById('btn-submit-expense').textContent = 'Perbarui Pengeluaran';
-    openModal('modal-expense');
-}
 </script>
-@endsection
-
-@section('modals')
-<!-- POP-UP MODAL: Form Catat Pengeluaran Operasional -->
-<div id="modal-expense" class="modal-overlay {{ $errors->any() ? 'open' : '' }}" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
-    <div class="modal-dialog">
-        <div class="modal-header">
-            <div class="modal-title-wrapper">
-                <div class="modal-icon-badge">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="12" y1="1" x2="12" y2="23"></line>
-                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                    </svg>
-                </div>
-                <div>
-                    <h2 id="expense-modal-title" class="modal-title">Catat Pengeluaran Operasional</h2>
-                    <div style="font-size: 12px; color: var(--text-caption); margin-top: 2px;">Beban Kasir &amp; Operasional Toko</div>
-                </div>
-            </div>
-            <button type="button" class="modal-close-btn" onclick="closeModal('modal-expense')" aria-label="Tutup Dialog">&times;</button>
-        </div>
-
-        <form action="{{ route('expenses.store') }}" method="POST" id="expense-form" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
-            @csrf
-            <input type="hidden" name="_method" id="expense-method" value="POST">
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="category">Akun Biaya / Kategori</label>
-                    <select name="category" id="category" class="form-control" required>
-                        <option value="">-- Pilih Akun Biaya Operasional --</option>
-                        @if(isset($expenseAccounts) && count($expenseAccounts) > 0)
-                            @foreach($expenseAccounts as $acc)
-                                <option value="{{ $acc->account_code }}" {{ old('category') == $acc->account_code ? 'selected' : '' }}>
-                                    {{ $acc->account_code }} - {{ $acc->account_name }}
-                                </option>
-                            @endforeach
-                        @else
-                            <option value="Operasional Toko" {{ old('category') === 'Operasional Toko' ? 'selected' : '' }}>6101 - Operasional Toko</option>
-                            <option value="Listrik & Air" {{ old('category') === 'Listrik & Air' ? 'selected' : '' }}>6102 - Listrik &amp; Air</option>
-                            <option value="Pemeliharaan & Perbaikan" {{ old('category') === 'Pemeliharaan & Perbaikan' ? 'selected' : '' }}>6103 - Pemeliharaan &amp; Perbaikan</option>
-                            <option value="Perlengkapan & ATK" {{ old('category') === 'Perlengkapan & ATK' ? 'selected' : '' }}>6104 - Perlengkapan &amp; ATK</option>
-                            <option value="Gaji & Upah Tenaga" {{ old('category') === 'Gaji & Upah Tenaga' ? 'selected' : '' }}>6105 - Gaji &amp; Upah Tenaga</option>
-                            <option value="Lain-lain" {{ old('category') === 'Lain-lain' ? 'selected' : '' }}>6199 - Lain-lain</option>
-                        @endif
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="amount">Nominal Pengeluaran (Rp)</label>
-                    <input type="text" inputmode="decimal" name="amount" id="amount" class="form-control tabular-nums" placeholder="0,00" value="{{ old('amount') }}" required data-currency-input data-currency-scale="2">
-                </div>
-
-                <div class="form-group">
-                    <label for="payment_method">Metode Pembayaran</label>
-                    <select name="payment_method" id="payment_method" class="form-control">
-                        <option value="cash" {{ old('payment_method') === 'cash' ? 'selected' : '' }}>Kas Tunai (1101)</option>
-                        <option value="transfer" {{ old('payment_method') === 'transfer' ? 'selected' : '' }}>Transfer Bank (1102)</option>
-                    </select>
-                    <div style="font-size: 11.5px; color: var(--text-caption); margin-top: 6px; line-height: 1.5;">
-                        Saldo Kas Tunai: <strong style="color: var(--text-main);">{{ $formatMoney($cashBalance) }}</strong>
-                        &middot; Saldo Bank: <strong style="color: var(--text-main);">{{ $formatMoney($bankBalance) }}</strong>
-                    </div>
-                </div>
-
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label for="description">Keterangan / Deskripsi</label>
-                    <input type="text" name="description" id="description" class="form-control" maxlength="255" placeholder="Contoh: Pembelian token listrik toko" value="{{ old('description') }}">
-                </div>
-            </div>
-
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-expense')">Batal</button>
-                <button type="submit" id="btn-submit-expense" class="btn">Simpan Pengeluaran</button>
-            </div>
-        </form>
-    </div>
-</div>
+@include('v2.expense-script')
 @endsection

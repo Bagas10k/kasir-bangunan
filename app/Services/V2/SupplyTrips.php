@@ -158,7 +158,9 @@ class SupplyTrips
             $payableTotal = $freight['freight_method'] === 'supplier' ? $total->plus($freightAmount) : $total;
             Money::value($this->str($payableTotal));
             $shift = null;
-            $freightCredit = $freight['freight_method'] === 'cash' ? self::CASH : self::BANK;
+            $freightCredit = $freight['freight_method'] === 'cash'
+                ? self::CASH
+                : ($freight['freight_bank_account_code'] ?? self::BANK);
             if ($freightAmount->isPositive() && $freight['freight_method'] !== 'supplier') {
                 if ($freight['freight_method'] === 'cash') {
                     $shift = app(Operations::class)->activeStoreShift(true);
@@ -177,6 +179,11 @@ class SupplyTrips
             }
 
             $now = now();
+            $freightCols = Schema::hasColumn('inventory_receipts', 'freight_amount')
+                ? (Schema::hasColumn('inventory_receipts', 'freight_bank_account_code')
+                    ? $freight
+                    : array_diff_key($freight, ['freight_bank_account_code' => true]))
+                : [];
             $receiptId = (int) DB::table('inventory_receipts')->insertGetId([
                 'receipt_number' => null,
                 'receipt_type' => 'purchase',
@@ -189,7 +196,7 @@ class SupplyTrips
                 'journal_entry_id' => null,
                 'created_at' => $now,
                 'updated_at' => $now,
-            ] + (Schema::hasColumn('inventory_receipts', 'freight_amount') ? $freight : []));
+            ] + $freightCols);
 
             DB::table('inventory_receipts')->where('id', $receiptId)->update([
                 'receipt_number' => 'RCV-'.str_pad((string) $receiptId, 6, '0', STR_PAD_LEFT),
@@ -313,6 +320,9 @@ class SupplyTrips
         if (! in_array($method, ['cash', 'transfer'], true)) {
             $this->invalid('Metode pembayaran perjalanan harus cash atau transfer.');
         }
+        $bankAccountCode = $method === 'transfer'
+            ? app(BankAccounts::class)->resolve(isset($data['bank_account_code']) ? (string) $data['bank_account_code'] : null)
+            : null;
 
         $key = $this->key($data['idempotency_key'] ?? null);
         $total = $fuel->plus($allowance);
@@ -320,7 +330,7 @@ class SupplyTrips
             $this->invalid('Total biaya perjalanan harus lebih dari nol.');
         }
 
-        $hash = $this->hash('trip', $actor, [
+        $hashPayload = [
             'delivery_id' => $deliveryId,
             'vehicle_id' => $vehicleId,
             'driver_id' => $driverId,
@@ -329,10 +339,14 @@ class SupplyTrips
             'fuel_cost' => (string) $fuel,
             'allowance' => (string) $allowance,
             'payment_method' => $method,
-        ]);
+        ];
+        if ($bankAccountCode !== null && $bankAccountCode !== self::BANK) {
+            $hashPayload['bank_account_code'] = $bankAccountCode;
+        }
+        $hash = $this->hash('trip', $actor, $hashPayload);
 
         try {
-            return DB::transaction(function () use ($actor, $vehicleId, $deliveryId, $driverId, $date, $destination, $fuel, $allowance, $method, $key, $total, $hash) {
+            return DB::transaction(function () use ($actor, $vehicleId, $deliveryId, $driverId, $date, $destination, $fuel, $allowance, $method, $bankAccountCode, $key, $total, $hash) {
                 $this->lockActor($actor);
 
                 $seen = $this->replay($actor, 'trip', $key, $hash);
@@ -344,7 +358,7 @@ class SupplyTrips
                 $driver = $this->assignment->resolve($driverId, $vehicleId, $delivery);
                 $destination = $delivery?->destination ?? $destination;
 
-                $account = $method === 'cash' ? self::CASH : self::BANK;
+                $account = $method === 'cash' ? self::CASH : ($bankAccountCode ?? self::BANK);
                 $shift = null;
 
                 if ($method === 'cash') {
@@ -367,7 +381,7 @@ class SupplyTrips
                 $this->guardAccount($account, $total);
 
                 $now = now();
-                $tripId = (int) DB::table('v2_trips')->insertGetId([
+                $tripRow = [
                     'delivery_id' => $deliveryId,
                     'vehicle_id' => $vehicleId,
                     'driver_id' => $driverId,
@@ -385,7 +399,11 @@ class SupplyTrips
                     'request_hash' => $hash,
                     'created_at' => $now,
                     'updated_at' => $now,
-                ]);
+                ];
+                if (Schema::hasColumn('v2_trips', 'bank_account_code')) {
+                    $tripRow['bank_account_code'] = $bankAccountCode;
+                }
+                $tripId = (int) DB::table('v2_trips')->insertGetId($tripRow);
 
                 $journalId = Ledger::post('v2_trip', $tripId, 'Biaya perjalanan '.$destination, [
                     ['account_code' => self::TRIP_EXPENSE, 'debit' => $this->str($total), 'credit' => '0.00'],
@@ -598,7 +616,7 @@ class SupplyTrips
         $this->invalid('Penerimaan sudah dikonfirmasi dan terkunci. Pembatalan biasa tidak diizinkan; gunakan proses koreksi atau retur.');
     }
 
-    /** @return array{freight_amount:string,freight_method:?string,freight_account:?string} */
+    /** @return array{freight_amount:string,freight_method:?string,freight_account:?string,freight_bank_account_code:?string} */
     public function freight(array $data): array
     {
         $amount = $this->amount($data['freight_amount'] ?? '0', 2, 'Ongkir');
@@ -606,7 +624,7 @@ class SupplyTrips
             $this->invalid('Ongkir tidak boleh negatif.');
         }
         if ($amount->isZero()) {
-            return ['freight_amount' => '0.00', 'freight_method' => null, 'freight_account' => null];
+            return ['freight_amount' => '0.00', 'freight_method' => null, 'freight_account' => null, 'freight_bank_account_code' => null];
         }
         if (! Schema::hasColumn('v2_receipt_drafts', 'freight_amount') || ! Schema::hasColumn('inventory_receipts', 'freight_amount')) {
             $this->invalid('Fitur ongkir belum diaktifkan. Migrasi ongkir perlu dijalankan admin terlebih dahulu.');
@@ -620,8 +638,16 @@ class SupplyTrips
             ->where('account_type', 'expense')->where('normal_balance', 'debit')->where('is_active', true)->exists()) {
             $this->invalid('Pilih akun beban ongkir yang aktif.');
         }
+        $bankAccountCode = $method === 'bank'
+            ? app(BankAccounts::class)->resolve(isset($data['freight_bank_account_code']) ? (string) $data['freight_bank_account_code'] : null, 'freight_bank_account_code')
+            : null;
 
-        return ['freight_amount' => $this->str($amount), 'freight_method' => $method, 'freight_account' => $account];
+        return [
+            'freight_amount' => $this->str($amount),
+            'freight_method' => $method,
+            'freight_account' => $account,
+            'freight_bank_account_code' => $bankAccountCode,
+        ];
     }
 
     private function requireAdmin(int $actor): void

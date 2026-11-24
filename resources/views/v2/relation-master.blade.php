@@ -54,9 +54,15 @@
                     <td data-label="Status"><x-ui.status :status="$record->is_active ? 'active' : 'archived'"/></td>
                     <td class="ui-actions">
                         <button type="button" class="btn-action-pill btn-action-edit" data-open-popup="popup-edit-{{ $kind }}-{{ $record->id }}" aria-label="Ubah {{ $record->name }}">Ubah</button>
+                        @if($record->is_active)
                         <form action="{{ route('v2.relations.archive', ['kind' => $kind, 'id' => $record->id]) }}" method="post" data-master-form data-method="PATCH">
-                            @csrf @method('PATCH')<button type="submit" class="btn-action-pill btn-action-archive" @disabled(!$record->is_active) aria-label="Arsipkan {{ $record->name }}">Arsipkan</button><span class="mr-msg" role="status"></span>
+                            @csrf @method('PATCH')<button type="submit" class="btn-action-pill btn-action-archive" aria-label="Arsipkan {{ $record->name }}">Arsipkan</button><span class="mr-msg" role="status"></span>
                         </form>
+                        @else
+                        <form action="{{ route('v2.relations.activate', ['kind' => $kind, 'id' => $record->id]) }}" method="post" data-master-form data-method="PATCH">
+                            @csrf @method('PATCH')<button type="submit" class="btn-action-pill btn-action-activate" aria-label="Aktifkan kembali {{ $record->name }}">Aktifkan kembali</button><span class="mr-msg" role="status"></span>
+                        </form>
+                        @endif
                     </td>
                 </tr>
             @empty

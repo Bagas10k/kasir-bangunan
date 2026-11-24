@@ -34,7 +34,7 @@ tambahkan templatnya di App\Support\V2\FormCatalog lalu panggil komponen ini.
 <div {{ $attributes->class(['uf', 'uf-w-'.$span, 'uf-'.$type]) }} @if($type === 'multiref') data-multiref-name="{{ $name }}" @endif @if(! empty($field['wrap'])) {{ $field['wrap'] }} @endif>
 @if (in_array($type, ['segmented', 'checklist', 'multiref'], true))
 <fieldset class="uf-group">
-<legend class="uf-label">{{ $field['label'] }}@if($required)<span class="uf-req" aria-hidden="true">*</span>@endif</legend>
+<legend class="uf-label">{{ $field['label'] }}@if($required)<span class="uf-req" aria-hidden="true">*</span>@endif @if($mode === 'add' && ! empty($field['info_tip']))<x-ui.info-tip :key="$field['info_tip']" :label="'Keterangan '.$field['label']"/>@endif</legend>
 @if($hint)<p class="uf-hint uf-hint-top" id="{{ $hintId }}">{{ $hint }}</p>@endif
 @if ($type === 'multiref')
 @php $picked = array_values(array_filter(array_map('intval', $selected))); @endphp
@@ -72,7 +72,7 @@ tambahkan templatnya di App\Support\V2\FormCatalog lalu panggil komponen ini.
 @endif
 </fieldset>
 @else
-<label class="uf-label" for="{{ $id }}">{{ $field['label'] }}@if($required)<span class="uf-req" aria-hidden="true">*</span>@elseif($optional)<span class="uf-opt">Opsional</span>@endif</label>
+<label class="uf-label" for="{{ $id }}">{{ $field['label'] }}@if($required)<span class="uf-req" aria-hidden="true">*</span>@elseif($optional)<span class="uf-opt">Opsional</span>@endif @if($mode === 'add' && ! empty($field['info_tip']))<x-ui.info-tip :key="$field['info_tip']" :label="'Keterangan '.$field['label']"/>@endif</label>
 @switch($type)
 @case('select')
 <select id="{{ $id }}" name="{{ $name }}" @if($required) required @endif @if($hintId) aria-describedby="{{ $hintId }}" @endif>

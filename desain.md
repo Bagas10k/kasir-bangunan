@@ -126,8 +126,8 @@ Isian dibangun dari `App\Support\V2\FormCatalog` + `<x-ui.field>`; gaya di `ui-d
 Lapisan tampilan `v2/pos-mobile.blade.php`, di-include setelah `pos-cashier-script`. Semua aksi memakai kontrol asli (stepper, hapus, nominal), jadi perhitungan tetap milik skrip kasir. Angka ringkasan dibaca dari event `kasir:cart` (`count`, `qty`, `gross`, `discount`, `total` dalam sen BigInt).
 - Bar keranjang hijau tua menempel di bawah layar: ikon dengan lencana jumlah jenis, "N jenis · M barang", total, dan tombol lime "Lihat keranjang". Bar hanya tampil bila keranjang berisi.
 - Barang yang sudah ada di keranjang menampilkan stepper − qty + di baris katalog. Tombol − pada qty 1 menghapus barang.
-- Keranjang dan Pembayaran tampil sebagai lembar bawah dengan pegangan, kartu barang putih, dan panel total (Subtotal, Diskon merah, Total belanja). Diskon baris tampil sebagai pil "Diskon −Rp x" + "Ubah diskon".
-- "Kosongkan keranjang" harus ditekan dua kali (dalam 3 detik).
+- Keranjang dan Pembayaran tampil sebagai lembar bawah dengan pegangan, kartu barang putih, dan panel total (Diskon merah bila ada, lalu Total belanja). Subtotal barang tidak diulang di ringkasan. Diskon baris tampil sebagai pil "Diskon −Rp x" + "Ubah diskon".
+- Tidak ada tombol kosongkan keranjang massal; barang dihapus satu per satu lewat kontrol baris keranjang.
 - Pembayaran: sakelar "Antar dengan armada toko" mengisi Cara penyerahan, dan untuk tunai tersedia pilihan nominal cepat (Uang pas, kelipatan 50 rb, kelipatan 100 rb). Tombol Kembali membuka lembar keranjang lagi.
 - Saat lembar terbuka, `view-transition-name` milik `main` dilepas, karena konteks tumpukannya membuat latar gelap menutupi lembar.
 
@@ -348,7 +348,7 @@ Berkas: `partials/table-filter-styles.blade.php` (kedua cangkang), `partials/fil
 ### 34.3 Keranjang mengambang di desktop
 
 - Katalog memakai satu kolom lebar penuh pada semua layar. Setelah barang ditambahkan, bar jumlah/total/Lihat keranjang tampil di kanan bawah desktop dan tablet; HP tetap memakai bar bawah.
-- Keranjang tidak lagi menjadi kolom permanen. Desktop/tablet membuka panel kanan, HP lembar bawah. Daftar, stepper, diskon, total, kosongkan dua langkah dan pembayaran memakai kontrol asli tanpa menyalin keranjang atau perhitungan.
+- Keranjang tidak lagi menjadi kolom permanen. Desktop/tablet membuka panel kanan, HP lembar bawah. Daftar, stepper, diskon, total, dan pembayaran memakai kontrol asli tanpa menyalin keranjang atau perhitungan.
 - Panel tertutup bersifat inert; tombol pembuka menyampaikan aria-expanded/controls. Tab berputar di dalam panel, Escape/latar/tutup menutup dan fokus kembali ke pembuka. Dialog pembayaran native tidak ditahan oleh perangkap Tab keranjang.
 - Berpindah menu menyembunyikan bar dan menutup panel tanpa menghapus barang. Lebar panel desktop dibatasi token 34rem; bar 32.5rem, tetap dibatasi lebar viewport.
 - Daftar `#items` memiliki gulir vertikal sendiri di dalam panel yang dibatasi tinggi viewport. Identitas pembeli, ringkasan total dan aksi pembayaran berada di luar area gulir barang. Daftar dapat difokuskan lewat keyboard, memiliki label region, scrollbar stabil dan overscroll terkurung. Tinggi minimum area barang6rem; pada viewport sangat pendek gulir panel tetap menjadi pengaman agar kontrol tidak terpotong.
@@ -374,8 +374,9 @@ Berkas: `partials/table-filter-styles.blade.php` (kedua cangkang), `partials/fil
 
 ## 36. Loading dan periode khusus
 
-- Skeleton bersama memakai bentuk judul, tiga ringkasan dan baris tabel tanpa angka palsu, role status dan penanda dekoratif aria-hidden. Warna/ukuran/durasi melalui token; reduced-motion mematikan animasi.
+- Skeleton bersama memakai bentuk judul, tiga ringkasan dan baris tabel tanpa angka palsu, role status dan penanda dekoratif aria-hidden. Tiap blok memakai gradasi kilau bergerak (`--ui-skeleton-shimmer`1,5detik linear, 200% lebar) di atas warna `--ui-head` plus denyut opasitas halus; warna/ukuran/durasi melalui token. Reduced-motion mematikan animasi dan menghapus lapisan kilau sehingga blok tampil statis.
 - Klik Masuk yang lolos validasi HTML langsung menampilkan skeleton sambil menunggu POST autentikasi native. Tidak menganggap autentikasi sukses sebelum server memeriksa akun. Shell login inert selama kirim; pageshow memulihkan kontrol saat kembali lewat Back. Tidak menyimpan password/token sesi di storage atau mengirim kredensial lewat jalur tambahan.
+- Tombol lihat kata sandi di halaman login hanya ikon mata SVG (`stroke=currentColor`, tanpa emoji), bukan teks Lihat/Sembunyikan. Ikon berganti mata/mata-garis; label aksesibel `aria-label` berubah "Tampilkan kata sandi"/"Sembunyikan kata sandi" dan `aria-pressed` tetap. Tombol kotak38×38px di dalam kolom, input diberi ruang kanan agar ikon tidak menutupi kata sandi; fokus/klik tidak berubah. Ikon nonaktif disembunyikan dengan `.pw-toggle svg[hidden]{display:none}` dan JS `toggleAttribute`, karena atribut `hidden` tidak otomatis menyembunyikan elemen SVG di Chromium. Pergantian ikon memakai morph300ms ease-in-out: ikon lama mengecil/memudar sementara ikon baru masuk dengan skala/rotasi, kedua ikon menempati sel grid yang sama agar tidak menggeser tombol; `prefers-reduced-motion` langsung menampilkan keadaan akhir. Latar login memakai hijau gelap penuh (tanpa area putih bawah): lapisan grid32px lime4%, titik24px terang4%, dan glow radial, dimasking radial dari kuat di kiri-atas hingga transparan di sisi lain sehingga tidak menutupi seluruh layar; vignette tipis menambah kedalaman. Kartu putih menjadi fokus dan catatan footer memakai hijau pucat agar terbaca. Kartu memakai bayangan dua lapis yang lebih tegas agar terangkat dari latar gelap; radius16px, ukuran dan isi kartu tidak berubah. Motif statis, tanpa aset baru, tidak menambah gulir, serta tidak mengubah kontras formulir di dalam kartu.
 - Workspace menampilkan skeleton selama main belum data-ready, bukan ruang kosong; no-JS menampilkan isi tanpa skeleton permanen. Panel Keuangan yang belum memiliki cache memakai skeleton sama; hasil cache boleh langsung tampil. Error mengganti skeleton dengan status dan akses halaman penuh, tidak memuat angka dummy.
 - Tanggal khusus berdiri sendiri di ringkasan Kasir dengan pemilih rentang existing, validasi server maksimal366 hari dan tidak melewati hari ini. Ringkasan/pembanding/grafik/terlaris berubah bersama, lima penjualan terbaru tidak difilter. Grafik sehari per jam; lebih panjang per hari,7 hari per bucket di atas62hari dan30hari per bucket di atas180hari.
 - Pembaruan tanpa reload/menyentuh keranjang. Respons usang ditolak; gagal mempertahankan hasil. Refresh latar memakai rentang terakhir yang diterapkan, bukan isian tanggal yang belum dikirim. Preferensi Kasir terpisah dari tanggal menu lain.
@@ -482,3 +483,62 @@ Berkas: `partials/table-filter-styles.blade.php` (kedua cangkang), `partials/fil
 - Pemilihan menu tetap memakai hash existing. Tanggal laporan hanya tampak di URL #laporan; produk/Kasir/Tagihan/menu lain tidak membawa date. master_kind lama yang sudah digantikan hash dan partial transport dibersihkan, tanpa menghapus parameter asing atau prefix deployment.
 - Pembersihan memakai replaceState tanpa reload atau menambah entri history. Berlaku pada tautan awal, klik menu dan navigasi hash. Form/filter tidak dimodifikasi.
 - Tanggal laporan terapan dibaca dari defaultValue input server, bukan value yang mungkin masih draft. Kembali ke Laporan dalam dokumen yang sama memulihkan tanggal terapan di alamat; uiLive menggunakannya pada GET internal sekalipun menu aktif memiliki URL bersih. Form fallback/reset riwayat penjualan tidak membawa date/master_kind.
+
+## 52. Menu aksi tiga titik pada tabel
+
+- Kolom Aksi setiap tabel ruang kerja memakai satu tombol tiga titik (SVG, bukan emoji) berukuran36px desktop dan44px pada layar sempit; label aksesibel menyebut barisnya. Panel berisi kontrol asli, bukan salinan, supaya handler/form/dialog tetap bekerja. Dialog tetap di sel baris.
+- Panel memakai permukaan putih, radius/token yang sama, bayangan, lebar12,5–20rem, tinggi maksimal65vh dengan gulir; posisi fixed dihitung saat dibuka dan dibalik/dijepit agar tidak keluar layar. Hanya satu panel terbuka; Escape mengembalikan fokus ke tombol, klik luar/gulir/resize menutup.
+- Urutan kontrol dipertahankan. Aksi utama (mis. pembayaran) diberi latar hijau lembut, arsip memakai warna bahaya. Form di dalam panel ditata satu kolom dengan tombol kirim selebar panel.
+- Katalog Kasir dikecualikan: tombol + Tambah tetap terlihat dan satu klik. Tanpa JavaScript, tombol aksi lama tetap tampil (fallback). Saat cetak, tombol dan panel disembunyikan.
+
+## 53. Pil status, pencarian HP, dan ringkasan keranjang
+
+- Pil status di kepala monitor memakai pola badge tema: latar warna lembut dari token, teks warna nada, titik8px, tanpa bingkai tebal. Nada ok/warn/info/bad konsisten dengan badge status lain; ukuran ringkas dan tidak mendominasi judul.
+- Kolom pencarian tabel mengisi satu baris penuh di HP (`flex-basis:100%`) dan kembali ke lebar terbatas di desktop; tinggi tetap satu kontrol44px. Chip filter turun ke baris berikutnya, bukan berbagi ruang sempit dengan kolom cari.
+- Lembar keranjang HP hanya menampilkan diskon (bila ada) lalu total; baris subtotal tidak diulang. Tombol kosongkan keranjang massal dihapus — barang dihapus satu per satu lewat kontrol baris.
+
+## 54. Nama supplier/mobil dan arsip karyawan
+
+- Nama supplier dan nomor polisi berupa tombol teks bergaris bawah warna tema tanpa karakter "›" buatan CSS; nama aksesibel tetap bersih dan tombol menandai `aria-haspopup=dialog`. Garis bawah menandakan dapat ditekan; fokus/klik membuka rincian yang sama.
+- Karyawan dan sopir tidak dihapus permanen. Arsipkan menyembunyikan dari pilihan baru tetapi riwayat pengiriman tetap; keterangan halaman menyebutkan hal ini agar tidak dikira menghapus data.
+
+## 55. Morph diskon, transisi grafik Kasir, dan panel tanggal khusus
+
+- Kartu diskon per baris membuka dengan morph tinggi240ms dan isi memudar masuk; menutup memendek ke tinggi judul lalu `open=false`. Klik beruntun ditahan selama morph; reduced-motion memakai buka/tutup langsung. Isian diskon40px, radius8, dan menjadi satu kolom di bawah380px.
+- Grafik ringkasan Kasir tidak berganti mendadak: saat periode berubah, figur chart masuk dengan opacity/geser/skala memakai token morph, sementara batang tumbuh lewat animasi data yang sudah ada. Reduced-motion melewati keduanya.
+- Tombol **Tanggal khusus** menampilkan rentang aktif pada labelnya, bukan hanya teks status. Status sukses singkat; galat tetap menyebut hasil sebelumnya. Mengirim rentang yang sama tanpa perubahan tidak memanggil server lagi; pembaruan uiLive tetap memaksa muat ulang agar data tidak basi.
+
+## 56. Tooltip bersama, aktifkan kembali arsip, dan rincian yang lebih rapi
+
+- Tooltip tunggal lintas halaman: chip hijau gelap, teks kecil, posisi fixed yang membalik/menjepit, muncul saat hover (jeda) dan fokus keyboard, `aria-describedby` sementara, Escape/klik luar/gulir menutup. `title` lama dipakai sebagai sumber lalu dikembalikan; teks terpotong memakai `data-tip-truncate`. Navigasi/rail dan elemen `data-tip-skip` dikecualikan; reduced-motion tanpa transisi; cetak menyembunyikan.
+- Status arsip tidak lagi jalan buntu: baris arsip menampilkan **Aktifkan kembali** (hijau) selain Ubah; baris aktif tetap **Arsipkan**. Tidak ada hapus permanen. Badge Diarsipkan menjelaskan lewat tooltip. Server hanya mengubah status, bukan riwayat/stok/utang/jurnal.
+- Dialog rincian: kartu KPI diganti **strip fakta ringkas** empat sel (2×2 di HP) tanpa kartu/hint, utang berjalan tetap ditonjolkan; aktivitas tagihan/pembayaran dinaikkan sebelum daftar produk, produk memakai badge peran, form tanggal 44px dan menumpuk di HP, tabel aktivitas memakai badge status serta header lengket. Blok riwayat mati dihapus. Angka dan sumber data tidak berubah.
+
+## 57. Pengeluaran operasional dan submenu tanpa muat ulang
+
+- **Pengeluaran** berada di grup Keuangan (khusus admin). Menu membuka halaman biaya operasional yang sudah ada sebagai panel workspace; kategori berasal dari akun beban aktif COA (HPP/persediaan dikecualikan), sumber dana Kas Tunai/Bank. Tidak menyentuh penjualan, piutang, atau laci kasir.
+- Simpan memposting jurnal seimbang (beban debit, kas/bank kredit) dan mengunci jurnal; saldo sumber tidak boleh negatif. Halaman penuh tetap tersedia di `/expenses`.
+- Halaman biaya legacy memakai `setCurrencyInput` milik layout lama; workspace menyediakan kompatibilitas nama itu, sedangkan format ketik dan nilai mentah tetap ditangani `ui-money`. Tanpa ini tombol Catat Pengeluaran berhenti sebelum dialog terbuka.
+- Tampilan panel Pengeluaran disamakan dengan tema ruang kerja: kartu putih, strip empat fakta (total utama), filter ringkas, tabel token dengan badge sumber/status, tombol hijau. Tidak ada lagi header/kartu bergaya inline legacy. Modal tetap memakai dialog yang ada; di HP fakta menjadi2×2 dan filter satu kolom.
+
+## 58. Info Toggletip, Rich Tooltip, Hover Card lintas sistem & perbaikan Pengeluaran
+
+- **Sistem keterangan terpadu (`v2/ui-tooltip.blade.php` + `<x-ui.info-tip>`)**:
+  - **Tooltip** (`data-tip` / `data-tip-truncate`) dan **Rich Info Toggletip** (`data-tip-key` + `data-toggletip`, ikon SVG `i` pada tombol `<button class="ui-info-btn">`) memakai `popover="manual"` sehingga tampil di atas `<dialog>` modal (`showModal()`) dan area bergulir.
+  - Interaksi ganda: hover/focus di desktop menampilkan pratinjau; klik/tap mengunci panel terbuka (`aria-expanded="true"`), ditutup lewat klik ulang ikon, klik luar, atau `Escape` (memulihkan fokus ke ikon). Target sentuh ikon di HP (`<= 760px`) diperluas ke 44×44px melalui `::after` tanpa merusak tinggi baris label.
+  - Kamus terpusat di JS (`window.uiTooltip.catalog`) menampung judul + uraian + catatan untuk istilah utama lintas domain (**Harga Modal / HPP**, **Margin Keuntungan**, Harga Kontraktor, Stok Minimum, Kas Harian, Sumber Dana, Uang Muka Sopir, Penerimaan Draf/Final/Ongkir, Selisih Kas, Laba Rugi/Neraca/Arus Kas, COA Inti, Pengeluaran Operasional, Akun Login), sehingga tidak menggandakan HTML di ratusan baris form edit.
+  - **Hover Card** (`data-hover-card`) dipakai di desktop pada tautan nama Supplier dan nomor polisi Mobil untuk pratinjau cepat sebelum membuka dialog rincian.
+  - Form Master Produk menampilkan Info Toggletip di samping pil dinamis `.uf-margin` (`ui-forms.blade.php`), dan Detail Produk (`master-product-detail.blade.php`) menambahkan baris fakta **Margin keuntungan** (`BigDecimal`) untuk harga eceran dan kontraktor.
+- **Perbaikan menu Pengeluaran (`expenses/index.blade.php` + `expenses/theme-styles.blade.php` + `v2/expense-script.blade.php`)**:
+  - Menyelaraskan nama field form `#expense-form` dengan endpoint `POST /v2/expenses` (`account_code` dan `source` = `cash`/`bank`).
+  - Menyertakan CSS modal `#modal-expense.modal-overlay` mandiri di `expenses/theme-styles.blade.php` bertema kepala hijau tua & tombol simpan lime agar bekerja penuh saat dimuat via `?partial=1` di workspace maupun halaman penuh `/expenses`, lengkap dengan tutup `Escape`/backdrop, pemulihan fokus, dan pembersihan salinan modal lama saat berpindah panel.
+  - Simpan berjalan lewat `fetch` JSON tanpa keluar dari workspace (`ui-remote:changed` + refresh fragmen + toast di `ui-result.blade.php`), dan tautan `Reset` di `bindRemote` (`ui-workspace.blade.php`) memulihkan daftar penuh ketika kembali dari URL tersaring.
+  - Filter daftar pengeluaran (`.exp-filter`) ditempatkan di header daftar `.exp-head` dengan satu input rentang tanggal (`data-date-range-start`/`end`) dan dikompilasi oleh komponen bersama `uiTableFilters` (`partials/filter-disclosure-script.blade.php` & `partials/table-filter-styles.blade.php`, termasuk `.exp-filter-actions`) menjadi tombol `[Filter]` + popover panel sesuai Bagian 30.
+- Penulisan memakai endpoint V2 `/v2/expenses` dengan layanan admin (tanggal, akun beban, sumber, nominal, keterangan). Rute arsip lama tetap baca-saja setelah cutover; memakai rute lama untuk menyimpan menghasilkan403. Form menyediakan tanggal (default hari ini), menampilkan galat di modal, dan setelah sukses mengarah ke `/expenses` dengan banner.
+- Submenu gabungan (Supplier/Pelanggan, Satuan/Kategori) hanya menukar panel dengan transisi ringan pada isi. Animasi masuk penuh, pemutaran ulang baris, dan gulir ke atas hanya terjadi saat pindah menu sidebar, bukan saat pindah submenu dalam menu yang sama.
+
+## 59. Dukungan multi-rekening bank dari Bagan Akun (COA)
+
+- Di modal **Bagan Akun** (`coa/index.blade.php`), akun bertipe **Aset** menampilkan opsi **Gunakan sebagai Rekening Bank (metode pembayaran)** (`is_bank_account`); akun inti `1102` tetap terkunci aktif sebagai rekening bank bawaan.
+- Semua formulir transaksi yang mendukung metode Transfer/Bank (**Kasir**, **Tagihan Piutang & Utang Supplier**, **Pengeluaran**, **Uang Muka & Realisasi Sopir**, **Biaya Ritase**, dan **Ongkir Penerimaan**) menampilkan pemilih **Rekening bank** kontekstual (`[data-bank-account-field]` / `[data-expense-bank-field]`) hanya saat metode Transfer/Bank dipilih, sehingga form tunai tetap ringkas.
+- Menambah/mengubah akun bank di COA memicu `uiLive.refresh()` agar pilihan rekening di seluruh ruang kerja langsung terbarui tanpa muat ulang manual; tabel Verifikasi Pembayaran, Riwayat Tagihan, Detail Nota, dan Pengeluaran menampilkan kode + nama rekening bank yang dipakai, sementara Ringkasan Admin merinci saldo per rekening bila lebih dari satu bank aktif.

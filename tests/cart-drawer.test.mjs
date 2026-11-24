@@ -71,7 +71,7 @@ test('Tab wraps inside the drawer but leaves native payment dialogs alone',()=>{
         addEventListener(type,fn){handler=fn;}};
     const pane={querySelectorAll:()=>[first,last],contains:()=>true};
     const start=source.indexOf("document.addEventListener('keydown',e=>{\n if(e.key!=='Tab'");
-    vm.runInNewContext(source.slice(start,source.indexOf('// Kosongkan:',start)),{document,pane});
+    vm.runInNewContext(source.slice(start,source.indexOf('// --- pembayaran sebagai lembar bawah ---',start)),{document,pane});
     handler({key:'Tab',shiftKey:false,preventDefault(){prevented++;}});
     assert.equal(focus,'first');
     document.activeElement=first;
@@ -80,4 +80,9 @@ test('Tab wraps inside the drawer but leaves native payment dialogs alone',()=>{
     document.querySelector=()=>({open:true});
     handler({key:'Tab',shiftKey:true,preventDefault(){prevented++;}});
     assert.equal(prevented,2);
+});
+
+test('lembar keranjang HP tidak memuat tombol kosongkan massal atau baris subtotal', () => {
+    assert.doesNotMatch(source, /pm-clear|pm-gross|Kosongkan keranjang/);
+    assert.match(source, /subRows\.hidden=!\(last\.discount>0n\)/);
 });

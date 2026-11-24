@@ -411,7 +411,7 @@
                             <td data-label="Akun">
                                 <div class="master-identity">
                                     <strong>{{ $acc->account_name }}</strong>
-                                    <small><span class="sku-code">{{ $acc->account_code }}</span>@if($acc->is_system) · Akun inti sistem @endif</small>
+                                    <small><span class="sku-code">{{ $acc->account_code }}</span>@if($acc->is_system) · Akun inti sistem @endif @if($acc->is_bank_account ?? false) · Rekening bank @endif</small>
                                 </div>
                             </td>
                             <td data-label="Klasifikasi">{{ $typeLabels[$acc->account_type] ?? ucfirst($acc->account_type) }}</td>
@@ -434,6 +434,7 @@
                                         data-id="{{ $acc->id }}" data-code="{{ $acc->account_code }}" data-name="{{ $acc->account_name }}"
                                         data-type="{{ $acc->account_type }}" data-balance="{{ $acc->normal_balance }}"
                                         data-system="{{ $acc->is_system ? '1' : '0' }}" data-active="{{ $acc->is_active ? '1' : '0' }}"
+                                        data-bank="{{ ($acc->is_bank_account ?? false) ? '1' : '0' }}"
                                         data-update-url="{{ route($coaWritePrefix.'.update', $acc->id) }}"
                                         onclick="editAccountBtn(this)">Ubah</button>
                                     @if(config('v2.enabled'))
@@ -481,7 +482,7 @@
             <input type="hidden" name="_method" id="form-method" value="POST">
             <div class="modal-body">
                 <p class="err" data-coa-error role="alert" tabindex="-1" hidden></p>
-                <div class="master-help" style="margin-bottom:14px;"><strong>Panduan:</strong> 1=Aset, 2=Kewajiban, 3=Ekuitas, 4/7=Pendapatan, 5/6/8=Beban. Klasifikasi akun yang sudah digunakan tidak dapat diubah.</div>
+                <div class="master-help" style="margin-bottom:14px;"><strong>Panduan:</strong> 1=Aset, 2=Kewajiban, 3=Ekuitas, 4/7=Pendapatan, 5/6/8=Beban. Klasifikasi akun yang sudah digunakan tidak dapat diubah. <x-ui.info-tip key="coa_akun_inti" label="Keterangan akun inti sistem"/></div>
                 <div class="master-modal-grid">
                     <div class="form-group"><label for="account_code">Kode Akun</label><input class="form-control tabular-nums" id="account_code" name="account_code" value="{{ old('account_code') }}" required autocomplete="off"></div>
                     <div class="form-group"><label for="account_name">Nama Akun</label><input class="form-control" id="account_name" name="account_name" value="{{ old('account_name') }}" required autocomplete="off"></div>
@@ -494,6 +495,13 @@
                             <span><strong>Akun aktif</strong><small id="account-active-help">Dapat dipilih pada transaksi baru.</small></span>
                         </label>
                     </div>
+                    <div class="form-group span-2" id="coa-bank-wrap" hidden>
+                        <input type="hidden" name="is_bank_account" value="0">
+                        <label class="coa-status-label" for="account-bank">
+                            <input type="checkbox" id="account-bank" name="is_bank_account" value="1" @checked(old('is_bank_account') === '1') aria-describedby="account-bank-help">
+                            <span><strong>Gunakan sebagai Rekening Bank (metode pembayaran)</strong><small id="account-bank-help">Otomatis muncul sebagai pilihan rekening bank di Kasir, Tagihan, Pengeluaran, Pengiriman, Penyesuaian Saldo, dan Arus Kas.</small></span>
+                        </label>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modal-coa')">Batal</button><button type="submit" id="btn-submit-coa" class="btn">Simpan Akun</button></div>
@@ -501,9 +509,29 @@
     </div>
 </div>
 <script>
+function syncBankAccountField(isSystem, code) {
+    var wrap = document.getElementById('coa-bank-wrap');
+    var box = document.getElementById('account-bank');
+    var type = document.getElementById('account_type').value;
+    if (!wrap || !box) return;
+    var isDefaultBank = code === '1102';
+    var eligible = type === 'asset' && (!isSystem || isDefaultBank);
+    wrap.hidden = !eligible;
+    if (!eligible) {
+        box.checked = false;
+        box.onclick = null;
+    } else if (isDefaultBank) {
+        box.checked = true;
+        box.onclick = function () { this.checked = true; return false; };
+    } else {
+        box.onclick = null;
+    }
+}
 function autoSuggestBalance() {
     var type = document.getElementById('account_type').value;
     document.getElementById('normal_balance').value = (type === 'asset' || type === 'expense') ? 'debit' : 'credit';
+    var codeEl = document.getElementById('account_code');
+    syncBankAccountField(Boolean(codeEl && codeEl.readOnly), codeEl ? codeEl.value.trim() : '');
 }
 function resetAccountForm() {
     document.getElementById('coa-form').action = "{{ route($coaWritePrefix.'.store') }}";
@@ -519,6 +547,8 @@ function resetAccountForm() {
     document.getElementById('account-active').checked = true;
     document.getElementById('account-active').disabled = false;
     document.getElementById('account-active').onclick = null;
+    document.getElementById('account-bank').checked = false;
+    syncBankAccountField(false, '');
     document.getElementById('form-title').textContent = 'Tambah Akun';
     document.getElementById('form-subtitle').textContent = 'Struktur buku besar';
     document.getElementById('btn-submit-coa').textContent = 'Simpan Akun';
@@ -539,6 +569,8 @@ function editAccountBtn(btn) {
     document.getElementById('account-active').checked = btn.dataset.active === '1';
     document.getElementById('account-active').disabled = false;
     document.getElementById('account-active').onclick = isSystem ? function () { this.checked = true; return false; } : null;
+    document.getElementById('account-bank').checked = btn.dataset.bank === '1' || btn.dataset.code === '1102';
+    syncBankAccountField(isSystem, btn.dataset.code);
     document.getElementById('form-title').textContent = 'Ubah Akun ' + btn.dataset.code;
     document.getElementById('form-subtitle').textContent = isSystem ? 'Akun inti sistem tetap aktif' : 'Perbarui identitas atau status akun';
     document.getElementById('btn-submit-coa').textContent = 'Perbarui Akun';

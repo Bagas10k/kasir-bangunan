@@ -3,7 +3,7 @@
 'use strict';
 if(window.uiTableFilters)return;
 
-const SOURCES='[data-ui-toolbar],.master-toolbar,.ledger-filter,.receivables-filter,.ritase-history-toolbar,.table-filters,.sales-filter-grid,.catalog-filter-row,.report-toolbar,#laporan>form.ui-toolbar';
+const SOURCES='[data-ui-toolbar],.master-toolbar,.ledger-filter,.receivables-filter,.ritase-history-toolbar,.table-filters,.sales-filter-grid,.catalog-filter-row,.report-toolbar,.exp-filter,#laporan>form.ui-toolbar';
 const CHILD_PICKERS='.select-options,.app-calendar,.ui-pick-list';
 const FOCUSABLE='input:not([type=hidden]),select,button,a[href],summary,[tabindex]';
 let serial=0,active=null;
@@ -132,7 +132,7 @@ function enhance(source){
             const fields=part.querySelector('.history-options-fields');
             if(fields)body.append(...Array.from(fields.children));
             part.remove();
-        }else if(part.matches('.sales-filter-actions,.master-toolbar-actions,.ledger-filter-actions,.receivables-filter-actions,.ui-toolbar-actions,.table-reset,#catalog-reset')){
+        }else if(part.matches('.sales-filter-actions,.master-toolbar-actions,.ledger-filter-actions,.receivables-filter-actions,.exp-filter-actions,.ui-toolbar-actions,.table-reset,#catalog-reset')){
             footer.append(part);
         }else body.append(part);
     }

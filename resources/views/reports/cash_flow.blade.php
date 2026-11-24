@@ -39,7 +39,7 @@
     <header class="statement-header">
         <div class="statement-title">
             <nav class="breadcrumb no-print" aria-label="Breadcrumb">Laporan Keuangan<span class="sep" aria-hidden="true">›</span>Arus Kas (Cash Flow)</nav>
-            <h2>Laporan Arus Kas</h2>
+            <h2>Laporan Arus Kas <x-ui.info-tip key="arus_kas_langsung" label="Keterangan metode langsung arus kas"/></h2>
             <p class="report-period">{{ $periodLabel }} · Metode Langsung</p>
         </div>
         <div class="statement-actions no-print">

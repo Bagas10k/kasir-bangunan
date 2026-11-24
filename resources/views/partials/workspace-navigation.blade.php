@@ -32,6 +32,7 @@
     $adminOnlyTasks = ['penerimaan'];
     // Halaman keuangan dimuat ke panel workspace lewat fetch; URL penuhnya tetap berfungsi.
     $financialLinks = [
+        'pengeluaran' => ['expenses.index', 'Pengeluaran'],
         'jurnal' => ['journals.index', 'Jurnal umum'],
         'neraca' => ['reports.balance_sheet', 'Neraca'],
         'laba-rugi' => ['reports.profit_loss', 'Laba rugi'],
@@ -54,7 +55,7 @@
         </details>
     @endforeach
     @if($navigationAdmin)
-        <details class="workspace-menu-group" data-menu-group="keuangan" @if(request()->routeIs('reports.*', 'journals.*', 'coa.*')) open @endif>
+        <details class="workspace-menu-group" data-menu-group="keuangan" @if(request()->routeIs('reports.*', 'journals.*', 'coa.*', 'expenses.*')) open @endif>
             <summary title="Keuangan"><svg class="menu-group-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H20v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H20M9 7h7M9 11h5"/></svg><span>Keuangan</span></summary>
             <div class="workspace-submenu">
                 @foreach($financialLinks as $task => [$routeName, $label])

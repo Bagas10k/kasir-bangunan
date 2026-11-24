@@ -2,6 +2,7 @@
 
 namespace App\Services\V2;
 
+use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -206,6 +207,25 @@ class MasterData
         });
     }
 
+    /** Aktifkan kembali = pulihkan dari arsip tanpa menghapus riwayat. */
+    public function activate(int $actor, string $kind, int $id): void
+    {
+        $this->requireAdmin($actor);
+        $this->assertKind($kind);
+
+        DB::transaction(function () use ($kind, $id): void {
+            [$table] = $this->keySpec($kind);
+            if (! $this->rowQuery($kind, $id)->lockForUpdate()->exists()) {
+                throw new RuntimeException('Data tidak ditemukan.');
+            }
+
+            $payload = $kind === 'vehicle'
+                ? ['status' => 'active', 'updated_at' => now()]
+                : ['is_active' => true, 'updated_at' => now()];
+            DB::table($table)->where('id', $id)->update($payload);
+        });
+    }
+
     /** @return int[] id produk yang HPP-nya terkunci oleh stok atau riwayat pergerakan. */
     public function costLockedIds(array $productIds): array
     {
@@ -283,7 +303,7 @@ class MasterData
             return null;
         }
         $amount = $this->decimal($value, $field, 2);
-        if (\Brick\Math\BigDecimal::of($amount)->isZero()) {
+        if (BigDecimal::of($amount)->isZero()) {
             throw new RuntimeException("Kolom '{$field}' harus lebih dari 0 atau dikosongkan.");
         }
 

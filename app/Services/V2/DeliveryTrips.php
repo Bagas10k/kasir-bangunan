@@ -6,6 +6,7 @@ use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -124,9 +125,12 @@ class DeliveryTrips
         if (! in_array($method, ['cash', 'transfer'], true)) {
             $this->invalid('Metode uang muka harus cash atau transfer.');
         }
+        $bankAccountCode = $method === 'transfer'
+            ? app(BankAccounts::class)->resolve(isset($data['bank_account_code']) ? (string) $data['bank_account_code'] : null)
+            : null;
 
         $key = $this->key($data['idempotency_key'] ?? null);
-        $hash = $this->hash('advance', $actor, [
+        $hashPayload = [
             'vehicle_id' => $vehicleId,
             'driver_id' => $driverId,
             'destination' => $destination,
@@ -134,10 +138,14 @@ class DeliveryTrips
             'date' => $date,
             'amount' => (string) $amount,
             'method' => $method,
-        ]);
+        ];
+        if ($bankAccountCode !== null && $bankAccountCode !== self::BANK) {
+            $hashPayload['bank_account_code'] = $bankAccountCode;
+        }
+        $hash = $this->hash('advance', $actor, $hashPayload);
 
         try {
-            return DB::transaction(function () use ($actor, $vehicleId, $deliveryId, $driverId, $destination, $date, $amount, $method, $key, $hash) {
+            return DB::transaction(function () use ($actor, $vehicleId, $deliveryId, $driverId, $destination, $date, $amount, $method, $bankAccountCode, $key, $hash) {
                 $this->lockActor($actor);
                 $seen = $this->replay($actor, 'advance', $key, $hash);
                 if ($seen !== null) {
@@ -148,7 +156,7 @@ class DeliveryTrips
                 $driver = $this->assignment->resolve($driverId, $vehicleId, $delivery);
                 $destination = $delivery?->destination ?? $destination;
 
-                $account = $method === 'cash' ? self::CASH : self::BANK;
+                $account = $method === 'cash' ? self::CASH : ($bankAccountCode ?? self::BANK);
                 $shift = null;
                 if ($method === 'cash') {
                     $shift = $this->openShift($actor);
@@ -161,7 +169,7 @@ class DeliveryTrips
                 $this->guardAccount($account, $amount);
 
                 $now = now();
-                $advanceId = (int) DB::table('v2_driver_advances')->insertGetId([
+                $advanceRow = [
                     'vehicle_id' => $vehicleId,
                     'driver_id' => $driverId,
                     'driver_name' => $driver->name,
@@ -177,7 +185,11 @@ class DeliveryTrips
                     'request_hash' => $hash,
                     'created_at' => $now,
                     'updated_at' => $now,
-                ]);
+                ];
+                if (Schema::hasColumn('v2_driver_advances', 'bank_account_code')) {
+                    $advanceRow['bank_account_code'] = $bankAccountCode;
+                }
+                $advanceId = (int) DB::table('v2_driver_advances')->insertGetId($advanceRow);
 
                 $journalId = Ledger::post('v2_driver_advance', $advanceId, 'Uang muka sopir '.$driver->name.' '.$date, [
                     ['account_code' => self::ADVANCE_ASSET, 'debit' => $this->str($amount), 'credit' => '0.00'],
@@ -237,19 +249,26 @@ class DeliveryTrips
         if ($refundMethod !== null && ! in_array($refundMethod, ['cash', 'transfer'], true)) {
             $this->invalid('Metode pengembalian harus cash atau transfer.');
         }
+        $refundBankAccountCode = $refundMethod === 'transfer'
+            ? app(BankAccounts::class)->resolve(isset($data['refund_bank_account_code']) ? (string) $data['refund_bank_account_code'] : null, 'refund_bank_account_code')
+            : null;
         $refundReceived = ($data['refund_received'] ?? null) === true;
 
         $key = $this->key($data['idempotency_key'] ?? null);
-        $hash = $this->hash('settle', $actor, [
+        $hashPayload = [
             'advance_id' => $advanceId,
             'fuel_cost' => (string) $fuel,
             'allowance' => (string) $allowance,
             'refund_method' => $refundMethod,
             'refund_received' => $refundReceived,
-        ]);
+        ];
+        if ($refundBankAccountCode !== null && $refundBankAccountCode !== self::BANK) {
+            $hashPayload['refund_bank_account_code'] = $refundBankAccountCode;
+        }
+        $hash = $this->hash('settle', $actor, $hashPayload);
 
         try {
-            return DB::transaction(function () use ($actor, $advanceId, $fuel, $allowance, $actual, $refundMethod, $refundReceived, $key, $hash) {
+            return DB::transaction(function () use ($actor, $advanceId, $fuel, $allowance, $actual, $refundMethod, $refundBankAccountCode, $refundReceived, $key, $hash) {
                 $this->lockActor($actor);
                 $seen = $this->replay($actor, 'settle', $key, $hash);
                 if ($seen !== null) {
@@ -280,20 +299,20 @@ class DeliveryTrips
                     }
                 }
 
-                $account = $refundMethod === 'transfer' ? self::BANK : self::CASH;
+                $account = $refundMethod === 'transfer' ? ($refundBankAccountCode ?? self::BANK) : self::CASH;
                 $shift = null;
                 if ($refund->isPositive() && $account === self::CASH) {
                     $shift = $this->openShift($actor); // uang kembali masuk laci shift sendiri
                 }
 
                 $now = now();
-                $settlementId = (int) DB::table('v2_driver_advance_settlements')->insertGetId([
+                $settlementRow = [
                     'advance_id' => $advanceId,
                     'fuel_cost' => $this->str($fuel),
                     'allowance' => $this->str($allowance),
                     'expense_total' => $this->str($actual),
                     'refund_amount' => $this->str($refund),
-                    'refund_method' => $account === self::BANK ? 'transfer' : 'cash',
+                    'refund_method' => $refundMethod === 'transfer' ? 'transfer' : 'cash',
                     'refund_received' => $refundReceived,
                     'status' => 'settled',
                     'journal_entry_id' => null,
@@ -303,7 +322,11 @@ class DeliveryTrips
                     'request_hash' => $hash,
                     'created_at' => $now,
                     'updated_at' => $now,
-                ]);
+                ];
+                if (Schema::hasColumn('v2_driver_advance_settlements', 'refund_bank_account_code')) {
+                    $settlementRow['refund_bank_account_code'] = $refundMethod === 'transfer' ? $account : null;
+                }
+                $settlementId = (int) DB::table('v2_driver_advance_settlements')->insertGetId($settlementRow);
 
                 $lines = [];
                 if ($actual->isPositive()) {

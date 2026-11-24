@@ -19,7 +19,7 @@
 @php
     $draftNumber = 'DRF-'.str_pad((string) $draft->id, 6, '0', STR_PAD_LEFT);
     $editData = ['id' => $draft->id, 'version' => $draft->version, 'supplier_id' => $draft->supplier_id, 'supplier_name' => $draft->supplier_name, 'receipt_date' => $draft->receipt_date, 'supplier_invoice_number' => $draft->supplier_invoice_number, 'notes' => $draft->notes,
-        'freight_amount' => (string) ($draft->freight_amount ?? '0'), 'freight_method' => $draft->freight_method ?? null, 'freight_account' => $draft->freight_account ?? null,
+        'freight_amount' => (string) ($draft->freight_amount ?? '0'), 'freight_method' => $draft->freight_method ?? null, 'freight_account' => $draft->freight_account ?? null, 'freight_bank_account_code' => $draft->freight_bank_account_code ?? null,
         'items' => array_map(function ($item) use ($draftProducts) {
             $product = $draftProducts->get($item['product_id']);
             return $item + ['name' => $product->name ?? 'Barang tidak tersedia', 'unit' => $product->unit ?? '', 'current_cost' => (string) ($product->cost_price ?? '0'), 'stock' => (string) ($product->stock_quantity ?? '0')];

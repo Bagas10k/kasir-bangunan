@@ -54,6 +54,8 @@ dialog.input-dialog.uf-dialog-wide{width:min(780px,calc(100vw - 32px));max-width
 .uf-pre{border-right:1px solid var(--ui-line-soft)}
 .uf-suf{border-left:1px solid var(--ui-line-soft);max-width:48%;overflow:hidden;text-overflow:ellipsis}
 .uf-lock{font-size:var(--ui-t-caption);color:var(--ui-warn-ink)}
+.uf-margin-row{display:inline-flex;align-items:center;gap:4px;margin-top:6px}
+.uf-margin-row[hidden]{display:none}
 .uf-margin{font-size:var(--ui-t-caption);font-weight:600;color:var(--ui-green);font-variant-numeric:tabular-nums}
 .uf-margin[data-tone=loss]{color:var(--ui-bad-ink)}
 

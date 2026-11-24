@@ -28,7 +28,6 @@ body .task-panel .sr-section{padding:0;margin:0;border:0;background:none;box-sha
 
 body .ui-link{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0;border:0;background:none;color:var(--ui-green);font:inherit;font-weight:650;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;text-decoration-color:rgb(20 83 45 / .35)}
 body .ui-link:hover{text-decoration-color:currentColor}
-body .ui-link::after{content:'›';font-size:1.1em;line-height:1;opacity:.6}
 #insight-dialog .ui-monitor-grid{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:4px}
 #insight-dialog .ui-subhead{margin:16px 0 8px}
 #insight-dialog .ui-table-wrap{max-height:230px}

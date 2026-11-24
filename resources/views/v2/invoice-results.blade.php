@@ -40,7 +40,7 @@
                                 <li>
                                     <strong>{{ $invoiceMoney($payment->amount) }} · {{ $paymentLabels[$payment->status] ?? $payment->status }}</strong>
                                     <p>{{ $payment->created_at ? \Illuminate\Support\Carbon::parse($payment->created_at)->format('d/m/Y H:i') : '—' }} · {{ $payment->requester_name ?? '—' }}</p>
-                                    <p>{{ $payable ? (['main'=>'Kas Utama','transfer'=>'Bank Utama','cash'=>'Laci kas harian'][$payment->method] ?? '—') : (['cash'=>'Tunai','transfer'=>'Transfer'][$payment->method] ?? '—') }} · Referensi: {{ $payment->reference ?? '—' }}</p>
+                                    <p>{{ $payable ? (['main'=>'Kas Utama','transfer'=>'Bank Utama','cash'=>'Laci kas harian'][$payment->method] ?? '—') : (['cash'=>'Tunai','transfer'=>'Transfer'][$payment->method] ?? '—') }}@if($payment->method === 'transfer' && !empty($payment->bank_account_code)) ({{ $payment->bank_account_code }}{{ isset($bankAccountNames[$payment->bank_account_code]) ? ' · '.$bankAccountNames[$payment->bank_account_code] : '' }})@endif · Referensi: {{ $payment->reference ?? '—' }}</p>
                                     @if($payment->proof_id)<a href="{{ route('v2.payments.proof', $payment->id) }}" target="_blank" rel="noopener">Lihat bukti transfer</a>@elseif($payment->method === 'transfer')<p class="note">Bukti foto belum tersedia pada catatan ini.</p>@endif
                                     @if($payment->approver_name)<p>Disetujui: {{ $payment->approver_name }}</p>@endif
                                     @if($payment->resolution_note)<p>Alasan: {{ $payment->resolution_note }} · {{ $payment->resolver_name ?? '—' }} · {{ $payment->resolved_at }}</p>@endif

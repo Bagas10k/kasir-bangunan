@@ -36,8 +36,10 @@ function partialUrl(url){const u=new URL(url,location.href);u.searchParams.set('
 // Halaman Keuangan lama (Bagan akun) memanggil openModal/closeModal/showLockInfo milik layouts.app, yang tidak dimuat workspace.
 // Tanpa pengganti ini, Tambah akun/Ubah/Terkunci di panel tidak bereaksi. Perilaku sama dengan versi layouts.app.
 if(typeof window.openModal!=='function'){
- window.openModal=id=>{const m=document.getElementById(id);if(!m)return;if(m.parentElement!==document.body)document.body.appendChild(m);m.classList.add('open');document.body.style.overflow='hidden';const first=m.querySelector('input:not([type=hidden]):not([readonly]),.select-trigger,textarea');if(first)setTimeout(()=>first.focus(),80);};
- window.closeModal=id=>{const m=document.getElementById(id);if(!m)return;m.classList.remove('open');document.body.style.overflow='';};
+ window.openModal=id=>{const m=document.getElementById(id);if(!m)return;m._openerTrigger=document.activeElement;if(m.parentElement!==document.body){m.dataset.teleportedModal='1';document.body.appendChild(m);}m.classList.add('open');document.body.style.overflow='hidden';const first=m.querySelector('input:not([type=hidden]):not([readonly]),select:not([disabled]),.select-trigger,textarea');if(first)setTimeout(()=>first.focus(),80);};
+ window.closeModal=id=>{const m=document.getElementById(id);if(!m)return;m.classList.remove('open');document.body.style.overflow='';m._openerTrigger?.focus?.({preventScroll:true});};
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.modal-overlay.open').forEach(m=>{m.classList.remove('open');document.body.style.overflow='';m._openerTrigger?.focus?.({preventScroll:true});});}});
+ document.addEventListener('click',e=>{if(e.target.classList?.contains('modal-overlay')){e.target.classList.remove('open');document.body.style.overflow='';e.target._openerTrigger?.focus?.({preventScroll:true});}});
 }
 if(typeof window.showLockInfo!=='function'){
  window.showLockInfo=(title,message)=>{
@@ -48,6 +50,22 @@ if(typeof window.showLockInfo!=='function'){
   d.querySelector('h2').textContent=title;d.querySelector('.note').textContent=message;d.showModal();d.querySelector('.uf-primary').focus();
  };
 }
+// Halaman biaya legacy memakai setCurrencyInput/format Rupiah milik layouts.app. Sediakan versi yang sama
+// agar tombol Catat Pengeluaran dan isian nominal bekerja saat halaman dimuat sebagai panel.
+// ui-currency-compat-start
+if(typeof window.setCurrencyInput!=='function'){
+ const scaleOf=el=>{const n=parseInt(el.getAttribute('data-currency-scale'),10);return Number.isNaN(n)?2:n;};
+ const rawToDisplay=(raw,scale)=>{
+  let s=String(raw??'').trim();if(s==='')return '';
+  const neg=s.charAt(0)==='-';if(neg)s=s.slice(1);
+  const parts=s.split('.');let whole=(parts[0]||'').replace(/\D/g,'').replace(/^0+(?=\d)/,'');
+  const dec=(parts[1]||'').replace(/\D/g,'').slice(0,scale);if(whole==='')whole='0';
+  return (neg?'-':'')+whole.replace(/\B(?=(\d{3})+(?!\d))/g,'.')+(dec.length?','+dec:'');
+ };
+ // Format ketik dan nilai mentah sudah ditangani ui-money untuk input[data-currency-input].
+ window.setCurrencyInput=(el,raw)=>{if(el)el.value=rawToDisplay(raw,scaleOf(el));};
+}
+// ui-currency-compat-end
 const remoteCleanup=new Map(); // kunci -> fungsi penghenti
 function runScripts(root,key){
  const timers=[],listeners=[];
@@ -75,6 +93,7 @@ function runScripts(root,key){
 function stopRemote(key){
  const stop=remoteCleanup.get(key);
  if(stop){stop();remoteCleanup.delete(key);}
+ for(const m of document.querySelectorAll('body > .modal-overlay[data-teleported-modal]')){m.classList.remove('open');document.body.style.overflow='';m.remove();}
 }
 function remoteBusy(panel,message){
   panel.replaceChildren();
@@ -162,7 +181,7 @@ function bindRemote(key,panel){
   if(url.origin!==location.origin||link.hasAttribute('download')||/csv|print/i.test(url.pathname+url.search))continue;
   const owner=links.find(item=>item.dataset.remote&&new URL(item.dataset.remote,location.href).pathname===url.pathname);
   if(!owner)continue;
-  link.addEventListener('click',event=>{event.preventDefault();select(owner.dataset.task);if(url.search)loadRemote(owner.dataset.task,url.toString(),{force:true});});
+  link.addEventListener('click',event=>{event.preventDefault();select(owner.dataset.task);if(url.search||remoteState.get(owner.dataset.task)!==url.toString())loadRemote(owner.dataset.task,url.toString(),{force:true});});
  }
 }
 // Menu gabungan (data-tabs) memiliki beberapa panel; satu tautan sidebar menjadi pemiliknya.
@@ -368,6 +387,7 @@ function workspaceUrl(task){
  return url;
 }
 function select(key,{focus=false,updateURL=true}={}){
+  const previous=active,sameGroup=previous!==null&&owner.get(previous)===owner.get(key);
   if(!panels.has(key))key=defaultTask;const changed=active!==key;
  for(const [id,panel]of panels){panel.hidden=id!==key;panel.inert=id!==key;}
   for(const link of links){const selected=owner.get(key)===link;if(selected){link.setAttribute('aria-current','page');const group=link.closest('[data-menu-group]');if(group)group.open=true;}else{link.removeAttribute('aria-current');}link.tabIndex=0;}
@@ -380,7 +400,11 @@ function select(key,{focus=false,updateURL=true}={}){
  if(remoteUrl)loadRemote(key,remoteLast.get(key)||remoteUrl);const own=owner.get(key);document.querySelector('#workspace-title').textContent=tabsOf.get(key)?own.textContent.trim():text[key][0];document.querySelector('#workspace-description').textContent=text[key][1];document.querySelector('.top-context strong').textContent=key==='kasir'?'Kasir':(own?.textContent.trim()||text[key][0]);
   const url=workspaceUrl(key);if(updateURL&&changed)url.hash=key;
   if(url.href!==location.href)history.replaceState(history.state,'',url.href);if(focus)own?.focus({preventScroll:true});
- if(changed&&document.body.classList.contains('workspace-enhanced')){window.uiMotion?.enter(panels.get(key));window.uiMotion?.textIn(document.querySelector('#workspace-title'));window.uiMotion?.textIn(document.querySelector('#workspace-description'));window.scrollTo({top:0,behavior:'instant'});}
+ if(changed&&!sameGroup&&document.body.classList.contains('workspace-enhanced')){window.uiMotion?.enter(panels.get(key));window.uiMotion?.textIn(document.querySelector('#workspace-title'));window.uiMotion?.textIn(document.querySelector('#workspace-description'));window.scrollTo({top:0,behavior:'instant'});}
+ // Submenu dalam grup yang sama: transisi ringan pada isi, tanpa memutar ulang baris/animasi masuk penuh.
+ if(changed&&sameGroup&&!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches){
+   for(const el of panels.get(key)?.children||[]){if(el.classList.contains('ui-subtabs'))continue;el.animate([{opacity:.4,transform:'translateY(4px)'},{opacity:1,transform:'none'}],{duration:180,easing:'cubic-bezier(.22,.8,.24,1)'});}
+ }
 }
 for(const link of links){link.addEventListener('click',e=>{e.preventDefault();select(link.dataset.task);if(matchMedia('(max-width:900px)').matches)window.v2Sidebar?.close();});link.addEventListener('keydown',e=>{const visible=links.filter(item=>item.closest('[data-menu-group]')?.open!==false),i=visible.indexOf(link);let n;if(e.key==='ArrowDown')n=(i+1)%visible.length;if(e.key==='ArrowUp')n=(i-1+visible.length)%visible.length;if(e.key==='Home')n=0;if(e.key==='End')n=visible.length-1;if(n!==undefined){e.preventDefault();visible[n].focus({preventScroll:true});}});}
 document.addEventListener('click',e=>{const link=e.target.closest?.('[data-task-link]');if(!link)return;e.preventDefault();select(link.dataset.taskLink);panels.get(active).querySelector('.popup-action,input,button')?.focus({preventScroll:true});});

@@ -79,6 +79,19 @@ class MasterRelations
         });
     }
 
+    public function activate(int $actor, string $kind, int $id): void
+    {
+        app(Operations::class)->requireRole($actor, ['admin']);
+        $this->assertKind($kind);
+
+        DB::transaction(function () use ($kind, $id): void {
+            if (! $this->rowQuery($kind, $id)->lockForUpdate()->exists()) {
+                throw new RuntimeException('Data tidak ditemukan.');
+            }
+            $this->rowQuery($kind, $id)->update(['is_active' => true, 'updated_at' => now()]);
+        });
+    }
+
     /** Resolve and lock the current driver identity inside the caller's transaction. */
     public function driver(int $id): object
     {

@@ -23,7 +23,7 @@ class ReceiptDrafts
             $snapshot = $this->snapshot($data);
             $hashSnapshot = $snapshot;
             if (($hashSnapshot['freight_amount'] ?? '0.00') === '0.00') {
-                unset($hashSnapshot['freight_amount'], $hashSnapshot['freight_method'], $hashSnapshot['freight_account']);
+                unset($hashSnapshot['freight_amount'], $hashSnapshot['freight_method'], $hashSnapshot['freight_account'], $hashSnapshot['freight_bank_account_code']);
             }
             $hash = hash('sha256', json_encode($hashSnapshot, JSON_THROW_ON_ERROR));
             if ($id === null) {
@@ -73,6 +73,7 @@ class ReceiptDrafts
                 'freight_amount' => (string) ($row->freight_amount ?? '0'),
                 'freight_method' => $row->freight_method ?? null,
                 'freight_account' => $row->freight_account ?? null,
+                'freight_bank_account_code' => $row->freight_bank_account_code ?? null,
             ]);
             DB::table('v2_receipt_drafts')->where('id', $id)->update(['status' => 'confirmed', 'version' => $row->version + 1, 'receipt_id' => $posted['receipt_id'], 'confirmed_by' => $actor, 'confirmed_at' => now(), 'updated_at' => now()]);
 
@@ -160,9 +161,14 @@ class ReceiptDrafts
         ksort($items);
 
         $freight = $this->supplyTrips->freight($data);
+        $freightCols = Schema::hasColumn('v2_receipt_drafts', 'freight_amount')
+            ? (Schema::hasColumn('v2_receipt_drafts', 'freight_bank_account_code')
+                ? $freight
+                : array_diff_key($freight, ['freight_bank_account_code' => true]))
+            : [];
 
         return ['supplier_id' => $supplier, 'receipt_date' => $data['receipt_date'], 'notes' => $this->text($data['notes'] ?? null), 'supplier_invoice_number' => $this->text($data['supplier_invoice_number'] ?? null), 'items' => json_encode(array_values($items), JSON_THROW_ON_ERROR), 'total_amount' => (string) $total]
-            + (Schema::hasColumn('v2_receipt_drafts', 'freight_amount') ? $freight : []);
+            + $freightCols;
     }
 
     private function decimal(mixed $value): BigDecimal

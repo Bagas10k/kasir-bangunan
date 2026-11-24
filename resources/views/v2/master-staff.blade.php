@@ -36,7 +36,7 @@
 
 <section class="card master-entity-card" id="master-section-staff" aria-labelledby="heading-master-staff">
     <h2 id="heading-master-staff">Daftar karyawan dan sopir</h2>
-    <p class="note">Satu daftar untuk seluruh staf. Karyawan yang juga menyetir ditautkan ke data sopir agar surat jalan memakai identitas yang sama.</p>
+    <p class="note">Satu daftar untuk seluruh staf. Karyawan yang juga menyetir ditautkan ke data sopir agar surat jalan memakai identitas yang sama. Mengarsipkan karyawan atau sopir menyembunyikannya dari pilihan baru tanpa menghapus riwayat pengiriman.</p>
 
     <x-ui.toolbar search="Cari nama, kode, atau posisi" label="Cari karyawan atau sopir" :chips="['Semua' => 'all', 'Karyawan' => 'role:staff,driver-internal', 'Sopir' => 'role:driver-internal,driver-external', 'Diarsipkan' => 'active:0']">
         <button type="button" class="btn-add-master" data-open-popup="popup-add-employee">Tambah karyawan</button>
@@ -59,11 +59,19 @@
                     <td data-label="Status"><x-ui.status :status="$staff->is_active ? 'active' : 'archived'"/></td>
                     <td class="ui-actions">
                         <button type="button" class="btn-action-pill btn-action-edit" data-open-popup="popup-edit-{{ $staff->kind }}-{{ $staff->id }}" aria-label="Ubah {{ $staff->name }}">Ubah</button>
+                        @if($staff->is_active)
                         <form method="POST" action="{{ $staff->kind === 'employee' ? route('v2.master.archive', ['kind' => 'employee', 'id' => $staff->id]) : route('v2.relations.archive', ['kind' => 'driver', 'id' => $staff->id]) }}" data-master-form data-method="PATCH">
                             @csrf @method('PATCH')
-                            <button type="submit" class="btn-action-pill btn-action-archive" @disabled(! $staff->is_active) aria-label="Arsipkan {{ $staff->name }}">Arsipkan</button>
+                            <button type="submit" class="btn-action-pill btn-action-archive" aria-label="Arsipkan {{ $staff->name }}">Arsipkan</button>
                             <span class="mr-msg" role="status" aria-live="polite"></span>
                         </form>
+                        @else
+                        <form method="POST" action="{{ $staff->kind === 'employee' ? route('v2.master.activate', ['kind' => 'employee', 'id' => $staff->id]) : route('v2.relations.activate', ['kind' => 'driver', 'id' => $staff->id]) }}" data-master-form data-method="PATCH">
+                            @csrf @method('PATCH')
+                            <button type="submit" class="btn-action-pill btn-action-activate" aria-label="Aktifkan kembali {{ $staff->name }}">Aktifkan kembali</button>
+                            <span class="mr-msg" role="status" aria-live="polite"></span>
+                        </form>
+                        @endif
                     </td>
                 </tr>
             @empty

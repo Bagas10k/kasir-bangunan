@@ -10,7 +10,7 @@
     sehingga perhitungan dan penyimpanan tetap milik pos-cashier-script. Angka ringkasan dibaca dari event kasir:cart.
 --}}
 <style>
-.pm-bar,.pm-backdrop,.pm-step,.pm-sheet-close,.pm-sheet-sub,.pm-sub-rows,.pm-clear,.pm-deliver,.pm-quick{display:none}
+.pm-bar,.pm-backdrop,.pm-step,.pm-sheet-close,.pm-sheet-sub,.pm-sub-rows,.pm-deliver,.pm-quick{display:none}
 @media all{
   body.pm-has-cart main.main-content{padding-bottom:112px !important}
   .pm-bar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 10px 10px 12px;border-radius:16px;background:#102A1D;box-shadow:0 18px 40px -12px rgba(4,12,8,.55);font-family:'Inter Kasir',-apple-system,'Segoe UI',sans-serif;animation:ui-rise .3s var(--ui-ease-out,ease-out)}
@@ -58,11 +58,14 @@
   html body #kasir .pos-cart-pane .summary-total span{font-size:16px !important;font-weight:800 !important;color:#102A1D !important}
   html body #kasir .pos-cart-pane #display-total{font-size:24px !important;line-height:30px !important;font-weight:800 !important;color:#102A1D !important;white-space:nowrap}
   .pm-sub-rows{display:block;margin:0 0 10px;padding:0 0 10px;border-bottom:1px solid #DCE5DF}
+  .pm-sub-rows[hidden]{display:none!important}
   .pm-sub-rows p{display:flex;justify-content:space-between;gap:12px;margin:0;white-space:nowrap;padding:3px 0;font-size:14px;color:#3C4A42;font-variant-numeric:tabular-nums}
   .pm-sub-rows p strong{color:#102A1D}
   .pm-sub-rows .pm-disc strong{color:#B42318}
-  html body #kasir .pm-clear{display:block;width:100%;min-height:44px !important;margin:6px 0 0 !important;padding:0 !important;border:0 !important;background:transparent !important;color:#fff !important;font-size:14px !important;font-weight:700 !important;box-shadow:none !important}
-  html body #kasir .pm-clear[data-armed]{color:#FCA5A5 !important}
+  html body #panel-kasir #kasir .pos-cart-pane details.line-discount[open]{padding:10px 12px 12px;border-radius:10px;background:var(--ui-hover)}
+  html body #panel-kasir #kasir .pos-cart-pane details.line-discount .discount-controls{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}
+  html body #panel-kasir #kasir .pos-cart-pane details.line-discount .discount-controls label{gap:4px;font-size:12px}
+  html body #panel-kasir #kasir .pos-cart-pane details.line-discount .discount-controls :is(select,input){min-height:40px!important;height:40px!important;border-radius:8px!important;font-size:14px!important}
   .pm-deliver{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding:12px 14px;border:1px solid #DFE6E1;border-radius:10px;background:#fff;cursor:pointer}
   .pm-deliver span{display:flex;flex-direction:column;font-size:15px;font-weight:700;color:#102A1D}
   .pm-deliver small{font-size:12.5px;font-weight:400;color:#5F7468}
@@ -76,6 +79,7 @@
   html body .pm-quick button{min-height:40px !important;height:40px;padding:0 6px !important;border:1px solid #DFE6E1 !important;border-radius:999px !important;background:#fff !important;color:#14532D !important;font-size:14px !important;font-weight:700 !important;box-shadow:none !important;font-variant-numeric:tabular-nums}
   html body .pm-quick button[aria-pressed=true]{border-color:#14532D !important;background:#14532D !important;color:#fff !important}
 }
+@media(max-width:380px){html body #panel-kasir #kasir .pos-cart-pane details.line-discount .discount-controls{grid-template-columns:1fr}}
 @media (max-width:760px){
   /* lembar bawah pembayaran */
   html :is(body#ui-dna-strong,body) #payment-modal-overlay[open]{inset:auto 0 0 0 !important;width:100vw !important;max-width:none !important;height:auto !important;max-height:94dvh !important;margin:0 !important;border-radius:20px 20px 0 0 !important;animation:pm-sheet-up .32s cubic-bezier(.22,.8,.24,1) !important}
@@ -153,13 +157,11 @@ function syncVisibility(){
  if(!active)closeSheet(false);
 }
 if(panel)new MutationObserver(syncVisibility).observe(panel,{attributes:true,attributeFilter:['hidden']});
-// --- kepala lembar keranjang: subjudul + tutup; baris subtotal/diskon; kosongkan ---
+// --- kepala lembar keranjang: subjudul + tutup; baris diskon ---
 const sub=document.createElement('p');sub.className='pm-sheet-sub';sheet.querySelector('#h-checkout')?.after(sub);
 const close=document.createElement('button');close.type='button';close.className='pm-sheet-close';close.setAttribute('aria-label','Tutup keranjang');close.textContent='×';sheet.append(close);
-const subRows=document.createElement('div');subRows.className='pm-sub-rows';subRows.innerHTML='<p class="pm-gross"><span></span><strong></strong></p><p class="pm-disc"><span>Diskon</span><strong></strong></p>';
+const subRows=document.createElement('div');subRows.className='pm-sub-rows';subRows.innerHTML='<p class="pm-disc"><span>Diskon</span><strong></strong></p>';
 form.querySelector('.summary-box')?.prepend(subRows);
-const clear=document.createElement('button');clear.type='button';clear.className='pm-clear';clear.textContent='Kosongkan keranjang';
-form.querySelector('.pos-checkout-action')?.after(clear);
 function paint(){
  const has=last.count>0;
  bar.hidden=!has;document.body.classList.toggle('pm-has-cart',has);
@@ -167,9 +169,7 @@ function paint(){
  window.uiNumbers.set(bar.querySelector('.pm-bar-badge'),String(last.count));window.uiNumbers.text(bar.querySelector('small'),meta);
  window.uiNumbers.set(bar.querySelector('strong'),last.valid?D.money(last.total):'Periksa isian');
  window.uiNumbers.text(sub,has?meta:'Belum ada barang');
- window.uiNumbers.text(subRows.querySelector('.pm-gross span'),'Subtotal ('+qtyText(last.qty)+' barang)');
- window.uiNumbers.set(subRows.querySelector('.pm-gross strong'),D.money(last.gross));
- subRows.querySelector('.pm-disc').hidden=!(last.discount>0n);window.uiNumbers.set(subRows.querySelector('.pm-disc strong'),'−'+D.money(last.discount));
+ subRows.hidden=!(last.discount>0n);window.uiNumbers.set(subRows.querySelector('.pm-disc strong'),'−'+D.money(last.discount));
  const count=payment?.querySelector('.pm-pay-count');if(count)window.uiNumbers.text(count,meta);
  if(!has&&document.body.classList.contains('pm-cart-open'))closeSheet(false);
  syncCatalog();syncQuick();syncLineDiscounts();
@@ -183,6 +183,28 @@ function syncLineDiscounts(){
  }
 }
 form.addEventListener('kasir:cart',e=>{last=e.detail;paint();});
+// Kartu diskon baris: buka/tutup dengan morph tinggi + isi, bukan muncul mendadak.
+document.addEventListener('click',event=>{
+ const summary=event.target.closest?.('#items details.line-discount>summary');
+ if(!summary)return;
+ const details=summary.parentElement;
+ if(details.dataset.morphing){event.preventDefault();return;}
+ if(reduce()||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+ event.preventDefault();
+ const panel=details.querySelector('.discount-controls'),opening=!details.open,from=details.offsetHeight;
+ details.style.overflow='hidden';details.dataset.morphing='1';
+ const done=()=>{details.style.removeProperty('overflow');delete details.dataset.morphing;};
+ const ease='cubic-bezier(.22,.8,.24,1)';
+ if(opening){
+  details.open=true;const to=details.offsetHeight;
+  panel?.animate([{opacity:0},{opacity:1}],{duration:240,easing:'ease-in-out'});
+  details.animate([{height:from+'px'},{height:to+'px'}],{duration:240,easing:ease}).finished.then(done,done);
+ }else{
+  const to=summary.offsetHeight;
+  panel?.animate([{opacity:1},{opacity:0}],{duration:200,easing:'ease-in-out'});
+  details.animate([{height:from+'px'},{height:to+'px'}],{duration:240,easing:ease}).finished.then(()=>{details.open=false;done();},done);
+ }
+});
 // --- stepper katalog ---
 function stepper(id){const s=document.createElement('span');s.className='pm-step';s.innerHTML='<button type="button" data-pm-step="-1">−</button><input type="text" inputmode="decimal" autocomplete="off" maxlength="23" data-pm-quantity><button type="button" data-pm-step="1">+</button><span class="sr-only" data-pm-qty-error role="status"></span>';s.dataset.product=id;const input=s.querySelector('[data-pm-quantity]'),error=s.querySelector('[data-pm-qty-error]');error.id='catalog-quantity-error-'+id;input.setAttribute('aria-describedby',error.id);return s;}
 function syncCatalog(){
@@ -274,13 +296,6 @@ document.addEventListener('keydown',e=>{
  const first=controls[0],lastControl=controls.at(-1);
  if(e.shiftKey&&(document.activeElement===first||!pane.contains(document.activeElement))){e.preventDefault();lastControl?.focus();}
  else if(!e.shiftKey&&(document.activeElement===lastControl||!pane.contains(document.activeElement))){e.preventDefault();first?.focus();}
-});
-// Kosongkan: tekan dua kali (aman dari salah sentuh).
-let armTimer=0;
-clear.addEventListener('click',()=>{
- if(!clear.hasAttribute('data-armed')){clear.setAttribute('data-armed','');clear.textContent='Tekan lagi untuk mengosongkan';clearTimeout(armTimer);armTimer=setTimeout(()=>{clear.removeAttribute('data-armed');clear.textContent='Kosongkan keranjang';},3000);return;}
- clearTimeout(armTimer);clear.removeAttribute('data-armed');clear.textContent='Kosongkan keranjang';
- for(const row of Array.from(items.children))row.querySelector('[data-remove]')?.click();
 });
 // --- pembayaran sebagai lembar bawah ---
 if(payment){

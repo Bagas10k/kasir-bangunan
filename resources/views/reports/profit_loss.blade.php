@@ -139,7 +139,7 @@
                     <td class="amount">{{ $num($report['total_revenue']) }}</td>
                 </tr>
 
-                <tr><th scope="row" colspan="3" class="section-title">2. Beban Pokok Penjualan (HPP)</th></tr>
+                <tr><th scope="row" colspan="3" class="section-title">2. Beban Pokok Penjualan (HPP) <x-ui.info-tip key="laba_rugi_hpp" label="Keterangan Beban Pokok Penjualan (HPP)"/></th></tr>
                 @forelse($report['cogs'] as $c)
                 <tr>
                     <td class="code"><span class="sku-code">{{ $c['code'] }}</span></td>

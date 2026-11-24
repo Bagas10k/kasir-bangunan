@@ -45,11 +45,18 @@ function syncMargin(form){
   // Untung per satuan untuk harga jual dan (bila diisi) harga kontraktor.
   for(const price of [sell,form.querySelector('input[type=hidden][name=contractor_price]')]){
    if(!price)continue;
-   const box=price.closest('.uf');let out=box?.querySelector('[data-ui-margin]');
-   if(!out&&box){out=document.createElement('output');out.className='uf-margin';out.dataset.uiMargin='';out.setAttribute('aria-live','polite');box.append(out);}
+   const box=price.closest('.uf');let row=box?.querySelector('[data-ui-margin-row]'),out=box?.querySelector('[data-ui-margin]'),tipBtn=box?.querySelector('[data-ui-margin-tip]');
+   if(!out&&box){
+    row=document.createElement('div');row.className='uf-margin-row';row.dataset.uiMarginRow='';
+    out=document.createElement('output');out.className='uf-margin';out.dataset.uiMargin='';out.setAttribute('aria-live','polite');
+    tipBtn=document.createElement('button');tipBtn.type='button';tipBtn.className='ui-info-btn';tipBtn.dataset.uiMarginTip='';tipBtn.setAttribute('data-toggletip','');tipBtn.setAttribute('data-tip-key','margin_keuntungan');tipBtn.setAttribute('aria-label','Keterangan Margin Keuntungan');tipBtn.setAttribute('aria-expanded','false');tipBtn.setAttribute('aria-controls','ui-tooltip');
+    tipBtn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
+    row.append(out,tipBtn);box.append(row);
+   }
    if(!out)continue;
    const s=price.value===''?0n:scaled(price.value);
-   if(s===0n){out.textContent='';out.removeAttribute('data-tone');continue;}
+   if(s===0n){out.textContent='';out.removeAttribute('data-tone');if(row)row.hidden=true;continue;}
+   if(row)row.hidden=false;
    const diff=s-c;out.dataset.tone=diff<0n?'loss':'gain';
    const pct=c>0n?' · '+(Number(diff*1000n/c)/10).toLocaleString('id-ID',{maximumFractionDigits:1})+'%':'';
    out.textContent=(diff<0n?'Rugi ':'Untung ')+rupiah(diff<0n?-diff:diff)+pct;
@@ -135,6 +142,14 @@ function enhanceForm(form){
     form.addEventListener('reset',()=>setTimeout(show));show();
   }
   for(const input of form.querySelectorAll('[data-ui-plate]'))input.value=plate(input.value);
+  // Form Ubah dirender per baris: sisipkan ikon info secara dinamis agar ukuran HTML awal tetap ringan.
+  for(const [suffix,key]of [['-cost_price','harga_modal'],['-contractor_price','harga_kontraktor'],['-min_stock','stok_minimum'],['-price_tier','harga_tier_kasir']]){
+   const input=form.querySelector('[id$="'+suffix+'"]');
+   const label=input?.closest('.uf')?.querySelector('.uf-label');
+   if(label&&!label.querySelector('.ui-info-btn')){
+    const btn=document.createElement('button');btn.type='button';btn.className='ui-info-btn';btn.dataset.tipKey=key;label.append(btn);
+   }
+  }
   syncUnit(form);syncMargin(form);
   form.addEventListener('change',e=>{if(e.target.name==='unit_id')syncUnit(form);if(e.target.name==='cost_price'||e.target.name==='selling_price')syncMargin(form);});
   form.addEventListener('input',e=>{if(e.target.matches('[data-ui-number]'))syncMargin(form);});

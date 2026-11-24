@@ -131,7 +131,7 @@ class V2WorkspaceViewTest extends TestCase
                     ->assertDontSee('data-menu-group="akses"', false);
                 // Menu gabungan: setiap panel tetap bisa dicapai lewat tautan sidebar atau tab di dalam menu.
                 $this->assertEqualsCanonicalizing(
-                    ['ringkasan', 'persetujuan', 'akun', 'kasir', 'riwayat-penjualan', 'tagihan', 'pengiriman', 'penerimaan', 'shift', 'laporan', 'master-product', 'master-supplier', 'master-customer', 'master-employee', 'master-vehicle', 'master-unit', 'master-category', 'jurnal', 'neraca', 'laba-rugi', 'arus-kas', 'bagan-akun'],
+                    ['ringkasan', 'persetujuan', 'akun', 'kasir', 'riwayat-penjualan', 'tagihan', 'pengiriman', 'penerimaan', 'shift', 'laporan', 'master-product', 'master-supplier', 'master-customer', 'master-employee', 'master-vehicle', 'master-unit', 'master-category', 'jurnal', 'neraca', 'laba-rugi', 'arus-kas', 'bagan-akun', 'pengeluaran'],
                     $this->reachableTasks($response->getContent())
                 );
                 // Supplier didahulukan karena pelanggan bersifat opsional saat penjualan.

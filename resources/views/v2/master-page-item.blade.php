@@ -103,29 +103,33 @@
 <section class="@unless($dialogsOnly)card @endunless master-entity-card" id="master-section-{{ $kind }}" @if($dialogsOnly) data-dialog-host @else aria-labelledby="heading-master-{{ $kind }}" @endif data-master-kind="{{ $kind }}">
     @unless($dialogsOnly)
     <h2 id="heading-master-{{ $kind }}">Daftar {{ $noun }}</h2>
-    <p class="note">{{ $subtitle }} Mengarsipkan tidak menghapus riwayat transaksi.</p>
+    <p class="note">{{ $subtitle }} {{ in_array($kind, ['employee', 'vehicle'], true) ? 'Mengarsipkan tidak menghapus riwayat pengiriman.' : 'Mengarsipkan tidak menghapus riwayat transaksi.' }}</p>
 
     <x-ui.toolbar :search="$searchHint" :label="'Cari '.$noun" :chips="['Semua' => 'all', 'Aktif' => 'active:1', 'Diarsipkan' => 'active:0']">
         <button type="button" class="btn-add-master" data-open-popup="popup-add-{{ $kind }}">Tambah {{ $noun }}</button>
         <button type="button" class="btn-import-master" data-open-popup="popup-import-{{ $kind }}">Impor Excel</button>
-        <a href="{{ route('v2.templates', $kind) }}" class="btn-template-download" title="Unduh format berkas Excel">Unduh template</a>
+        <a href="{{ route('v2.templates', $kind) }}" class="btn-template-download" data-tip="Unduh format berkas Excel">Unduh template</a>
     </x-ui.toolbar>
 
     <div class="ui-table-wrap scroll master-table-scroll" data-ui-table tabindex="0" role="region" aria-label="Daftar {{ $noun }}">
         <table class="ui-table master-clean-table" id="table-master-{{ $kind }}">
             <caption class="sr">Daftar {{ $noun }}</caption>
+            @php
+                $headerTips = ['sku' => 'Kode barang; boleh diganti.', 'code' => 'Kode otomatis; boleh diganti.'];
+                $headerInfoKeys = ['cost_price' => 'harga_modal', 'selling_price' => 'harga_kontraktor'];
+            @endphp
             <thead>
                 <tr>
                     @foreach ($display as $column)
-                        <th scope="col" @class(['ui-num' => in_array($column, ['cost_price', 'selling_price'], true)])>{{ $labels[$column] ?? $column }}</th>
+                        <th scope="col" @class(['ui-num' => in_array($column, ['cost_price', 'selling_price'], true)]) @isset($headerTips[$column]) data-tip="{{ $headerTips[$column] }}" @endisset>{{ $labels[$column] ?? $column }}@isset($headerInfoKeys[$column])<x-ui.info-tip :key="$headerInfoKeys[$column]" :label="'Keterangan '.($labels[$column] ?? $column)" :dark="true"/>@endisset</th>
                     @endforeach
                     @if ($kind === 'product')
-                        <th scope="col" class="ui-num">Stok / satuan</th>
+                        <th scope="col" class="ui-num">Stok / satuan<x-ui.info-tip key="stok_saat_ini" label="Keterangan Stok / satuan" :dark="true"/></th>
                     @elseif ($kind === 'supplier')
                         <th scope="col" class="ui-num">Produk</th>
                         <th scope="col" class="ui-num">Utang berjalan</th>
                     @elseif ($kind === 'customer')
-                        <th scope="col" class="ui-num">Frekuensi belanja</th>
+                        <th scope="col" class="ui-num">Frekuensi belanja<x-ui.info-tip text="Jumlah transaksi penjualan yang tercatat atas nama pelanggan ini." title="Frekuensi Belanja" label="Keterangan Frekuensi belanja" :dark="true"/></th>
                         <th scope="col" class="ui-num">Piutang pelanggan</th>
                     @elseif ($kind === 'vehicle')
                         <th scope="col" class="ui-num">Dipakai</th>
@@ -153,9 +157,11 @@
                                 @elseif($kind === 'customer' && $column === 'name' && ($record->price_tier ?? '') === 'contractor')
                                     {{ $record->name }} <span class="ui-badge ui-badge--ok">Kontraktor</span>
                                 @elseif($kind === 'supplier' && $column === 'name')
-                                    <button type="button" class="ui-link" data-insight="supplier" data-insight-id="{{ $record->id }}" data-insight-name="{{ $record->name }}" data-insight-meta="Kode {{ $record->code }}">{{ $record->name }}</button>
+                                    @php $hcSup = ($supplierInsights ?? [])[$record->id] ?? null; @endphp
+                                    <button type="button" class="ui-link" data-insight="supplier" data-insight-id="{{ $record->id }}" data-insight-name="{{ $record->name }}" data-insight-meta="Kode {{ $record->code }}" data-hover-card data-hc-title="{{ $record->name }}" data-hc-meta="Kode {{ $record->code }}" data-hc-rows="{{ json_encode([['Produk terhubung', (string) ($hcSup ? count($hcSup['products']) : 0)], ['Utang berjalan', $rp($hcSup['outstanding'] ?? '0')]], JSON_UNESCAPED_UNICODE) }}" data-hc-foot="Klik untuk lihat daftar produk & tagihan" aria-haspopup="dialog">{{ $record->name }}</button>
                                 @elseif($kind === 'vehicle' && $column === 'license_plate')
-                                    <button type="button" class="ui-link" data-insight="vehicle" data-insight-id="{{ $record->id }}" data-insight-name="{{ $record->license_plate }}" data-insight-meta="{{ $record->vehicle_type }}">{{ $record->license_plate }}</button>
+                                    @php $hcVeh = ($vehicleInsights ?? [])[$record->id] ?? null; @endphp
+                                    <button type="button" class="ui-link" data-insight="vehicle" data-insight-id="{{ $record->id }}" data-insight-name="{{ $record->license_plate }}" data-insight-meta="{{ $record->vehicle_type }}" data-hover-card data-hc-title="{{ $record->license_plate }}" data-hc-meta="{{ $record->vehicle_type ?: 'Armada pengiriman' }}" data-hc-rows="{{ json_encode([['Total pemakaian', ($hcVeh ? $hcVeh['deliveries'] + $hcVeh['trips'] : 0).' kali'], ['Terakhir dipakai', ($hcVeh['last_used'] ?? null) ? \Carbon\Carbon::parse($hcVeh['last_used'])->locale('id')->translatedFormat('j M Y') : 'Belum pernah']], JSON_UNESCAPED_UNICODE) }}" data-hc-foot="Klik untuk lihat riwayat pengiriman & sopir" aria-haspopup="dialog">{{ $record->license_plate }}</button>
                                 @else
                                     {{ $record->{$column} ?? '—' }}
                                 @endif
@@ -187,12 +193,21 @@
                                 @include('v2.master-product-detail')
                             @endif
                             <button type="button" class="btn-action-pill btn-action-edit" data-open-popup="popup-edit-{{ $kind }}-{{ $record->id }}" aria-label="Ubah {{ $recordName }}">Ubah</button>
+                            @if($isActive)
                             <form method="POST" action="{{ route('v2.master.archive', ['kind' => $kind, 'id' => $record->id]) }}" data-master-form data-method="PATCH">
                                 @csrf
                                 @method('PATCH')
-                                <button type="submit" class="btn-action-pill btn-action-archive" @disabled(! $isActive) aria-label="Arsipkan {{ $recordName }}">Arsipkan</button>
+                                <button type="submit" class="btn-action-pill btn-action-archive" aria-label="Arsipkan {{ $recordName }}">Arsipkan</button>
                                 <span class="mr-msg" role="status" aria-live="polite"></span>
                             </form>
+                            @else
+                            <form method="POST" action="{{ route('v2.master.activate', ['kind' => $kind, 'id' => $record->id]) }}" data-master-form data-method="PATCH">
+                                @csrf
+                                @method('PATCH')
+                                <button type="submit" class="btn-action-pill btn-action-activate" aria-label="Aktifkan kembali {{ $recordName }}">Aktifkan kembali</button>
+                                <span class="mr-msg" role="status" aria-live="polite"></span>
+                            </form>
+                            @endif
 
                             {{-- Dialog Popup Ubah Record Ini --}}
                             <dialog class="input-dialog uf-dialog @if($kind === 'product') uf-dialog-wide @endif" id="popup-edit-{{ $kind }}-{{ $record->id }}" aria-labelledby="title-edit-{{ $kind }}-{{ $record->id }}">

@@ -53,7 +53,7 @@
         @forelse($paymentHistory as $payment)
             <li>
                 <div class="sd-payment-top">
-                    <div><strong class="sd-amount">{{ $money($payment->amount) }}</strong><span class="sd-method">{{ $methodLabels[$payment->method] ?? $payment->method }}</span></div>
+                    <div><strong class="sd-amount">{{ $money($payment->amount) }}</strong><span class="sd-method">{{ $methodLabels[$payment->method] ?? $payment->method }}@if($payment->method === 'transfer' && !empty($payment->bank_account_code)) · {{ $payment->bank_account_code }}{{ isset($bankAccountNames[$payment->bank_account_code]) ? ' '.$bankAccountNames[$payment->bank_account_code] : '' }}@endif</span></div>
                     <x-ui.status :status="$payment->status" :label="$payment->status === 'posted' ? 'Tercatat' : null"/>
                 </div>
                 <dl class="sd-payment-meta">

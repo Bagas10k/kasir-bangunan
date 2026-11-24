@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\AccountBalanceService;
 use App\Services\ExpenseService;
+use App\Services\V2\BankAccounts;
 use Brick\Math\BigDecimal;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -12,7 +13,7 @@ use Illuminate\View\View;
 
 class ExpenseController extends Controller
 {
-    public function index(Request $request, AccountBalanceService $balances): View
+    public function index(Request $request, AccountBalanceService $balances, BankAccounts $bankService): View
     {
         $filters = $request->validate([
             'start_date' => 'nullable|date_format:Y-m-d',
@@ -44,7 +45,13 @@ class ExpenseController extends Controller
             ->get();
 
         $cashBalance = (string) $balances->balance('1101');
-        $bankBalance = (string) $balances->balance('1102');
+        $bankAccounts = $bankService->active();
+        $bankAccountNames = $bankService->nameMap(false);
+        $bankBalances = [];
+        foreach ($bankAccounts as $bankAccount) {
+            $bankBalances[(string) $bankAccount->account_code] = (string) $balances->balance((string) $bankAccount->account_code);
+        }
+        $bankBalance = (string) $bankService->totalBalance($balances, false);
 
         $now = Carbon::now();
         $startOfMonth = $now->copy()->startOfMonth()->toDateString();
@@ -76,7 +83,9 @@ class ExpenseController extends Controller
             'period_label' => $now->translatedFormat('F Y'),
         ];
 
-        return view('expenses.index', compact('expenses', 'expenseAccounts', 'expenseCategories', 'cashBalance', 'bankBalance', 'expenseSummary'));
+        return view('expenses.index', compact(
+            'expenses', 'expenseAccounts', 'expenseCategories', 'cashBalance', 'bankBalance', 'bankAccounts', 'bankBalances', 'bankAccountNames', 'expenseSummary'
+        ));
     }
 
     public function store(Request $request, ExpenseService $service)

@@ -34,7 +34,7 @@
                 <div class="pos-buyer-meta">
                     <span id="pos-buyer-hint">Transaksi langsung kasir (ambil di toko). Penjualan kredit/tempo wajib memilih pelanggan terdaftar.</span>
                 </div>
-                <div class="pos-tier" role="radiogroup" aria-label="Harga"><span class="pos-tier-label" aria-hidden="true">Harga</span><button type="button" role="radio" data-tier="retail" aria-checked="true">Eceran</button><button type="button" role="radio" data-tier="contractor" aria-checked="false" tabindex="-1">Kontraktor</button></div>
+                <div class="pos-tier" role="radiogroup" aria-label="Harga"><span class="pos-tier-label" aria-hidden="true">Harga <x-ui.info-tip key="harga_tier_kasir" label="Keterangan tarif Eceran dan Kontraktor" :dark="true"/></span><button type="button" role="radio" data-tier="retail" aria-checked="true">Eceran</button><button type="button" role="radio" data-tier="contractor" aria-checked="false" tabindex="-1">Kontraktor</button></div>
             </div>
             <div class="pos-cart-section"><div class="cart-label"><strong>Keranjang Belanja</strong><span id="cart-item-count" data-live-skip>0 jenis item</span></div><div class="cart-table-scroll"><div class="cart-column-header"><span>Produk</span><span class="cart-column-quantity">Jumlah</span><span class="cart-column-subtotal">Subtotal</span><span class="sr-only">Aksi</span></div><div id="cart-empty-row" data-live-skip class="note cart-empty-message">Keranjang belanja kosong. Cari produk di katalog lalu pilih item untuk dimasukkan ke keranjang.</div><div id="items"></div></div></div>
             <button type="button" id="add-item" hidden>Tambah barang</button>
@@ -63,10 +63,10 @@
                             Perhatian: Transaksi kredit (piutang usaha) wajib memilih pelanggan terdaftar!
                         </div>
                         <p id="modal-buyer-hint" class="note pos-buyer-meta" style="margin-top:6px;">Pelanggan umum hanya untuk pembayaran tunai atau transfer lunas.</p>
-                        <div class="pos-tier pos-tier--light" role="radiogroup" aria-label="Tipe pelanggan"><span class="pos-tier-label" aria-hidden="true">Tipe pelanggan</span><button type="button" role="radio" data-tier="retail" aria-checked="true">Eceran</button><button type="button" role="radio" data-tier="contractor" aria-checked="false" tabindex="-1">Kontraktor</button></div>
+                        <div class="pos-tier pos-tier--light" role="radiogroup" aria-label="Tipe pelanggan"><span class="pos-tier-label" aria-hidden="true">Tipe pelanggan <x-ui.info-tip key="harga_tier_kasir" label="Keterangan tipe pelanggan Eceran dan Kontraktor"/></span><button type="button" role="radio" data-tier="retail" aria-checked="true">Eceran</button><button type="button" role="radio" data-tier="contractor" aria-checked="false" tabindex="-1">Kontraktor</button></div>
                     </div>
 
-                    <div class="field pay-method-field"><label id="payment-method-label" for="payment-method">Metode Pembayaran</label><select id="payment-method" name="payment_method" class="pay-method-native" data-native-select tabindex="-1" aria-hidden="true"><option value="cash">Tunai (Cash)</option><option value="transfer">Transfer Bank</option><option value="credit">Kredit (Piutang Usaha)</option></select>
+                    <div class="field pay-method-field"><label id="payment-method-label" for="payment-method">Metode Pembayaran <x-ui.info-tip key="metode_bayar_kasir" label="Keterangan metode pembayaran"/></label><select id="payment-method" name="payment_method" class="pay-method-native" data-native-select tabindex="-1" aria-hidden="true"><option value="cash">Tunai (Cash)</option><option value="transfer">Transfer Bank</option><option value="credit">Kredit (Piutang Usaha)</option></select>
                         <div class="pay-method" role="radiogroup" aria-labelledby="payment-method-label">
                             <button type="button" role="radio" data-value="cash" aria-checked="true">Tunai</button>
                             <button type="button" role="radio" data-value="transfer" aria-checked="false" tabindex="-1">Transfer</button>
@@ -83,6 +83,7 @@
                         </script></div>
                     <div class="field"><label for="paid-amount-display">Nominal Pembayaran (Rp)</label><input id="paid-amount-display" type="text" data-money-display inputmode="decimal" value="" placeholder="0" maxlength="30" required autocomplete="off"><input id="paid-amount" name="paid_amount" type="hidden" value="0"></div>
                     <div class="field" id="deposit-field" hidden><label for="deposit-method">Uang muka (DP) masuk ke</label><select id="deposit-method" name="deposit_method" disabled><option value="cash">Tunai (kas laci)</option><option value="transfer">Transfer (bank)</option></select></div>
+                    <div class="field" data-bank-account-field hidden><label for="checkout-bank-account">Rekening bank tujuan</label><select id="checkout-bank-account" name="bank_account_code" disabled>@foreach(($bankAccounts ?? collect([(object)['account_code' => '1102', 'account_name' => 'Rekening Bank']])) as $bankAcc)<option value="{{ $bankAcc->account_code }}">{{ $bankAcc->account_code }} · {{ $bankAcc->account_name }}</option>@endforeach</select></div>
                     <div class="field" data-transfer-proof-field hidden><label for="checkout-transfer-proof">Foto bukti transfer</label><input id="checkout-transfer-proof" name="transfer_proof" type="file" accept="image/jpeg,image/png,image/webp" disabled><p class="note">Wajib untuk transfer pelanggan. JPG/PNG/WebP, maksimal 5 MB. Menunggu verifikasi admin.</p></div>
                     <p class="note" id="paid-hint">Tunai berlebih menjadi kembalian.</p>
                     <div class="summary-row"><span>Kembalian:</span><strong id="display-change" data-live-skip>Rp 0</strong></div>

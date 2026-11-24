@@ -3,6 +3,7 @@
 use App\Http\Controllers\ChartOfAccountController;
 use App\Http\Controllers\V2\AccountController;
 use App\Http\Controllers\V2\CashBankAdjustmentController;
+use App\Http\Controllers\V2\OperatingExpenseController;
 use App\Http\Controllers\V2\SupplierActivityController;
 use App\Http\Controllers\V2\WorkspaceController;
 use Illuminate\Support\Facades\Route;
@@ -14,12 +15,14 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::put('/chart-of-accounts/{id}', [ChartOfAccountController::class, 'update'])->whereNumber('id')->middleware('throttle:30,1')->name('coa.update');
     Route::patch('/chart-of-accounts/{id}/archive', [ChartOfAccountController::class, 'archive'])->whereNumber('id')->middleware('throttle:30,1')->name('coa.archive');
     Route::post('/journals/adjustments', [CashBankAdjustmentController::class, 'store'])->middleware('throttle:30,1')->name('journals.adjustments.store');
+    Route::post('/expenses', [OperatingExpenseController::class, 'store'])->middleware('throttle:30,1')->name('expenses.store');
     Route::get('/invoices', [WorkspaceController::class, 'invoices'])->name('invoices.index');
     Route::get('/sales/{id}/detail', [WorkspaceController::class, 'saleDetail'])->whereNumber('id')->name('sales.detail');
     Route::get('/payments/{id}/proof', [WorkspaceController::class, 'paymentProof'])->whereNumber('id')->middleware('throttle:60,1')->name('payments.proof');
     Route::post('/relations/{kind}', [WorkspaceController::class, 'saveRelation'])->whereIn('kind', ['driver', 'unit', 'category'])->name('relations.store');
     Route::put('/relations/{kind}/{id}', [WorkspaceController::class, 'updateRelation'])->whereIn('kind', ['driver', 'unit', 'category'])->whereNumber('id')->name('relations.update');
     Route::patch('/relations/{kind}/{id}', [WorkspaceController::class, 'archiveRelation'])->whereIn('kind', ['driver', 'unit', 'category'])->whereNumber('id')->name('relations.archive');
+    Route::patch('/relations/{kind}/{id}/activate', [WorkspaceController::class, 'activateRelation'])->whereIn('kind', ['driver', 'unit', 'category'])->whereNumber('id')->middleware('throttle:30,1')->name('relations.activate');
     Route::get('/accounts', [AccountController::class, 'index'])->name('accounts.index');
     Route::post('/accounts', [AccountController::class, 'store'])->middleware('throttle:20,1')->name('accounts.store');
     Route::put('/accounts/{id}', [AccountController::class, 'update'])->whereNumber('id')->middleware('throttle:20,1')->name('accounts.update');
@@ -47,6 +50,7 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::post('/trips', [WorkspaceController::class, 'trip'])->name('trips.store');
     Route::put('/master/{kind}/{id}', [WorkspaceController::class, 'updateMaster'])->whereNumber('id')->name('master.update');
     Route::patch('/master/{kind}/{id}', [WorkspaceController::class, 'archiveMaster'])->whereNumber('id')->name('master.archive');
+    Route::patch('/master/{kind}/{id}/activate', [WorkspaceController::class, 'activateMaster'])->whereNumber('id')->middleware('throttle:30,1')->name('master.activate');
     Route::post('/opening-balances/preview', [WorkspaceController::class, 'openingPreview'])->name('openings.preview');
     Route::get('/master/{kind}', [WorkspaceController::class, 'master'])->name('master');
     Route::post('/master/{kind}', [WorkspaceController::class, 'saveMaster'])->name('master.store');

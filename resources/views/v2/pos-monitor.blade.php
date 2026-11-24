@@ -32,7 +32,7 @@
         </div>
         <div class="pd-controls">
             <div class="pos-shift-notice" id="store-shift-state" data-live-skip data-pos-shift-state="{{ $activeStoreShift ? 'open' : 'closed' }}" data-store-shift-id="{{ $activeStoreShift->id ?? '' }}" data-today-status="{{ !empty($todayCashDay) ? substr((string) $todayCashDay->opened_at, 0, 10).':'.$todayCashDay->status : '' }}" data-status-url="{{ route('v2.shifts.active') }}" data-manage-shift="{{ $isAdminView ? '1' : '0' }}" role="status" aria-live="polite" aria-label="Status kas harian">
-                <strong>{{ $activeStoreShift ? 'Kas harian '.substr((string) $activeStoreShift->opened_at, 0, 10).' aktif' : (!empty($todayCashDay) ? 'Kas harian '.substr((string) $todayCashDay->opened_at, 0, 10).' sudah ditutup' : ($isAdminView ? 'Kas harian belum dibuka' : 'Menunggu admin membuka kas harian')) }}</strong>
+                <strong>{{ $activeStoreShift ? 'Kas harian '.substr((string) $activeStoreShift->opened_at, 0, 10).' aktif' : (!empty($todayCashDay) ? 'Kas harian '.substr((string) $todayCashDay->opened_at, 0, 10).' sudah ditutup' : ($isAdminView ? 'Kas harian belum dibuka' : 'Menunggu admin membuka kas harian')) }}</strong> <x-ui.info-tip key="status_kas_harian" label="Keterangan kas harian toko"/>
                 <a class="pos-shift-action" href="#shift" data-task-link="shift"><span>{{ $activeStoreShift || !empty($todayCashDay) || !$isAdminView ? 'Lihat kas harian' : 'Buka kas harian' }}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
             </div>
             <div class="pd-seg" id="sales-period-control" role="group" aria-label="Pilih rentang waktu">
@@ -98,7 +98,7 @@
                                     <div class="pd-grid" aria-hidden="true"><i></i><i></i><i></i></div>
                                     <div class="pd-bars" @if ($key === $initial) id="sales-chart" @endif>
                                         @foreach ($d['buckets'] as $bucket)
-                                            <div class="pd-col @if ($bucket['peak']) is-peak @endif" title="{{ $bucket['label'] }} · {{ $bucket['formatted_total'] }}">
+                                            <div class="pd-col @if ($bucket['peak']) is-peak @endif" data-tip="{{ $bucket['label'] }} · {{ $bucket['formatted_total'] }}">
                                                 <i style="height: {{ $bucket['height'] }}%" data-motion-bar="{{ $bucket['height'] }}" data-motion-key="sale-{{ $bucket['date'] ?? $bucket['label'] }}"></i>
                                             </div>
                                         @endforeach
@@ -124,7 +124,7 @@
                             @foreach ($d['top_products'] as $i => $top)
                                 <li data-motion-item>
                                     <span class="pd-rank">{{ $i + 1 }}</span>
-                                    <span class="pd-top-name" title="{{ $top['name'] }}">{{ $top['name'] }}</span>
+                                    <span class="pd-top-name" data-tip-truncate>{{ $top['name'] }}</span>
                                     <span class="pd-top-qty" data-number-text="top-{{ $top['name'] }}">{{ $top['formatted_qty'] }} {{ $top['unit'] }}</span>
                                     <i class="pd-top-bar" style="width: {{ $top['share'] }}%" data-motion-axis="x" data-motion-bar="{{ $top['share'] }}" data-motion-key="product-{{ $top['name'] }}" aria-hidden="true"></i>
                                 </li>

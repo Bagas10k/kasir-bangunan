@@ -54,7 +54,7 @@
 <p class="as-sub"><span class="as-desk">Hal yang menunggu keputusan Anda. Hilang sendiri setelah ditangani.</span><span class="as-mob">{{ count($todo) }} hal menunggu Anda</span></p>
 <ul class="as-todo-list">
 @foreach($todo as [$label, $labelLong, $count, $hint, $target, $button, $tone])
-<li><a class="as-todo-item" href="#{{ $target }}" data-task-link="{{ $target }}" title="{{ $count }} {{ $labelLong }} · {{ $hint }}"><span class="as-dot as-dot--{{ $tone }}" aria-hidden="true"></span><strong class="as-todo-n">{{ $count }}</strong><span class="as-todo-label"><span class="as-desk">{{ $label }}</span><span class="as-mob">{{ $count }} {{ $labelLong }}</span></span><small class="as-todo-hint">{{ $hint }}</small><span class="as-todo-go">{{ $button }}</span></a></li>
+<li><a class="as-todo-item" href="#{{ $target }}" data-task-link="{{ $target }}" data-tip="{{ $count }} {{ $labelLong }} · {{ $hint }}"><span class="as-dot as-dot--{{ $tone }}" aria-hidden="true"></span><strong class="as-todo-n">{{ $count }}</strong><span class="as-todo-label"><span class="as-desk">{{ $label }}</span><span class="as-mob">{{ $count }} {{ $labelLong }}</span></span><small class="as-todo-hint">{{ $hint }}</small><span class="as-todo-go">{{ $button }}</span></a></li>
 @endforeach
 </ul>
 @endif
@@ -82,7 +82,7 @@
 <div data-period="{{ $key }}" data-motion-region data-motion-version="{{ hash('sha256', json_encode($p['buckets'])) }}">
 <p class="as-sub">@if($p['peak'])Tertinggi Rp {{ $p['peak']['short'] }} pada {{ $p['peak']['date'] ? $dayLabel($p['peak']['date']) : 'pukul '.$p['peak']['label'] }}@else Belum ada penjualan pada periode ini @endif</p>
 <div class="as-plot as-plot--{{ $key }}" role="img" aria-label="Grafik penjualan {{ strtolower($label) }}@if($p['peak']), tertinggi {{ $p['peak']['formatted'] }}@endif">
-@foreach($p['buckets'] as $i => $b)<span class="as-col @if($b['peak']) is-peak @endif" style="--h:{{ $b['height'] }};--i:{{ $i }}" title="{{ $b['date'] ? $dayLabel($b['date']) : $b['label'] }}: {{ $b['formatted_total'] }}"><i data-motion-bar="{{ $b['height'] }}" data-motion-key="sale-{{ $b['date'] ?? $b['label'] }}"></i>@if($b['show'])<small>@if($b['date']){{ (int) substr($b['date'], 8, 2) }}<span class="as-desk"> {{ $months[(int) substr($b['date'], 5, 2) - 1] }}</span>@else{{ substr($b['label'], 0, 2) }}@endif</small>@endif</span>@endforeach
+@foreach($p['buckets'] as $i => $b)<span class="as-col @if($b['peak']) is-peak @endif" style="--h:{{ $b['height'] }};--i:{{ $i }}" data-tip="{{ $b['date'] ? $dayLabel($b['date']) : $b['label'] }}: {{ $b['formatted_total'] }}"><i data-motion-bar="{{ $b['height'] }}" data-motion-key="sale-{{ $b['date'] ?? $b['label'] }}"></i>@if($b['show'])<small>@if($b['date']){{ (int) substr($b['date'], 8, 2) }}<span class="as-desk"> {{ $months[(int) substr($b['date'], 5, 2) - 1] }}</span>@else{{ substr($b['label'], 0, 2) }}@endif</small>@endif</span>@endforeach
 </div>
 </div>
 @endforeach
@@ -108,10 +108,15 @@
 <dl class="as-lines">
 <div><dt>Tunai di laci<span class="as-desk">&nbsp;(shift terbuka)</span></dt><dd>{{ \App\Services\V2\Money::display($sum['drawer']['total']) }}</dd></div>
 <div><dt>Bank terverifikasi</dt><dd>{{ \App\Services\V2\Money::display($sum['bank']) }}</dd></div>
-<div class="{{ \Brick\Math\BigDecimal::of((string) $metrics['awaiting']['total'])->isPositive() ? 'is-warn' : '' }}"><dt><span class="as-dot as-dot--warn" aria-hidden="true"></span>Transfer menunggu</dt><dd>{{ \App\Services\V2\Money::display($metrics['awaiting']['total']) }}</dd></div>
-<div><dt>Uang muka sopir terbuka</dt><dd>{{ \App\Services\V2\Money::display($metrics['advances']['total']) }}</dd></div>
-<div><dt title="Neto seluruh shift yang ditutup bulan ini, termasuk yang sudah diperiksa">Selisih bulan ini (riwayat)</dt><dd>{{ $signed((string) $difference) }}</dd></div>
-<div class="{{ $metrics['shifts']['review'] > 0 ? 'is-warn' : '' }}"><dt title="Pemeriksaan selisih yang belum selesai dari semua tanggal; bukan saldo kas">Belum diselesaikan</dt><dd>{{ $signed($unresolvedDifference) }} · {{ $metrics['shifts']['review'] }} shift</dd></div>
+@if(count($sum['bank_accounts'] ?? []) > 1)
+@foreach($sum['bank_accounts'] as $bankRow)
+<div class="as-sub-bank"><dt>&nbsp;&nbsp;↳ {{ $bankRow['account_code'] }} · {{ $bankRow['account_name'] }}</dt><dd>{{ \App\Services\V2\Money::display($bankRow['balance']) }}</dd></div>
+@endforeach
+@endif
+<div class="{{ \Brick\Math\BigDecimal::of((string) $metrics['awaiting']['total'])->isPositive() ? 'is-warn' : '' }}"><dt><span class="as-dot as-dot--warn" aria-hidden="true"></span>Transfer menunggu <x-ui.info-tip key="transfer_menunggu" label="Keterangan transfer menunggu"/></dt><dd>{{ \App\Services\V2\Money::display($metrics['awaiting']['total']) }}</dd></div>
+<div><dt>Uang muka sopir terbuka <x-ui.info-tip key="uang_muka_sopir" label="Keterangan uang muka sopir"/></dt><dd>{{ \App\Services\V2\Money::display($metrics['advances']['total']) }}</dd></div>
+<div><dt>Selisih bulan ini (riwayat) <x-ui.info-tip key="selisih_kas_riwayat" label="Keterangan selisih bulan ini"/></dt><dd>{{ $signed((string) $difference) }}</dd></div>
+<div class="{{ $metrics['shifts']['review'] > 0 ? 'is-warn' : '' }}"><dt>Belum diselesaikan <x-ui.info-tip key="selisih_belum_selesai" label="Keterangan selisih belum diselesaikan"/></dt><dd>{{ $signed($unresolvedDifference) }} · {{ $metrics['shifts']['review'] }} shift</dd></div>
 </dl>
 </div>
 </details>

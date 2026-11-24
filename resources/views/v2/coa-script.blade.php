@@ -54,6 +54,7 @@ async function save(target){
             return;
         }
         document.dispatchEvent(new CustomEvent('ui-remote:changed',{detail:{url:root.dataset.refreshUrl}}));
+        window.uiLive?.refresh?.();
         if(document.getElementById('coa-form')!==form)return;
         if(editing)window.closeModal('modal-coa');
         const message=data.message||'Akun berhasil disimpan.';

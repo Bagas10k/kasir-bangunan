@@ -84,7 +84,7 @@ html body :is([data-table-filter-panel],#u#u#u) .ui-filter-footer{
     display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;flex:none;padding:12px 20px;
     border-top:1px solid #edf1ee;background:#f8faf8;
 }
-html body :is([data-table-filter-panel],#u#u#u) :is(.sales-filter-actions,.master-toolbar-actions,.ledger-filter-actions,.receivables-filter-actions,.ui-toolbar-actions){
+html body :is([data-table-filter-panel],#u#u#u) :is(.sales-filter-actions,.master-toolbar-actions,.ledger-filter-actions,.receivables-filter-actions,.exp-filter-actions,.ui-toolbar-actions){
     display:flex !important;gap:8px !important;flex-wrap:wrap;width:100%;margin:0 !important;padding:0 !important;grid-area:auto !important;border:0 !important;
 }
 html body :is([data-table-filter-panel],#u#u#u) :is(.ui-filter-footer button,.ui-filter-footer a,.report-apply,.report-reset){
@@ -97,7 +97,7 @@ html body :is([data-table-filter-panel],#u#u#u) .ui-filter-reset{margin-right:au
 html body :is(.ui-filter-trigger,.ui-filter-search-submit,[data-table-filter-panel] button,[data-table-filter-panel] a):focus-visible{outline:2px solid #14532d;outline-offset:3px}
 html body :is([data-table-filter-panel][hidden],#u#u#u),html body .ui-filter-count[hidden],html body .ui-filter-current[hidden]{display:none !important}
 @media(max-width:760px){
-    html body :is([data-filter-ready],#u#u#u)>[data-filter-search]{max-width:none;flex:1 1 160px}
+    html body :is([data-filter-ready],#u#u#u)>[data-filter-search]{flex:1 1 100%;width:100%;max-width:none}
     html body :is([data-filter-ready],#u#u#u)>.ui-toolbar-actions{flex-basis:100%;margin:0}
     html body .ui-filter-current{max-width:18ch}
 }

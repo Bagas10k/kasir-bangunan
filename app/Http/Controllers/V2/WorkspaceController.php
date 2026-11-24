@@ -4,6 +4,7 @@ namespace App\Http\Controllers\V2;
 
 use App\Http\Controllers\Controller;
 use App\Services\V2\AdminSummary;
+use App\Services\V2\BankAccounts;
 use App\Services\V2\CustomerLookup;
 use App\Services\V2\DeliveryTrips;
 use App\Services\V2\MasterData;
@@ -148,8 +149,11 @@ class WorkspaceController extends Controller
         ['historySales' => $historySales, 'historyFilters' => $historyFilters] = $this->historyData($request);
         $recentSales = DB::table('v2_sales as s')->leftJoin('v2_parties as p', 'p.id', '=', 's.customer_id')
             ->orderByDesc('s.id')->limit(5)->get(['s.id', 's.number', 'p.name as customer_name']);
+        $bankService = app(BankAccounts::class);
+        $bankAccounts = $bankService->active();
+        $bankAccountNames = $bankService->nameMap(false);
 
-        return view('v2.workspace', compact('activeStoreShift', 'todayCashDay', 'adminSummary', 'role', 'shifts', 'reviewShifts', 'invoices', 'invoiceFilters', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'customerInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'receiptDrafts', 'draftProducts', 'receiptFinalAudit', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters', 'recentSales', 'freightReady', 'freightAccounts'));
+        return view('v2.workspace', compact('activeStoreShift', 'todayCashDay', 'adminSummary', 'role', 'shifts', 'reviewShifts', 'invoices', 'invoiceFilters', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'customerInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'receiptDrafts', 'draftProducts', 'receiptFinalAudit', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters', 'recentSales', 'freightReady', 'freightAccounts', 'bankAccounts', 'bankAccountNames'));
     }
 
     public function dashboardPeriod(Request $request): JsonResponse
@@ -217,6 +221,12 @@ class WorkspaceController extends Controller
             ->paginate($invoiceFilters['invoice_per_page'], ['*'], 'invoice_page', $invoiceFilters['invoice_page']);
         $invoices->withPath(route(config('v2.enabled') ? 'pos.index' : 'v2.index'))
             ->appends($invoiceFilters)->fragment('tagihan');
+        $paymentColumns = ['pm.id', 'proof.id as proof_id', 'pm.invoice_id', 'pm.amount', 'pm.method', 'pm.status', 'pm.reference', 'pm.created_at',
+            'pm.resolution_note', 'pm.resolved_at', 'requester.name as requester_name',
+            'approver.name as approver_name', 'resolver.name as resolver_name'];
+        if (Schema::hasColumn('v2_payments', 'bank_account_code')) {
+            $paymentColumns[] = 'pm.bank_account_code';
+        }
         $invoicePayments = DB::table('v2_payments as pm')
             ->leftJoin('users as requester', 'requester.id', '=', 'pm.requested_by')
             ->leftJoin('users as approver', 'approver.id', '=', 'pm.approved_by')
@@ -224,16 +234,17 @@ class WorkspaceController extends Controller
             ->leftJoin('v2_payment_proofs as proof', 'proof.payment_id', '=', 'pm.id')
             ->whereIn('pm.invoice_id', $invoices->pluck('id'))
             ->orderBy('pm.id')
-            ->get(['pm.id', 'proof.id as proof_id', 'pm.invoice_id', 'pm.amount', 'pm.method', 'pm.status', 'pm.reference', 'pm.created_at',
-                'pm.resolution_note', 'pm.resolved_at', 'requester.name as requester_name',
-                'approver.name as approver_name', 'resolver.name as resolver_name'])
+            ->get($paymentColumns)
             ->groupBy('invoice_id');
         foreach ($invoices as $invoice) {
             $invoice->payment_history = $invoicePayments->get($invoice->id, collect());
         }
         $role = $this->operations->role($request->user()->id);
+        $bankService = app(BankAccounts::class);
+        $bankAccounts = $bankService->active();
+        $bankAccountNames = $bankService->nameMap(false);
 
-        return compact('invoices', 'invoiceFilters', 'role');
+        return compact('invoices', 'invoiceFilters', 'role', 'bankAccounts', 'bankAccountNames');
     }
 
     public function history(Request $request): JsonResponse
@@ -368,8 +379,11 @@ class WorkspaceController extends Controller
             ->leftJoin('v2_payment_proofs as proof', 'proof.payment_id', '=', 'pm.id')
             ->where('pm.invoice_id', $inv->id)->orderBy('pm.id')->get(['pm.*', 'u.name as requester_name', 'proof.id as proof_id']) : collect();
         $role = $this->operations->role($request->user()->id);
+        $bankService = app(BankAccounts::class);
+        $bankAccounts = $bankService->active();
+        $bankAccountNames = $bankService->nameMap(false);
 
-        return response()->json(['sale_id' => $id, 'html' => view('v2.sale-detail', compact('document', 'inv', 'paymentHistory', 'role'))->render()])
+        return response()->json(['sale_id' => $id, 'html' => view('v2.sale-detail', compact('document', 'inv', 'paymentHistory', 'role', 'bankAccounts', 'bankAccountNames'))->render()])
             ->header('Cache-Control', 'private, no-store');
     }
 
@@ -393,6 +407,15 @@ class WorkspaceController extends Controller
             app(MasterRelations::class)->archive($request->user()->id, $kind, $id);
 
             return ['status' => 'archived'];
+        });
+    }
+
+    public function activateRelation(Request $request, string $kind, int $id): JsonResponse
+    {
+        return $this->run(function () use ($request, $kind, $id): array {
+            app(MasterRelations::class)->activate($request->user()->id, $kind, $id);
+
+            return ['status' => 'activated'];
         });
     }
 
@@ -484,6 +507,7 @@ class WorkspaceController extends Controller
             'customer_id' => ['nullable', 'integer', 'min:1'],
             'payment_method' => ['required', Rule::in(['cash', 'transfer', 'credit'])],
             'deposit_method' => ['nullable', Rule::in(['cash', 'transfer'])],
+            'bank_account_code' => ['nullable', 'string', 'max:20'],
             'paid_amount' => ['required', 'string', 'max:30'],
             'idempotency_key' => ['required', 'string', 'min:8', 'max:100'],
             'fulfillment' => ['required', Rule::in(['pickup', 'delivery'])],
@@ -507,13 +531,13 @@ class WorkspaceController extends Controller
     public function collect(Request $request, int $id): JsonResponse
     {
         $this->operations->requireRole($request->user()->id, ['admin', 'cashier']);
-        $data = $request->validate(['amount' => ['required', 'string', 'max:30'], 'method' => ['required', Rule::in(['cash', 'transfer', 'main'])], 'idempotency_key' => ['required', 'string', 'min:8', 'max:100'], 'reference' => ['nullable', 'string', 'max:255'], 'seen_payment_id' => ['nullable', 'integer', 'min:0'], 'confirm_duplicate' => ['nullable', 'boolean']]);
+        $data = $request->validate(['amount' => ['required', 'string', 'max:30'], 'method' => ['required', Rule::in(['cash', 'transfer', 'main'])], 'bank_account_code' => ['nullable', 'string', 'max:20'], 'idempotency_key' => ['required', 'string', 'min:8', 'max:100'], 'reference' => ['nullable', 'string', 'max:255'], 'seen_payment_id' => ['nullable', 'integer', 'min:0'], 'confirm_duplicate' => ['nullable', 'boolean']]);
         $needsProof = $data['method'] === 'transfer' && DB::table('v2_invoices')->where('id', $id)->where('direction', 'receivable')->exists();
         $photo = $this->validateTransferProof($request, $needsProof);
 
         return $this->run(fn () => app(PaymentProofs::class)->record($request->user()->id, $photo, function () use ($request, $id, $data): array {
             $seen = isset($data['seen_payment_id']) ? (int) $data['seen_payment_id'] : null;
-            $paymentId = $this->operations->collect($request->user()->id, $id, $data['amount'], $data['method'], $data['idempotency_key'], $data['reference'] ?? null, $seen, (bool) ($data['confirm_duplicate'] ?? false));
+            $paymentId = $this->operations->collect($request->user()->id, $id, $data['amount'], $data['method'], $data['idempotency_key'], $data['reference'] ?? null, $seen, (bool) ($data['confirm_duplicate'] ?? false), $data['bank_account_code'] ?? null);
 
             return ['payment_id' => $paymentId, 'data' => ['id' => $paymentId, 'status' => (string) DB::table('v2_payments')->where('id', $paymentId)->value('status')]];
         }));
@@ -697,6 +721,15 @@ class WorkspaceController extends Controller
             app(MasterData::class)->archive($request->user()->id, $kind, $id);
 
             return ['status' => 'archived'];
+        });
+    }
+
+    public function activateMaster(Request $request, string $kind, int $id): JsonResponse
+    {
+        return $this->run(function () use ($request, $kind, $id): array {
+            app(MasterData::class)->activate($request->user()->id, $kind, $id);
+
+            return ['status' => 'activated'];
         });
     }
 

@@ -65,7 +65,7 @@
             <strong class="summary-value">{{ $rp($report['total_liabilities_and_equity']) }}</strong>
         </div>
         <div class="summary-item {{ $balanced ? 'is-result' : 'is-alert' }}">
-            <span class="summary-label">{{ $balanced ? 'Status Neraca' : 'Selisih Aset − Pasiva' }}</span>
+            <span class="summary-label">{{ $balanced ? 'Status Neraca' : 'Selisih Aset − Pasiva' }} <x-ui.info-tip key="neraca_seimbang" label="Keterangan keseimbangan neraca"/></span>
             <strong class="summary-value">{{ $balanced ? 'SEIMBANG' : $rpSigned($difference) }}</strong>
         </div>
     </section>

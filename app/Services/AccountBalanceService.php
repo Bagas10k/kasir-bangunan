@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\V2\BankAccounts;
 use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -27,13 +28,16 @@ class AccountBalanceService
 
     public function assertSufficient(string $accountCode, string $amount, ?int $excludeJournalId = null): void
     {
-        $labels = ['1101' => 'Kas Tunai', '1102' => 'Bank'];
-        if (!isset($labels[$accountCode])) {
+        $label = $this->resolveCashOrBankLabel($accountCode);
+        if ($label === null) {
             throw new InvalidArgumentException('Kontrol saldo hanya berlaku untuk akun Kas dan Bank.');
         }
 
         $opening = DB::table('opening_balances')->where('singleton_key', 1)->lockForUpdate()->first();
-        if (!$opening || $opening->status !== 'posted') {
+        $bookkeepingStarted = ($opening && $opening->status === 'posted')
+            || DB::table('v2_opening_batches')->where('singleton_key', 1)->exists()
+            || DB::table('journal_entries')->exists();
+        if (! $bookkeepingStarted) {
             throw new InvalidArgumentException('Mulai pembukuan dan posting saldo awal sebelum mengeluarkan Kas atau Bank.');
         }
 
@@ -42,11 +46,30 @@ class AccountBalanceService
         if ($available->isLessThan($required)) {
             throw new InvalidArgumentException(sprintf(
                 'Saldo %s tidak cukup. Tersedia Rp %s, dibutuhkan Rp %s.',
-                $labels[$accountCode],
+                $label,
                 $this->formatMoney($available),
                 $this->formatMoney($required)
             ));
         }
+    }
+
+    private function resolveCashOrBankLabel(string $accountCode): ?string
+    {
+        if ($accountCode === '1101') {
+            return 'Kas Tunai';
+        }
+        if ($accountCode === '1102') {
+            $name = DB::table('chart_of_accounts')->where('account_code', '1102')->value('account_name');
+
+            return is_string($name) && $name !== '' ? $name.' (1102)' : 'Bank';
+        }
+        if (app(BankAccounts::class)->isBankAccount($accountCode, false)) {
+            $name = DB::table('chart_of_accounts')->where('account_code', $accountCode)->value('account_name');
+
+            return is_string($name) && $name !== '' ? $name.' ('.$accountCode.')' : 'Bank ('.$accountCode.')';
+        }
+
+        return null;
     }
 
     private function formatMoney(BigDecimal $amount): string
@@ -54,8 +77,8 @@ class AccountBalanceService
         $scaled = (string) $amount->toScale(2);
         $negative = str_starts_with($scaled, '-');
         [$whole, $fraction] = explode('.', ltrim($scaled, '-'));
-        $formatted = preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', $whole) . ',' . $fraction;
+        $formatted = preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', $whole).','.$fraction;
 
-        return $negative ? '-' . $formatted : $formatted;
+        return $negative ? '-'.$formatted : $formatted;
     }
 }

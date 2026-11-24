@@ -180,7 +180,8 @@ html body .ur-btn.is-primary:hover{background:#0f2a1d}
         ['PUT', /\/v2\/(?:master|relations)\/([a-z]+)\/\d+$/, function (d, m) { return { title: 'Perubahan ' + (SHOP[m[1]] || 'data').toLowerCase() + ' disimpan' }; }],
         ['PATCH', /\/v2\/(?:master|relations)\/([a-z]+)\/\d+$/, function (d, m) { return { title: (SHOP[m[1]] || 'Data') + ' diarsipkan', detail: 'Riwayat transaksi tetap utuh.' }; }],
         ['POST', /\/v2\/accounts$/, function () { return { title: 'Akun login dibuat' }; }],
-        ['PUT', /\/v2\/accounts\/\d+$/, function () { return { title: 'Akun login diperbarui' }; }]
+        ['PUT', /\/v2\/accounts\/\d+$/, function () { return { title: 'Akun login diperbarui' }; }],
+        ['POST', /\/v2\/expenses$/, function (d) { return { title: 'Pengeluaran dicatat', detail: (d && d.expense_number ? d.expense_number + ' · ' : '') + 'Jurnal seimbang sudah dikunci.' }; }]
     ];
 
     function persist(o) {

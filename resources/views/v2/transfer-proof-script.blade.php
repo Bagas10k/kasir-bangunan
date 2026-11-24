@@ -3,11 +3,18 @@
 'use strict';
 function sync(form){
     if(!form)return;
+    const method=form.elements.payment_method?.value||form.elements.method?.value||form.elements.refund_method?.value||form.elements.freight_method?.value;
+    const dp=String(form.elements.paid_amount?.value||'0');
+    const dpTransfer=method==='credit'&&form.elements.deposit_method?.value==='transfer'&&!/^0+(?:\.0+)?$/.test(dp);
+    const bankField=form.querySelector('[data-bank-account-field]');
+    const bankSelect=bankField?.querySelector('select');
+    if(bankField&&bankSelect){
+        const showBank=method==='transfer'||method==='bank'||dpTransfer;
+        bankField.hidden=!showBank;bankSelect.disabled=!showBank;bankSelect.required=showBank;
+    }
     const input=form.querySelector('[name=transfer_proof]'),field=form.querySelector('[data-transfer-proof-field]');
     if(!input||!field)return;
-    const method=form.elements.payment_method?.value||form.elements.method?.value;
-    const dp=String(form.elements.paid_amount?.value||'0');
-    const transfer=method==='transfer'||(method==='credit'&&form.elements.deposit_method?.value==='transfer'&&!/^0+(?:\.0+)?$/.test(dp));
+    const transfer=method==='transfer'||dpTransfer;
     field.hidden=!transfer;input.disabled=!transfer;input.required=transfer;
     if(!transfer)input.value='';
 }

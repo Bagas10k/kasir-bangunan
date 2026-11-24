@@ -52,6 +52,6 @@ test('the existing supplier name button opens its dialog without the undefined h
         createElement:node,addEventListener:(type,fn)=>events[type]=fn,dispatchEvent(){},activeElement:null},CustomEvent:class{}});
     events.click({preventDefault(){},target:{closest:()=>({dataset:{insight:'supplier',insightId:'1',insightName:'Supplier sintetis'}})}});
     assert.equal(dialog.open,true);
-    assert.equal(nodes['[data-insight-history-block]'].hidden,true);
     assert.equal(nodes['[data-supplier-activity]'].hidden,false);
+    assert.equal(nodes['[data-insight-figures]'].children.length,4);
 });

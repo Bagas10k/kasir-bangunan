@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\V2\BankAccounts;
 use Brick\Math\BigDecimal;
 use DateTime;
 use Illuminate\Support\Collection;
@@ -304,13 +305,14 @@ class AccountingReportService
     {
         $startDate = $this->sanitizeDate($startDate);
         $endDate = $this->sanitizeDate($endDate);
+        $cashAccounts = app(BankAccounts::class)->cashAndBankCodes(false);
 
         // 1. Calculate Beginning Cash (Saldo Awal Kas & Bank sebelum startDate)
         $beginningCash = BigDecimal::zero();
         if ($startDate) {
             $beforeQuery = DB::table('journal_entry_lines')
                 ->join('journal_entries', 'journal_entry_lines.journal_entry_id', '=', 'journal_entries.id')
-                ->whereIn('journal_entry_lines.account_code', self::CASH_ACCOUNTS)
+                ->whereIn('journal_entry_lines.account_code', $cashAccounts)
                 ->where('journal_entries.transaction_date', '<', $startDate);
 
             $begDebit = BigDecimal::zero();
@@ -325,7 +327,7 @@ class AccountingReportService
         // 2. Calculate Ending Cash (Saldo Akhir Kas & Bank per endDate)
         $endingQuery = DB::table('journal_entry_lines')
             ->join('journal_entries', 'journal_entry_lines.journal_entry_id', '=', 'journal_entries.id')
-            ->whereIn('journal_entry_lines.account_code', self::CASH_ACCOUNTS);
+            ->whereIn('journal_entry_lines.account_code', $cashAccounts);
 
         if ($endDate) {
             $endingQuery->where('journal_entries.transaction_date', '<=', $endDate);
@@ -341,7 +343,7 @@ class AccountingReportService
 
         // 3. Ending Cash Breakdown per Account
         $breakdownAccounts = DB::table('chart_of_accounts')
-            ->whereIn('account_code', self::CASH_ACCOUNTS)
+            ->whereIn('account_code', $cashAccounts)
             ->orderBy('account_code')
             ->get(['account_code', 'account_name']);
 
@@ -372,7 +374,7 @@ class AccountingReportService
         // 4. Retrieve journal entries with cash movements within the period
         $entryIdsQuery = DB::table('journal_entry_lines')
             ->join('journal_entries', 'journal_entry_lines.journal_entry_id', '=', 'journal_entries.id')
-            ->whereIn('journal_entry_lines.account_code', self::CASH_ACCOUNTS);
+            ->whereIn('journal_entry_lines.account_code', $cashAccounts);
 
         if ($startDate) {
             $entryIdsQuery->where('journal_entries.transaction_date', '>=', $startDate);
@@ -420,7 +422,7 @@ class AccountingReportService
                 $nonCashLines = [];
 
                 foreach ($entryLines as $l) {
-                    if (in_array($l->account_code, self::CASH_ACCOUNTS, true)) {
+                    if (in_array($l->account_code, $cashAccounts, true)) {
                         $cashDebit = $cashDebit->plus((string) $l->debit);
                         $cashCredit = $cashCredit->plus((string) $l->credit);
                     } else {

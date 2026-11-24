@@ -19,8 +19,9 @@
         @endunless
     </div>
     @if($payable)
-    <div class="field collect-source"><label for="meth-{{ $paymentFieldId }}">Sumber dana</label><select id="meth-{{ $paymentFieldId }}" name="method"><option value="main">Kas Utama</option><option value="transfer">Bank Utama</option><option value="cash">Laci shift</option></select></div>
+    <div class="field collect-source"><label for="meth-{{ $paymentFieldId }}">Sumber dana <x-ui.info-tip key="sumber_dana_supplier" label="Keterangan sumber dana pembayaran"/></label><select id="meth-{{ $paymentFieldId }}" name="method"><option value="main">Kas Utama</option><option value="transfer">Bank Utama</option><option value="cash">Laci shift</option></select></div>
     @endif
+    <div class="field" data-bank-account-field hidden><label for="bank-{{ $paymentFieldId }}">{{ $payable ? 'Rekening bank sumber' : 'Rekening bank tujuan' }}</label><select id="bank-{{ $paymentFieldId }}" name="bank_account_code" disabled>@foreach(($bankAccounts ?? collect([(object)['account_code' => '1102', 'account_name' => 'Rekening Bank']])) as $bankAcc)<option value="{{ $bankAcc->account_code }}">{{ $bankAcc->account_code }} · {{ $bankAcc->account_name }}</option>@endforeach</select></div>
     @unless($payable)
     <div class="field" data-transfer-proof-field hidden><label for="transfer-proof-{{ $paymentFieldId }}">Foto bukti transfer</label><input id="transfer-proof-{{ $paymentFieldId }}" name="transfer_proof" type="file" accept="image/jpeg,image/png,image/webp" disabled><p class="note">Wajib bila transfer. JPG/PNG/WebP, maksimal 5 MB. Foto tersimpan pada pembayaran ini dan menunggu verifikasi admin.</p></div>
     @endunless

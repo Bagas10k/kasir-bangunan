@@ -15,14 +15,18 @@ final class AdminSummary
 {
     private const WATCH_LIMIT = 5;
 
-    public function __construct(private readonly AccountBalanceService $balances) {}
+    public function __construct(
+        private readonly AccountBalanceService $balances,
+        private readonly BankAccounts $bankAccounts,
+    ) {}
 
     /** @return array<string, mixed> */
     public function snapshot(string $today): array
     {
         return [
             'drawer' => $this->drawer(),
-            'bank' => (string) $this->balances->balance('1102'),
+            'bank' => (string) $this->bankAccounts->totalBalance($this->balances, false),
+            'bank_accounts' => $this->bankAccounts->balancesByAccount($this->balances, true),
             'receivable_overdue' => DB::table('v2_invoices')->where('direction', 'receivable')->where('status', '<>', 'paid')
                 ->whereNotNull('due_date')->where('due_date', '<', $today)->count(),
             'unassigned' => DB::table('v2_deliveries')->where('status', 'prepared')->whereNull('vehicle_id')->orderBy('id')->limit(1)->value('number'),

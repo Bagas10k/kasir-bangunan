@@ -294,3 +294,7 @@ test('uiLive synchronizes moved filter controls by identity rather than rebuildi
     assert.equal(calls[0][0], old);
     assert.equal(calls[0][1], fresh);
 });
+
+test('kolom cari mengisi satu baris penuh di HP', () => {
+    assert.match(styles, /@media\(max-width:760px\)\{[\s\S]*?\[data-filter-search\]\{flex:1 1 100%;width:100%;max-width:none\}/);
+});

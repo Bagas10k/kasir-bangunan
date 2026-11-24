@@ -209,7 +209,7 @@
     <article class="balance-tile">
         <small>Saldo Akhir Bank</small>
         <strong>Rp {{ $formatMoney($bankBalance) }}</strong>
-        <span>Saldo awal + seluruh mutasi akun 1102</span>
+        <span>@if(count($bankAccounts ?? []) > 1)Total {{ count($bankAccounts) }} rekening bank aktif @else Saldo awal + seluruh mutasi akun 1102 @endif</span>
     </article>
     <article class="balance-tile">
         <small>Status Saldo Pembukaan</small>
@@ -224,7 +224,7 @@
         <span class="adjustment-toggle" aria-hidden="true">+</span>
     </summary>
     <div class="adjustment-content">
-    <h2 class="section-title">Jurnal Penyesuaian Saldo</h2>
+    <h2 class="section-title">Jurnal Penyesuaian Saldo <x-ui.info-tip text="Mengoreksi saldo Kas (1101) atau Bank (1102) ke angka tujuan tanpa mengubah saldo awal yang sudah terkunci." title="Jurnal Penyesuaian" label="Keterangan jurnal penyesuaian"/></h2>
     <p class="section-copy">Isi saldo tujuan. Selisihnya otomatis masuk ke akun lawan.</p>
     <form id="adjustment-form" method="POST" action="{{ $adjustmentAction }}">
         @csrf
@@ -237,7 +237,7 @@
             <div class="form-group adjustment-wide"><label for="adjustment-description">Alasan koreksi</label><input class="form-control" id="adjustment-description" name="description" maxlength="200" value="{{ old('description') }}" placeholder="Mis. selisih hitung kas pagi" required></div>
         </div>
         <p class="adjustment-hint" id="adjustment-help">Saldo tujuan mengikuti sisi normal akun. Jurnal lama tetap tersimpan.</p>
-        @if($v2Writes)<p class="adjustment-hint">Pada tahap ini hanya Kas (1101) dan Bank (1102) yang dapat disesuaikan. Saldo awal yang sudah diposting tidak diubah; selisih dicatat sebagai jurnal penyesuaian baru.</p>@endif
+        @if($v2Writes)<p class="adjustment-hint">Pada tahap ini hanya Kas (1101) dan akun Rekening Bank aktif yang dapat disesuaikan. Saldo awal yang sudah diposting tidak diubah; selisih dicatat sebagai jurnal penyesuaian baru.</p>@endif
         @if(!$v2Writes && $openingStatus !== 'posted')<p class="adjustment-hint">Posting pertama memulai pembukuan dan menggantikan draf saldo awal.</p>@endif
         @if($adjustmentAccounts->isEmpty())<p class="section-copy">Belum ada akun aktif. Siapkan dahulu melalui <a href="{{ route('coa.index') }}">Bagan Akun</a>.</p>@endif
         <div class="adjustment-confirm">

@@ -78,7 +78,7 @@
 </section>
 
 <section class="card" aria-labelledby="receipt-heading">
-<h2 id="receipt-heading">Penerimaan barang berutang</h2>
+<h2 id="receipt-heading">Penerimaan barang berutang <x-ui.info-tip key="draf_penerimaan" label="Keterangan draf dan konfirmasi final penerimaan"/></h2>
 <p class="note">Simpan sebagai draf dahulu. Stok, HPP, dan utang supplier baru berubah saat penerimaan dikonfirmasi dan dikunci.</p>
 <p class="note">Pilih barang di daftar Perlu restok; supplier diisi otomatis bila hanya satu. Satu penerimaan tetap untuk satu supplier.</p>
 <form id="receipt-form" novalidate>
@@ -103,7 +103,7 @@
     </div>
 </div>
 <fieldset class="rc-items">
-    <legend class="lbl">Barang diterima</legend>
+    <legend class="lbl">Barang diterima <x-ui.info-tip key="hpp_penerimaan" label="Keterangan HPP satuan pembelian"/></legend>
     <div class="rc-head" aria-hidden="true"><span>Barang</span><span>Jumlah</span><span>HPP satuan</span><span>Nilai</span><span></span></div>
     <div id="receipt-items"></div>
     <div class="rc-foot">
@@ -113,9 +113,10 @@
 </fieldset>
 <p class="note">HPP satuan dipakai untuk nilai persediaan, bukan harga jual.</p>
 <fieldset class="row" @disabled(!($freightReady ?? false))>
-    <legend>Ongkir pembelian (beban, bukan HPP)</legend>
+    <legend>Ongkir pembelian (beban, bukan HPP) <x-ui.info-tip key="ongkir_penerimaan" label="Keterangan ongkir pembelian"/></legend>
     <div class="field"><label for="rc-freight">Ongkir</label><input id="rc-freight" name="freight_amount" data-money inputmode="decimal" value="0" maxlength="30"></div>
     <div class="field"><label for="rc-freight-method">Pembayaran ongkir</label><select id="rc-freight-method" name="freight_method"><option value="supplier">Ikut tagihan supplier</option><option value="cash">Kas harian</option><option value="bank">Bank</option></select></div>
+    <div class="field" data-bank-account-field hidden><label for="rc-freight-bank">Rekening bank ongkir</label><select id="rc-freight-bank" name="freight_bank_account_code" disabled>@foreach(($bankAccounts ?? collect([(object)['account_code' => '1102', 'account_name' => 'Rekening Bank']])) as $bankAcc)<option value="{{ $bankAcc->account_code }}">{{ $bankAcc->account_code }} · {{ $bankAcc->account_name }}</option>@endforeach</select></div>
     <div class="field"><label for="rc-freight-account">Akun beban ongkir</label><select id="rc-freight-account" name="freight_account"><option value="">Pilih akun beban</option>@foreach(($freightAccounts ?? collect()) as $account)<option value="{{ $account->account_code }}">{{ $account->account_code }} · {{ $account->account_name }}</option>@endforeach</select></div>
 </fieldset>
 @unless($freightReady ?? false)<p class="note">Ongkir belum aktif: migrasi perlu dijalankan setelah mendapat persetujuan admin. Penerimaan tanpa ongkir tetap tersedia.</p>@endunless
@@ -167,7 +168,7 @@
 <td data-label="Nomor" class="ui-primary rh-number">{{ $receipt->receipt_number ?: '#'.$receipt->id }}<span class="ui-sub">{{ $receipt->supplier_name ? 'Pemasok: '.$receipt->supplier_name : ($receipt->receipt_type === 'opening' ? 'Stok awal gudang' : 'Tanpa pemasok') }}@if(! empty($receipt->supplier_invoice_number))<span class="rh-ref"> · Nota {{ $receipt->supplier_invoice_number }}</span>@endif
 @if($receipt->notes)<span class="rh-ref"> · {{ \Illuminate\Support\Str::limit($receipt->notes, 40) }}</span>@endif</span></td>
 <td data-label="Produk" class="rh-lines rh-product">@forelse($lines as $line)<span>{{ $line->product_name }}</span>@empty<span class="ui-muted">—</span>@endforelse</td>
-<td data-label="Tipe" class="rh-type">@if($voided)<span class="ui-badge ui-badge--bad">Dibatalkan</span><span class="ui-sub rh-void-note">{{ \Carbon\Carbon::parse($receipt->voided_at)->locale('id')->translatedFormat('d M Y H:i') }}{{ $receipt->voided_by_name ? ' · '.$receipt->voided_by_name : '' }} · {{ $receipt->void_reason }}</span>@else<span class="ui-badge ui-badge--{{ $typeTone }}">{{ $typeLabel }}</span>@endif<span class="ui-sub" title="{{ $payLabel }}">Akun {{ $account !== '' ? $account : '—' }} · {{ $payLabel }}</span></td>
+<td data-label="Tipe" class="rh-type">@if($voided)<span class="ui-badge ui-badge--bad">Dibatalkan</span><span class="ui-sub rh-void-note">{{ \Carbon\Carbon::parse($receipt->voided_at)->locale('id')->translatedFormat('d M Y H:i') }}{{ $receipt->voided_by_name ? ' · '.$receipt->voided_by_name : '' }} · {{ $receipt->void_reason }}</span>@else<span class="ui-badge ui-badge--{{ $typeTone }}">{{ $typeLabel }}</span>@endif<span class="ui-sub" data-tip="{{ $payLabel }}">Akun {{ $account !== '' ? $account : '—' }} · {{ $payLabel }}</span></td>
 <td data-label="Qty" class="ui-num rh-lines">@forelse($lines as $line)<span>{{ $qty($line->quantity) }} <small>{{ $line->product_unit }}</small></span>@empty<span>—</span>@endforelse</td>
 <td data-label="HPP satuan" class="ui-num rh-lines">@forelse($lines as $line)<span>{{ \App\Services\V2\Money::display($line->unit_cost) }}</span>@empty<span>—</span>@endforelse</td>
 <td data-label="Total" class="ui-num rh-total"><strong>{{ \App\Services\V2\Money::display($receipt->total_amount) }}</strong>@if(\Brick\Math\BigDecimal::of((string) ($receipt->freight_amount ?? '0'))->isPositive())<span class="ui-sub">Nilai barang</span><span class="ui-sub">Ongkir {{ \App\Services\V2\Money::display($receipt->freight_amount) }} · {{ ['supplier'=>'Utang supplier','cash'=>'Kas','bank'=>'Bank'][$receipt->freight_method] ?? '—' }}</span>@endif</td>
@@ -266,6 +267,14 @@
             <option value="transfer">Transfer</option>
         </select>
     </div>
+    <div class="field" data-bank-account-field hidden>
+        <label for="trip-bank">Rekening bank</label>
+        <select id="trip-bank" name="bank_account_code" disabled>
+            @foreach(($bankAccounts ?? collect([(object)['account_code' => '1102', 'account_name' => 'Rekening Bank']])) as $bankAcc)
+                <option value="{{ $bankAcc->account_code }}">{{ $bankAcc->account_code }} · {{ $bankAcc->account_name }}</option>
+            @endforeach
+        </select>
+    </div>
 </div>
 <p><button type="submit">Catat biaya aktual</button></p>
 <p data-error class="err" tabindex="-1" hidden></p>
@@ -284,7 +293,7 @@
 @else
     @foreach ($waitingPayments as $payment)
     <form class="v2-json-form" action="{{ route('v2.payments.reject', $payment->id) }}">
-        <p><strong>{{ \App\Services\V2\Money::display($payment->amount) }}</strong> · {{ ($payment->invoice_direction ?? '') === 'payable' ? 'Bayar ke' : 'Dari' }} {{ $payment->party_name ?? 'Pelanggan umum' }} · {{ $payment->invoice_number }} · {{ ['main' => 'Kas Utama', 'cash' => 'Laci shift', 'transfer' => 'Bank Utama'][$payment->method] ?? $payment->method }}@if($payment->requester_name) · diajukan {{ $payment->requester_name }}@endif</p>
+        <p><strong>{{ \App\Services\V2\Money::display($payment->amount) }}</strong> · {{ ($payment->invoice_direction ?? '') === 'payable' ? 'Bayar ke' : 'Dari' }} {{ $payment->party_name ?? 'Pelanggan umum' }} · {{ $payment->invoice_number }} · {{ ['main' => 'Kas Utama', 'cash' => 'Laci shift', 'transfer' => 'Bank Utama'][$payment->method] ?? $payment->method }}@if($payment->method === 'transfer' && !empty($payment->bank_account_code)) ({{ $payment->bank_account_code }}{{ isset($bankAccountNames[$payment->bank_account_code]) ? ' · '.$bankAccountNames[$payment->bank_account_code] : '' }})@endif @if($payment->requester_name) · diajukan {{ $payment->requester_name }}@endif</p>
         <div class="field">
             <label for="reject-{{ $payment->id }}">Alasan penolakan</label>
             <input id="reject-{{ $payment->id }}" name="reason" required minlength="5" maxlength="1000">
@@ -827,6 +836,9 @@ if (receipt) {
             receipt.elements.freight_amount.value = draft.freight_amount || '0';
             receipt.elements.freight_method.value = draft.freight_method || 'supplier';
             receipt.elements.freight_account.value = draft.freight_account || '';
+            if (receipt.elements.freight_bank_account_code && draft.freight_bank_account_code) {
+                receipt.elements.freight_bank_account_code.value = draft.freight_bank_account_code;
+            }
             for (const name of ['freight_amount','freight_method','freight_account']) receipt.elements[name].dispatchEvent(new Event('change',{bubbles:true}));
         }
         box.replaceChildren();
@@ -872,6 +884,9 @@ if (receipt) {
             payload.freight_amount = receipt.elements.freight_amount.value || '0';
             payload.freight_method = receipt.elements.freight_method.value;
             payload.freight_account = receipt.elements.freight_account.value || null;
+            if (receipt.elements.freight_bank_account_code && !receipt.elements.freight_bank_account_code.disabled) {
+                payload.freight_bank_account_code = receipt.elements.freight_bank_account_code.value || null;
+            }
         }
         receipt._lastError = null;
         const url = receipt.dataset.draftId ? draftUpdateUrl.replace(/\/0$/, '/' + receipt.dataset.draftId) : @json(route('v2.receipts.store'));

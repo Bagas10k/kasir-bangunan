@@ -214,7 +214,7 @@
                                 <td data-label="Tanggal" class="ui-nowrap">{{ $when($pm->created_at ?? null) }}</td>
                                 <td data-label="Tagihan" class="ui-primary ui-nowrap">{{ $pm->invoice_number ?? ('#'.($pm->invoice_id ?? '')) }}<span class="ui-sub">{{ ($pm->invoice_direction ?? '') === 'payable' ? 'Utang supplier' : 'Piutang pelanggan' }}</span></td>
                                 <td data-label="Nama">{{ $pm->party_name ?? '—' }}</td>
-                                <td data-label="Sumber dana">{{ $sourceLabel[$pm->method ?? ''] ?? '—' }}@if($pm->proof_id)<span class="ui-sub"><a href="{{ route('v2.payments.proof', $pm->id) }}" target="_blank" rel="noopener">Lihat bukti transfer</a></span>@endif</td>
+                                <td data-label="Sumber dana">{{ $sourceLabel[$pm->method ?? ''] ?? '—' }}@if(($pm->method ?? '') === 'transfer' && !empty($pm->bank_account_code))<span class="ui-sub">{{ $pm->bank_account_code }}{{ isset($bankAccountNames[$pm->bank_account_code]) ? ' · '.$bankAccountNames[$pm->bank_account_code] : '' }}</span>@endif @if($pm->proof_id)<span class="ui-sub"><a href="{{ route('v2.payments.proof', $pm->id) }}" target="_blank" rel="noopener">Lihat bukti transfer</a></span>@endif</td>
                                 <td data-label="Jumlah" class="ui-num">{{ $rp($pm->amount ?? null) }}</td>
                                 @if($isAdmin)<td data-label="Pengaju">{{ $pm->requester_name ?? '—' }}</td>@endif
                                 <td data-label="Status"><x-ui.status :status="$pm->status ?? ''"/></td>
@@ -288,7 +288,7 @@
                     <h3 id="rep-bank">Transfer bank</h3>
                     <dl class="ui-kv">
                         <div class="is-total"><dt>Transfer terverifikasi</dt><dd>{{ $rp($daily['bank']['posted'] ?? null) }}</dd></div>
-                        <div><dt>Menunggu verifikasi</dt><dd>{{ $rp($daily['bank']['pending'] ?? null) }}</dd></div>
+                        <div><dt>Menunggu verifikasi <x-ui.info-tip key="transfer_menunggu" label="Keterangan transfer menunggu verifikasi"/></dt><dd>{{ $rp($daily['bank']['pending'] ?? null) }}</dd></div>
                     </dl>
                     <p class="ui-sub">Transfer yang menunggu belum masuk bank sampai admin memverifikasi.</p>
                 </section>
@@ -519,6 +519,7 @@
                 delivery_fee: val(checkout, 'delivery_fee'),
                 payment_method: method,
                 deposit_method: method === 'credit' ? val(checkout, 'deposit_method') : null,
+                bank_account_code: checkout.elements['bank_account_code'] && !checkout.elements['bank_account_code'].disabled && checkout.elements['bank_account_code'].value ? checkout.elements['bank_account_code'].value : null,
                 paid_amount: val(checkout, 'paid_amount'),
                 idempotency_key: val(checkout, 'idempotency_key'),
                 fulfillment: val(checkout, 'fulfillment'),
@@ -594,6 +595,7 @@
             var payload = {
                 amount: val(form, 'amount'),
                 method: val(form, 'method'),
+                bank_account_code: form.elements['bank_account_code'] && !form.elements['bank_account_code'].disabled && form.elements['bank_account_code'].value ? form.elements['bank_account_code'].value : null,
                 idempotency_key: val(form, 'idempotency_key'),
                 reference: val(form, 'reference') === '' ? null : val(form, 'reference'),
                 seen_payment_id: val(form, 'seen_payment_id') === '' ? null : val(form, 'seen_payment_id'),
@@ -728,5 +730,7 @@
 </dialog>
 @include('v2.sale-detail-script')
 @include('v2.transfer-proof-script')
+@include('v2.table-actions')
+@include('v2.ui-tooltip')
 </body>
 </html>

@@ -19,7 +19,7 @@
   --ui-cart-list-min:6rem;
   --ui-catalog-product-width:40%;--ui-catalog-detail-width:20%;
   --ui-restock-list-max:22rem;
-  --ui-skeleton-duration:1.2s;--ui-skeleton-card-height:6rem;--ui-skeleton-opacity:.45;
+  --ui-skeleton-duration:1.2s;--ui-skeleton-shimmer:1.5s;--ui-skeleton-card-height:6rem;--ui-skeleton-opacity:.45;
   --ui-loading-layer:200;--ui-loading-width:72rem;
   --ui-catalog-quantity-width:4rem;--ui-morph-duration:300ms;--ui-morph-easing:ease-in-out;--ui-morph-layer:121;
   --ui-sidebar-duration:260ms;--ui-sidebar-text-duration:180ms;

@@ -2044,5 +2044,6 @@
         @include('v2.ui-sidebar-js')
     @endif
     @include('v2.ui-motion')
+@include('v2.ui-tooltip')
 </body>
 </html>

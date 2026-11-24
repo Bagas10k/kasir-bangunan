@@ -7,6 +7,7 @@ use Brick\Math\RoundingMode;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -594,7 +595,8 @@ class Operations
                     'updated_at' => now(),
                 ]);
             } elseif ($tendered->isPositive() && ($method === 'transfer' || $depositMethod === 'transfer')) {
-                DB::table('v2_payments')->insert([
+                $bankCode = app(BankAccounts::class)->resolve(isset($data['bank_account_code']) ? (string) $data['bank_account_code'] : null);
+                $paymentRow = [
                     'invoice_id' => $invoiceId,
                     'shift_id' => null,
                     'amount' => $this->str($tendered),
@@ -608,7 +610,11 @@ class Operations
                     'journal_entry_id' => null,
                     'created_at' => now(),
                     'updated_at' => now(),
-                ]);
+                ];
+                if (Schema::hasColumn('v2_payments', 'bank_account_code')) {
+                    $paymentRow['bank_account_code'] = $bankCode;
+                }
+                DB::table('v2_payments')->insert($paymentRow);
             }
 
             $deliveryNumber = null;
@@ -645,7 +651,7 @@ class Operations
      * @param  int|null  $seenPaymentId  id pembayaran terakhir (bukan ditolak) saat form dibuka; null = tidak diperiksa.
      * @param  bool  $confirmed  pengguna sudah menyatakan ini bukan pembayaran yang sama.
      */
-    public function collect(int $actor, int $invoiceId, string $amount, string $method, string $key, ?string $reference = null, ?int $seenPaymentId = null, bool $confirmed = false): int
+    public function collect(int $actor, int $invoiceId, string $amount, string $method, string $key, ?string $reference = null, ?int $seenPaymentId = null, bool $confirmed = false, ?string $bankAccountCode = null): int
     {
         $this->requireRole($actor, ['admin', 'cashier']);
         if (! in_array($method, ['cash', 'transfer', 'main'], true)) {
@@ -659,13 +665,18 @@ class Operations
         if (! $value->isPositive()) {
             $this->invalid('Nominal harus lebih dari nol.');
         }
+        $resolvedBank = $method === 'transfer' ? app(BankAccounts::class)->resolve($bankAccountCode) : null;
 
-        return DB::transaction(function () use ($actor, $invoiceId, $value, $method, $key, $reference, $seenPaymentId, $confirmed) {
+        return DB::transaction(function () use ($actor, $invoiceId, $value, $method, $key, $reference, $seenPaymentId, $confirmed, $bankAccountCode, $resolvedBank) {
             $invoice = DB::table('v2_invoices')->where('id', $invoiceId)->lockForUpdate()->first();
             if (! $invoice) {
                 $this->invalid('Tagihan tidak ditemukan.');
             }
-            $requestHash = hash('sha256', json_encode([$invoiceId, $this->str($value), $method, $reference], JSON_THROW_ON_ERROR));
+            $hashParts = [$invoiceId, $this->str($value), $method, $reference];
+            if ($resolvedBank !== null && trim((string) ($bankAccountCode ?? '')) !== '') {
+                $hashParts[] = $resolvedBank;
+            }
+            $requestHash = hash('sha256', json_encode($hashParts, JSON_THROW_ON_ERROR));
             $existing = DB::table('v2_payments')->where('idempotency_key', $key)->first();
             if ($existing) {
                 abort_unless((int) $existing->requested_by === $actor, 403);
@@ -693,6 +704,7 @@ class Operations
                 $this->invalid('Nominal melebihi sisa tagihan.');
             }
 
+            $hasBankCol = Schema::hasColumn('v2_payments', 'bank_account_code');
             if ($invoice->direction === 'payable') {
                 // Hanya pembayaran laci yang terikat pada shift toko saat pengajuan.
                 $shiftId = $method === 'cash' ? $this->currentShiftId($actor) : null;
@@ -701,7 +713,7 @@ class Operations
                 }
 
                 // Kasir mengajukan; admin membayar langsung tercatat (tunai dari laci shift-nya, transfer dari bank).
-                $paymentId = DB::table('v2_payments')->insertGetId([
+                $paymentRow = [
                     'invoice_id' => $invoiceId,
                     'shift_id' => $shiftId,
                     'amount' => $this->str($value),
@@ -715,7 +727,11 @@ class Operations
                     'journal_entry_id' => null,
                     'created_at' => now(),
                     'updated_at' => now(),
-                ]);
+                ];
+                if ($hasBankCol) {
+                    $paymentRow['bank_account_code'] = $resolvedBank;
+                }
+                $paymentId = DB::table('v2_payments')->insertGetId($paymentRow);
                 if ($this->role($actor) === 'admin') {
                     $this->postPayable($actor, $invoice, DB::table('v2_payments')->where('id', $paymentId)->first());
                 }
@@ -724,7 +740,7 @@ class Operations
             }
 
             if ($method === 'transfer') {
-                return DB::table('v2_payments')->insertGetId([
+                $paymentRow = [
                     'invoice_id' => $invoiceId,
                     'shift_id' => null,
                     'amount' => $this->str($value),
@@ -738,7 +754,12 @@ class Operations
                     'journal_entry_id' => null,
                     'created_at' => now(),
                     'updated_at' => now(),
-                ]);
+                ];
+                if ($hasBankCol) {
+                    $paymentRow['bank_account_code'] = $resolvedBank;
+                }
+
+                return DB::table('v2_payments')->insertGetId($paymentRow);
             }
 
             $shift = $this->openShiftFor($actor, true);
@@ -826,8 +847,12 @@ class Operations
                 if ($payment->method !== 'transfer') {
                     $this->invalid('Hanya transfer yang menunggu verifikasi bank.');
                 }
+                $bankCode = trim((string) ($payment->bank_account_code ?? '')) ?: self::BANK;
+                if (! app(BankAccounts::class)->isBankAccount($bankCode, true)) {
+                    $this->invalid('Rekening bank tujuan sudah tidak aktif di Bagan Akun.');
+                }
                 $entryId = Ledger::post('v2_payment', $paymentId, 'Verifikasi transfer '.$invoice->number, [
-                    ['account_code' => self::BANK, 'debit' => $this->str($amount), 'credit' => '0.00'],
+                    ['account_code' => $bankCode, 'debit' => $this->str($amount), 'credit' => '0.00'],
                     ['account_code' => self::AR, 'debit' => '0.00', 'credit' => $this->str($amount)],
                 ]);
             } elseif ($invoice->direction === 'payable') {
@@ -859,7 +884,7 @@ class Operations
     /**
      * Membukukan pembayaran utang supplier (dipanggil dalam transaksi, tagihan sudah dikunci):
      * tunai keluar dari laci shift pemohon (harus terbuka dan cukup), saldo Kas/Bank tidak boleh negatif,
-     * jurnal DR 2101 / CR 1101 atau 1102, lalu pembayaran posted dan sisa tagihan berkurang.
+     * jurnal DR 2101 / CR 1101 atau rekening bank aktif, lalu pembayaran posted dan sisa tagihan berkurang.
      */
     private function postPayable(int $actor, object $invoice, object $payment): void
     {
@@ -878,8 +903,17 @@ class Operations
         }
         // Laci shift memakai uang laci kasir; Kas Utama dan Bank Utama memakai saldo toko dan tidak mengubah laci.
         $drawer = $source === 'cash';
-        $account = $source === 'transfer' ? self::BANK : self::CASH;
-        $label = $source === 'transfer' ? 'Bank Utama' : 'Kas Utama (Tunai)';
+        $bankService = app(BankAccounts::class);
+        if ($source === 'transfer') {
+            $account = trim((string) ($payment->bank_account_code ?? '')) ?: self::BANK;
+            if (! $bankService->isBankAccount($account, true)) {
+                $this->invalid('Rekening bank sumber dana sudah tidak aktif di Bagan Akun.');
+            }
+            $label = $bankService->label($account);
+        } else {
+            $account = self::CASH;
+            $label = 'Kas Utama (Tunai)';
+        }
         if ($drawer) {
             $drawer = DB::table('v2_shifts')->where('id', $payment->shift_id)->lockForUpdate()->first();
             if (! $drawer || $drawer->status !== 'open' || ($drawer->is_shared ? (int) $drawer->store_open_key !== 1 : (int) $drawer->user_id !== (int) $payment->requested_by)) {

@@ -23,6 +23,7 @@ class CashBankAdjustments
     public function __construct(
         private AccountBalanceService $balances,
         private Operations $operations,
+        private BankAccounts $bankAccounts,
     ) {}
 
     /**
@@ -38,9 +39,10 @@ class CashBankAdjustments
 
         $code = (string) $data['account_code'];
         $counterCode = (string) $data['counter_account_code'];
-        if (! in_array($code, self::ALLOWED_ACCOUNTS, true)) {
+        $allowedActive = $this->bankAccounts->cashAndBankCodes(true);
+        if (! in_array($code, $allowedActive, true)) {
             throw ValidationException::withMessages([
-                'account_code' => 'Tahap ini hanya mengizinkan penyesuaian saldo Kas (1101) atau Bank (1102).',
+                'account_code' => 'Tahap ini hanya mengizinkan penyesuaian saldo Kas (1101) atau akun Rekening Bank yang aktif.',
             ]);
         }
 
@@ -75,8 +77,9 @@ class CashBankAdjustments
 
             $counterCurrent = $this->balances->balance($counterCode);
             $counterAfter = $counterCurrent->minus($difference);
+            $guardedAccounts = $this->bankAccounts->cashAndBankCodes(false);
             foreach ([[$code, $target], [$counterCode, $counterAfter]] as [$checkedCode, $result]) {
-                if (in_array($checkedCode, self::ALLOWED_ACCOUNTS, true) && $result->isNegative()) {
+                if (in_array($checkedCode, $guardedAccounts, true) && $result->isNegative()) {
                     throw ValidationException::withMessages([
                         'adjustment' => 'Penyesuaian tidak boleh membuat saldo Kas atau Bank negatif.',
                     ]);

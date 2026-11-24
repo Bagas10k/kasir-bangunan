@@ -57,6 +57,35 @@ test('initial deep links and real menu switching both clean the address without 
     assert.equal(new URL(context.location.href).search,'?utm_source=fixture');
     assert.equal(report.value,'2026-11-24');
 });
+test('switching a subtab inside the same menu skips entrance animation and scroll reset',()=>{
+    const {context}=setup();
+    const nodes={setAttribute(){},textContent:''};
+    const supplierLink={dataset:{},textContent:'Supplier & pelanggan'};
+    const reportLink={dataset:{},textContent:'Laporan'};
+    context.document.querySelector=()=>nodes;
+    context.document.body={dataset:{},toggleAttribute(){},classList:{contains:()=>true}};
+    context.active=null;context.defaultTask='master-supplier';
+    context.panels=new Map(['master-supplier','master-customer','laporan'].map(key=>[key,{}]));
+    context.owner=new Map([['master-supplier',supplierLink],['master-customer',supplierLink],['laporan',reportLink]]);
+    context.tabsOf=new Map([['master-supplier',{masterSupplier:'Supplier'}],['master-customer',{masterCustomer:'Pelanggan'}]]);
+    context.links=[];context.remoteState=new Map();
+    context.text={'master-supplier':['Supplier','Pemasok'],'master-customer':['Pelanggan','Pembeli'],laporan:['Laporan','Laporan harian']};
+    context.store=()=>{};context.history={state:{},replaceState(){}};
+    let enters=0,scrolls=0,fades=0;
+    context.window={uiMotion:{enter(){enters++;},textIn(){}},scrollTo(){scrolls++;}};
+    context.panels.get('master-customer').children=[{classList:{contains:()=>false},animate(){fades++;}}];
+    const start=source.indexOf('function select(');
+    vm.runInContext(source.slice(start,source.indexOf('for(const link of links){link.addEventListener(',start)),context);
+    context.select('master-supplier',{updateURL:false});
+    enters=0;scrolls=0;fades=0;
+    context.select('master-customer');
+    assert.equal(enters,0,'subtab tidak memutar animasi masuk');
+    assert.equal(scrolls,0,'subtab tidak mengembalikan gulir ke atas');
+    assert.equal(fades,1,'subtab tetap memakai transisi ringan pada isi');
+    context.select('laporan');
+    assert.equal(enters,1,'pindah menu tetap memakai animasi masuk');
+    assert.equal(scrolls,1,'pindah menu tetap kembali ke atas');
+});
 test('workspace refresh uses the applied report date without polluting the visible menu URL',async()=>{
     const live=readFileSync(new URL('../resources/views/v2/ui-live.blade.php',import.meta.url),'utf8');
     const href='http://example.test/kasir-bangunan/#master-product',requests=[];
