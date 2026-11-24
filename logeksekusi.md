@@ -1779,3 +1779,13 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
 - **Pelaksana**: OpenCode / GPT-6.2 Sol. `sprint2`, `receipt-restock`, skrip dan gaya rekomendasi, serta `ui-forms-styles` diperbarui. Dokumentasi serta tes `receipt-restock` dan `restock-panel` diselaraskan.
 - **Bukti**: tes regresi fokus gagal sebelum perbaikan; Chromium merekam dialog melompat ke Jumlah setelah klik. Sesudahnya, fixture Chromium 390/820/1150 px menambah lima rekomendasi tanpa loncat fokus/gulir, lalu menguji tambah manual, penolakan supplier berbeda, Periksa → Ubah lagi, dan tidak ada overflow horizontal (exit 0).
 - **Regresi**: Node penuh 179/179 (exit 0), PHP terfokus SQLite in-memory 42/42, 399 asersi (exit 0). Tidak menyimpan draf toko, mengubah pembukuan, migrasi, commit, atau deploy.
+
+## 2026-11-24 — Rilis 196e5b6 + 8cf80a1 dan deploy produksi (multi-bank)
+- Pelaksana: Hermes atas permintaan pengguna. Cakupan: akun bank ganda, sumber dana bank pada pembayaran/biaya/uang muka/ritase/ongkir, menu biaya operasional, penyempurnaan komponen UI, serta regenerasi dokumen alur sistem.
+- Commit: 196e5b6 (multi bank + UI, 71 berkas) dan 8cf80a1 (biaya/laporan + dokumen alur). Keduanya di-push ke origin feat/cash-flow-role-hierarchy.
+- Tes: PHP647 kasus,639 lulus/8 dilewati; Node179/179; Pint lulus; tidak ada berkas sensitif yang ikut di-commit.
+- Migrasi `2026_11_24_040733_add_multi_bank_account_support` bersifat aditif: `chart_of_accounts.is_bank_account` (1102 ditandai bank) dan kolom bank_account_code nullable di v2_payments, expenses, v2_driver_advances, v2_driver_advance_settlements, v2_trips, v2_receipt_drafts, inventory_receipts. Tanpa backfill saldo atau perubahan jurnal lama.
+- Backup pra-migrasi: `backups/db/tbg01-db-20261124-093603.sql.gz` + arsip uploads. Rehearsal: restore ke DB scratch, migrasi dijalankan dengan image kandidat sebagai root, kolom dan flag 1102 terverifikasi, data user2/jurnal4 utuh, DB scratch dihapus.
+- Cutover: maintenance → migrasi produksi sebagai root (DONE, tanpa pending) → release override ke `release-8cf80a1` → app+worker dibuat ulang tanpa menyentuh mysql/nginx/tunnel → aset public/build disalin dari image → nginx reload → maintenance dibuka. Rollback disiapkan ke `release-edc62fd` (tidak terpakai) dan backup DB tersedia.
+- Verifikasi: app healthy + worker running pada release-8cf80a1; `is_bank_account` ada dan 1102=1; jumlah data user2/jurnal4/penjualan1 tidak berubah; `storage/logs` dapat ditulis www-data (perbaikan entrypoint tetap berlaku); log app tanpa error; origin login200, publik login200. Migrasi tercatat Ran batch9.
+- Repo server `deploy-v2` di 8cf80a1; bundle, log build, build.old, dan DB rehearsal dibersihkan.
