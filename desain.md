@@ -570,3 +570,7 @@ Berkas: `partials/table-filter-styles.blade.php` (kedua cangkang), `partials/fil
 
 - Popup baca-saja memakai padding yang konsisten serta judul kelompok yang menjelaskan konteks angka: identitas/stok, harga/margin, saldo, atau riwayat. Riwayat penerimaan merangkum jumlah jenis barang di tabel; per produk, jumlah dan HPP tampil sejajar di popup.
 - Jurnal menampilkan dua aksi terpisah: perpindahan uang dan koreksi saldo buku. Isian ada di popup; pemberitahuan jurnal baru hanya tampil jika ada aktivitas baru.
+
+## 65. Stepper jumlah keranjang Kasir di layar sempit
+- Pengatur jumlah (`- jumlah +`) mengikuti lebar isi, bukan lebar tetap 110 px. Angka memakai lebar minimum 3 karakter, tombol 36 px, latar tombol transparan tanpa garis pemisah, sehingga angka tetap terlihat walau font sistem diperbesar.
+- Pada keranjang sempit, baris barang menjadi: nama + hapus, lalu stepper di kiri dan subtotal di kanan. Subtotal tidak lagi terjepit.

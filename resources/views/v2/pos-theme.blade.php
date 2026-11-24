@@ -183,10 +183,10 @@ body #panel-kasir #kasir .cart-unit-price{color:var(--ui-ink-2);font-weight:600;
 body #panel-kasir #kasir .cart-stock{white-space:nowrap}
 body #panel-kasir #kasir .cart-stock.is-out{color:var(--ui-bad-ink);font-weight:600}
 body #panel-kasir #kasir .item-subtotal{grid-area:sub;min-width:0;text-align:right;font-size:1rem;font-weight:700;color:var(--ui-ink);font-variant-numeric:tabular-nums;white-space:nowrap}
-body #panel-kasir #kasir .qty-stepper{grid-area:qty;justify-self:start;min-width:0;max-width:100%;display:inline-flex;align-items:center;height:34px;border:1px solid var(--ui-line);border-radius:8px;overflow:hidden;background:#fff}
+body #panel-kasir #kasir .qty-stepper{grid-area:qty;justify-self:start;min-width:0;max-width:100%;display:inline-flex;align-items:center;height:34px;border:1px solid var(--ui-line);border-radius:8px;overflow:visible;background:#fff}
 body #panel-kasir #kasir .qty-stepper button{min-height:32px;height:32px;min-width:32px;width:32px;flex:none;padding:0;border:0 !important;border-radius:0 !important;background:#f5f8f6 !important;color:var(--ui-ink-2) !important;font-size:1rem;line-height:1}
 body #panel-kasir #kasir .qty-stepper button:hover{background:var(--ui-green-soft) !important;color:var(--ui-green) !important}
-body #panel-kasir #kasir .qty-stepper input[data-name=quantity]{width:7ch;min-width:52px;max-width:96px;height:32px;min-height:32px;padding:0 4px;font-size:.9375rem;border:0 !important;border-inline:1px solid var(--ui-line-soft) !important;border-radius:0 !important;box-shadow:none !important;text-align:center;font-weight:650;font-variant-numeric:tabular-nums}
+body #panel-kasir #kasir .qty-stepper input[data-name=quantity]{width:7ch;min-width:3ch;max-width:96px;height:32px;min-height:32px;padding:0 4px;font-size:.9375rem;border:0 !important;border-inline:1px solid var(--ui-line-soft) !important;border-radius:0 !important;box-shadow:none !important;text-align:center;font-weight:650;font-variant-numeric:tabular-nums}
 body #panel-kasir #kasir .item-row [data-remove]{grid-area:del;justify-self:end;align-self:start;width:30px;min-width:30px;height:30px;min-height:30px;padding:0;border:0 !important;border-radius:8px !important;background:transparent !important;color:var(--ui-ink-3) !important;font-size:1.125rem;line-height:1;box-shadow:none !important}
 body #panel-kasir #kasir .item-row [data-remove]:hover{background:var(--ui-bad-bg) !important;color:var(--ui-bad-ink) !important}
 /* diskon: tertutup = tautan kecil di sebelah jumlah; terbuka = isian penuh di baris sendiri */
@@ -239,13 +239,15 @@ body #panel-kasir #kasir .cart-error:not(:empty){margin:8px 0 0;padding:8px 10px
   body #panel-kasir #kasir .cart-product-meta{white-space:normal}
   body #panel-kasir #kasir #items>.item-row{grid-template-columns:auto minmax(0,1fr) 30px;grid-template-areas:"head head del" "qty sub sub" "disc disc disc";column-gap:8px;row-gap:4px}
   body #panel-kasir #kasir .line-discount[open]{grid-area:disc}
-  body #panel-kasir #kasir .qty-stepper input[data-name=quantity]{min-width:44px;width:5ch}
+  body #panel-kasir #kasir .qty-stepper input[data-name=quantity]{min-width:3ch;width:auto}
 }
 /* Cart width, not viewport width, decides between cards and aligned columns. */
 @container pos-cart (max-width:539px){
-  body #panel-kasir #kasir #items>.item-row{grid-template-columns:110px minmax(0,1fr) 30px;grid-template-areas:"head head del" "qty sub sub" "disc disc disc";gap:4px 6px;padding:8px 2px}
-  body #panel-kasir #kasir .qty-stepper{width:110px;box-sizing:border-box}
-  body #panel-kasir #kasir .qty-stepper input[data-name=quantity]{width:44px;min-width:0;max-width:44px;flex:1 1 0}
+  body #panel-kasir #kasir #items>.item-row{grid-template-columns:minmax(0,1fr) auto 30px;grid-template-areas:"head head del" "qty sub del" "disc disc disc";gap:4px 8px;padding:8px 2px}
+  /* Stepper ringkas: ukuran mengikuti isi, angka tidak pernah terpotong walau font sistem diperbesar. */
+  body #panel-kasir #kasir .qty-stepper{width:auto;min-width:102px;max-width:min(132px,100%);box-sizing:border-box}
+  body #panel-kasir #kasir .qty-stepper button{width:36px;min-width:36px;height:36px;min-height:36px;background:transparent !important}
+  body #panel-kasir #kasir .qty-stepper input[data-name=quantity]{flex:1 1 auto;width:auto;min-width:3ch;max-width:none;border-inline:0 !important;padding-inline:2px}
   body #panel-kasir #kasir .item-subtotal{white-space:normal;overflow-wrap:anywhere;font-size:.875rem}
   body #panel-kasir #kasir .line-discount summary{font-size:.8125rem;padding:0;min-height:28px}
   body #panel-kasir #kasir .line-discount[open]{grid-area:auto;grid-column:1/-1;grid-row:3}

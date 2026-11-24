@@ -1831,3 +1831,8 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
 - Verifikasi: app healthy, worker running, image release-a548100; log storage dapat ditulis www-data; origin login200, publik login200; log app tanpa error.
 - Catatan data: `journal_entries` bertambah dari 4 menjadi 5. Deploy ini tidak menulis jurnal; penambahan berasal dari aktivitas pengguna di aplikasi (indikasi penyesuaian saldo yang sebelumnya 500 kini berhasil).
 - Repo server `deploy-v2` di a548100; bundle, log build, dan build.old dibersihkan. Rollback tersedia ke `release-8cf80a1`.
+
+## [2026-11-24] - Stepper jumlah keranjang Kasir di layar sempit
+- **Pelaksana**: OpenCode / GPT-6.2 Sol. `resources/views/v2/pos-theme.blade.php`: stepper tidak lagi berlebar tetap 110 px; angka `min-width:3ch`, tombol 36 px tanpa latar, `overflow` tidak memotong, dan baris keranjang sempit memakai `minmax(0,1fr) auto 30px` agar subtotal tidak terjepit. `desain.md` bagian 65 ditambahkan.
+- **Verifikasi**: Chromium fixture CSS asli 18 kasus (280-430 px, nilai 12/120/1.500, font akar 16 dan 20 px, tombol 40 px dipaksa seperti perangkat sentuh) - angka muat dan terlihat, subtotal minimal 78 px, tanpa overflow halaman; desktop 620 px tetap 124 px (exit 0). PHPUnit 93/93, 944 asersi (exit 0); Node 179/179 (exit 0).
+- **Batas**: Hanya tampilan keranjang Kasir; tidak mengubah perhitungan, validasi, atau data. Belum push/deploy.
