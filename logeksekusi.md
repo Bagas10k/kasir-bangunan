@@ -1818,3 +1818,8 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
   - PHPUnit terfokus SQLite in-memory 142/142, 1.038 asersi (exit 0), termasuk riwayat pelanggan per periode, akses kasir 403, dan tautan detail baru.
   - Node 179/179 (exit 0); Pint lolos; token checker berkas baru 0 error; `git diff --check` tanpa temuan.
 - **Batas**: Tidak menyimpan data master, tidak memposting jurnal, tidak mengubah stok/draf toko, tidak ada migrasi/commit/deploy. Pratinjau cetak fisik belum diuji.
+
+## [2026-11-24] - Ruang bawah popup Pindah Dana dan Penyesuaian Saldo
+- **Pelaksana**: OpenCode / GPT-6.2 Sol. `resources/views/journals/index.blade.php`: tema `uf-dialog` mengunci `padding-bottom` isi popup ke 0 dengan `!important` ber-Id ganda, sehingga ruang bawah dipasang pada elemen terakhir isi (`margin-bottom`) plus `safe-area` di layar sempit; grid isian menjadi satu kolom pada ≤640 px.
+- **Verifikasi**: Chromium headless dengan CSS asli (`ui-dna`, token, gaya jurnal) 1000 px dan 500/390 px (exit 0): jarak tombol terakhir ke tepi bawah isi 23 px, tanpa overflow; satu kolom di layar sempit. PHPUnit terfokus 21/21 (237 asersi, exit 0); Node 179/179 (exit 0).
+- **Batas**: Hanya CSS popup jurnal; tidak mengubah form, endpoint, atau data. Belum push/deploy.

@@ -264,7 +264,14 @@
     html body dialog.journal-popup{width:min(var(--ui-cart-width),calc(100% - 2 * var(--ui-space-group)));max-height:calc(100dvh - 2 * var(--ui-space-group));margin:auto;padding:0;border:0;border-radius:var(--ui-radius);background:var(--ui-surface);color:var(--ui-ink)}
     html body dialog.journal-popup .popup-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--ui-space-group);padding:var(--ui-space-section);background:var(--ui-green-2);color:var(--ui-surface)}
     html body dialog.journal-popup .popup-heading h2{margin:0;color:var(--ui-lime);font-size:var(--ui-h2)}
-    html body dialog.journal-popup .popup-content{padding:var(--ui-space-section)}
+    /* Tema popup uf-dialog mengunci padding bawah isi ke 0 (!important, selektor id ganda).
+       Ruang bawah dipasang pada elemen terakhir agar tetap berlaku tanpa melawan tema. */
+    html body :is(#transfer-panel,#adjustment-panel) .popup-content>:last-child{margin-bottom:var(--ui-space-panel)}
+    @media(max-width:640px){
+        html body :is(#transfer-panel,#adjustment-panel) .popup-content>:last-child{margin-bottom:calc(var(--ui-space-panel) + env(safe-area-inset-bottom))}
+        html body :is(#transfer-panel,#adjustment-panel) .popup-heading{padding:var(--ui-space-group) var(--ui-space-section)}
+        html body :is(#transfer-panel,#adjustment-panel) .adjustment-grid{grid-template-columns:minmax(0,1fr)}
+    }
     .journal-popup .popup-content>.section-title{display:none}
     .journal-popup .uf-dialog-sub{margin:0}
     .adjustment-panel { margin-bottom:16px; padding:0; overflow:hidden; }
