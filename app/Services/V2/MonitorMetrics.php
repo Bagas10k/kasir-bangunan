@@ -40,6 +40,12 @@ final class MonitorMetrics
         $receipts = DB::table('inventory_receipts')->whereNull('voided_at')->whereBetween('receipt_date', [$monthStart, $monthEnd])->get(['total_amount', 'receipt_type']);
         [$receiptTotal, $receiptCount] = $this->sumRows($receipts, fn (object $row): BigDecimal => BigDecimal::of((string) $row->total_amount));
 
+        $opnamesMonth = DB::table('v2_stock_opnames')
+            ->whereBetween('opname_date', [$monthStart, $monthEnd])
+            ->get(['gain_total', 'loss_total']);
+        [$opnameGainTotal, $opnameCount] = $this->sumRows($opnamesMonth, fn (object $row): BigDecimal => BigDecimal::of((string) $row->gain_total));
+        [$opnameLossTotal] = $this->sumRows($opnamesMonth, fn (object $row): BigDecimal => BigDecimal::of((string) $row->loss_total));
+
         $shiftScope = fn () => DB::table('v2_shifts')->when(! $admin, fn ($q) => $q->where(fn ($visible) => $visible->where('is_shared', true)->orWhere('user_id', $actor)));
         $differences = $shiftScope()->whereIn('status', ['closed', 'review'])->whereBetween(DB::raw('date(closed_at)'), [$monthStart, $monthEnd])->get(['difference']);
         [$differenceTotal] = $this->sumRows($differences, fn (object $row): BigDecimal => BigDecimal::of((string) ($row->difference ?? '0')));
@@ -71,6 +77,11 @@ final class MonitorMetrics
                 'review' => $unresolvedCount,
                 'difference_month' => $differenceTotal,
                 'difference_unresolved' => $unresolvedTotal,
+            ],
+            'stock_opnames' => [
+                'count' => $opnameCount,
+                'gain_total' => $opnameGainTotal,
+                'loss_total' => $opnameLossTotal,
             ],
             'stock' => [
                 'active' => (clone $products)->where('is_active', true)->count(),

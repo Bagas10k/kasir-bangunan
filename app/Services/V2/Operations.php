@@ -30,6 +30,8 @@ class Operations
 
     private const DELIVERY_REVENUE = '4102';
 
+    private const SALES_DISCOUNT_CONTRA = '4103';
+
     private const COGS = '5101';
 
     public function role(int $actor): string
@@ -288,7 +290,10 @@ class Operations
 
     public function checkout(int $actor, array $data): array
     {
-        $this->requireRole($actor, ['admin', 'cashier']);
+        $actorRole = $this->role($actor);
+        if (! in_array($actorRole, ['admin', 'cashier'], true)) {
+            abort(403);
+        }
 
         $key = trim((string) ($data['idempotency_key'] ?? ''));
         if ($key === '') {
@@ -344,8 +349,12 @@ class Operations
             }
             $dueDate = $rawDue;
         }
+        $notes = isset($data['notes']) && trim((string) $data['notes']) !== '' ? trim((string) $data['notes']) : null;
+        if ($notes !== null && mb_strlen($notes) > 500) {
+            $this->invalid('Catatan nota maksimal 500 karakter.');
+        }
 
-        return DB::transaction(function () use ($actor, $data, $key, $method, $fulfillment, $destination, $items, $deliveryFee, $customerId, $vehicleId, $driverName, $tier, $dueDate) {
+        return DB::transaction(function () use ($actor, $actorRole, $data, $key, $method, $fulfillment, $destination, $items, $deliveryFee, $customerId, $vehicleId, $driverName, $tier, $dueDate, $notes) {
             $shift = $this->openShiftFor($actor, true);
             $requestHash = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
             $existing = DB::table('v2_sales')->where('idempotency_key', $key)->first();
@@ -414,12 +423,15 @@ class Operations
                     $this->invalid('Diskon item melebihi harga barang.');
                 }
 
+                $lineCogs = $qty->multipliedBy($cost)->toScale(2, RoundingMode::HalfUp);
                 $rows[] = [
                     'product_id' => (int) $product->id,
                     'name' => $product->name,
                     'quantity' => $qty,
                     'unit_price' => $price,
                     'cost_price' => $cost,
+                    'gross' => $gross,
+                    'line_cogs' => $lineCogs,
                     'discount' => $discount,
                     'subtotal' => $net,
                     'stock' => $stock,
@@ -428,13 +440,15 @@ class Operations
                 $subtotal = $subtotal->plus($gross);
                 $lineDiscountTotal = $lineDiscountTotal->plus($discount);
                 $goodsBase = $goodsBase->plus($net);
-                $cogs = $cogs->plus($qty->multipliedBy($cost)->toScale(2, RoundingMode::HalfUp));
+                $cogs = $cogs->plus($lineCogs);
             }
 
             $invoiceDiscount = Money::value(Money::discount(
                 $this->str($goodsBase),
                 $this->discount($data['discount'] ?? null)
             ), 2);
+
+            $this->enforceCashierMarginPolicy($actorRole, $rows, $subtotal, $lineDiscountTotal, $invoiceDiscount, $goodsBase, $cogs);
 
             $total = $goodsBase->minus($invoiceDiscount)->plus($deliveryFee)->toScale(2, RoundingMode::HalfUp);
             if (! $total->isPositive()) {
@@ -484,7 +498,7 @@ class Operations
 
             $status = $this->saleStatus($paid, $total);
 
-            $saleId = DB::table('v2_sales')->insertGetId([
+            $saleRow = [
                 'number' => 'TMP-'.bin2hex(random_bytes(8)),
                 'user_id' => $actor,
                 'shift_id' => (int) $shift->id,
@@ -505,7 +519,11 @@ class Operations
                 'idempotency_key' => $key,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
+            if (Schema::hasColumn('v2_sales', 'notes')) {
+                $saleRow['notes'] = $notes;
+            }
+            $saleId = DB::table('v2_sales')->insertGetId($saleRow);
 
             $number = 'INV-'.now()->format('Ymd').'-'.str_pad((string) $saleId, 5, '0', STR_PAD_LEFT);
             DB::table('v2_sales')->where('id', $saleId)->update(['number' => $number, 'updated_at' => now()]);
@@ -557,10 +575,22 @@ class Operations
             DB::table('v2_invoices')->where('id', $invoiceId)->update(['number' => $invoiceNumber, 'updated_at' => now()]);
 
             $goodsNet = $goodsBase->minus($invoiceDiscount)->toScale(2, RoundingMode::HalfUp);
+            $totalDiscount = $lineDiscountTotal->plus($invoiceDiscount)->toScale(2, RoundingMode::HalfUp);
+            $useDiscountContra = $totalDiscount->isPositive() && DB::table('chart_of_accounts')
+                ->where('account_code', self::SALES_DISCOUNT_CONTRA)
+                ->where('is_active', true)
+                ->where('account_type', 'revenue')
+                ->where('normal_balance', 'debit')
+                ->exists();
             $saleLines = [
                 ['account_code' => self::AR, 'debit' => $this->str($total), 'credit' => '0.00'],
             ];
-            if ($goodsNet->isPositive()) {
+            if ($useDiscountContra) {
+                $saleLines[] = ['account_code' => self::SALES_DISCOUNT_CONTRA, 'debit' => $this->str($totalDiscount), 'credit' => '0.00'];
+                if ($subtotal->isPositive()) {
+                    $saleLines[] = ['account_code' => self::GOODS_REVENUE, 'debit' => '0.00', 'credit' => $this->str($subtotal)];
+                }
+            } elseif ($goodsNet->isPositive()) {
                 $saleLines[] = ['account_code' => self::GOODS_REVENUE, 'debit' => '0.00', 'credit' => $this->str($goodsNet)];
             }
             if ($deliveryFee->isPositive()) {
@@ -1146,6 +1176,65 @@ class Operations
     private function methodLabel(string $method): string
     {
         return ['cash' => 'laci shift', 'main' => 'Kas Utama', 'transfer' => 'Bank Utama'][$method] ?? $method;
+    }
+
+    /**
+     * Aturan margin khusus peran kasir (konfigurasi opsional via config/v2.php).
+     * Admin tetap diizinkan melewati batas; pesan galat kasir tidak pernah membocorkan angka HPP.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function enforceCashierMarginPolicy(
+        string $actorRole,
+        array $rows,
+        BigDecimal $subtotal,
+        BigDecimal $lineDiscountTotal,
+        BigDecimal $invoiceDiscount,
+        BigDecimal $goodsBase,
+        BigDecimal $cogs,
+    ): void {
+        if ($actorRole !== 'cashier') {
+            return;
+        }
+
+        $rawMaxPercent = config('v2.pos.cashier_max_discount_percent');
+        if ($rawMaxPercent !== null && trim((string) $rawMaxPercent) !== '') {
+            try {
+                $maxPercent = Money::value((string) $rawMaxPercent, 2);
+            } catch (\Throwable) {
+                $maxPercent = null;
+            }
+            if ($maxPercent !== null && ! $maxPercent->isNegative() && $maxPercent->isLessThanOrEqualTo('100')) {
+                $label = rtrim(rtrim((string) $maxPercent->toScale(2, RoundingMode::HalfUp), '0'), '.');
+                foreach ($rows as $row) {
+                    if ($row['discount']->isPositive()) {
+                        $lineMax = $row['gross']->multipliedBy($maxPercent)->dividedBy('100', 2, RoundingMode::HalfUp);
+                        if ($row['discount']->isGreaterThan($lineMax)) {
+                            $this->invalid('Diskon barang '.$row['name'].' melebihi batas kasir maksimal '.$label.'%. Hubungi admin.');
+                        }
+                    }
+                }
+                $totalDiscount = $lineDiscountTotal->plus($invoiceDiscount)->toScale(2, RoundingMode::HalfUp);
+                if ($totalDiscount->isPositive()) {
+                    $maxTotal = $subtotal->multipliedBy($maxPercent)->dividedBy('100', 2, RoundingMode::HalfUp);
+                    if ($totalDiscount->isGreaterThan($maxTotal)) {
+                        $this->invalid('Total diskon melebihi batas kasir maksimal '.$label.'%. Hubungi admin.');
+                    }
+                }
+            }
+        }
+
+        if ((bool) config('v2.pos.block_cashier_below_cost', false)) {
+            foreach ($rows as $row) {
+                if ($row['line_cogs']->isPositive() && $row['subtotal']->isLessThan($row['line_cogs'])) {
+                    $this->invalid('Harga bersih barang '.$row['name'].' melewati batas margin kasir. Hubungi admin.');
+                }
+            }
+            $goodsNet = $goodsBase->minus($invoiceDiscount)->toScale(2, RoundingMode::HalfUp);
+            if ($cogs->isPositive() && $goodsNet->isLessThan($cogs)) {
+                $this->invalid('Total diskon melewati batas margin kasir. Hubungi admin.');
+            }
+        }
     }
 
     private function invalid(string $message): never

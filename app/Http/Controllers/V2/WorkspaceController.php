@@ -16,10 +16,14 @@ use App\Services\V2\OpeningBalances;
 use App\Services\V2\Operations;
 use App\Services\V2\PaymentProofs;
 use App\Services\V2\PosDashboard;
+use App\Services\V2\PurchaseReturns;
 use App\Services\V2\ReceiptDrafts;
 use App\Services\V2\ReportsDocuments;
+use App\Services\V2\SalesReturns;
 use App\Services\V2\ShiftClosingSummary;
+use App\Services\V2\StockOpnames;
 use App\Services\V2\SupplyTrips;
+use App\Services\V2\WorkspaceTables;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -44,69 +48,63 @@ class WorkspaceController extends Controller
         }
 
         $openingState = $role === 'admin' ? $this->openingBalances->availability() : null;
-        $shifts = DB::table('v2_shifts as s')->leftJoin('users as u', 'u.id', '=', 's.user_id')
-            ->when($role !== 'admin', fn ($q) => $q->where(fn ($visible) => $visible->where('s.is_shared', true)->orWhere('s.user_id', $request->user()->id)))
-            ->orderByDesc('s.id')->limit(30)->get(['s.*', 'u.name as user_name']);
+        $tables = app(WorkspaceTables::class);
+        $shiftsTable = $tables->build($request->user()->id, 'shifts');
+        $shifts = $shiftsTable['paginator'];
         $reviewShifts = $role === 'admin'
             ? DB::table('v2_shifts')->where('status', 'review')->orderBy('closed_at')->orderBy('id')->get(['id', 'opened_at', 'counted_cash', 'difference'])
             : collect();
         $activeStoreShift = $this->operations->activeStoreShift();
         $todayCashDay = $activeStoreShift ? null : $this->todayCashDay();
         ['invoices' => $invoices, 'invoiceFilters' => $invoiceFilters] = $this->invoiceData($request);
-        $payments = DB::table('v2_payments as pm')
-            ->leftJoin('v2_invoices as i', 'i.id', '=', 'pm.invoice_id')
-            ->leftJoin('v2_parties as p', 'p.id', '=', 'i.party_id')
-            ->leftJoin('users as u', 'u.id', '=', 'pm.requested_by')
-            ->leftJoin('v2_payment_proofs as proof', 'proof.payment_id', '=', 'pm.id')
-            ->when($role !== 'admin', fn ($q) => $q->where('pm.requested_by', $request->user()->id))
-            ->orderByDesc('pm.id')->limit(50)->get(['pm.*', 'i.number as invoice_number', 'i.direction as invoice_direction', 'p.name as party_name', 'u.name as requester_name', 'proof.id as proof_id']);
+        $paymentsTable = $tables->build($request->user()->id, 'payments');
+        $payments = $paymentsTable['paginator'];
+        $pendingRejectPayments = $tables->pendingRejectPayments($request->user()->id);
         $products = DB::table('products')->where('is_active', true)->orderBy('name')->get(['id', 'sku', 'name', 'category', 'selling_price', 'contractor_price', 'stock_quantity', 'min_stock', 'unit']);
         $customers = DB::table('v2_parties')->where('kind', 'customer')->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name', 'notes']);
         $sales = DB::table('v2_sales')->when($role !== 'admin', fn ($q) => $q->where('user_id', $request->user()->id))->orderByDesc('id')->limit(30)->get();
-        $deliveries = DB::table('v2_deliveries as d')->leftJoin('vehicles as v', 'v.id', '=', 'd.vehicle_id')
-            ->whereIn('d.sale_id', $sales->pluck('id'))->orderByDesc('d.id')->get(['d.*', 'v.license_plate']);
+        $deliveriesTable = $tables->build($request->user()->id, 'deliveries');
+        $deliveries = $deliveriesTable['paginator'];
         $suppliers = $role === 'admin' ? DB::table('v2_parties')->where('kind', 'supplier')->where('is_active', true)->get() : collect();
-        $dispatchVehicles = DB::table('vehicles')->where('status', 'active')->get();
+        $dispatchVehicles = $deliveriesTable['data']['dispatchVehicles'];
         $vehicles = $role === 'admin' ? $dispatchVehicles : collect();
-        $drivers = DB::table('v2_drivers as drivers')
-            ->leftJoin('v2_parties as employees', 'employees.id', '=', 'drivers.employee_id')
-            ->where('drivers.is_active', true)
-            ->where(fn ($query) => $query->where('drivers.kind', 'external')->orWhere('employees.is_active', true))
-            ->orderBy('drivers.name')->get(['drivers.*', 'employees.name as employee_name']);
+        $drivers = $deliveriesTable['data']['drivers'];
         $productOptions = $role === 'admin' ? DB::table('product_options')->orderBy('name')->get()->groupBy('type') : collect();
         $employees = $role === 'admin' ? DB::table('v2_parties')->where('kind', 'employee')->orderBy('name')->get() : collect();
         $productSupplierLinks = $role === 'admin' ? DB::table('v2_product_suppliers')
             ->join('v2_parties', 'v2_parties.id', '=', 'v2_product_suppliers.supplier_id')
             ->orderBy('v2_parties.name')->get(['v2_product_suppliers.*', 'v2_parties.name', 'v2_parties.is_active'])->groupBy('product_id') : collect();
         $transportDeliveries = $role === 'admin' ? DB::table('v2_deliveries')->orderByDesc('id')->get() : collect();
-        $receiptHistory = $role === 'admin' ? DB::table('inventory_receipts')->leftJoin('users as void_user', 'void_user.id', '=', 'inventory_receipts.voided_by')
-            ->orderByDesc('inventory_receipts.receipt_date')->orderByDesc('inventory_receipts.id')->limit(50)
-            ->get(['inventory_receipts.*', 'void_user.name as voided_by_name']) : collect();
-        // Dokumen yang sudah diposting selalu final. Draf disimpan terpisah dan belum masuk stok/utang.
-        $receiptDrafts = $role === 'admin' && Schema::hasTable('v2_receipt_drafts')
-            ? DB::table('v2_receipt_drafts as d')->join('v2_parties as p', 'p.id', '=', 'd.supplier_id')
-                ->leftJoin('users as u', 'u.id', '=', 'd.created_by')
-                ->whereIn('d.status', ['draft', 'cancelled'])->orderByDesc('d.id')->limit(50)
-                ->get(['d.*', 'p.name as supplier_name', 'u.name as author_name'])
-            : collect();
-        foreach ($receiptDrafts as $draft) {
-            $draft->items = json_decode($draft->items, true, 512, JSON_THROW_ON_ERROR);
+        if ($role === 'admin') {
+            $receiptsTable = $tables->build($request->user()->id, 'receipts');
+            $receiptHistory = $receiptsTable['paginator'];
+            $receiptItems = $receiptsTable['data']['receiptItems'];
+            $receiptFinalAudit = $receiptsTable['data']['receiptFinalAudit'];
+
+            $draftsTable = $tables->build($request->user()->id, 'receipt-drafts');
+            $receiptDrafts = $draftsTable['paginator'];
+            $draftProducts = $draftsTable['data']['draftProducts'];
+
+            $opnamesTable = $tables->build($request->user()->id, 'stock-opnames');
+            $stockOpnames = $opnamesTable['paginator'];
+            $stockOpnameItems = $opnamesTable['data']['stockOpnameItems'];
+
+            $saleReturnsTable = $tables->build($request->user()->id, 'sale-returns');
+            $saleReturns = $saleReturnsTable['paginator'];
+
+            $purchaseReturnsTable = $tables->build($request->user()->id, 'purchase-returns');
+            $purchaseReturns = $purchaseReturnsTable['paginator'];
+        } else {
+            $receiptHistory = collect();
+            $receiptItems = collect();
+            $receiptFinalAudit = collect();
+            $receiptDrafts = collect();
+            $draftProducts = collect();
+            $stockOpnames = collect();
+            $stockOpnameItems = collect();
+            $saleReturns = collect();
+            $purchaseReturns = collect();
         }
-        $draftProducts = $receiptDrafts->isEmpty() ? collect() : DB::table('products')
-            ->whereIn('id', $receiptDrafts->flatMap(fn ($draft) => array_column($draft->items, 'product_id'))->unique())
-            ->get(['id', 'name', 'sku', 'unit', 'cost_price', 'stock_quantity'])->keyBy('id');
-        $receiptFinalAudit = $role === 'admin' && Schema::hasTable('v2_receipt_drafts')
-            ? DB::table('v2_receipt_drafts as d')->leftJoin('users as u', 'u.id', '=', 'd.confirmed_by')
-                ->whereIn('d.receipt_id', $receiptHistory->pluck('id'))->where('d.status', 'confirmed')
-                ->get(['d.receipt_id', 'd.confirmed_at', 'u.name as confirmed_by_name'])->keyBy('receipt_id')
-            : collect();
-        // Rincian barang per penerimaan untuk tabel Riwayat (baca saja; satu kueri untuk 50 nota terakhir).
-        $receiptItems = $receiptHistory->isEmpty() ? collect() : DB::table('inventory_receipt_items')
-            ->join('products', 'products.id', '=', 'inventory_receipt_items.product_id')
-            ->whereIn('inventory_receipt_items.inventory_receipt_id', $receiptHistory->pluck('id'))
-            ->orderBy('inventory_receipt_items.id')
-            ->get(['inventory_receipt_items.inventory_receipt_id', 'inventory_receipt_items.quantity', 'inventory_receipt_items.unit_cost', 'inventory_receipt_items.subtotal', 'products.name as product_name', 'products.unit as product_unit'])
-            ->groupBy('inventory_receipt_id');
         $relationRecords = [];
         if ($role === 'admin') {
             foreach (['driver', 'unit', 'category'] as $kind) {
@@ -153,8 +151,34 @@ class WorkspaceController extends Controller
         $bankService = app(BankAccounts::class);
         $bankAccounts = $bankService->active();
         $bankAccountNames = $bankService->nameMap(false);
+        $posPolicy = [
+            'role' => $role,
+            'cashier_max_discount_percent' => config('v2.pos.cashier_max_discount_percent'),
+            'block_cashier_below_cost' => (bool) config('v2.pos.block_cashier_below_cost', false),
+        ];
 
-        return view('v2.workspace', compact('activeStoreShift', 'todayCashDay', 'adminSummary', 'role', 'shifts', 'reviewShifts', 'invoices', 'invoiceFilters', 'payments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'customerInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'receiptDrafts', 'draftProducts', 'receiptFinalAudit', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters', 'recentSales', 'freightReady', 'freightAccounts', 'bankAccounts', 'bankAccountNames', 'openingState'));
+        return view('v2.workspace', compact('activeStoreShift', 'todayCashDay', 'adminSummary', 'role', 'shifts', 'reviewShifts', 'invoices', 'invoiceFilters', 'payments', 'pendingRejectPayments', 'products', 'customers', 'sales', 'deliveries', 'suppliers', 'vehicles', 'daily', 'driverAdvances', 'dispatchVehicles', 'drivers', 'employees', 'productOptions', 'productSupplierLinks', 'supplierInsights', 'customerInsights', 'vehicleInsights', 'posDashboard', 'transportDeliveries', 'receiptHistory', 'receiptItems', 'receiptDrafts', 'draftProducts', 'receiptFinalAudit', 'stockOpnames', 'stockOpnameItems', 'saleReturns', 'purchaseReturns', 'metrics', 'relationRecords', 'masterKind', 'masterRecords', 'allMasterRecords', 'historySales', 'historyFilters', 'recentSales', 'freightReady', 'freightAccounts', 'bankAccounts', 'bankAccountNames', 'openingState', 'posPolicy'));
+    }
+
+    /** Fragmen tabel operasional berpaginasi server (tanpa muat ulang halaman). */
+    public function tableFragment(Request $request, string $table): JsonResponse
+    {
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'filter' => ['nullable', 'string', 'max:40'],
+            'per_page' => ['sometimes', 'integer', 'in:10,25,50'],
+            'page' => ['sometimes', 'integer', 'min:1', 'max:1000000'],
+        ]);
+
+        $built = app(WorkspaceTables::class)->build($request->user()->id, $table, $validated);
+
+        return response()->json([
+            'html' => view($built['view'], $built['data'])->render(),
+            'filters' => $built['filters'],
+            'total' => $built['paginator']->total(),
+            'page' => $built['paginator']->currentPage(),
+            'last_page' => $built['paginator']->lastPage(),
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     public function dashboardPeriod(Request $request): JsonResponse
@@ -402,8 +426,11 @@ class WorkspaceController extends Controller
         $bankService = app(BankAccounts::class);
         $bankAccounts = $bankService->active();
         $bankAccountNames = $bankService->nameMap(false);
+        $returnSummary = $role === 'admin' && Schema::hasTable('v2_sale_returns')
+            ? app(SalesReturns::class)->summary($request->user()->id, $id)
+            : null;
 
-        return response()->json(['sale_id' => $id, 'html' => view('v2.sale-detail', compact('document', 'inv', 'paymentHistory', 'role', 'bankAccounts', 'bankAccountNames'))->render()])
+        return response()->json(['sale_id' => $id, 'html' => view('v2.sale-detail', compact('document', 'inv', 'paymentHistory', 'role', 'bankAccounts', 'bankAccountNames', 'returnSummary'))->render()])
             ->header('Cache-Control', 'private, no-store');
     }
 
@@ -453,6 +480,41 @@ class WorkspaceController extends Controller
         abort_unless(in_array($kind, app(MasterData::class)->kinds(), true), 404);
 
         return $this->run(fn () => ['id' => app(MasterData::class)->store($request->user()->id, $kind, $request->all())]);
+    }
+
+    /** Katalog produk aktif untuk sinkronisasi stok & harga kasir tanpa muat ulang (tanpa HPP). */
+    public function posCatalog(Request $request): JsonResponse
+    {
+        $this->operations->requireRole($request->user()->id, ['admin', 'cashier']);
+
+        $products = DB::table('products')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'sku', 'name', 'category', 'selling_price', 'contractor_price', 'stock_quantity', 'min_stock', 'unit'])
+            ->map(function ($product): array {
+                $row = [
+                    'id' => (string) $product->id,
+                    'sku' => (string) ($product->sku ?? ''),
+                    'name' => (string) $product->name,
+                    'category' => (string) ($product->category ?: 'Umum'),
+                    'selling_price' => (string) Money::value((string) $product->selling_price, 2),
+                ];
+                if ($product->contractor_price !== null) {
+                    $row['contractor_price'] = (string) Money::value((string) $product->contractor_price, 2);
+                }
+                $row['stock_quantity'] = (string) Money::value((string) $product->stock_quantity, 4);
+                $row['min_stock'] = (string) Money::value((string) ($product->min_stock ?? '0'), 4);
+                $row['unit'] = (string) $product->unit;
+
+                return $row;
+            })
+            ->values()
+            ->all();
+
+        return response()->json([
+            'products' => $products,
+            'synced_at' => now()->toIso8601String(),
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     /** Saran pelanggan saat kasir mengetik nama pembeli. */
@@ -534,6 +596,7 @@ class WorkspaceController extends Controller
             'fulfillment' => ['required', Rule::in(['pickup', 'delivery'])],
             'destination' => ['nullable', 'required_if:fulfillment,delivery', 'string', 'max:255'],
             'price_tier' => ['nullable', Rule::in(['retail', 'contractor'])],
+            'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
         $isTransfer = $data['payment_method'] === 'transfer' || ($data['payment_method'] === 'credit' && ($data['deposit_method'] ?? '') === 'transfer');
@@ -682,6 +745,35 @@ class WorkspaceController extends Controller
         $this->operations->requireRole($request->user()->id, ['admin']);
 
         return $this->run(fn () => app(SupplyTrips::class)->voidReceipt($request->user()->id, $id, $request->all()));
+    }
+
+    public function stockOpnameProducts(Request $request): JsonResponse
+    {
+        $data = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+
+        return $this->run(fn () => app(StockOpnames::class)->searchProducts($request->user()->id, (string) ($data['q'] ?? '')))
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function storeStockOpname(Request $request): JsonResponse
+    {
+        return $this->run(fn () => app(StockOpnames::class)->record($request->user()->id, $request->all()));
+    }
+
+    public function storeSaleReturn(Request $request, int $id): JsonResponse
+    {
+        return $this->run(fn () => app(SalesReturns::class)->store($request->user()->id, $id, $request->all()));
+    }
+
+    public function receiptReturnable(Request $request, int $id): JsonResponse
+    {
+        return $this->run(fn () => app(PurchaseReturns::class)->summary($request->user()->id, $id))
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function storePurchaseReturn(Request $request, int $id): JsonResponse
+    {
+        return $this->run(fn () => app(PurchaseReturns::class)->store($request->user()->id, $id, $request->all()));
     }
 
     /** Pemilih barang di form penerimaan: barang yang tertaut ke supplier terpilih. */

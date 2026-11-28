@@ -11,37 +11,7 @@
 <h2 id="h-pengiriman">Daftar pengiriman</h2>
 <p class="note">Surat jalan dari penjualan yang dikirim. Kirim barang setelah memilih mobil dan sopir, lalu catat saat barang diterima.</p>
 <x-ui.toolbar search="Cari surat jalan, tujuan, atau sopir" label="Cari pengiriman" :chips="['Semua' => 'all', 'Siap dikirim' => 'status:prepared', 'Sedang dikirim' => 'status:sent', 'Diterima' => 'status:received']"/>
-<div class="ui-table-wrap scroll" data-ui-table tabindex="0" role="region" aria-label="Daftar pengiriman">
-<table class="ui-table">
-<caption class="sr">Daftar pengiriman terbaru</caption>
-<thead><tr><th scope="col">Surat jalan</th><th scope="col">Tujuan</th><th scope="col">Mobil dan sopir</th><th scope="col">Status</th><th scope="col" class="ui-actions">Aksi</th></tr></thead>
-<tbody>
-@forelse($deliveries as $delivery)
-<tr data-status="{{ $delivery->status }}">
-<td class="ui-primary ui-nowrap" data-label="Surat jalan">{{ $delivery->number }}</td>
-<td data-label="Tujuan">{{ $delivery->destination ?: '—' }}</td>
-<td data-label="Mobil dan sopir">{{ $delivery->license_plate ?? 'Belum ditugaskan' }}@if($delivery->driver_name)<span class="ui-sub">{{ $delivery->driver_name }}</span>@endif</td>
-<td data-label="Status"><x-ui.status :status="$delivery->status"/></td>
-<td class="ui-actions">
-@if($delivery->status==='prepared')
-<form class="driver-form" action="{{ route('v2.deliveries.dispatch',$delivery->id) }}">
-    <h3 class="sr">Kirim surat jalan {{ $delivery->number }}</h3>
-    <label>Kendaraan<select name="vehicle_id" required><option value="">Pilih mobil</option>@foreach($dispatchVehicles as $vehicle)<option value="{{ $vehicle->id }}" @selected((int) $delivery->vehicle_id === (int) $vehicle->id)>{{ $vehicle->license_plate }}</option>@endforeach</select></label>
-    <label>Sopir terdaftar<select name="driver_id" required data-selected-driver="{{ $delivery->driver_id }}">@include('v2.driver-options')</select></label>
-    <button>Kirim barang</button><p class="err" data-error hidden></p>
-</form>
-@elseif($delivery->status==='sent')
-<form class="driver-form" action="{{ route('v2.deliveries.receive',$delivery->id) }}"><button class="btn-action-pill">Catat barang diterima</button><p class="err" data-error hidden></p></form>
-@endif
-<a class="btn-action-pill" href="{{ route('v2.documents', ['id' => $delivery->sale_id, 'kind' => 'delivery']) }}">Surat jalan</a>
-</td>
-</tr>
-@empty
-<tr data-ui-empty-static><td colspan="5" class="ui-empty"><strong>Belum ada pengiriman.</strong>Penjualan dengan pengiriman akan menghasilkan surat jalan di sini.</td></tr>
-@endforelse
-</tbody>
-</table>
-</div>
+<div data-server-table="deliveries" data-table-url="{{ route('v2.tables.show', 'deliveries') }}" data-table-default-filter="all" data-live-skip aria-live="polite">@include('v2.tables.deliveries-results')</div>
 </section>
 @if($role==='admin')
 <section class="card" id="uang-muka-sopir"><h2>Uang muka yang perlu direalisasi <x-ui.info-tip key="uang_muka_sopir" label="Keterangan uang muka sopir"/></h2><p class="note">Setelah sopir kembali, buka aksi realisasi pada baris uang muka yang sesuai.</p>
@@ -53,7 +23,7 @@
     <p class="note">Surat jalan mengisi tujuan dan penugasan yang sudah tercatat. Bila belum ditugaskan, pilih mobil dan sopir; pilihan disimpan bersama surat jalan.</p>
     <label>Tanggal<input type="date" name="date" value="{{ now()->toDateString() }}" required></label><label>Uang muka<input name="amount" data-money inputmode="decimal" required></label><label>Sumber<select name="method"><option value="cash">Kas shift admin</option><option value="transfer">Bank</option></select></label><label data-bank-account-field hidden>Rekening bank<select name="bank_account_code" disabled>@foreach(($bankAccounts ?? collect([(object)['account_code' => '1102', 'account_name' => 'Rekening Bank']])) as $bankAcc)<option value="{{ $bankAcc->account_code }}">{{ $bankAcc->account_code }} · {{ $bankAcc->account_name }}</option>@endforeach</select></label><button>Bayarkan uang muka</button><p class="err" data-error hidden></p>
 </form>
-<div class="ui-table-wrap scroll" tabindex="0" role="region" aria-label="Uang muka sopir terbuka">
+<div class="ui-table-wrap scroll" data-ui-table data-ui-noun="uang muka" tabindex="0" role="region" aria-label="Uang muka sopir terbuka">
 <table class="ui-table">
 <caption class="sr">Uang muka sopir yang belum direalisasi</caption>
 <thead><tr><th scope="col">Tanggal</th><th scope="col">Sopir</th><th scope="col">Tujuan</th><th scope="col" class="ui-num">Uang muka</th><th scope="col" class="ui-actions">Aksi</th></tr></thead>
@@ -75,7 +45,9 @@
 </section>
 @endif
 <script>
-document.querySelectorAll('[data-selected-driver]').forEach(select => { select.value = select.dataset.selectedDriver || ''; });
+const syncSelectedDrivers = root => root.querySelectorAll('[data-selected-driver]').forEach(select => { select.value = select.dataset.selectedDriver || ''; });
+syncSelectedDrivers(document);
+window.uiLive?.onPatch(syncSelectedDrivers);
 // Realisasi: sisa yang harus dikembalikan sopir dihitung saat mengetik (hanya tampilan; server menghitung ulang).
 const settleCalc = form => {
     const out = form.querySelector('[data-settle-calc]');
@@ -113,5 +85,5 @@ document.querySelectorAll('[data-transport-form]').forEach(form => {
     delivery.addEventListener('change', sync);
     sync();
 });
-(()=>{const keys=new WeakMap();/* ditangani di dokumen: form di baris baru dari uiLive ikut berfungsi */document.addEventListener('submit',async e=>{const f=e.target.closest?.('.driver-form');if(!f)return;if(!keys.has(f))keys.set(f,crypto.randomUUID());const key=keys.get(f);e.preventDefault();if(f.dataset.busy||!f.reportValidity())return;f.dataset.busy='1';const b=f.querySelector('button'),error=f.querySelector('[data-error]');b.disabled=true;error.hidden=true;const payload=Object.fromEntries(new FormData(f));if(f.hasAttribute('data-key'))payload.idempotency_key=key;if(f.hasAttribute('data-settlement'))payload.refund_received=f.elements.refund_received.checked;try{const r=await fetch(f.action,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw Error(Object.values(d.errors||{}).flat().join(' ')||d.message||'Gagal menyimpan');keys.delete(f);delete f.dataset.busy;b.disabled=false;await window.uiLive.saved(f);}catch(e){error.textContent=e.message;error.hidden=false;}finally{delete f.dataset.busy;b.disabled=false;}});})();
+(()=>{const keys=new WeakMap();const safeKey=()=>{if(typeof window.v2Uuid==='function')return window.v2Uuid();if(typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function')return crypto.randomUUID();if(typeof crypto!=='undefined'&&typeof crypto.getRandomValues==='function'){const b=new Uint8Array(16);crypto.getRandomValues(b);return Array.from(b,x=>('0'+x.toString(16)).slice(-2)).join('');}return 'drv-'+Date.now()+'-'+Math.random().toString(16).slice(2);};/* ditangani di dokumen: form di baris baru dari uiLive ikut berfungsi */document.addEventListener('submit',async e=>{const f=e.target.closest?.('.driver-form');if(!f)return;if(!keys.has(f))keys.set(f,safeKey());const key=keys.get(f);e.preventDefault();if(f.dataset.busy||!f.reportValidity())return;f.dataset.busy='1';const b=f.querySelector('button'),error=f.querySelector('[data-error]');b.disabled=true;error.hidden=true;const payload=Object.fromEntries(new FormData(f));if(f.hasAttribute('data-key'))payload.idempotency_key=key;if(f.hasAttribute('data-settlement'))payload.refund_received=f.elements.refund_received.checked;try{const r=await fetch(f.action,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw Error(Object.values(d.errors||{}).flat().join(' ')||d.message||'Gagal menyimpan');keys.delete(f);delete f.dataset.busy;b.disabled=false;await window.uiLive.saved(f);}catch(e){error.textContent=e.message;error.hidden=false;}finally{delete f.dataset.busy;b.disabled=false;}});})();
 </script>

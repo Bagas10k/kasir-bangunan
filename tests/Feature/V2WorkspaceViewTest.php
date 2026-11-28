@@ -146,13 +146,15 @@ class V2WorkspaceViewTest extends TestCase
                     ->assertSee('data-menu-group="master"', false)
                     ->assertSee('data-task="akun"', false)
                     ->assertSee('id="mobile-quick-actions"', false)
-                    ->assertSee('Buat orderan')
-                    ->assertSee('Barang masuk')
-                    ->assertSee('Status bayar')
+                    ->assertSee('Halaman Ringkasan')
+                    ->assertSee('Halaman Penerimaan barang')
+                    ->assertSee('Halaman Pengeluaran operasional')
+                    ->assertSee('Halaman Kasir')
+                    ->assertSee('pm-nav-toggle', false)
                     ->assertDontSee('data-menu-group="akses"', false);
                 // Menu gabungan: setiap panel tetap bisa dicapai lewat tautan sidebar atau tab di dalam menu.
                 $this->assertEqualsCanonicalizing(
-                    ['ringkasan', 'persetujuan', 'akun', 'kasir', 'riwayat-penjualan', 'tagihan', 'pengiriman', 'penerimaan', 'shift', 'laporan', 'master-product', 'master-supplier', 'master-customer', 'master-employee', 'master-vehicle', 'master-unit', 'master-category', 'jurnal', 'neraca', 'laba-rugi', 'arus-kas', 'bagan-akun', 'pengeluaran'],
+                    ['ringkasan', 'persetujuan', 'akun', 'kasir', 'riwayat-penjualan', 'tagihan', 'pengiriman', 'penerimaan', 'stok-opname', 'shift', 'laporan', 'master-product', 'master-supplier', 'master-customer', 'master-employee', 'master-vehicle', 'master-unit', 'master-category', 'jurnal', 'neraca', 'laba-rugi', 'arus-kas', 'bagan-akun', 'pengeluaran'],
                     $this->reachableTasks($response->getContent())
                 );
                 // Supplier didahulukan karena pelanggan bersifat opsional saat penjualan.

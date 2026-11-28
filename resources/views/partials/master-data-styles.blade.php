@@ -507,11 +507,11 @@
     }
 
     @media (max-width: 900px) {
-        .app-sidebar:not(.open) {
+        .app-sidebar:not(.open):where(:not(#workspace-sidebar)) {
             visibility: hidden;
             pointer-events: none;
         }
-        .app-sidebar.open {
+        .app-sidebar.open:where(:not(#workspace-sidebar)) {
             visibility: visible;
             pointer-events: auto;
         }

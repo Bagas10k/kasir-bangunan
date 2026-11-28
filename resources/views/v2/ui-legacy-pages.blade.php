@@ -37,8 +37,6 @@ body:has([data-unified-shell]) .main-content{padding:24px 28px 40px;max-width:14
   body:has([data-unified-shell]) .main-topbar{padding:0 16px}
   body:has([data-unified-shell]) .main-topbar .mobile-menu-toggle{display:inline-flex}
   body:has([data-unified-shell]) .main-content{padding:16px}
-  body:has([data-unified-shell]) .sidebar-overlay{position:fixed;inset:0;z-index:95;width:100%;height:100%;padding:0;border:0;border-radius:0;background:rgb(15 42 29 / .5);cursor:pointer}
-  body.sidebar-open:has([data-unified-shell]) .sidebar-overlay{display:block}
 }
 
 /* ---------- kulit isi halaman lama ---------- */

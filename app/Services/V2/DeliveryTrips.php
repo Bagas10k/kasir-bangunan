@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
  * Uang lewat Money (BigDecimal, HalfUp), jurnal lewat Ledger. Tanpa mutasi stok.
  *
  * Advance: DR 1191 (uang muka karyawan) / CR 1101|1102.
- * Settle : DR 6101 aktual + DR 1101|1102 sisa kembali / CR 1191 uang muka.
+ * Settle : DR 6201 aktual + DR 1101|1102 sisa kembali / CR 1191 uang muka.
  *
  * Batasan jujur: biaya aktual di atas uang muka DITOLAK. Selisih lebih harus
  * dicatat sebagai pengeluaran terpisah (belum didukung di sini).
@@ -27,7 +27,7 @@ class DeliveryTrips
 
     private const ADVANCE_ASSET = '1191';
 
-    private const TRIP_EXPENSE = '6101';
+    private const TRIP_EXPENSE = '6201';
 
     public function __construct(private TransportAssignment $assignment) {}
 

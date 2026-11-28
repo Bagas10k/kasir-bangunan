@@ -85,6 +85,32 @@ class V2OperationsTest extends TestCase
         $this->assertEquals(177, DB::table('v2_invoices')->first()->paid);
     }
 
+    public function test_pos_discount_posts_gross_4101_and_debit_4103_when_system_contra_4103_is_active(): void
+    {
+        DB::table('chart_of_accounts')->insert([
+            'account_code' => '4103', 'account_name' => 'Potongan Penjualan',
+            'account_type' => 'revenue', 'normal_balance' => 'debit',
+            'is_contra' => true, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $cashier = $this->actor('cashier');
+        $product = $this->product();
+        app(Operations::class)->openShift($this->storeShiftAdmin()->id, '100.00', 'admin');
+        $data = $this->payload($product); // 2 x 100 = 200; line disc 10% = 20; inv disc 10% of 180 = 18; total disc = 38; ongkir = 15; total = 177
+
+        $this->actingAs($cashier)->postJson(route('v2.sales.store'), $data)->assertOk();
+
+        $saleEntry = DB::table('journal_entries')->where('reference_type', 'v2_sale')->first();
+        $lines = DB::table('journal_entry_lines')->where('journal_entry_id', $saleEntry->id)->get()->keyBy('account_code');
+        $this->assertSame('200.00', number_format((float) $lines['4101']->credit, 2, '.', ''));
+        $this->assertSame('38.00', number_format((float) $lines['4103']->debit, 2, '.', ''));
+        $this->assertSame('15.00', number_format((float) $lines['4102']->credit, 2, '.', ''));
+        $this->assertSame('177.00', number_format((float) $lines['1103']->debit, 2, '.', ''));
+        $this->assertSame(
+            number_format((float) DB::table('journal_entry_lines')->where('journal_entry_id', $saleEntry->id)->sum('debit'), 2, '.', ''),
+            number_format((float) DB::table('journal_entry_lines')->where('journal_entry_id', $saleEntry->id)->sum('credit'), 2, '.', '')
+        );
+    }
+
     public function test_transfer_sale_is_receivable_until_admin_confirms_and_stock_only_once(): void
     {
         Storage::fake('local');

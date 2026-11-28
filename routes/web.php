@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChartOfAccountController;
 use App\Http\Controllers\DemoSetupController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\HelpCenterController;
 use App\Http\Controllers\InventoryReceiptController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\PosController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RitaseController;
 use App\Http\Controllers\StockOpnameController;
 use App\Http\Controllers\VehicleController;
+use App\Http\Middleware\V2Cutover;
 use Illuminate\Support\Facades\Route;
 
 require __DIR__.'/v2.php';
@@ -29,6 +31,10 @@ Route::middleware('guest')->group(function () {
 // Authenticated cashier / store / accounting routes
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::get('/panduan/{article?}', HelpCenterController::class)
+        ->where('article', '[a-z0-9-]+')
+        ->withoutMiddleware(V2Cutover::class)
+        ->name('help.index');
 
     // POS & Cashier
     Route::get('/', [PosController::class, 'index'])->name('pos.index');

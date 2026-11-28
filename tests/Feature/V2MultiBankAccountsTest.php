@@ -56,8 +56,9 @@ class V2MultiBankAccountsTest extends TestCase
             ['4101', 'Penjualan', 'revenue', 'credit', false],
             ['4102', 'Pendapatan Ongkir', 'revenue', 'credit', false],
             ['5101', 'HPP', 'expense', 'debit', false],
-            ['6101', 'Biaya Perjalanan', 'expense', 'debit', false],
+            ['6101', 'Beban Operasional Toko', 'expense', 'debit', false],
             ['6102', 'Beban Listrik & Air', 'expense', 'debit', false],
+            ['6201', 'Beban Transportasi & Ritase Armada', 'expense', 'debit', false],
         ];
         foreach ($rows as [$code, $name, $type, $normal, $isBank]) {
             DB::table('chart_of_accounts')->insertOrIgnore([
@@ -263,6 +264,11 @@ class V2MultiBankAccountsTest extends TestCase
         $this->actingAs($admin)->get(route('expenses.index'))
             ->assertOk()
             ->assertSee('1104 · Bank BRI');
+
+        $this->get(route('journals.index', ['source' => 'operating_expense', 'partial' => 1]))
+            ->assertOk()
+            ->assertSee('value="operating_expense"', false)
+            ->assertSee('Pengeluaran Operasional');
     }
 
     public function test_driver_advance_settlement_trip_and_receipt_freight_use_selected_bank_account(): void

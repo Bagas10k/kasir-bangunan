@@ -592,8 +592,38 @@
 #kasir .checkout-options{margin-top:18px}
 #kasir .checkout-options>summary{min-height:44px;cursor:pointer;color:#14532d;font-weight:650}
 #kasir .review-line{display:flex;justify-content:space-between;gap:16px;font-variant-numeric:tabular-nums}
+#kasir .pos-catalog-status-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+#kasir .pos-catalog-status-row #product-search-status{margin:0;flex:1 1 220px}
+#kasir .pos-catalog-head-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+html body #panel-kasir #kasir .pos-head-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 14px;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:rgba(255,255,255,.12);color:#F1F5F2;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;box-shadow:none}
+html body #panel-kasir #kasir .pos-head-btn:hover:not(:disabled){background:rgba(255,255,255,.22)}
+html body #panel-kasir #kasir .pos-head-btn:disabled{opacity:.65;cursor:wait}
+html body #panel-kasir #kasir .pos-head-btn[hidden]{display:none !important}
+html body #panel-kasir #kasir #pos-held-toggle{border-color:rgba(200,242,107,.55);background:rgba(200,242,107,.16);color:#C8F26B}
+#kasir .pos-arrears-banner{margin-top:8px;padding:8px 11px;border-radius:8px;border:1px solid rgba(200,242,107,.35);background:rgba(255,255,255,.12);color:#F1F5F2;font-size:12.5px;line-height:1.4;font-variant-numeric:tabular-nums}
+#kasir .pos-arrears-banner.is-overdue{border-color:#F0D58C;background:#FFF9E8;color:#6B4200;font-weight:600}
+#kasir .pos-arrears-banner--light{border-color:#CFE3D6;background:#EEF6F1;color:#14532D}
+#kasir .pos-arrears-banner--light.is-overdue{border-color:#F0D58C;background:#FFF9E8;color:#6B4200}
+#kasir .pos-arrears-banner[hidden]{display:none !important}
+#kasir .pos-policy-note{margin:8px 0 0;font-size:12px;line-height:1.4;color:#3C4A42}
+#kasir .pos-checkout-action{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#kasir .pos-checkout-action .btn-pill-submit{flex:1 1 180px}
+html body #panel-kasir #kasir .pos-hold-action-btn{min-height:46px;padding:0 16px;border:1px solid rgba(255,255,255,.32);border-radius:999px;background:rgba(255,255,255,.1);color:#F1F5F2;font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+html body #panel-kasir #kasir .pos-hold-action-btn:hover:not(:disabled){background:rgba(255,255,255,.2)}
+html body #panel-kasir #kasir .pos-hold-action-btn:disabled{opacity:.45;cursor:not-allowed}
+#kasir .pos-held-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+#kasir .pos-held-item{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid #DFE6E1;border-radius:12px;background:#F7FAF8}
+#kasir .pos-held-meta{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 200px}
+#kasir .pos-held-meta strong{font-size:14px;color:#102A1D}
+#kasir .pos-held-meta span{font-size:12.5px;color:#4B5A52;font-variant-numeric:tabular-nums}
+#kasir .pos-held-actions{display:flex;gap:8px;flex-wrap:wrap}
+#kasir .pos-held-actions button{min-height:44px;padding:0 14px;border-radius:10px;font-size:13.5px;font-weight:700;cursor:pointer}
+#kasir #checkout-notes{width:100%;min-height:66px;padding:10px 12px;border:1px solid #DFE6E1;border-radius:8px;font:inherit;font-size:14px;resize:vertical}
 @media(max-width:700px){
  #kasir .input-dialog .row>.field{flex:1 1 100%}
+ #kasir .pos-catalog-head-actions{width:100%}
+ #kasir .pos-head-btn{flex:1 1 auto}
+ #kasir .pos-hold-action-btn{width:100%}
 }
 @media(max-width:700px){#kasir .catalog-filter-row{grid-template-columns:repeat(2,minmax(0,1fr))}#kasir .catalog-filter-row>button{grid-column:1/-1}#kasir .catalog-table-scroll{max-height:280px}#kasir .search-kbd-hint{display:none}#kasir .cart-table-scroll{max-height:260px}#kasir .item-row .item-subtotal{font-size:12px}#kasir .qty-stepper input[data-name=quantity]{width:64px;max-width:64px}}
 </style>

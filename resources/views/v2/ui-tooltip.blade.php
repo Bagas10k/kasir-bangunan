@@ -10,7 +10,9 @@
 <style>
 .ui-tip{position:fixed;inset:auto;margin:0;z-index:100200;max-width:min(22rem,calc(100vw - 1.5rem));padding:8px 11px;border:1px solid rgb(200 242 107 / .22);border-radius:10px;background:var(--ui-green-2,#0f4224);color:var(--ui-surface,#fff);font:500 .8125rem/1.4 var(--font-body,system-ui,sans-serif);box-shadow:0 12px 28px rgb(15 42 29 / .32);pointer-events:none;opacity:0;white-space:normal;overflow-wrap:anywhere;text-align:left}
 .ui-tip.is-rich{max-width:min(24rem,calc(100vw - 1.5rem));padding:10px 13px}
-.ui-tip.is-pinned{pointer-events:auto}
+.ui-tip:is(.is-pinned,.is-interactive){pointer-events:auto}
+.ui-tip .ui-tip-article{display:flex;width:fit-content;align-items:center;min-height:var(--ui-tap);color:var(--ui-lime);font-weight:var(--ui-weight-strong);text-decoration:underline}
+.ui-tip .ui-tip-article:focus-visible{outline:var(--ui-stroke) solid var(--ui-lime);outline-offset:var(--ui-space-tight)}
 .ui-tip.is-on{opacity:1;animation:var(--ui-float-in,ui-tip-in .18s cubic-bezier(.34,1.56,.64,1))}
 .ui-tip[hidden]{display:none!important}
 .ui-tip:not([hidden]):not(:popover-open){display:block}
@@ -61,7 +63,7 @@ const CATALOG={
  harga_tier_kasir:{title:'Tarif Eceran vs Kontraktor',body:'Menentukan daftar harga yang diterapkan ke seluruh barang di keranjang.',note:'Pelanggan bertanda Kontraktor otomatis mengaktifkan tarif ini, dan kasir tetap bisa menggantinya bila perlu.'},
  status_kas_harian:{title:'Kas Harian Toko',body:'Satu catatan laci bersama per tanggal yang dibuka dan ditutup oleh admin.',note:'Transaksi penjualan di Kasir hanya dapat disimpan selama kas harian berstatus aktif.'},
  metode_bayar_kasir:{title:'Metode Pembayaran Kasir',body:'Tunai langsung masuk uang laci. Transfer wajib foto bukti dan menunggu verifikasi admin. Kredit wajib memilih pelanggan terdaftar dan sisanya menjadi piutang.'},
- sumber_dana_supplier:{title:'Sumber Dana Pembayaran',body:'Kas Utama & Bank Utama memakai saldo toko tanpa mengurangi uang laci kasir.',note:'Laci Kas Harian mengurangi uang tunai di laci yang sedang terbuka.'},
+ sumber_dana_supplier:{title:'Sumber Dana Pembayaran',body:'Kas Utama dan Rekening Bank memakai saldo toko. Untuk transfer, pilih rekening sumber yang dipakai.',note:'Hanya Laci Kas Harian yang mengurangi uang tunai di laci yang sedang terbuka.'},
  uang_muka_sopir:{title:'Uang Muka Sopir',body:'Dana perjalanan yang diserahkan ke sopir sebelum berangkat.',note:'Belum dicatat sebagai beban biaya sampai formulir realisasi (BBM, uang jalan, dan pengembalian sisa) disimpan.'},
  hpp_penerimaan:{title:'HPP Satuan Pembelian',body:'Harga beli per satuan sesuai faktur supplier.',note:'Saat draf dikonfirmasi, nilai ini memperbarui HPP rata-rata tertimbang produk dan mencatat utang supplier.'},
  ongkir_penerimaan:{title:'Ongkir Pembelian',body:'Biaya kirim yang dibebankan langsung ke akun beban operasional terpilih.',note:'Ongkir tidak menambah nilai HPP per satuan barang di persediaan.'},
@@ -72,7 +74,9 @@ const CATALOG={
  laba_rugi_hpp:{title:'Beban Pokok Penjualan (HPP)',body:'Total harga modal dari barang-barang yang sudah terjual pada periode laporan.',note:'Berbeda dengan nilai pembelian stok baru yang masih tersimpan sebagai aset persediaan.'},
  neraca_seimbang:{title:'Keseimbangan Neraca',body:'Total Aset harus sama persis dengan Total Kewajiban + Ekuitas (termasuk laba/rugi berjalan).',note:'Jika muncul selisih, periksa kembali saldo awal atau entri jurnal.'},
  arus_kas_langsung:{title:'Metode Langsung Arus Kas',body:'Merangkum arus kas masuk dan keluar nyata pada Kas Tunai (1101) dan seluruh Rekening Bank yang aktif/tercatat selama periode laporan.'},
- coa_akun_inti:{title:'Akun Inti Sistem',body:'Akun bawaan pembukuan otomatis (Kas, Bank, Piutang, Persediaan, Utang, Penjualan, HPP).',note:'Kode dan status aktifnya dikunci agar jurnal otomatis tidak gagal. Akun Aset lain dapat ditandai sebagai Rekening Bank agar tampil di metode pembayaran.'},
+ coa_akun_inti:{title:'Batasan Bagan Akun Sistem',body:'16 akun inti (termasuk 4103 Potongan Penjualan & 4104 Retur Penjualan) dikelola dan dijurnal otomatis oleh sistem.',note:'Admin cukup menambah Rekening Bank tambahan (1xxx) atau akun Beban Operasional (6xxx/8xxx) untuk kategori di menu Pengeluaran.'},
+ coa_saldo_normal:{title:'Saldo Normal',body:'Terisi otomatis mengikuti jenis akun yang dipilih.',note:'Rekening Bank tambahan dan Beban Operasional keduanya bersaldo normal Debet.'},
+ coa_akun_kontra:{title:'Akun Pengurang Sistem',body:'Akun pengurang bawaan sistem yang nilainya memotong total kelompoknya di laporan keuangan.',note:'Dipakai otomatis oleh sistem: 4103 untuk diskon POS dan 4104 untuk retur penjualan. Tidak perlu dibuat manual.'},
  pengeluaran_operasional:{title:'Pengeluaran Operasional',body:'Biaya harian toko di luar penjualan dan pembelian barang dagangan (listrik, ATK, upah).',note:'Langsung memotong saldo Kas Tunai (1101) atau Rekening Bank terpilih dan mengunci jurnal.'},
  akun_login_peran:{title:'Hak Akses Peran',body:'Admin dapat mengelola semua menu termasuk master, penerimaan, dan keuangan.',note:'Kasir hanya mengakses operasional penjualan, tagihan, pengiriman, dan laporan miliknya.'}
 };
@@ -85,13 +89,21 @@ const card=document.createElement('div');
 card.className='ui-hover-card';card.id='ui-hover-card';card.setAttribute('role','region');card.setAttribute('aria-label','Pratinjau ringkas');card.hidden=true;
 if(card.showPopover)card.setAttribute('popover','manual');
 
-let target=null,pinned=false,showTimer=0,hideTimer=0;
+let target=null,pinned=false,showTimer=0,hideTimer=0,leaveTimer=0;
+// Semua tooltip muncul setelah kursor diam 1 detik; fokus keyboard tetap langsung.
+const HOVER_DELAY=1000;
 let hcTarget=null,hcShow=0,hcHide=0;
 const clean=value=>String(value||'').replace(/\s+/g,' ').trim();
 const skip='[data-tip-skip],.app-calendar,.rail-tip,.rail-flyout,.workspace-sidebar,.workspace-navigation,.pos-combo-list,.select-options';
 
 function candidate(node){return node?.closest?.('[data-tip-key],[data-toggletip],[data-tip],[data-tip-truncate],[title]')||null;}
 function isInteractiveToggletip(el){return Boolean(el?.hasAttribute('data-toggletip')||el?.classList?.contains('ui-info-btn'));}
+function articleFor(el){
+ if(el.dataset.tipArticle)return el.dataset.tipArticle;
+ if(!isInteractiveToggletip(el))return null;
+ const help=document.getElementById('contextual-help-trigger');
+ return help?.dataset.tipArticle||help?.dataset.helpBase;
+}
 
 const INFO_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
 function hydrateInfoButtons(root){
@@ -117,7 +129,7 @@ function resolvePayload(el){
  if(el.dataset.tip){
   const text=clean(el.dataset.tip);
   if(!text)return null;
-  return el.dataset.tipTitle?{title:clean(el.dataset.tipTitle),body:text}:text;
+   return el.dataset.tipTitle?{title:clean(el.dataset.tipTitle),body:text,note:clean(el.dataset.tipNote)}:text;
  }
  if(el.hasAttribute('data-tip-truncate')){
   return el.scrollWidth>el.clientWidth+1?clean(el.textContent)||null:null;
@@ -145,16 +157,13 @@ function renderTip(payload){
  }
 }
 
-function mount(node){
- if(!node.isConnected)document.body.append(node);
- // Pastikan elemen berada di top-layer (atau di atas dialog modal aktif) dengan re-append bila perlu
- const topDialog=document.querySelector('dialog[open]');
- if(topDialog&&!node.showPopover&&node.parentElement!==topDialog)topDialog.append(node);
- else if(!topDialog&&node.parentElement!==document.body)document.body.append(node);
+function mount(node,anchor){
+ const host=anchor.closest('dialog[open]')||document.body;
+ if(node.parentElement!==host)host.append(node);
 }
 
-function openLayer(node){
- mount(node);
+function openLayer(node,anchor){
+ mount(node,anchor);
  node.hidden=false;
  try{if(node.showPopover&&!node.matches(':popover-open'))node.showPopover();}catch{}
 }
@@ -186,11 +195,23 @@ function show(el,pin=false){
  if(el===target&&pinned===pin)return;
  const payload=resolvePayload(el);if(!payload)return;
  clearTimeout(hideTimer);clearTimeout(showTimer);
- if(target&&target!==el)hide(true);
+ if(target)hide(true);
  target=el;pinned=Boolean(pin);
  renderTip(payload);
+ const article=articleFor(el);
+ tip.setAttribute('role',article?'region':'tooltip');
+ if(article){
+  tip.setAttribute('aria-label','Panduan halaman');
+  const link=document.createElement('a');
+  link.className='ui-tip-article';
+  link.href=article;link.target='_blank';link.rel='noopener';
+  link.textContent='Baca selengkapnya';link.setAttribute('aria-label','Baca selengkapnya (tab baru)');
+  tip.append(link);
+ }else{tip.removeAttribute('aria-label');}
  tip.classList.toggle('is-pinned',pinned);
- openLayer(tip);
+ // Tooltip bertautan bisa disentuh kursor agar tautan Baca selengkapnya dapat diklik.
+ tip.classList.toggle('is-interactive',Boolean(article));
+ openLayer(tip,el);
  el._tipDescribedby=el.getAttribute('aria-describedby');
  el.setAttribute('aria-describedby',[el._tipDescribedby,tip.id].filter(Boolean).join(' '));
  if(isInteractiveToggletip(el))el.setAttribute('aria-expanded','true');
@@ -199,9 +220,10 @@ function show(el,pin=false){
 }
 
 function hide(immediate=false){
+ clearTimeout(showTimer);clearTimeout(leaveTimer);
  if(!target)return;
  const el=target;target=null;pinned=false;clearTimeout(showTimer);clearTimeout(hideTimer);
- tip.classList.remove('is-on','is-pinned');
+ tip.classList.remove('is-on','is-pinned','is-interactive');
  if(el._tipDescribedby)el.setAttribute('aria-describedby',el._tipDescribedby);else el.removeAttribute('aria-describedby');
  delete el._tipDescribedby;
  if(isInteractiveToggletip(el))el.setAttribute('aria-expanded','false');
@@ -228,7 +250,7 @@ function showHoverCard(el){
   card.append(dl);
  }
  if(el.dataset.hcFoot){const ft=document.createElement('p');ft.className='ui-hc-foot';ft.textContent=el.dataset.hcFoot;card.append(ft);}
- openLayer(card);
+ openLayer(card,el);
  requestAnimationFrame(()=>{if(hcTarget!==el)return;card.classList.add('is-on');placeBox(el,card,'bottom');});
 }
 function hideHoverCard(immediate=false){
@@ -242,26 +264,41 @@ function hideHoverCard(immediate=false){
 document.addEventListener('pointerover',event=>{
  if(event.pointerType&&event.pointerType!=='mouse')return;
  const hc=event.target.closest?.('[data-hover-card]');
- if(hc&&hc!==hcTarget){clearTimeout(hcShow);hcShow=setTimeout(()=>showHoverCard(hc),240);}
+  if(hc&&hc!==hcTarget&&!hc.contains(event.relatedTarget)){clearTimeout(hcShow);hcShow=setTimeout(()=>showHoverCard(hc),HOVER_DELAY);}
  if(card.contains(event.target))clearTimeout(hcHide);
+ if(tip.contains(event.target)){clearTimeout(leaveTimer);return;}
  if(pinned)return;
- const el=candidate(event.target);if(!el||el===target)return;
- clearTimeout(showTimer);showTimer=setTimeout(()=>show(el,false),140);
+ const el=candidate(event.target);if(!el||el.closest(skip))return;
+ if(el===target){clearTimeout(leaveTimer);return;}
+ if(el.contains(event.relatedTarget))return;
+ if(target)hide(true);
+ clearTimeout(showTimer);showTimer=setTimeout(()=>show(el,false),HOVER_DELAY);
 });
 document.addEventListener('pointerout',event=>{
+ if(event.pointerType&&event.pointerType!=='mouse')return;
  const hc=event.target.closest?.('[data-hover-card]');
- if(hc&&hc===hcTarget&&!hc.contains(event.relatedTarget)&&!card.contains(event.relatedTarget)){clearTimeout(hcShow);hcHide=setTimeout(()=>hideHoverCard(),120);}
+ if(hc&&!hc.contains(event.relatedTarget)&&!card.contains(event.relatedTarget)){
+  clearTimeout(hcShow);
+  if(hc===hcTarget)hcHide=setTimeout(()=>hideHoverCard(),120);
+ }
  if(card.contains(event.target)&&!card.contains(event.relatedTarget)&&!hcTarget?.contains(event.relatedTarget)){hcHide=setTimeout(()=>hideHoverCard(),120);}
  if(pinned)return;
- const el=candidate(event.target);if(!el||el!==target)return;
- if(el.contains(event.relatedTarget))return;
- clearTimeout(showTimer);hide();
+ if(target&&tip.contains(event.target)&&!tip.contains(event.relatedTarget)&&!target.contains(event.relatedTarget)){clearTimeout(leaveTimer);leaveTimer=setTimeout(()=>hide(),250);return;}
+ const el=candidate(event.target);
+ if(!el)return;
+ if(el!==target){if(!el.contains(event.relatedTarget))clearTimeout(showTimer);return;}
+ if(el.contains(event.relatedTarget)||tip.contains(event.relatedTarget))return;
+ clearTimeout(showTimer);
+ if(tip.classList.contains('is-interactive')){clearTimeout(leaveTimer);leaveTimer=setTimeout(()=>hide(),250);}else hide();
 });
 document.addEventListener('click',event=>{
  const el=candidate(event.target);
  if(el&&isInteractiveToggletip(el)){
   event.preventDefault();event.stopPropagation();
-  if(target===el&&pinned){hide(true);}else{show(el,true);}
+   if(target===el&&pinned){hide(true);}else{
+    show(el,true);
+     if(event.detail===0)tip.querySelector('.ui-tip-article')?.focus({preventScroll:true});
+   }
   return;
  }
  // Pada layar sentuh (atau klik badge status), izinkan tap membuka keterangan badge
@@ -278,17 +315,30 @@ document.addEventListener('focusin',event=>{
  if(pinned&&target&&target!==el)hide(true);
  if(el.matches(':focus-visible')){clearTimeout(showTimer);show(el,false);}
 });
-document.addEventListener('focusout',event=>{if(target&&!pinned&&event.target===target)hide();});
+document.addEventListener('focusout',event=>{
+ if(!target||pinned||tip.contains(event.relatedTarget)||event.relatedTarget===target)return;
+ if(event.target===target||tip.contains(event.target))hide();
+});
 document.addEventListener('keydown',event=>{
+ if(event.key==='Tab'&&target){
+  const link=tip.querySelector('.ui-tip-article');
+   if(event.target===target&&!event.shiftKey&&link){event.preventDefault();link.focus({preventScroll:true});return;}
+   if(event.target===link&&event.shiftKey){event.preventDefault();target.focus({preventScroll:true});return;}
+ }
  if(event.key==='Escape'){
-  const prev=pinned?target:null;
-  hide(true);hideHoverCard(true);
-  if(prev&&prev.isConnected)prev.focus({preventScroll:true});
+   const prev=pinned||tip.contains(document.activeElement)?target:null;
+   if(target)event.preventDefault?.();
+   if(prev?.isConnected)prev.focus({preventScroll:true});
+   hide(true);hideHoverCard(true);
  }
 });
 document.addEventListener('pointerdown',event=>{
  if(target&&!target.contains(event.target)&&!tip.contains(event.target))hide(true);
  if(hcTarget&&!hcTarget.contains(event.target)&&!card.contains(event.target))hideHoverCard(true);
+},true);
+document.addEventListener('close',event=>{
+ if(target&&event.target.contains(target))hide(true);
+ if(hcTarget&&event.target.contains(hcTarget))hideHoverCard(true);
 },true);
 addEventListener('scroll',()=>{if(!pinned)hide(true);hideHoverCard(true);},true);
 addEventListener('resize',()=>{hide(true);hideHoverCard(true);});

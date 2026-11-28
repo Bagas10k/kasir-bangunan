@@ -42,7 +42,8 @@ class V2SupplyTripsTest extends TestCase
             ['2101', 'Utang Usaha', 'liability', 'credit'],
             ['3101', 'Modal', 'equity', 'credit'],
             ['4102', 'Pendapatan Ongkir', 'revenue', 'credit'],
-            ['6101', 'Biaya Perjalanan', 'expense', 'debit'],
+            ['6101', 'Beban Operasional Toko', 'expense', 'debit'],
+            ['6201', 'Beban Transportasi & Ritase Armada', 'expense', 'debit'],
         ] as [$code, $name, $type, $normal]) {
             DB::table('chart_of_accounts')->insertOrIgnore([
                 'account_code' => $code, 'account_name' => $name, 'account_type' => $type,
@@ -264,7 +265,7 @@ class V2SupplyTripsTest extends TestCase
         $this->assertCount(2, $lines);
         $this->assertSame('1101', $lines[0]->account_code);
         $this->assertSame('150.00', number_format((float) $lines[0]->credit, 2, '.', ''));
-        $this->assertSame('6101', $lines[1]->account_code);
+        $this->assertSame('6201', $lines[1]->account_code);
         $this->assertSame('150.00', number_format((float) $lines[1]->debit, 2, '.', ''));
         // Ongkir 4102 tidak ikut dijurnal pada beban perjalanan.
         $this->assertSame(0, DB::table('journal_entry_lines')->where('journal_entry_id', $result['journal_entry_id'])->where('account_code', '4102')->count());
@@ -321,7 +322,7 @@ class V2SupplyTripsTest extends TestCase
         $lines = DB::table('journal_entry_lines')->where('journal_entry_id', $result['journal_entry_id'])->orderBy('account_code')->get();
         $this->assertSame('1102', $lines[0]->account_code);
         $this->assertSame('100.00', number_format((float) $lines[0]->credit, 2, '.', ''));
-        $this->assertSame('6101', $lines[1]->account_code);
+        $this->assertSame('6201', $lines[1]->account_code);
         $this->assertDatabaseCount('v2_shift_movements', 0);
         $this->assertDatabaseCount('v2_trips', 1);
     }

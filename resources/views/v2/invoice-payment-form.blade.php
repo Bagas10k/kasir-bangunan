@@ -4,8 +4,8 @@
     $payHint = ! $payable
         ? 'Tunai langsung tercatat dan masuk laci kas harian. Transfer menunggu verifikasi admin.'
         : ($role === 'admin'
-            ? 'Pilih sumber dana. Kas Utama dan Bank Utama memakai saldo toko dan tidak mengubah laci; Laci shift memakai uang laci yang sedang terbuka.'
-            : 'Diajukan ke admin. Kas Utama dan Bank Utama tidak mengubah laci; Laci shift memakai laci toko aktif. Utang berkurang setelah disetujui.');
+            ? 'Pembayaran langsung mengurangi sisa tagihan.'
+            : 'Utang berkurang setelah pengajuan disetujui admin.');
 @endphp
 <form class="form-collect" action="{{ route('v2.payments.store', ['id' => $inv->id]) }}" data-invoice="{{ $inv->id }}" data-direction="{{ $inv->direction }}" data-hint="{{ $payHint }}" novalidate>
     <h3 class="sr">{{ $payLabel }} {{ $inv->number }}</h3>
@@ -19,9 +19,25 @@
         @endunless
     </div>
     @if($payable)
-    <div class="field collect-source"><label for="meth-{{ $paymentFieldId }}">Sumber dana <x-ui.info-tip key="sumber_dana_supplier" label="Keterangan sumber dana pembayaran"/></label><select id="meth-{{ $paymentFieldId }}" name="method"><option value="main">Kas Utama</option><option value="transfer">Bank Utama</option><option value="cash">Laci shift</option></select></div>
+    <div class="field collect-source">
+        <label for="meth-{{ $paymentFieldId }}">Sumber dana <x-ui.info-tip key="sumber_dana_supplier" label="Keterangan sumber dana pembayaran"/></label>
+        <select id="meth-{{ $paymentFieldId }}" name="method" aria-describedby="source-hint-{{ $paymentFieldId }}">
+            <option value="main" data-source-hint="Bayar dari kas toko. Rekap laci tidak berubah.">Kas Utama</option>
+            <option value="transfer" data-source-hint="Pilih rekening yang benar-benar dipakai untuk membayar.">Rekening Bank</option>
+            <option value="cash" data-source-hint="Uang keluar dari laci Kas Harian yang aktif.">Laci Kas Harian</option>
+        </select>
+        <p class="note" id="source-hint-{{ $paymentFieldId }}" data-collect-source-hint aria-live="polite">Bayar dari kas toko. Rekap laci tidak berubah.</p>
+    </div>
     @endif
-    <div class="field" data-bank-account-field hidden><label for="bank-{{ $paymentFieldId }}">{{ $payable ? 'Rekening bank sumber' : 'Rekening bank tujuan' }}</label><select id="bank-{{ $paymentFieldId }}" name="bank_account_code" disabled>@foreach(($bankAccounts ?? collect([(object)['account_code' => '1102', 'account_name' => 'Rekening Bank']])) as $bankAcc)<option value="{{ $bankAcc->account_code }}">{{ $bankAcc->account_code }} · {{ $bankAcc->account_name }}</option>@endforeach</select></div>
+    <div class="field" data-bank-account-field hidden>
+        <label for="bank-{{ $paymentFieldId }}">{{ $payable ? 'Rekening bank sumber' : 'Rekening bank tujuan' }}</label>
+        <select id="bank-{{ $paymentFieldId }}" name="bank_account_code" disabled>
+            @if($payable)<option value="">Pilih rekening sumber</option>@endif
+            @foreach(($bankAccounts ?? collect([(object)['account_code' => '1102', 'account_name' => 'Rekening Bank']])) as $bankAcc)
+                <option value="{{ $bankAcc->account_code }}">{{ $bankAcc->account_code }} · {{ $bankAcc->account_name }}</option>
+            @endforeach
+        </select>
+    </div>
     @unless($payable)
     <div class="field" data-transfer-proof-field hidden><label for="transfer-proof-{{ $paymentFieldId }}">Foto bukti transfer</label><input id="transfer-proof-{{ $paymentFieldId }}" name="transfer_proof" type="file" accept="image/jpeg,image/png,image/webp" disabled><p class="note">Wajib bila transfer. JPG/PNG/WebP, maksimal 5 MB. Foto tersimpan pada pembayaran ini dan menunggu verifikasi admin.</p></div>
     @endunless

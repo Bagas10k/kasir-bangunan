@@ -44,7 +44,8 @@ class V2DeliveryTripsTest extends TestCase
             ['1102', 'Bank', 'asset', 'debit'],
             ['1191', 'Uang Muka Karyawan', 'asset', 'debit'],
             ['3101', 'Modal', 'equity', 'credit'],
-            ['6101', 'Biaya Perjalanan', 'expense', 'debit'],
+            ['6101', 'Beban Operasional Toko', 'expense', 'debit'],
+            ['6201', 'Beban Transportasi & Ritase Armada', 'expense', 'debit'],
         ] as [$code, $name, $type, $normal]) {
             DB::table('chart_of_accounts')->insertOrIgnore([
                 'account_code' => $code, 'account_name' => $name, 'account_type' => $type,
@@ -256,11 +257,11 @@ class V2DeliveryTripsTest extends TestCase
         $this->assertSame('50.00', $settlement['refund_amount']);
 
         $this->assertSame('0.00', $this->accountNet('1191'));
-        $this->assertSame('50.00', $this->accountNet('6101'));
+        $this->assertSame('50.00', $this->accountNet('6201'));
         $this->assertSame('950.00', $this->accountNet('1101'));
         $this->assertSame('settled', DB::table('v2_driver_advances')->where('id', $advance['advance_id'])->value('status'));
 
-        $this->assertSame(1, DB::table('journal_entry_lines')->where('account_code', '6101')->count());
+        $this->assertSame(1, DB::table('journal_entry_lines')->where('account_code', '6201')->count());
         $this->assertSame(0, DB::table('v2_trips')->count());
         $this->assertSame(2, DB::table('v2_shift_movements')->where('shift_id', $shift)->count());
         $this->assertGloballyBalanced();
@@ -315,7 +316,7 @@ class V2DeliveryTripsTest extends TestCase
         $this->assertSame(0, DB::table('v2_driver_advance_settlements')->count());
         $this->assertSame('open', DB::table('v2_driver_advances')->where('id', $advance['advance_id'])->value('status'));
         $this->assertSame(2, DB::table('journal_entries')->count()); // hanya funding + advance
-        $this->assertSame('0.00', $this->accountNet('6101'));
+        $this->assertSame('0.00', $this->accountNet('6201'));
 
         // Sisa kembali wajib dikonfirmasi eksplisit dan metodenya jelas.
         $this->assertInvalid(fn () => $service->settle($admin->id, $advance['advance_id'], [
@@ -396,7 +397,7 @@ class V2DeliveryTripsTest extends TestCase
 
         $this->assertSame('0.00', $settlement['expense_total']);
         $this->assertSame('100.00', $settlement['refund_amount']);
-        $this->assertSame(0, DB::table('journal_entry_lines')->where('account_code', '6101')->count());
+        $this->assertSame(0, DB::table('journal_entry_lines')->where('account_code', '6201')->count());
         $this->assertSame('0.00', $this->accountNet('1191'));
         $this->assertSame('500.00', $this->accountNet('1102'));
         $this->assertSame(0, DB::table('v2_trips')->count());

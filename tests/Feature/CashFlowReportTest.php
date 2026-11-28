@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\AccountingReportService;
+use App\Services\V2\Operations;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -209,5 +210,53 @@ class CashFlowReportTest extends TestCase
         $this->assertStringContainsString('ARUS KAS DARI AKTIVITAS INVESTASI', $content);
         $this->assertStringContainsString('ARUS KAS DARI AKTIVITAS PENDANAAN', $content);
         $this->assertStringContainsString('Kas & Bank Akhir Periode', $content);
+    }
+
+    public function test_cash_flow_separates_v2_pos_cash_sales_from_receivable_collections(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        DB::table('v2_user_roles')->insert([
+            'user_id' => $admin->id, 'role' => 'admin', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $productId = DB::table('products')->insertGetId([
+            'sku' => 'SYN-CF-001', 'name' => 'Semen Sintetis', 'unit' => 'sak', 'category' => 'Semen',
+            'cost_price' => '50000.0000', 'selling_price' => '75000.00', 'stock_quantity' => '20.0000',
+            'min_stock' => '2.0000', 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $customerId = DB::table('v2_parties')->insertGetId([
+            'kind' => 'customer', 'code' => 'SYN-CF-CUST', 'name' => 'Kontraktor Sintetis',
+            'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $ops = app(Operations::class);
+        $ops->openShift($admin->id, '100000.00', 'admin');
+
+        // 1. Penjualan tunai POS (1 sak = 75.000) -> harus masuk label Penjualan Tunai.
+        $ops->checkout($admin->id, [
+            'items' => [['product_id' => $productId, 'quantity' => '1']],
+            'payment_method' => 'cash',
+            'paid_amount' => '75000.00',
+            'fulfillment' => 'pickup',
+            'idempotency_key' => 'cf-pos-cash-001',
+        ]);
+
+        // 2. Penjualan kredit POS (2 sak = 150.000) + pelunasan piutang bertahap 50.000 -> harus masuk label Pelunasan Piutang.
+        $credit = $ops->checkout($admin->id, [
+            'items' => [['product_id' => $productId, 'quantity' => '2']],
+            'customer_id' => $customerId,
+            'payment_method' => 'credit',
+            'fulfillment' => 'pickup',
+            'idempotency_key' => 'cf-pos-credit-001',
+        ]);
+        $ops->collect($admin->id, $credit['invoice_id'], '50000.00', 'cash', 'cf-collect-001');
+
+        $report = $this->reportService->generateCashFlow(now()->toDateString(), now()->toDateString());
+        $inflows = collect($report['operating_activities']['inflows'])->keyBy('label');
+
+        $this->assertTrue($report['is_reconciled']);
+        $this->assertSame('125000.00', $report['operating_activities']['total_inflow']);
+        $this->assertSame('75000.00', (string) ($inflows['Penerimaan dari Penjualan Tunai / Uang Muka']['amount'] ?? '0.00'));
+        $this->assertSame('50000.00', (string) ($inflows['Penerimaan Pelunasan Piutang Pelanggan']['amount'] ?? '0.00'));
     }
 }

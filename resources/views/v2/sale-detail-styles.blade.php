@@ -37,6 +37,7 @@ html body #input-popup-sale-detail #sale-detail-view{display:grid;gap:var(--ui-s
 #input-popup-sale-detail #sale-detail-view .sd-collection{padding-top:var(--ui-space-section);border-top:var(--ui-stroke) solid var(--ui-line)}
 html body #input-popup-sale-detail .sd-footer{justify-content:space-between;flex-wrap:wrap}
 html body #input-popup-sale-detail .sd-print-action a{display:inline-flex;align-items:center;justify-content:center;gap:var(--ui-space-control);min-height:var(--ui-tap);padding:var(--ui-space-control) var(--ui-space-section);border:var(--ui-stroke) solid var(--ui-green);border-radius:var(--ui-radius);background:var(--ui-green);color:var(--ui-surface);font-family:var(--font-body);font-size:var(--ui-t-label);font-weight:var(--ui-weight-medium);text-decoration:none}
+html body #input-popup-sale-detail .sd-print-action{display:flex;flex-wrap:wrap;gap:var(--ui-space-control)}
 html body #input-popup-sale-detail .sd-print-action a:hover{background:var(--ui-green-2)}
 html body #input-popup-sale-detail .sd-print-action svg{width:var(--ui-t-body);height:var(--ui-t-body)}
 html body #input-popup-sale-detail :is(.sd-print-action a,.sd-evidence,.sd-table-scroll):focus-visible{outline:var(--ui-stroke) solid var(--ui-focus);outline-offset:var(--ui-space-tight)}

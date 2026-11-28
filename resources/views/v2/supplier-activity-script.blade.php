@@ -6,7 +6,7 @@ const results=dialog.querySelector('[data-supplier-results]'),error=dialog.query
 const from=form.elements.from,to=form.elements.to,defaults={from:from.value,to:to.value};
 let supplier=null,version=0,controller=null;
 function endpoint(template,id){return new URL(template.replace('/suppliers/0/','/suppliers/'+id+'/'),location.href);}
-async function load(url){
+async function load(url, pageLink=null){
  const current=++version;controller?.abort();controller=new AbortController();
  results.setAttribute('aria-busy','true');error.hidden=true;print.hidden=true;
  try{
@@ -14,7 +14,9 @@ async function load(url){
   if(!response.ok||response.redirected)throw Error('read');
   const data=await response.json();if(current!==version||!dialog.open)return;
   if(typeof data.html!=='string'||typeof data.from!=='string'||typeof data.to!=='string')throw Error('shape');
+  const restoreFocus=document.activeElement===pageLink;
   results.innerHTML=data.html;
+  if(restoreFocus)results.querySelector('[data-supplier-page-status]')?.focus();
   const address=endpoint(dialog.dataset.supplierPrintUrl,supplier);address.searchParams.set('from',data.from);address.searchParams.set('to',data.to);
   print.href=address.toString();print.hidden=false;
   window.uiMotion?.staggerRows(results);
@@ -41,7 +43,7 @@ results.addEventListener('click',event=>{
  if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
  const link=event.target.closest('.supplier-activity-pages a[href]');if(!link||!supplier)return;
  const url=new URL(link.href,location.href);if(url.origin!==location.origin||url.pathname!==rangeUrl().pathname)return;
- event.preventDefault();load(url);
+ event.preventDefault();load(url,link);
 });
 dialog.addEventListener('close',()=>{version++;controller?.abort();supplier=null;print.hidden=true;results.removeAttribute('aria-busy');});
 })();

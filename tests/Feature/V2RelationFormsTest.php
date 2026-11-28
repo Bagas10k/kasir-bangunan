@@ -44,7 +44,8 @@ class V2RelationFormsTest extends TestCase
             ['1301', 'Persediaan', 'asset', 'debit'],
             ['2101', 'Utang Usaha', 'liability', 'credit'],
             ['3101', 'Modal', 'equity', 'credit'],
-            ['6101', 'Biaya Perjalanan', 'expense', 'debit'],
+            ['6101', 'Beban Operasional Toko', 'expense', 'debit'],
+            ['6201', 'Beban Transportasi & Ritase Armada', 'expense', 'debit'],
         ] as [$code, $name, $type, $normal]) {
             DB::table('chart_of_accounts')->insertOrIgnore([
                 'account_code' => $code, 'account_name' => $name, 'account_type' => $type,

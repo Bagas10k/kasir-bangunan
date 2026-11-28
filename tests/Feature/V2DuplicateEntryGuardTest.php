@@ -168,5 +168,127 @@ class V2DuplicateEntryGuardTest extends TestCase
         $this->actingAs($admin)->get(route('v2.index'))->assertOk()
             ->assertSee('name="seen_payment_id" value="'.$payment.'"', false)
             ->assertSee('name="supplier_invoice_number"', false);
+
+        $this->actingAs($admin)->get(route('expenses.index', ['partial' => 1]))->assertOk()
+            ->assertSee('name="idempotency_key"', false)
+            ->assertSee('data-expense-confirm-duplicate', false);
+
+        config(['v2.enabled' => true]);
+        $this->actingAs($admin)->get(route('journals.index', ['partial' => 1]))->assertOk()
+            ->assertSee('name="idempotency_key"', false)
+            ->assertSee('data-transfer-confirm-duplicate', false);
+    }
+
+    public function test_operating_expense_replays_same_idempotency_key_and_guards_duplicate_entries(): void
+    {
+        $admin = $this->actor('admin', 'Admin Sintetis');
+        $otherAdmin = $this->actor('admin', 'Admin Kedua');
+        $this->books();
+        DB::table('chart_of_accounts')->insertOrIgnore([
+            'account_code' => '6101', 'account_name' => 'Beban Operasional',
+            'account_type' => 'expense', 'normal_balance' => 'debit',
+            'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $today = now()->toDateString();
+        $payload = [
+            'date' => $today,
+            'account_code' => '6101',
+            'source' => 'cash',
+            'amount' => '75000.00',
+            'description' => 'Token listrik gudang',
+            'idempotency_key' => 'exp-syn-key-0001',
+        ];
+
+        // Kiriman pertama berhasil (1 pengeluaran, 1 jurnal pengeluaran).
+        $first = $this->actingAs($admin)->postJson(route('v2.expenses.store'), $payload)->assertCreated();
+        $expenseId = (int) $first->json('expense_id');
+        $expenseNumber = (string) $first->json('expense_number');
+        $this->assertSame(1, DB::table('expenses')->count());
+
+        // Kirim ulang dengan idempotency_key + isi sama -> replay tanpa menggandakan catatan/jurnal.
+        $this->actingAs($admin)->postJson(route('v2.expenses.store'), $payload)
+            ->assertCreated()
+            ->assertJsonPath('expense_id', $expenseId)
+            ->assertJsonPath('expense_number', $expenseNumber);
+        $this->assertSame(1, DB::table('expenses')->count());
+
+        // Kunci sama untuk isi berbeda -> 422 idempotency_key.
+        $this->actingAs($admin)->postJson(route('v2.expenses.store'), array_merge($payload, ['amount' => '80000.00']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('idempotency_key');
+
+        // Aktor lain memakai kunci idempotency yang sama -> 403.
+        $this->actingAs($otherAdmin)->postJson(route('v2.expenses.store'), $payload)->assertForbidden();
+
+        // Kunci baru tetapi isi identik (tanggal, akun, sumber, nominal, keterangan sama) -> tahan 422 duplicate_expense.
+        $secondPayload = array_merge($payload, ['idempotency_key' => 'exp-syn-key-0002']);
+        $this->actingAs($admin)->postJson(route('v2.expenses.store'), $secondPayload)
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.duplicate_expense.0', fn (string $m) => str_contains($m, $expenseNumber) && str_contains($m, 'Rp 75.000'));
+        $this->assertSame(1, DB::table('expenses')->count());
+
+        // Keterangan berbeda tidak dianggap dobel.
+        $this->actingAs($admin)->postJson(route('v2.expenses.store'), array_merge($secondPayload, [
+            'description' => 'Token listrik kantor',
+            'idempotency_key' => 'exp-syn-key-0003',
+        ]))->assertCreated();
+        $this->assertSame(2, DB::table('expenses')->count());
+
+        // Konfirmasi eksplisit (confirm_duplicate=true) dengan kunci kedua -> tetap tersimpan.
+        $this->actingAs($admin)->postJson(route('v2.expenses.store'), array_merge($secondPayload, [
+            'confirm_duplicate' => true,
+        ]))->assertCreated();
+        $this->assertSame(3, DB::table('expenses')->count());
+    }
+
+    public function test_cash_bank_transfer_replays_same_idempotency_key_and_guards_duplicate_entries(): void
+    {
+        $admin = $this->actor('admin', 'Admin Sintetis');
+        $otherAdmin = $this->actor('admin', 'Admin Kedua');
+        $this->books();
+        DB::table('chart_of_accounts')->where('account_code', '1102')->update(['is_bank_account' => true]);
+
+        $today = now()->toDateString();
+        $payload = [
+            'transaction_date' => $today,
+            'from_account_code' => '1101',
+            'to_account_code' => '1102',
+            'amount' => '200000.00',
+            'description' => 'Setor kas sore ke Bank',
+            'password' => 'password',
+            'idempotency_key' => 'trf-syn-key-0001',
+        ];
+
+        $first = $this->actingAs($admin)->postJson(route('v2.journals.transfers.store'), $payload)->assertCreated();
+        $journalId = (int) $first->json('journal_entry_id');
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'cash_bank_transfer')->count());
+
+        // Kirim ulang dengan kunci & isi sama -> replay exact journal ID, tanpa jurnal kedua.
+        $this->actingAs($admin)->postJson(route('v2.journals.transfers.store'), $payload)
+            ->assertCreated()
+            ->assertJsonPath('journal_entry_id', $journalId);
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'cash_bank_transfer')->count());
+
+        // Kunci sama untuk nominal berbeda -> 422 idempotency_key.
+        $this->actingAs($admin)->postJson(route('v2.journals.transfers.store'), array_merge($payload, ['amount' => '250000.00']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('idempotency_key');
+
+        // Aktor lain dengan kunci sama -> 403.
+        $this->actingAs($otherAdmin)->postJson(route('v2.journals.transfers.store'), $payload)->assertForbidden();
+
+        // Kunci baru tetapi pindah dana identik (sumber, tujuan, nominal, tanggal) -> 422 duplicate_transfer.
+        $secondPayload = array_merge($payload, ['idempotency_key' => 'trf-syn-key-0002']);
+        $this->actingAs($admin)->postJson(route('v2.journals.transfers.store'), $secondPayload)
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.duplicate_transfer.0', fn (string $m) => str_contains($m, 'Jurnal #'.$journalId) && str_contains($m, 'Rp 200.000'));
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'cash_bank_transfer')->count());
+
+        // Dikonfirmasi (confirm_duplicate=true) -> tersimpan jurnal kedua.
+        $this->actingAs($admin)->postJson(route('v2.journals.transfers.store'), array_merge($secondPayload, [
+            'confirm_duplicate' => true,
+        ]))->assertCreated();
+        $this->assertSame(2, DB::table('journal_entries')->where('reference_type', 'cash_bank_transfer')->count());
     }
 }

@@ -186,4 +186,9 @@
   :is(#modal-coa,#f#f) .modal-footer .btn.btn-secondary{min-width:0}
   :is(#modal-coa,#f#f) .modal-footer .btn:not(.btn-secondary){min-width:0;flex:1 1 auto}
 }
+@media screen and (max-width:720px){
+  :is([data-remote-content],[data-finance-page] main,#f#f) .cash-flow-report{padding:var(--ui-space-control) !important}
+  :is([data-remote-content],[data-finance-page] main,#f#f) .cash-flow-report .report-table :is(th,td){padding-inline:var(--ui-space-control) !important}
+  :is([data-remote-content],[data-finance-page] main,#f#f) .cash-flow-report .report-table :is(thead th,td.amount){white-space:normal;overflow-wrap:anywhere}
+}
 </style>

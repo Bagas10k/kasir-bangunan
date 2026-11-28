@@ -44,9 +44,17 @@ class V2SupplierActivityTest extends TestCase
     {
         $f = $this->fixture();
         $base = '/v2/suppliers/'.$f['supplier'];
-        $this->actingAs($f['admin'])->getJson($base.'/activity?from=2026-11-01&to=2026-11-23')->assertOk()
+        $range = '?from=2026-11-01&to=2026-11-23';
+        $firstPage = $this->actingAs($f['admin'])->getJson($base.'/activity'.$range)->assertOk()
             ->assertJsonPath('total', 23)->assertJsonPath('last_page', 2)
             ->assertJsonPath('outstanding', '1763.30')->assertJsonPath('awaiting', '7.05');
+        $this->assertStringContainsString('1–20 dari 23 aktivitas', $firstPage->json('html'));
+        $this->assertStringContainsString('from=2026-11-01&amp;to=2026-11-23&amp;page=2', $firstPage->json('html'));
+        $secondPage = $this->getJson($base.'/activity'.$range.'&page=2')->assertOk();
+        $this->assertStringContainsString('21–23 dari 23 aktivitas', $secondPage->json('html'));
+        $this->assertStringContainsString('Halaman 2 dari 2', $secondPage->json('html'));
+        $this->assertStringContainsString('Sebelumnya', $secondPage->json('html'));
+        $this->assertStringNotContainsString('Berikutnya', $secondPage->json('html'));
         $print = $this->get($base.'/statement?from=2026-11-01&to=2026-11-23&page=2')->assertOk()
             ->assertSee('SYN-ACT-01')->assertSee('SYN-ACT-21')->assertDontSee('SYN-OUTSIDE')->assertDontSee('SYN-OTHER-PARTY');
         $this->assertStringContainsString('no-store', $print->headers->get('Cache-Control'));

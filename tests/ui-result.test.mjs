@@ -101,3 +101,25 @@ test('receipt draft save, update, confirm and cancel describe the correct effect
         assert.match(f.saved().detail, detail);
     }
 });
+
+test('stock opname, sale return and purchase return raise localized toasts', async () => {
+    const f = setup([
+        { ok: true, body: { number: 'OPN-20261126-00001' } },
+        { ok: true, body: { number: 'RET-20261126-00001' } },
+        { ok: true, body: { number: 'RTP-20261126-00001' } },
+    ]);
+    await f.window.fetch('/v2/stock-opnames', { method: 'POST' });
+    await tick();
+    assert.equal(f.saved().title, 'Stok opname diposting');
+    assert.match(f.saved().detail, /OPN-20261126-00001/);
+
+    await f.window.fetch('/v2/sales/15/returns', { method: 'POST' });
+    await tick();
+    assert.equal(f.saved().title, 'Retur penjualan dicatat');
+    assert.match(f.saved().detail, /RET-20261126-00001/);
+
+    await f.window.fetch('/v2/receipts/8/returns', { method: 'POST' });
+    await tick();
+    assert.equal(f.saved().title, 'Retur pembelian dicatat');
+    assert.match(f.saved().detail, /RTP-20261126-00001/);
+});

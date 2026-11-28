@@ -20,6 +20,8 @@ class OperatingExpenseController extends Controller
             'bank_account_code' => 'nullable|string|max:20',
             'amount' => ['required', 'numeric', 'gt:0', 'decimal:0,2'],
             'description' => 'nullable|string|max:255',
+            'idempotency_key' => ['nullable', 'string', 'min:8', 'max:100', 'regex:/^[\x20-\x7E]+$/'],
+            'confirm_duplicate' => ['nullable', 'boolean'],
         ], [
             'date.date_format' => 'Tanggal pengeluaran tidak valid.',
             'account_code.required' => 'Pilih akun beban operasional.',
@@ -32,6 +34,9 @@ class OperatingExpenseController extends Controller
             'amount.gt' => 'Nominal pengeluaran harus lebih dari nol.',
             'amount.decimal' => 'Nominal pengeluaran maksimal 2 angka desimal.',
             'description.max' => 'Keterangan maksimal 255 karakter.',
+            'idempotency_key.min' => 'Kunci transaksi tidak valid.',
+            'idempotency_key.max' => 'Kunci transaksi tidak valid.',
+            'idempotency_key.regex' => 'Kunci transaksi tidak valid.',
         ]);
 
         try {

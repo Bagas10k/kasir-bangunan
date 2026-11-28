@@ -40,6 +40,13 @@ html body :is(.ui-dna-ops,#ui-dna-ops).expenses-page .exp-table .ui-badge{min-wi
 :is(.expenses-page,#exp#exp) .exp-alert{padding:10px 14px;border-radius:10px;font-size:14px;line-height:1.45}
 :is(.expenses-page,#exp#exp) .exp-alert[hidden]{display:none !important}
 :is(.expenses-page,#exp#exp) .exp-alert--ok{border:1px solid #bfd8c7;background:#e4f0e8;color:#14532d;font-weight:600}
+:is(.expenses-page,#exp#exp) .pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:14px 0 0;padding:0;border:0}
+:is(.expenses-page,#exp#exp) .pagination-meta{font-size:13px;color:#5f7468;font-variant-numeric:tabular-nums}
+:is(.expenses-page,#exp#exp) .pagination-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+:is(.expenses-page,#exp#exp) .page-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:0 14px;border:1px solid #d5ded8;border-radius:10px;background:#fff;color:#14532d;font-size:13.5px;font-weight:600;text-decoration:none}
+:is(.expenses-page,#exp#exp) .page-btn:hover:not(.disabled):not(.active){border-color:#14532d;background:#f1f7f3}
+:is(.expenses-page,#exp#exp) .page-btn.active{border-color:#14532d;background:#14532d;color:#fff}
+:is(.expenses-page,#exp#exp) .page-btn.disabled{opacity:.5;cursor:not-allowed}
 
 /* Modal overlay & form: selaras penuh dengan popup Operasional/Master (kepala hijau tua, judul lime, affix Rp, segmen 2 opsi, Batal kiri & Simpan lime kanan) */
 #modal-expense.modal-overlay{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(9,30,18,.55);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease,visibility .18s ease;backdrop-filter:none;-webkit-backdrop-filter:none}
@@ -56,6 +63,11 @@ html body :is(.ui-dna-ops,#ui-dna-ops).expenses-page .exp-table .ui-badge{min-wi
 #modal-expense .modal-body{overflow:auto;padding:20px 24px;flex:1 1 auto;min-height:0}
 #modal-expense .exp-alert--bad{margin:0 0 14px;padding:10px 12px;border:1px solid #f3b7b1;border-radius:8px;background:#fde7e5;color:#9b1c1c;font-size:14px;font-weight:600}
 #modal-expense .exp-alert--bad[hidden]{display:none !important}
+#modal-expense .exp-dup-confirm{margin:0 0 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#modal-expense .exp-dup-confirm[hidden]{display:none !important}
+#modal-expense .exp-dup-btn{min-height:44px;padding:0 16px;border:1px solid #b45309;border-radius:8px;background:#fff7ed;color:#9a3412;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+#modal-expense .exp-dup-btn:hover{background:#ffedd5}
+#modal-expense .exp-dup-btn:focus-visible{outline:2px solid #9a3412;outline-offset:2px}
 #modal-expense .form-group{display:flex;flex-direction:column;gap:6px;margin:0 0 16px}
 #modal-expense .form-group>label{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:#102a1d;margin:0}
 #modal-expense .exp-opt{line-height:18px;padding:0 8px;border-radius:999px;background:#eef2ef;font-size:11.5px;font-weight:600;color:#5f7468}
@@ -66,6 +78,7 @@ html body :is(.ui-dna-ops,#ui-dna-ops).expenses-page .exp-table .ui-badge{min-wi
 #modal-expense .exp-affix:focus-within{border-color:#14532d;box-shadow:0 0 0 3px rgba(20,83,45,.16)}
 #modal-expense .exp-pre{display:flex;align-items:center;flex:none;padding:0 12px;background:#f4f6f5;border-right:1px solid #e4ebe6;color:#5f7468;font-size:14px;font-weight:600}
 #modal-expense .exp-affix input{flex:1 1 auto;min-width:0;height:44px;min-height:44px;padding:0 12px;border:0 !important;border-radius:0 !important;box-shadow:none !important;text-align:right;font-size:15px;font-weight:600;color:#102a1d;font-variant-numeric:tabular-nums}
+html body #modal-expense .exp-affix #amount{font-size:var(--ui-t-body) !important;font-weight:var(--ui-weight-medium)}
 #modal-expense .exp-source-native{position:absolute !important;width:1px !important;height:1px !important;overflow:hidden !important;clip-path:inset(50%) !important;opacity:0;pointer-events:none}
 #modal-expense .exp-seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;border-radius:10px;background:#eef2ef}
 #modal-expense .exp-seg button{min-height:38px;height:38px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:#3c4a42;font:inherit;font-size:14px;font-weight:600;cursor:pointer;box-shadow:none}

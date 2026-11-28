@@ -42,7 +42,8 @@ function buildFly(group){
  const head=document.createElement('div');head.className='rail-flyout-title';head.setAttribute('aria-hidden','true');head.textContent=name;head.style.minHeight=Math.round(r.height)+'px';fly.append(head);
  for(const item of group.querySelectorAll('.workspace-submenu a')){
   const a=document.createElement('a');a.href=item.getAttribute('href');a.textContent=item.textContent.trim();if(item.getAttribute('aria-current'))a.setAttribute('aria-current','page');
-  a.addEventListener('click',e=>{e.preventDefault();hideFly({instant:true});if(item.dataset.task)item.click();else location.href=item.href;});fly.append(a);
+   if(item.target==='_blank'){a.target=item.target;a.rel='noopener';}
+   a.addEventListener('click',e=>{hideFly({instant:true});if(a.target==='_blank')return;e.preventDefault();if(item.dataset.task)item.click();else location.href=item.href;});fly.append(a);
  }
  fly.hidden=false;
  const h=fly.offsetHeight,rail=sidebar.getBoundingClientRect();

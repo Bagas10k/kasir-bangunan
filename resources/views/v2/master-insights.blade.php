@@ -36,28 +36,26 @@
         <button type="button" class="popup-close secondary" data-close-dialog aria-label="Tutup rincian">×</button>
     </div>
     <div class="popup-content insight-content detail-content">
-        <section class="detail-section">
-            <h3 data-insight-summary-title>Ringkasan</h3>
+        <section class="detail-section" aria-labelledby="insight-summary-title">
+            <h3 id="insight-summary-title" data-insight-summary-title>Ringkasan</h3>
             <dl class="insight-facts" data-insight-figures></dl>
         </section>
-        <section class="detail-section" data-supplier-activity hidden>
-            <h3>Tagihan dan pembayaran dalam periode</h3>
+        <section class="detail-section" data-supplier-activity aria-labelledby="supplier-activity-title" hidden>
+            <h3 id="supplier-activity-title">Riwayat tagihan &amp; pembayaran <x-ui.info-tip text="Filter tanggal hanya berlaku untuk riwayat ini. Pengajuan yang belum disetujui belum mengurangi utang." label="Keterangan aktivitas supplier" :data-tip-article="route('help.index', 'master-supplier')" /></h3>
             <form id="supplier-activity-form" method="get">
                 <div class="insight-range">
-                    <label for="supplier-activity-from">Dari</label>
+                    <label for="supplier-activity-from">Rentang tanggal</label>
                     <input type="date" id="supplier-activity-from" name="from" data-date-range-start="supplier-activity-to" value="{{ now()->subDays(29)->toDateString() }}" max="{{ now()->toDateString() }}" required>
-                    <span class="range-sep" aria-hidden="true">–</span>
-                    <label for="supplier-activity-to">Sampai</label>
-                    <input type="date" id="supplier-activity-to" name="to" data-date-range-end value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" required>
+                    <input type="date" id="supplier-activity-to" name="to" data-date-range-end aria-label="Tanggal akhir" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" required>
                 </div>
                 <button type="submit">Tampilkan</button>
-                <a data-supplier-print hidden target="_blank" rel="noopener">Cetak semua dalam rentang</a>
+                <a data-supplier-print hidden target="_blank" rel="noopener" aria-label="Cetak semua aktivitas dalam rentang (tab baru)">Cetak periode</a>
             </form>
             <p data-supplier-error class="err" role="alert" hidden></p>
             <div data-supplier-results aria-live="polite"></div>
         </section>
-        <section class="detail-section" data-insight-list>
-            <h3 data-insight-list-title>Rincian</h3>
+        <section class="detail-section" data-insight-list aria-labelledby="insight-list-title">
+            <h3 id="insight-list-title" data-insight-list-title>Rincian</h3>
             <div class="ui-table-wrap scroll" tabindex="0" role="region" aria-label="Rincian relasi">
                 <table class="ui-table"><thead data-insight-head></thead><tbody data-insight-body></tbody></table>
             </div>
@@ -81,9 +79,9 @@ function fact(label,value,primary){const box=el('div','',primary?'is-primary':''
 function open(kind,id,name,meta){
  const info=(data[kind]||{})[id];if(!info)return;
  figures.replaceChildren();body.replaceChildren();head.replaceChildren();
- title.textContent=name;sub.textContent=meta||'';
+ title.textContent=name;sub.textContent=meta||'';dialog.dataset.insightKind=kind;
   supplierActivity.hidden=kind!=='supplier';
-  dialog.querySelector('[data-insight-summary-title]').textContent=kind==='supplier'?'Ringkasan supplier · semua tanggal':'Ringkasan pemakaian mobil';
+   dialog.querySelector('[data-insight-summary-title]').textContent=kind==='supplier'?'Posisi supplier · semua tanggal':'Ringkasan pemakaian mobil';
  if(kind==='supplier'){
    figures.append(fact('Sisa utang ke supplier',info.outstanding,true),fact('Pembayaran terverifikasi',info.settled),fact('Pembayaran belum diverifikasi',info.awaiting),fact('Produk terhubung',String(info.products.length)));
   listTitle.textContent='Produk yang dipasok';
@@ -95,7 +93,7 @@ function open(kind,id,name,meta){
    if(!product.active)cell.append(el('span','Produk diarsipkan','ui-sub'));
    body.append(tr);
   }
-  note.textContent='Deposit (uang muka) ke supplier belum dicatat sistem; yang tampil adalah tagihan dan pembayaran.';
+   note.textContent='';
  }else{
   figures.append(fact('Surat jalan',String(info.deliveries),true),fact('Ritase tercatat',String(info.trips)),fact('Biaya ritase',info.trip_cost),fact('Terakhir dipakai',info.last_used||'—'));
   listTitle.textContent='Riwayat pemakaian';
@@ -104,7 +102,7 @@ function open(kind,id,name,meta){
   for(const item of info.history)body.append(row([item.date,item.label,item.destination,item.driver],['Tanggal','Kegiatan','Tujuan','Sopir']));
   note.textContent='Sopir diambil dari surat jalan dan catatan ritase; biaya dari ritase yang sudah dibukukan.';
  }
-  dialog._openerTrigger=document.activeElement;if(!dialog.open)dialog.showModal();dialog.querySelector('.popup-close').focus({preventScroll:true});
+   dialog._openerTrigger=document.activeElement;if(!dialog.open)dialog.showModal();dialog.querySelector('.popup-content').scrollTop=0;dialog.querySelector('.popup-close').focus({preventScroll:true});
  document.dispatchEvent(new CustomEvent('master-insight:open',{detail:{kind,id}}));
 }
 document.addEventListener('click',e=>{

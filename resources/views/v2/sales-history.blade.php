@@ -1,6 +1,6 @@
 <section class="card pos-recent-card pos-history-full" id="sales-history" aria-labelledby="h-sales" data-live-skip data-history-today="{{ now()->toDateString() }}" data-history-default-start="{{ now()->subDays(6)->toDateString() }}" data-history-selected="{{ $historyFilters['history_period'] ?? 'week' }}" data-history-page="{{ $historyFilters['history_page'] }}">
 <h2 id="h-sales">Riwayat penjualan</h2>
-<p class="note">Penjualan dan piutang pada nota yang sama. Pilih nama pembeli untuk detail, cicilan, dan cetak nota.</p>
+<p class="note">Buka <strong>Detail</strong> untuk melihat barang dan pembayaran pada nota.@if($role === 'admin') Untuk pengembalian barang, pilih <strong>Catat retur</strong> di detail nota.@endif</p>
 <form method="get" action="{{ route(config('v2.enabled') ? 'pos.index' : 'v2.index') }}#riwayat-penjualan" class="sales-filter-grid" id="history-filter-form" data-filter-inline data-history-url="{{ route('v2.sales.history') }}" data-filtered="{{ $historyFilters['sale_search'] !== '' || $historyFilters['sale_method'] !== '' || $historyFilters['start_date'] !== now()->subDays(6)->toDateString() || $historyFilters['end_date'] !== now()->toDateString() || $historyFilters['history_per_page'] !== 10 ? '1' : '0' }}">
     <div class="field"><label for="sales-search">Cari nota</label><input id="sales-search" name="sale_search" type="search" class="form-control" maxlength="100" value="{{ $historyFilters['sale_search'] }}" placeholder="Cari nomor nota atau pembeli…"></div>
 
@@ -21,6 +21,14 @@
 <p class="err" id="history-error" role="alert" tabindex="-1" hidden></p>
 <div id="history-results" aria-live="polite">@include('v2.sales-history-results')</div>
 </section>
+@if(($role ?? '') === 'admin')
+<section class="card" id="sale-returns-history" aria-labelledby="h-sale-returns">
+<h2 id="h-sale-returns">Riwayat retur penjualan</h2>
+<p class="note">Pengembalian barang pelanggan (khusus admin). Membuka detail nota untuk mencatat retur baru.</p>
+<x-ui.toolbar search="Cari nomor retur, nota, atau pembeli" label="Cari retur penjualan"/>
+<div data-server-table="sale-returns" data-table-url="{{ route('v2.tables.show', 'sale-returns') }}" data-table-default-filter="all" data-live-skip aria-live="polite">@include('v2.tables.sale-returns-results')</div>
+</section>
+@endif
 <style>
 html body #panel-riwayat-penjualan #sales-history{margin:0 !important;min-width:0}
 html body #sales-history #history-table{width:100%;border-collapse:collapse}

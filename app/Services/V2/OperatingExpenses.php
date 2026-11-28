@@ -3,6 +3,7 @@
 namespace App\Services\V2;
 
 use App\Services\AccountBalanceService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -18,6 +19,7 @@ final class OperatingExpenses
     public function __construct(
         private AccountBalanceService $balances,
         private BankAccounts $bankAccounts,
+        private OperationIdempotency $idempotency,
     ) {}
 
     /**
@@ -59,7 +61,23 @@ final class OperatingExpenses
             throw ValidationException::withMessages(['description' => 'Keterangan maksimal 255 karakter.']);
         }
 
-        return DB::transaction(function () use ($date, $code, $source, $sourceCode, $amount, $description): array {
+        $idempotencyKey = $this->idempotency->normalizeKey($data['idempotency_key'] ?? null);
+        $confirmDuplicate = filter_var($data['confirm_duplicate'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $requestHash = $this->idempotency->hashPayload([
+            'date' => $date,
+            'account_code' => $code,
+            'source' => $source,
+            'source_code' => $sourceCode,
+            'amount' => (string) $amount,
+            'description' => $description,
+        ]);
+
+        return DB::transaction(function () use ($actor, $date, $code, $source, $sourceCode, $amount, $description, $idempotencyKey, $confirmDuplicate, $requestHash): array {
+            $replayed = $this->idempotency->replay('operating_expense', $actor, $idempotencyKey, $requestHash);
+            if ($replayed !== null) {
+                return $replayed;
+            }
+
             $accounts = DB::table('chart_of_accounts')
                 ->whereIn('account_code', [$code, $sourceCode])
                 ->orderBy('account_code')
@@ -73,8 +91,8 @@ final class OperatingExpenses
             if (! $expense || ! $expense->is_active) {
                 throw ValidationException::withMessages(['account_code' => 'Akun beban tidak ditemukan atau tidak aktif.']);
             }
-            if ($expense->account_type !== 'expense' || in_array($code, self::BLOCKED_ACCOUNTS, true)) {
-                throw ValidationException::withMessages(['account_code' => 'Pilih akun beban operasional; HPP/persediaan tidak boleh dipakai.']);
+            if ($expense->account_type !== 'expense' || $expense->normal_balance !== 'debit' || in_array($code, self::BLOCKED_ACCOUNTS, true)) {
+                throw ValidationException::withMessages(['account_code' => 'Pilih akun beban operasional bersaldo normal debet; akun HPP/persediaan atau akun kontra tidak boleh dipakai.']);
             }
             if (! $paidFrom || ! $paidFrom->is_active) {
                 throw ValidationException::withMessages(['source' => 'Akun Kas/Bank sumber dana tidak ditemukan atau tidak aktif.']);
@@ -89,18 +107,50 @@ final class OperatingExpenses
                 throw ValidationException::withMessages(['amount' => $exception->getMessage()]);
             }
 
+            $paymentMethod = $source === 'bank' ? 'transfer' : 'cash';
+            $hasBankCol = Schema::hasColumn('expenses', 'bank_account_code');
+
+            if (! $confirmDuplicate) {
+                $normalizedDesc = mb_strtolower($description);
+                $candidates = DB::table('expenses')
+                    ->where('expense_date', $date)
+                    ->where('category', $code)
+                    ->where('payment_method', $paymentMethod)
+                    ->where('amount', (string) $amount)
+                    ->when($source === 'bank' && $hasBankCol, fn ($query) => $query->where(function ($sub) use ($sourceCode): void {
+                        $sub->where('bank_account_code', $sourceCode);
+                        if ($sourceCode === '1102') {
+                            $sub->orWhereNull('bank_account_code');
+                        }
+                    }))
+                    ->orderByDesc('id')
+                    ->lockForUpdate()
+                    ->get(['id', 'expense_number', 'expense_date', 'amount', 'description']);
+
+                $duplicate = $candidates->first(
+                    fn ($row): bool => mb_strtolower(trim((string) ($row->description ?? ''))) === $normalizedDesc
+                );
+                if ($duplicate) {
+                    $label = $duplicate->expense_number ?: '#'.$duplicate->id;
+                    $dateText = Carbon::parse($duplicate->expense_date)->locale('id')->translatedFormat('j M Y');
+                    throw ValidationException::withMessages([
+                        'duplicate_expense' => 'Pengeluaran serupa sudah tercatat pada '.$dateText.' sebagai '.$label.' ('.Money::display((string) $duplicate->amount).'). Bila memang ada pengeluaran kedua yang sama, tekan tombol "Ya, tetap simpan pengeluaran".',
+                    ]);
+                }
+            }
+
             $now = now();
             $expenseRow = [
                 'expense_number' => null,
                 'expense_date' => $date,
                 'category' => $code,
                 'amount' => (string) $amount,
-                'payment_method' => $source === 'bank' ? 'transfer' : 'cash',
+                'payment_method' => $paymentMethod,
                 'description' => $description !== '' ? $description : null,
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
-            if (Schema::hasColumn('expenses', 'bank_account_code')) {
+            if ($hasBankCol) {
                 $expenseRow['bank_account_code'] = $source === 'bank' ? $sourceCode : null;
             }
             $expenseId = DB::table('expenses')->insertGetId($expenseRow);
@@ -121,12 +171,16 @@ final class OperatingExpenses
 
             DB::table('expenses')->where('id', $expenseId)->update(['journal_entry_id' => $journalId, 'updated_at' => $now]);
 
-            return [
+            $result = [
                 'expense_id' => $expenseId,
                 'expense_number' => $number,
                 'amount' => (string) $amount,
                 'journal_entry_id' => $journalId,
             ];
+
+            $this->idempotency->record('operating_expense', $actor, $idempotencyKey, $requestHash, $expenseId, $result);
+
+            return $result;
         });
     }
 }

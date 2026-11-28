@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\AccountingReportService;
 use App\Services\V2\Operations;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -66,7 +67,9 @@ class V2ChartOfAccountsTest extends TestCase
     {
         config(['v2.enabled' => true]);
         $id = $this->account();
-        $this->postJson('/v2/chart-of-accounts', $this->payload('6197'))->assertUnauthorized();
+        $this->postJson('/v2/chart-of-accounts', $this->payload('6197'))
+            ->assertUnauthorized()
+            ->assertJsonPath('message', 'Sesi login habis. Muat ulang halaman lalu masuk kembali.');
         foreach ([$this->actor('cashier'), User::factory()->create()] as $user) {
             $this->actingAs($user);
             $this->postJson('/v2/chart-of-accounts', $this->payload('6197'))->assertForbidden();
@@ -115,19 +118,26 @@ class V2ChartOfAccountsTest extends TestCase
     public function test_new_core_accounts_cannot_be_created_inactive_renumbered_or_archived(): void
     {
         $this->actingAs($this->actor());
-        foreach ([['1191', 'asset', 'debit'], ['4102', 'revenue', 'credit'], ['6101', 'expense', 'debit']] as [$code, $type, $normal]) {
-            $payload = ['account_code' => $code, 'account_type' => $type, 'normal_balance' => $normal] + $this->payload();
-            $this->postJson('/v2/chart-of-accounts', ['is_active' => false] + $payload)
-                ->assertUnprocessable()->assertJsonValidationErrors('is_active');
-            $this->postJson('/v2/chart-of-accounts', $payload)->assertCreated();
-            $id = DB::table('chart_of_accounts')->where('account_code', $code)->value('id');
+        foreach ([['1191', 'asset', 'debit', false], ['4102', 'revenue', 'credit', false], ['4103', 'revenue', 'debit', true], ['6101', 'expense', 'debit', false]] as [$code, $type, $normal, $isContra]) {
+            $payload = ['account_code' => $code, 'account_type' => $type, 'normal_balance' => $normal, 'is_contra' => $isContra] + $this->payload($code);
+            // Akun inti sistem dikelola lewat v2:prepare, tidak dibuat manual lewat endpoint operasional V2.
+            $this->postJson('/v2/chart-of-accounts', $payload)
+                ->assertUnprocessable();
+
+            $id = DB::table('chart_of_accounts')->insertGetId([
+                'account_code' => $code, 'account_name' => 'Akun Sistem '.$code,
+                'account_type' => $type, 'normal_balance' => $normal,
+                'is_contra' => $isContra, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+            ]);
             $this->putJson('/v2/chart-of-accounts/'.$id, ['account_code' => $code.'9'] + $payload)
                 ->assertUnprocessable()->assertJsonValidationErrors('account_code');
             $this->putJson('/v2/chart-of-accounts/'.$id, ['is_active' => false] + $payload)
                 ->assertUnprocessable()->assertJsonValidationErrors('is_active');
             $this->patchJson('/v2/chart-of-accounts/'.$id.'/archive')
                 ->assertUnprocessable()->assertJsonValidationErrors('is_active');
-            $this->assertDatabaseHas('chart_of_accounts', ['id' => $id, 'account_code' => $code, 'is_active' => true]);
+            $this->putJson('/v2/chart-of-accounts/'.$id, ['account_name' => 'Nama Baru '.$code] + $payload)
+                ->assertOk();
+            $this->assertDatabaseHas('chart_of_accounts', ['id' => $id, 'account_code' => $code, 'account_name' => 'Nama Baru '.$code, 'is_active' => true]);
         }
     }
 
@@ -217,9 +227,14 @@ class V2ChartOfAccountsTest extends TestCase
         $this->assertDatabaseCount('chart_of_accounts', 1);
         $this->assertSame(0, Artisan::call('v2:prepare', $options + ['--apply' => true]));
         $this->assertDatabaseHas('chart_of_accounts', ['account_code' => '4102', 'account_type' => 'revenue', 'normal_balance' => 'credit', 'is_active' => true]);
-        $this->assertDatabaseCount('chart_of_accounts', 12);
+        $this->assertDatabaseHas('chart_of_accounts', ['account_code' => '4103', 'account_type' => 'revenue', 'normal_balance' => 'debit', 'is_contra' => true, 'is_active' => true]);
+        $this->assertDatabaseHas('chart_of_accounts', ['account_code' => '4104', 'account_type' => 'revenue', 'normal_balance' => 'debit', 'is_contra' => true, 'is_active' => true]);
+        $this->assertDatabaseHas('chart_of_accounts', ['account_code' => '6201', 'account_type' => 'expense', 'normal_balance' => 'debit', 'is_active' => true]);
+        $this->assertDatabaseHas('chart_of_accounts', ['account_code' => '5201', 'account_type' => 'expense', 'normal_balance' => 'debit', 'is_active' => true]);
+        $this->assertDatabaseHas('chart_of_accounts', ['account_code' => '7101', 'account_type' => 'revenue', 'normal_balance' => 'credit', 'is_active' => true]);
+        $this->assertDatabaseCount('chart_of_accounts', 17);
         $this->assertSame(0, Artisan::call('v2:prepare', $options + ['--apply' => true]));
-        $this->assertDatabaseCount('chart_of_accounts', 12);
+        $this->assertDatabaseCount('chart_of_accounts', 17);
         $this->assertSame($roles, DB::table('v2_user_roles')->get()->toJson());
         $this->assertSame($lines, DB::table('journal_entry_lines')->get()->toJson());
         $this->assertDatabaseCount('journal_entries', 1);
@@ -269,5 +284,171 @@ class V2ChartOfAccountsTest extends TestCase
         $debit = DB::table('journal_entry_lines')->sum('debit');
         $credit = DB::table('journal_entry_lines')->sum('credit');
         $this->assertSame((string) $debit, (string) $credit);
+    }
+
+    public function test_admin_can_create_and_report_accounting_contra_accounts_while_normal_accounts_keep_strict_rules(): void
+    {
+        config(['v2.enabled' => true]);
+        $admin = $this->actor();
+        $this->actingAs($admin);
+
+        // Batasan fitur V2: admin hanya boleh membuat Rekening Bank tambahan (1xxx) atau Beban Operasional (6xxx/8xxx).
+        $this->postJson('/v2/chart-of-accounts', [
+            'account_code' => '1104',
+            'account_name' => 'Bank BCA Toko',
+            'account_type' => 'asset',
+            'normal_balance' => 'debit',
+            'is_bank_account' => true,
+            'is_active' => true,
+        ])->assertCreated();
+
+        $this->postJson('/v2/chart-of-accounts', [
+            'account_code' => '6106',
+            'account_name' => 'Beban Internet & Telepon',
+            'account_type' => 'expense',
+            'normal_balance' => 'debit',
+            'is_active' => true,
+        ])->assertCreated();
+
+        // Akun kontra manual & akun di luar batasan (aset non-bank, kewajiban, ekuitas, pendapatan, HPP) ditolak di V2.
+        foreach ([
+            ['1591', 'Akumulasi Penyusutan Kendaraan', 'asset', 'credit', true, false, 'is_contra'],
+            ['3102', 'Prive Pemilik', 'equity', 'debit', true, false, 'is_contra'],
+            ['4103', 'Potongan Penjualan', 'revenue', 'debit', true, false, 'is_contra'],
+            ['5109', 'Potongan Pembelian', 'expense', 'credit', true, false, 'is_contra'],
+            ['1501', 'Kendaraan Armada', 'asset', 'debit', false, false, 'account_type'],
+            ['2102', 'Utang Gaji', 'liability', 'credit', false, false, 'account_type'],
+            ['3201', 'Laba Ditahan', 'equity', 'credit', false, false, 'account_type'],
+            ['4105', 'Pendapatan Kustom', 'revenue', 'credit', false, false, 'account_type'],
+            ['5102', 'Beban Angkut Pembelian', 'expense', 'debit', false, false, 'account_type'],
+        ] as [$code, $name, $type, $balance, $contra, $bank, $expectedError]) {
+            $this->postJson('/v2/chart-of-accounts', [
+                'account_code' => $code,
+                'account_name' => $name,
+                'account_type' => $type,
+                'normal_balance' => $balance,
+                'is_contra' => $contra,
+                'is_bank_account' => $bank,
+                'is_active' => true,
+            ])->assertUnprocessable()->assertJsonValidationErrors($expectedError);
+        }
+
+        // Rekening bank tidak boleh jadi akun kontra.
+        $this->postJson('/v2/chart-of-accounts', [
+            'account_code' => '1115',
+            'account_name' => 'Bank Kontra Tidak Sah',
+            'account_type' => 'asset',
+            'normal_balance' => 'credit',
+            'is_contra' => true,
+            'is_bank_account' => true,
+            'is_active' => true,
+        ])->assertUnprocessable()->assertJsonValidationErrors('is_bank_account');
+
+        // Sistem menyediakan akun inti termasuk akun pengurang sistem (4103 & 4104) via v2:prepare.
+        $this->assertSame(0, Artisan::call('v2:prepare', ['--admin' => (string) $admin->id, '--accounts-only' => true, '--apply' => true]));
+
+        // Akun kontra sistem atau akun non-debet ditolak di pencatatan pengeluaran operasional.
+        DB::table('chart_of_accounts')->insert([
+            'account_code' => '5109', 'account_name' => 'Potongan Pembelian', 'account_type' => 'expense',
+            'normal_balance' => 'credit', 'is_contra' => true, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->postJson(route('v2.expenses.store'), [
+            'date' => now()->toDateString(),
+            'account_code' => '5109',
+            'source' => 'cash',
+            'amount' => '10000',
+            'description' => 'Tidak boleh pakai akun kontra',
+        ])->assertUnprocessable()->assertJsonValidationErrors('account_code');
+
+        // Verifikasi laporan Neraca & Laba Rugi dengan akun kontra sistem (4103 & 4104) tetap akurat & seimbang.
+        $today = now()->toDateString();
+        $j1 = DB::table('journal_entries')->insertGetId(['reference_type' => 'synthetic', 'reference_id' => 1, 'description' => 'Modal awal', 'transaction_date' => $today, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('journal_entry_lines')->insert([
+            ['journal_entry_id' => $j1, 'account_code' => '1101', 'account_name' => 'Kas Utama', 'debit' => '500.00', 'credit' => '0.00', 'created_at' => now(), 'updated_at' => now()],
+            ['journal_entry_id' => $j1, 'account_code' => '3101', 'account_name' => 'Modal Awal', 'debit' => '0.00', 'credit' => '500.00', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        $j2 = DB::table('journal_entries')->insertGetId(['reference_type' => 'synthetic', 'reference_id' => 2, 'description' => 'Penjualan, potongan, retur, dan biaya', 'transaction_date' => $today, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('journal_entry_lines')->insert([
+            ['journal_entry_id' => $j2, 'account_code' => '1101', 'account_name' => 'Kas Utama', 'debit' => '150.00', 'credit' => '0.00', 'created_at' => now(), 'updated_at' => now()],
+            ['journal_entry_id' => $j2, 'account_code' => '4103', 'account_name' => 'Potongan Penjualan', 'debit' => '20.00', 'credit' => '0.00', 'created_at' => now(), 'updated_at' => now()],
+            ['journal_entry_id' => $j2, 'account_code' => '4104', 'account_name' => 'Retur Penjualan', 'debit' => '30.00', 'credit' => '0.00', 'created_at' => now(), 'updated_at' => now()],
+            ['journal_entry_id' => $j2, 'account_code' => '4101', 'account_name' => 'Penjualan Material', 'debit' => '0.00', 'credit' => '200.00', 'created_at' => now(), 'updated_at' => now()],
+            ['journal_entry_id' => $j2, 'account_code' => '6106', 'account_name' => 'Beban Internet & Telepon', 'debit' => '50.00', 'credit' => '0.00', 'created_at' => now(), 'updated_at' => now()],
+            ['journal_entry_id' => $j2, 'account_code' => '1101', 'account_name' => 'Kas Utama', 'debit' => '0.00', 'credit' => '50.00', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $reports = app(AccountingReportService::class);
+        $pl = $reports->generateProfitAndLoss($today, $today);
+        $bs = $reports->generateBalanceSheet($today);
+
+        $this->assertSame('150.00', $pl['total_revenue']); // 200 - 20 potongan - 30 retur
+        $this->assertSame('100.00', $pl['net_profit']);    // 150 - 50 beban
+        $this->assertSame('600.00', $bs['total_assets']);  // 500 + 150 - 50
+        $this->assertSame('600.00', $bs['total_equity']);  // 500 + 100 laba
+        $this->assertTrue($bs['is_balanced']);
+    }
+
+    public function test_system_accounts_lock_structure_even_when_unused_while_allowing_name_customization_and_custom_accounts_are_fully_editable(): void
+    {
+        config(['v2.enabled' => true]);
+        $this->actingAs($this->actor());
+
+        $systemId = DB::table('chart_of_accounts')->insertGetId([
+            'account_code' => '4102', 'account_name' => 'Pendapatan Ongkir',
+            'account_type' => 'revenue', 'normal_balance' => 'credit',
+            'is_contra' => false, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // Nama akun terhubung sistem boleh disesuaikan.
+        $this->putJson('/v2/chart-of-accounts/'.$systemId, [
+            'account_code' => '4102', 'account_name' => 'Pendapatan Jasa Pengiriman Armada',
+            'account_type' => 'revenue', 'normal_balance' => 'credit', 'is_contra' => false, 'is_active' => true,
+        ])->assertOk();
+        $this->assertDatabaseHas('chart_of_accounts', ['id' => $systemId, 'account_name' => 'Pendapatan Jasa Pengiriman Armada']);
+
+        // Klasifikasi/kontra akun terhubung sistem tetap terkunci meski belum dipakai di jurnal.
+        $this->putJson('/v2/chart-of-accounts/'.$systemId, [
+            'account_code' => '4102', 'account_name' => 'Pendapatan Jasa Pengiriman Armada',
+            'account_type' => 'revenue', 'normal_balance' => 'debit', 'is_contra' => true, 'is_active' => true,
+        ])->assertUnprocessable()->assertJsonValidationErrors('account_type');
+
+        // Akun kustom yang belum dijurnal dapat disesuaikan dalam batasan V2 (Rekening Bank atau Beban Operasional).
+        $customId = $this->account('6198');
+        $this->putJson('/v2/chart-of-accounts/'.$customId, [
+            'account_code' => '1105', 'account_name' => 'Rekening Bank BRI',
+            'account_type' => 'asset', 'normal_balance' => 'debit', 'is_contra' => false, 'is_bank_account' => true, 'is_active' => true,
+        ])->assertOk();
+        $this->assertDatabaseHas('chart_of_accounts', [
+            'id' => $customId, 'account_code' => '1105', 'account_type' => 'asset',
+            'normal_balance' => 'debit', 'is_contra' => false, 'is_bank_account' => true,
+        ]);
+
+        // Mengubah akun kustom ke jenis di luar batasan (mis. Ekuitas/Kontra) ditolak.
+        $this->putJson('/v2/chart-of-accounts/'.$customId, [
+            'account_code' => '3102', 'account_name' => 'Prive Pemilik',
+            'account_type' => 'equity', 'normal_balance' => 'debit', 'is_contra' => true, 'is_bank_account' => false, 'is_active' => true,
+        ])->assertUnprocessable()->assertJsonValidationErrors('is_contra');
+
+        // Filter scope=system / scope=custom & daftar saran preset hanya menampilkan kode/nama yang belum ada.
+        $this->get(route('coa.index', ['scope' => 'system']))->assertOk()
+            ->assertSee('4102')
+            ->assertSee('data-tip="Pendapatan ongkir POS"', false)
+            ->assertDontSee('(Pendapatan ongkir POS)')
+            ->assertDontSee('Rekening Bank BRI');
+        $response = $this->get(route('coa.index', ['scope' => 'custom']))->assertOk()
+            ->assertSee('Rekening Bank BRI')->assertDontSee('Pendapatan Jasa Pengiriman Armada');
+        $presetCodes = array_column($response->viewData('recommendedPresets'), 'code');
+        $this->assertNotContains('1105', $presetCodes);
+        $this->assertContains('1104', $presetCodes);
+
+        // Saran dengan nama persis sama juga disembunyikan meski memakai kode berbeda.
+        DB::table('chart_of_accounts')->insert([
+            'account_code' => '6197', 'account_name' => 'Beban Listrik & Air',
+            'account_type' => 'expense', 'normal_balance' => 'debit',
+            'is_contra' => false, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $afterNameMatch = $this->get(route('coa.index'))->assertOk();
+        $this->assertNotContains('6102', array_column($afterNameMatch->viewData('recommendedPresets'), 'code'));
+        $this->assertContains('6197', $afterNameMatch->viewData('existingAccountCodes'));
     }
 }

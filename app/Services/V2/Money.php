@@ -61,6 +61,18 @@ final class Money
         return ($negative ? '-' : '').'Rp '.$grouped.($fraction === '00' ? '' : ','.$fraction);
     }
 
+    /** Cumulative value of a quantity slice, rounded down so the last slice keeps any remaining cents. */
+    public static function portionAt(BigDecimal $total, BigDecimal $originalQty, BigDecimal $cumulativeQty): BigDecimal
+    {
+        return $total->multipliedBy($cumulativeQty)->dividedBy($originalQty, 2, RoundingMode::Down);
+    }
+
+    /** Keep fractional cents for the final return so earlier returns cannot exhaust the line value. */
+    public static function returnPortion(BigDecimal $total, BigDecimal $originalQty, BigDecimal $cumulativeQty, BigDecimal $previousAmount): BigDecimal
+    {
+        return BigDecimal::max(self::portionAt($total, $originalQty, $cumulativeQty)->minus($previousAmount), BigDecimal::zero()->toScale(2));
+    }
+
     /**
      * Hitung diskon atas dasar (base) tertentu.
      * $discount: ['type' => 'amount'|'percent', 'value' => string]; array kosong = 0.

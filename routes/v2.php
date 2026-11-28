@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ChartOfAccountController;
+use App\Http\Controllers\HelpCenterController;
 use App\Http\Controllers\V2\AccountController;
 use App\Http\Controllers\V2\CashBankAdjustmentController;
 use App\Http\Controllers\V2\CashBankTransferController;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 // Fresh operational surface; legacy routes remain untouched until release gates pass.
 Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::get('/', [WorkspaceController::class, 'index'])->name('index');
+    Route::get('/panduan/{article?}', [HelpCenterController::class, 'legacy'])->where('article', '[a-z0-9-]+')->name('help');
     Route::post('/chart-of-accounts', [ChartOfAccountController::class, 'store'])->middleware('throttle:30,1')->name('coa.store');
     Route::put('/chart-of-accounts/{id}', [ChartOfAccountController::class, 'update'])->whereNumber('id')->middleware('throttle:30,1')->name('coa.update');
     Route::patch('/chart-of-accounts/{id}/archive', [ChartOfAccountController::class, 'archive'])->whereNumber('id')->middleware('throttle:30,1')->name('coa.archive');
@@ -19,6 +21,10 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::post('/journals/transfers', [CashBankTransferController::class, 'store'])->middleware('throttle:30,1')->name('journals.transfers.store');
     Route::post('/expenses', [OperatingExpenseController::class, 'store'])->middleware('throttle:30,1')->name('expenses.store');
     Route::get('/invoices', [WorkspaceController::class, 'invoices'])->name('invoices.index');
+    Route::get('/tables/{table}', [WorkspaceController::class, 'tableFragment'])
+        ->whereIn('table', ['payments', 'deliveries', 'shifts', 'receipts', 'receipt-drafts', 'stock-opnames', 'sale-returns', 'purchase-returns'])
+        ->middleware('throttle:120,1')
+        ->name('tables.show');
     Route::get('/sales/{id}/detail', [WorkspaceController::class, 'saleDetail'])->whereNumber('id')->name('sales.detail');
     Route::get('/payments/{id}/proof', [WorkspaceController::class, 'paymentProof'])->whereNumber('id')->middleware('throttle:60,1')->name('payments.proof');
     Route::post('/relations/{kind}', [WorkspaceController::class, 'saveRelation'])->whereIn('kind', ['driver', 'unit', 'category'])->name('relations.store');
@@ -50,6 +56,11 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::post('/receipt-drafts/{id}/confirm', [WorkspaceController::class, 'confirmReceiptDraft'])->whereNumber('id')->name('receipt-drafts.confirm');
     Route::post('/receipt-drafts/{id}/cancel', [WorkspaceController::class, 'cancelReceiptDraft'])->whereNumber('id')->name('receipt-drafts.cancel');
     Route::post('/receipts/{id}/void', [WorkspaceController::class, 'voidReceipt'])->whereNumber('id')->name('receipts.void');
+    Route::get('/receipts/{id}/returnable', [WorkspaceController::class, 'receiptReturnable'])->whereNumber('id')->name('receipts.returnable');
+    Route::post('/receipts/{id}/returns', [WorkspaceController::class, 'storePurchaseReturn'])->whereNumber('id')->middleware('throttle:30,1')->name('receipts.returns.store');
+    Route::get('/stock-opnames/products', [WorkspaceController::class, 'stockOpnameProducts'])->name('stock-opnames.products');
+    Route::post('/stock-opnames', [WorkspaceController::class, 'storeStockOpname'])->middleware('throttle:30,1')->name('stock-opnames.store');
+    Route::post('/sales/{id}/returns', [WorkspaceController::class, 'storeSaleReturn'])->whereNumber('id')->middleware('throttle:30,1')->name('sales.returns.store');
     Route::post('/trips', [WorkspaceController::class, 'trip'])->name('trips.store');
     Route::put('/master/{kind}/{id}', [WorkspaceController::class, 'updateMaster'])->whereNumber('id')->name('master.update');
     Route::patch('/master/{kind}/{id}', [WorkspaceController::class, 'archiveMaster'])->whereNumber('id')->name('master.archive');
@@ -63,6 +74,7 @@ Route::middleware('auth')->prefix('v2')->name('v2.')->group(function (): void {
     Route::get('/shifts/{id}/closing-summary', [WorkspaceController::class, 'closingSummary'])->whereNumber('id')->name('shifts.closing-summary');
     Route::get('/customers/search', [WorkspaceController::class, 'searchCustomers'])->name('customers.search');
     Route::post('/customers/resolve', [WorkspaceController::class, 'resolveCustomer'])->name('customers.resolve');
+    Route::get('/pos/catalog', [WorkspaceController::class, 'posCatalog'])->middleware('throttle:60,1')->name('pos.catalog');
     Route::get('/sales/history', [WorkspaceController::class, 'history'])->name('sales.history');
     Route::get('/sales/dashboard', [WorkspaceController::class, 'dashboardPeriod'])->name('sales.dashboard');
     Route::post('/sales', [WorkspaceController::class, 'checkout'])->name('sales.store');

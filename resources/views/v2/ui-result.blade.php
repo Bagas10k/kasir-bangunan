@@ -182,7 +182,10 @@ html body .ur-btn.is-primary:hover{background:#0f2a1d}
         ['POST', /\/v2\/accounts$/, function () { return { title: 'Akun login dibuat' }; }],
         ['PUT', /\/v2\/accounts\/\d+$/, function () { return { title: 'Akun login diperbarui' }; }],
         ['POST', /\/v2\/expenses$/, function (d) { return { title: 'Pengeluaran dicatat', detail: (d && d.expense_number ? d.expense_number + ' · ' : '') + 'Jurnal seimbang sudah dikunci.' }; }],
-        ['POST', /\/v2\/journals\/transfers$/, function (d) { return { title: 'Pindah dana tercatat', detail: (d && d.from_account_code && d.to_account_code ? d.from_account_code + ' → ' + d.to_account_code + ' · ' : '') + 'Jurnal seimbang sudah dikunci.' }; }]
+        ['POST', /\/v2\/journals\/transfers$/, function (d) { return { title: 'Pindah dana tercatat', detail: (d && d.from_account_code && d.to_account_code ? d.from_account_code + ' → ' + d.to_account_code + ' · ' : '') + 'Jurnal seimbang sudah dikunci.' }; }],
+        ['POST', /\/v2\/stock-opnames$/, function (d) { return { title: 'Stok opname diposting', detail: (d && d.number ? d.number + ' · ' : '') + 'Stok gudang dan jurnal selisih sudah diperbarui.' }; }],
+        ['POST', /\/v2\/sales\/\d+\/returns$/, function (d) { return { title: 'Retur penjualan dicatat', detail: (d && d.number ? d.number + ' · ' : '') + 'Stok kembali dan pembukuan diperbarui.' }; }],
+        ['POST', /\/v2\/receipts\/\d+\/returns$/, function (d) { return { title: 'Retur pembelian dicatat', detail: (d && d.number ? d.number + ' · ' : '') + 'Stok dan utang supplier diperbarui.' }; }]
     ];
 
     function persist(o) {
@@ -299,7 +302,11 @@ html body .ur-btn.is-primary:hover{background:#0f2a1d}
         actions.append(next);
 
         card.append(badge, h2, number, total, rows);
-        if (methodValue === 'transfer' && data.paid && !/^0+(\.0+)?$/.test(String(data.paid))) {
+        var submittedPaid = form.elements.paid_amount ? String(form.elements.paid_amount.value || '0') : '0';
+        var isTransferPending = (methodValue === 'transfer'
+            || (methodValue === 'credit' && form.elements.deposit_method && !form.elements.deposit_method.disabled && form.elements.deposit_method.value === 'transfer'))
+            && submittedPaid && !/^0+(\.0+)?$/.test(submittedPaid.trim());
+        if (isTransferPending) {
             var note = document.createElement('p');
             note.className = 'ur-note';
             note.textContent = 'Transfer menunggu verifikasi admin sebelum masuk ke bank.';

@@ -161,3 +161,49 @@ test('kirim ganda saat request berjalan hanya mengirim satu POST', async () => {
     await first;
     assert.equal(app.button.disabled, false);
 });
+
+test('sesi login habis (401/419) menampilkan pesan Bahasa Indonesia, bukan Unauthenticated', async () => {
+    for (const status of [401, 419]) {
+        const app = setupExpenseScript();
+        app.respond(async () => ({ ok: false, status, json: async () => ({ message: 'Unauthenticated.' }) }));
+        await app.submit();
+        assert.equal(app.error.hidden, false);
+        assert.match(app.error.textContent, /Sesi login habis/i);
+        assert.doesNotMatch(app.error.textContent, /Unauthenticated/i);
+        assert.equal(app.button.disabled, false);
+    }
+});
+
+test('pengeluaran mengirim idempotency_key konsisten saat retry jaringan dan mendukung konfirmasi duplikat', async () => {
+    const app = setupExpenseScript();
+    // Gagal jaringan pertama: key harus tetap sama pada percobaan ulang.
+    app.respond(async () => { throw Error('offline'); });
+    await app.submit();
+    const firstKey = app.requests[0].options.body.get('idempotency_key');
+    assert.ok(firstKey && firstKey.length >= 8);
+
+    // Percobaan ulang setelah jaringan pulih: server mengembalikan peringatan duplikat (422).
+    app.respond(async () => ({
+        ok: false,
+        status: 422,
+        json: async () => ({ errors: { duplicate_expense: ['Pengeluaran serupa sudah tercatat sebagai EXP-001.'] } }),
+    }));
+    await app.submit();
+    assert.equal(app.requests[1].options.body.get('idempotency_key'), firstKey);
+    assert.equal(app.requests[1].options.body.get('confirm_duplicate'), '0');
+    assert.match(app.error.textContent, /EXP-001/);
+
+    // Konfirmasi duplikat mengirim confirm_duplicate=1 dengan idempotency_key yang sama, lalu merotasi key sesudah sukses.
+    app.form.dataset.confirmDuplicate = '1';
+    app.respond(async (_url, options) => (options.method === 'POST'
+        ? { ok: true, status: 201, json: async () => ({ expense_number: 'EXP-002' }) }
+        : { ok: true, text: async () => '' }));
+    await app.submit();
+    assert.equal(app.requests[2].options.body.get('idempotency_key'), firstKey);
+    assert.equal(app.requests[2].options.body.get('confirm_duplicate'), '1');
+
+    // Simpan baru berikutnya harus memakai kunci baru (sudah dirotasi).
+    await app.submit();
+    const nextPost = app.requests.filter((r) => r.options.method === 'POST')[3];
+    assert.notEqual(nextPost.options.body.get('idempotency_key'), firstKey);
+});

@@ -32,11 +32,25 @@ function build(select){
  const sync=()=>{input.value=select.value?labelOf(select.value):'';note.textContent=select.value?'Pelanggan terdaftar '+(select.selectedOptions[0]?.dataset.code||''):'Kosongkan untuk pelanggan umum.';};
  const close=()=>{list.hidden=true;list.replaceChildren();combo.index=-1;input.setAttribute('aria-expanded','false');};
 
- function choose(id,name,tier){
+ function applyMeta(option,name,tier,meta){
+  option.dataset.name=name;
+  option.dataset.tier=tier||'retail';
+  option.dataset.code=meta?.code||'';
+  option.dataset.openCount=String(meta?.open_invoices_count??0);
+  option.dataset.openBalance=String(meta?.open_balance??'0.00');
+  option.dataset.overdueCount=String(meta?.overdue_count??0);
+  option.dataset.overdueBalance=String(meta?.overdue_balance??'0.00');
+  option.textContent=name;
+ }
+ function choose(id,name,tier,meta){
   if(id){
-   if(!select.querySelector('option[value="'+id+'"]')){
-    const option=document.createElement('option');option.value=id;option.dataset.name=name;option.dataset.tier=tier||'retail';option.textContent=name;select.append(option);
-    for(const other of combos)if(other.select!==select&&!other.select.querySelector('option[value="'+id+'"]')){const clone=option.cloneNode(true);other.select.append(clone);}
+   let option=select.querySelector('option[value="'+id+'"]');
+   if(!option){option=document.createElement('option');option.value=id;select.append(option);}
+   applyMeta(option,name,tier,meta);
+   for(const other of combos)if(other.select!==select){
+    let otherOpt=other.select.querySelector('option[value="'+id+'"]');
+    if(!otherOpt){otherOpt=document.createElement('option');otherOpt.value=id;other.select.append(otherOpt);}
+    applyMeta(otherOpt,name,tier,meta);
    }
    select.value=String(id);
   }else{select.value='';}
@@ -44,6 +58,12 @@ function build(select){
   close();sync();
  }
 
+ function formatRp(raw){
+  const parts=String(raw||'0').split('.');
+  const intPart=(parts[0]||'0').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+  const dec=(parts[1]||'').replace(/0+$/,'');
+  return 'Rp '+intPart+(dec?','+dec:'');
+ }
  function render(results,term){
   list.replaceChildren();combo.items=[];
   const add=(label,hint,action,kind)=>{
@@ -55,7 +75,16 @@ function build(select){
    list.append(item);combo.items.push({node:item,action});
   };
   add('Pelanggan umum','Tanpa memilih data pelanggan',()=>choose('',''),'general');
-  for(const row of results)add(row.name,row.code+(row.price_tier==='contractor'?' · Kontraktor':''),()=>choose(row.id,row.name,row.price_tier));
+  for(const row of results){
+   const parts=[row.code];
+   if(row.price_tier==='contractor')parts.push('Kontraktor');
+   if(Number(row.open_invoices_count)>0){
+    let debt='Piutang '+formatRp(row.open_balance);
+    if(Number(row.overdue_count)>0)debt+=' ('+row.overdue_count+' lewat tempo)';
+    parts.push(debt);
+   }
+   add(row.name,parts.join(' · '),()=>choose(row.id,row.name,row.price_tier,row));
+  }
   const exact=results.some(row=>row.name.toLowerCase()===term.toLowerCase());
   if(term.length>=2&&!exact)add('Buat pelanggan baru: '+term,'disimpan ke data pelanggan',()=>create(term),'create');
   list.hidden=false;input.setAttribute('aria-expanded','true');combo.index=-1;
@@ -67,7 +96,7 @@ function build(select){
    const response=await fetch(resolveUrl,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':token},body:JSON.stringify({name})});
    const payload=await response.json();
    if(!response.ok)throw new Error(payload.message||'Pelanggan gagal disimpan.');
-   choose(payload.id,payload.name,payload.price_tier);
+   choose(payload.id,payload.name,payload.price_tier,payload);
    note.textContent=payload.created?'Pelanggan baru '+payload.code+' dibuat.':'Memakai pelanggan terdaftar '+payload.code+'.';
   }catch(error){note.textContent=error.message;close();}
  }

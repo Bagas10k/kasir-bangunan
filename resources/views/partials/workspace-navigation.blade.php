@@ -18,6 +18,7 @@
             ...($navigationAdmin ? [] : ['persetujuan' => 'Status pembayaran']),
             'pengiriman' => 'Pengiriman',
             'penerimaan' => 'Penerimaan barang',
+            'stok-opname' => 'Stok opname',
             'shift' => [$navigationAdmin ? 'Kas & laporan' : 'Kas harian & laporan saya', ['shift' => 'Kas harian', 'laporan' => $navigationAdmin ? 'Laporan harian' : 'Laporan saya']],
         ]],
         'master' => ['Master data', 'M4 6c0-3.5 16-3.5 16 0v12c0 3.5-16 3.5-16 0zM4 6c0 3.5 16 3.5 16 0M4 12c0 3.5 16 3.5 16 0', [
@@ -29,7 +30,7 @@
         ]],
     ];
     $adminOnlyGroups = ['pengawasan', 'master'];
-    $adminOnlyTasks = ['penerimaan'];
+    $adminOnlyTasks = ['penerimaan', 'stok-opname'];
     // Halaman keuangan dimuat ke panel workspace lewat fetch; URL penuhnya tetap berfungsi.
     $financialLinks = [
         'pengeluaran' => ['expenses.index', 'Pengeluaran'],

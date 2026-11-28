@@ -6,6 +6,7 @@ use App\Services\V2\Money;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class V2Prepare extends Command
 {
@@ -29,15 +30,23 @@ class V2Prepare extends Command
             return self::FAILURE;
         }
         $required = [
-            '1101' => ['Kas Utama', 'asset', 'debit'], '1102' => ['Bank', 'asset', 'debit'],
-            '1103' => ['Piutang usaha', 'asset', 'debit'], '1191' => ['Uang muka sopir', 'asset', 'debit'],
-            '1301' => ['Persediaan', 'asset', 'debit'], '2101' => ['Utang usaha', 'liability', 'credit'],
-            '3101' => ['Modal awal', 'equity', 'credit'], '4101' => ['Penjualan', 'revenue', 'credit'],
-            '4102' => ['Pendapatan ongkir', 'revenue', 'credit'], '5101' => ['HPP', 'expense', 'debit'],
-            '6101' => ['Biaya perjalanan', 'expense', 'debit'],
+            '1101' => ['Kas Utama', 'asset', 'debit', false], '1102' => ['Bank', 'asset', 'debit', false],
+            '1103' => ['Piutang usaha', 'asset', 'debit', false], '1191' => ['Uang muka sopir', 'asset', 'debit', false],
+            '1301' => ['Persediaan', 'asset', 'debit', false], '2101' => ['Utang usaha', 'liability', 'credit', false],
+            '3101' => ['Modal awal', 'equity', 'credit', false], '4101' => ['Penjualan', 'revenue', 'credit', false],
+            '4102' => ['Pendapatan ongkir', 'revenue', 'credit', false],
+            '4103' => ['Potongan Penjualan', 'revenue', 'debit', true],
+            '4104' => ['Retur Penjualan', 'revenue', 'debit', true],
+            '5101' => ['HPP', 'expense', 'debit', false],
+            '5201' => ['Beban Selisih Opname', 'expense', 'debit', false],
+            '6101' => ['Beban Operasional Toko', 'expense', 'debit', false],
+            '6201' => ['Beban Transportasi & Ritase Armada', 'expense', 'debit', false],
+            '7101' => ['Pendapatan Lain-lain', 'revenue', 'credit', false],
         ];
+        $hasContra = Schema::hasColumn('chart_of_accounts', 'is_contra');
+        $hasBank = Schema::hasColumn('chart_of_accounts', 'is_bank_account');
         $missing = [];
-        foreach ($required as $code => [$name,$type,$normal]) {
+        foreach ($required as $code => [$name, $type, $normal, $isContra]) {
             $a = DB::table('chart_of_accounts')->where('account_code', (string) $code)->first();
             if (! $a) {
                 $missing[] = (string) $code;
@@ -58,13 +67,20 @@ class V2Prepare extends Command
                 return self::FAILURE;
             }
             if ($this->option('apply')) {
-                DB::transaction(function () use ($required, $missing): void {
+                DB::transaction(function () use ($required, $missing, $hasContra, $hasBank): void {
                     foreach ($missing as $code) {
-                        [$name, $type, $normal] = $required[$code];
-                        DB::table('chart_of_accounts')->insertOrIgnore([
+                        [$name, $type, $normal, $isContra] = $required[$code];
+                        $row = [
                             'account_code' => $code, 'account_name' => $name, 'account_type' => $type,
                             'normal_balance' => $normal, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
-                        ]);
+                        ];
+                        if ($hasContra) {
+                            $row['is_contra'] = $isContra;
+                        }
+                        if ($hasBank) {
+                            $row['is_bank_account'] = $code === '1102';
+                        }
+                        DB::table('chart_of_accounts')->insertOrIgnore($row);
                         $account = DB::table('chart_of_accounts')->where('account_code', $code)->lockForUpdate()->first();
                         if (! $account || ! $account->is_active || $account->account_type !== $type || $account->normal_balance !== $normal) {
                             throw new \RuntimeException('System account changed during repair; no changes committed.');
@@ -119,10 +135,17 @@ class V2Prepare extends Command
             }
         }
         if ($this->option('apply')) {
-            DB::transaction(function () use ($required, $missing, $ids, $admin) {
+            DB::transaction(function () use ($required, $missing, $ids, $admin, $hasContra, $hasBank) {
                 foreach ($missing as $code) {
-                    [$name,$type,$normal] = $required[$code];
-                    DB::table('chart_of_accounts')->insert(['account_code' => $code, 'account_name' => $name, 'account_type' => $type, 'normal_balance' => $normal, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+                    [$name, $type, $normal, $isContra] = $required[$code];
+                    $row = ['account_code' => $code, 'account_name' => $name, 'account_type' => $type, 'normal_balance' => $normal, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()];
+                    if ($hasContra) {
+                        $row['is_contra'] = $isContra;
+                    }
+                    if ($hasBank) {
+                        $row['is_bank_account'] = $code === '1102';
+                    }
+                    DB::table('chart_of_accounts')->insert($row);
                 }
                 foreach ($ids as $id) {
                     DB::table('v2_user_roles')->insertOrIgnore(['user_id' => $id, 'role' => $id === $admin ? 'admin' : 'cashier', 'created_at' => now(), 'updated_at' => now()]);

@@ -8,6 +8,7 @@ use App\Services\V2\BankAccounts;
 use Brick\Math\BigDecimal;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
@@ -26,6 +27,8 @@ class ExpenseController extends Controller
                     $fail('Filter sumber dana tidak valid.');
                 }
             }],
+            'per_page' => ['nullable', 'integer', 'in:10,25,50'],
+            'page' => ['nullable', 'integer', 'min:1', 'max:1000000'],
         ]);
         $expenseQuery = DB::table('expenses');
         if (! empty($filters['start_date'])) {
@@ -54,11 +57,18 @@ class ExpenseController extends Controller
                 $expenseQuery->where('payment_method', $methodFilter);
             }
         }
-        $expenses = $expenseQuery->latest()->limit(10)->get();
+        $perPage = (int) ($filters['per_page'] ?? 10);
+        $expenses = $expenseQuery
+            ->orderByDesc('expense_date')
+            ->orderByDesc('id')
+            ->paginate($perPage)
+            ->setPath(route('expenses.index'))
+            ->appends(Arr::except($request->query(), ['partial', 'page']));
         $expenseCategories = DB::table('expenses')->distinct()->orderBy('category')->pluck('category');
 
         $expenseAccounts = DB::table('chart_of_accounts')
             ->where('account_type', 'expense')
+            ->where('normal_balance', 'debit')
             ->where('is_active', true)
             ->whereNotIn('account_code', ['5101', '5201', '6201'])
             ->orderBy('account_code')

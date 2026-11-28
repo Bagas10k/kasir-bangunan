@@ -10,10 +10,57 @@ function feedback(message){
     if(box){box.textContent=message;box.hidden=false;box.focus?.({preventScroll:true});}
 }
 
+function nextTransferKey(){
+    if(typeof window.v2Uuid==='function')return window.v2Uuid();
+    if(typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function')return crypto.randomUUID();
+    if(typeof crypto!=='undefined'&&typeof crypto.getRandomValues==='function'){
+        const b=new Uint8Array(16);crypto.getRandomValues(b);
+        b[6]=(b[6]&15)|64;b[8]=(b[8]&63)|128;
+        const h=Array.from(b,v=>v.toString(16).padStart(2,'0')).join('');
+        return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+    }
+    return 'trf-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12);
+}
+
+function ensureTransferKey(form,rotate=false){
+    const field=form.elements?.namedItem?.('idempotency_key');
+    if(!field)return;
+    if(rotate||!field.value)field.value=nextTransferKey();
+}
+
+function transferDupBox(form){
+    const node=form.querySelector?.('[data-transfer-duplicate]');
+    return node?.hasAttribute?.('data-transfer-duplicate')?node:null;
+}
+
+function clearTransferDuplicate(form){
+    delete form.dataset.confirmDuplicate;
+    const confirmField=form.elements?.namedItem?.('confirm_duplicate');
+    if(confirmField)confirmField.value='0';
+    const dupBox=transferDupBox(form);
+    if(dupBox)dupBox.hidden=true;
+}
+
 function bind(node,openFromHash=false){
     for(const id of ['#adjustment-form','#transfer-form']){
         const form=node.querySelector(id);
         if(!form)continue;
+        ensureTransferKey(form,false);
+        const onEdit=event=>{
+            if(event?.target?.name==='password'||event?.target?.type==='password')return;
+            clearTransferDuplicate(form);
+            ensureTransferKey(form,true);
+        };
+        form.addEventListener?.('input',onEdit);
+        form.addEventListener?.('change',onEdit);
+        const rawDupBtn=form.querySelector?.('[data-transfer-confirm-duplicate]');
+        const dupBtn=rawDupBtn?.hasAttribute?.('data-transfer-confirm-duplicate')?rawDupBtn:null;
+        dupBtn?.addEventListener?.('click',()=>{
+            form.dataset.confirmDuplicate='1';
+            const confirmField=form.elements?.namedItem?.('confirm_duplicate');
+            if(confirmField)confirmField.value='1';
+            return save(form);
+        });
         form.addEventListener('submit',event=>{
             event.preventDefault();
             return save(form);
@@ -62,34 +109,48 @@ async function refresh(message){
 async function save(form){
     if(form.dataset.busy||!form.reportValidity())return;
     const error=form.querySelector('[data-adjustment-error]');
+    const dupBox=transferDupBox(form);
     const password=form.elements.namedItem('password');
+    const confirmField=form.elements?.namedItem?.('confirm_duplicate');
     const buttons=Array.from(form.querySelectorAll('button[type=submit]'));
     form.dataset.busy='1';
     form.setAttribute('aria-busy','true');
     for(const button of buttons)button.disabled=true;
     if(error)error.hidden=true;
+    if(dupBox)dupBox.hidden=true;
     window.v2FormFeedback?.clear(form);
 
     try{
+        ensureTransferKey(form,false);
+        if(confirmField)confirmField.value=form.dataset.confirmDuplicate==='1'?'1':'0';
         const meta=document.querySelector('meta[name=csrf-token]');
         const token=meta?.content||form.elements.namedItem('_token')?.value||'';
+        const payload=new FormData(form);
+        const keyField=form.elements?.namedItem?.('idempotency_key');
+        if(keyField?.value&&typeof payload.set==='function')payload.set('idempotency_key',keyField.value);
+        if(typeof payload.set==='function'&&confirmField)payload.set('confirm_duplicate',confirmField.value);
         const response=await fetch(form.action,{
-            method:'POST',body:new FormData(form),credentials:'same-origin',
+            method:'POST',body:payload,credentials:'same-origin',
             headers:{Accept:'application/json','X-CSRF-TOKEN':token}
         });
         const data=await response.json().catch(()=>({}));
         if(!response.ok||response.redirected){
+            const isDup=response.status===422&&Boolean(data.errors?.duplicate_transfer?.length);
             const fields=Object.values(data.errors||{}).flat().join(' ');
             const message=response.status>=500?'Server belum dapat menyimpan penyesuaian. Coba lagi nanti.':
                 fields||(response.status===419?'Sesi formulir kedaluwarsa. Muat ulang halaman lalu coba lagi.':
                 (response.status===401||response.status===403||response.redirected?'Sesi atau izin tidak aktif. Masuk kembali sebagai admin.':'Penyesuaian belum dapat disimpan. Periksa isian.'));
             if(error){error.textContent=message;error.hidden=false;}
+            if(isDup&&dupBox){dupBox.hidden=false;}
+            else{clearTransferDuplicate(form);}
             window.v2FormFeedback?.errors(form,data.errors||{});
             if(password)password.value='';
             (error||form).focus?.();
             return;
         }
 
+        clearTransferDuplicate(form);
+        ensureTransferKey(form,true);
         document.dispatchEvent(new CustomEvent('ui-remote:changed',{detail:{url:root.dataset.refreshUrl}}));
         if(document.querySelector(selector)!==root)return;
         if(password)password.value='';

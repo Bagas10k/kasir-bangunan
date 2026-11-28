@@ -5,12 +5,12 @@ const navigation=document.querySelector('.nav');
 const links=Array.from(navigation?.querySelectorAll('[data-task]')||[]);
 const host=document.querySelector('#task-panels');
 if(!host||!links.length)return;
-const groups={kasir:['#kasir','#h-sales'],tagihan:['#tagihan','#h-verify','#reject-heading'],pengiriman:['#delivery-start','#pengiriman','#trip-heading','#uang-muka-sopir','#h-deliveries'],'master-product':['#master-section-product'],'master-customer':['#master-section-customer'],'master-supplier':['#master-section-supplier'],'master-employee':['#master-section-staff','#master-section-employee','#master-section-driver'],'master-vehicle':['#master-section-vehicle'],penerimaan:['#receipt-heading','#receipt-drafts','#receipt-history'],shift:['#h-shift','#review-heading','#opening-heading'],laporan:['#laporan']};
-const text={kasir:['Kasir','Pilih barang di katalog, lalu lanjutkan pembayaran.'],tagihan:['Tagihan & pembayaran','Piutang pelanggan, utang supplier, dan pemeriksaan pembayaran.'],pengiriman:['Pengiriman & sopir','Surat jalan, status pengiriman, dan biaya perjalanan.'],'master-product':['Produk','Katalog barang: satuan, kategori, harga jual, stok minimum, dan supplier.'],'master-customer':['Pelanggan','Opsional saat penjualan; kasir boleh mengetik nama pembeli langsung.'],'master-supplier':['Supplier','Pemasok barang. Tekan nama supplier untuk melihat produk dan riwayat transaksinya.'],'master-employee':['Karyawan & sopir','Satu daftar staf toko; kolom posisi menandai siapa yang bertugas sebagai sopir.'],'master-vehicle':['Mobil','Armada pengiriman. Tekan nomor polisi untuk melihat riwayat pemakaian dan sopirnya.'],penerimaan:['Penerimaan barang','Catat barang masuk dan tagihan supplier melalui formulir penerimaan.'],shift:['Kas harian','Satu catatan laci per tanggal, uang fisik, dan pemeriksaan selisih.'],laporan:['Laporan harian','Tunai, transfer terverifikasi, dan transfer menunggu dipisahkan.']};
+const groups={kasir:['#kasir','#h-sales'],tagihan:['#tagihan','#h-verify','#reject-heading'],pengiriman:['#delivery-start','#pengiriman','#trip-heading','#uang-muka-sopir','#h-deliveries'],'master-product':['#master-section-product'],'master-customer':['#master-section-customer'],'master-supplier':['#master-section-supplier'],'master-employee':['#master-section-staff','#master-section-employee','#master-section-driver'],'master-vehicle':['#master-section-vehicle'],penerimaan:['#receipt-heading','#receipt-drafts','#receipt-history','#purchase-returns-history'],'stok-opname':['#stock-opname-history'],shift:['#h-shift','#review-heading','#opening-heading'],laporan:['#laporan']};
+const text={kasir:['Kasir','Pilih barang di katalog, lalu lanjutkan pembayaran.'],tagihan:['Tagihan & pembayaran','Piutang pelanggan, utang supplier, dan pemeriksaan pembayaran.'],pengiriman:['Pengiriman & sopir','Surat jalan, status pengiriman, dan biaya perjalanan.'],'master-product':['Produk','Katalog barang: satuan, kategori, harga jual, stok minimum, dan supplier.'],'master-customer':['Pelanggan','Opsional saat penjualan; kasir boleh mengetik nama pembeli langsung.'],'master-supplier':['Supplier','Pemasok barang. Tekan nama supplier untuk melihat produk dan riwayat transaksinya.'],'master-employee':['Karyawan & sopir','Satu daftar staf toko; kolom posisi menandai siapa yang bertugas sebagai sopir.'],'master-vehicle':['Mobil','Armada pengiriman. Tekan nomor polisi untuk melihat riwayat pemakaian dan sopirnya.'],penerimaan:['Penerimaan barang','Catat barang masuk, tagihan supplier, dan retur pembelian.'],'stok-opname':['Stok opname','Cocokkan stok fisik gudang dengan stok sistem secara berkala.'],shift:['Kas harian','Satu catatan laci per tanggal, uang fisik, dan pemeriksaan selisih.'],laporan:['Laporan harian','Tunai, transfer terverifikasi, dan transfer menunggu dipisahkan.']};
 groups.akun=['#login-accounts'];text.akun=['Akun Login','Kelola akun Admin dan Kasir; terpisah dari master karyawan.'];
 const panels=new Map();
 groups.kasir=['#kasir'];
-groups['riwayat-penjualan']=['#h-sales'];
+groups['riwayat-penjualan']=['#h-sales','#sale-returns-history'];
 text['riwayat-penjualan']=['Riwayat penjualan','Seluruh nota, piutang penjualan, pembayaran cicilan, dan cetak nota.'];
 groups['master-unit']=['#master-section-unit'];text['master-unit']=['Satuan','Satuan dipakai pada setiap produk; mengarsipkan tidak menghapus riwayat.'];
 groups['master-category']=['#master-section-category'];text['master-category']=['Kategori','Kelompok produk untuk mempermudah pencarian di kasir.'];
@@ -26,8 +26,9 @@ const remoteCache=new Map();        // kunci -> {url, html, at}
 const remoteFetching=new Map();     // mencegah permintaan ganda untuk alamat yang sama
 const remoteVersions=new Map();
 document.addEventListener('ui-remote:changed',event=>{
- const url=new URL(event.detail?.url||location.href,location.href);if(url.origin!==location.origin)return;
- for(const link of links){if(!link.dataset.remote||new URL(link.dataset.remote,location.href).pathname!==url.pathname)continue;
+ const clearAll=event.detail?.all===true;
+ const url=new URL(event.detail?.url||location.href,location.href);if(!clearAll&&url.origin!==location.origin)return;
+ for(const link of links){if(!link.dataset.remote||(!clearAll&&new URL(link.dataset.remote,location.href).pathname!==url.pathname))continue;
   const key=link.dataset.task;remoteVersions.set(key,(remoteVersions.get(key)||0)+1);remoteCache.delete(key);remoteFetching.delete(key);
  }
 });
@@ -192,6 +193,7 @@ function bindRemote(key,panel){
   });
  }
 }
+window.uiRemoteRebind=el=>{const panel=el?.closest?.('.task-panel');if(!panel)return;for(const [k,p]of panels)if(p===panel){bindRemote(k,panel);break;}};
 // Menu gabungan (data-tabs) memiliki beberapa panel; satu tautan sidebar menjadi pemiliknya.
 const owner=new Map(),tabsOf=new Map();
 for(const link of links){
@@ -208,7 +210,7 @@ for(const link of links){
  for(const key of keys){
   const panel=document.createElement('div');panel.id='panel-'+key;panel.className='task-panel';
   // Kelas lapis DNA (ui-dna bagian 18 dan 20): halaman Operasional dan Master.
-  if(key.startsWith('master-')||['tagihan','riwayat-penjualan','pengiriman','penerimaan','shift','laporan','persetujuan'].includes(key))panel.classList.add('ui-dna-ops');if(key.startsWith('master-'))panel.classList.add('ui-dna-master');
+  if(key.startsWith('master-')||['tagihan','riwayat-penjualan','pengiriman','penerimaan','stok-opname','shift','laporan','persetujuan'].includes(key))panel.classList.add('ui-dna-ops');if(key.startsWith('master-'))panel.classList.add('ui-dna-master');
   panel.setAttribute('role','region');panel.setAttribute('aria-labelledby',link.id);panel.tabIndex=0;
   if(tabs){
    const bar=document.createElement('div');bar.className='ui-subtabs';bar.setAttribute('role','tablist');bar.setAttribute('aria-label',link.textContent.trim());
@@ -337,6 +339,7 @@ function cellText(row,label){return Array.from(row?.cells||[]).find(c=>c.dataset
 function segmentSelect(select){
  if(!select||select.dataset.segmented)return;select.dataset.segmented='1';
  const group=document.createElement('div');group.className='ui-segment';group.setAttribute('role','radiogroup');
+ const description=select.getAttribute('aria-describedby');if(description)group.setAttribute('aria-describedby',description);
  const label=select.id?document.querySelector('label[for="'+select.id+'"]'):null;if(label){label.id=label.id||select.id+'-label';group.setAttribute('aria-labelledby',label.id);}
  const buttons=Array.from(select.options).map(o=>{const b=document.createElement('button');b.type='button';b.textContent=o.textContent;b.dataset.value=o.value;b.setAttribute('role','radio');b.addEventListener('click',()=>{select.value=o.value;select.dispatchEvent(new Event('change',{bubbles:true}));sync();});group.append(b);return b;});
  function sync(){for(const b of buttons){const on=b.dataset.value===select.value;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;}}
@@ -356,7 +359,9 @@ function enhanceCollect(form,result){
   // Nominal tidak diisi otomatis; tombol cepat mengisi sisa tagihan dengan satu klik.
    if(balance&&/^\d+(\.\d{1,2})?$/.test(balance)&&!form.querySelector('.popup-fill')){const fill=document.createElement('button');fill.type='button';fill.className='secondary popup-fill';fill.textContent='Lunasi '+rest;fill.addEventListener('click',()=>{amount.value=balance;amount.dispatchEvent(new Event('input',{bubbles:true}));amount.focus();});amount.closest('.field')?.append(fill);}}
  const ref=form.querySelector('input[name=reference]');if(ref&&!ref.placeholder)ref.placeholder='No. transfer / catatan';
- segmentSelect(form.querySelector('select[name=method]'));
+ const method=form.querySelector('select[name=method]'),sourceHint=form.querySelector('[data-collect-source-hint]');
+ if(method&&sourceHint)method.addEventListener('change',()=>{sourceHint.textContent=method.selectedOptions[0]?.dataset.sourceHint||'';});
+ segmentSelect(method);
  const hint=document.createElement('p');hint.className='note popup-hint';hint.textContent=form.dataset.hint||'Pilih sumber dana pembayaran.';form.querySelector('.popup-submit')?.before(hint);
 }
 // Form isian di halaman menjadi popup. Dipasang saat muat dan pada baris/daftar baru dari uiLive (form di dalam dialog dilewati).
@@ -381,6 +386,7 @@ function invoiceDetails(root){
 popupForms(document);invoiceDetails(document);
 window.uiLive?.onPatch(popupForms);
 document.addEventListener('ui-invoices:render',event=>{tuckKeys(event.detail.root);labelRows(event.detail.root);popupForms(event.detail.root);invoiceDetails(event.detail.root);});
+document.addEventListener('ui-server-table:render',event=>{tuckKeys(event.detail.root);labelRows(event.detail.root);popupForms(event.detail.root);invoiceDetails(event.detail.root);});
 // List filter remains a GET, not a mutation; labels keep their stored enum values.
 const kinds={customer:'Pelanggan',supplier:'Supplier',employee:'Karyawan / staf',product:'Produk',vehicle:'Kendaraan'};
 for(const option of document.querySelectorAll('select[name=master_kind] option'))option.textContent=kinds[option.value]||option.textContent;

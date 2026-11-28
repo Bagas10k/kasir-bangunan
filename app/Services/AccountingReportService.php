@@ -7,6 +7,7 @@ use Brick\Math\BigDecimal;
 use DateTime;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class AccountingReportService
 {
@@ -415,8 +416,33 @@ class AccountingReportService
                 ->get()
                 ->groupBy('entry_id');
 
+            $v2PaymentMeta = [];
+            $v2PaymentIds = $entries
+                ->map(fn ($lines) => $lines->first())
+                ->filter(fn ($head) => $head && $head->reference_type === 'v2_payment' && $head->reference_id)
+                ->pluck('reference_id')
+                ->unique()
+                ->values()
+                ->all();
+            if ($v2PaymentIds !== [] && Schema::hasTable('v2_payments')) {
+                $v2PaymentMeta = DB::table('v2_payments as p')
+                    ->leftJoin('v2_invoices as i', 'i.id', '=', 'p.invoice_id')
+                    ->leftJoin('v2_sales as s', 's.id', '=', 'i.sale_id')
+                    ->whereIn('p.id', $v2PaymentIds)
+                    ->get([
+                        'p.id',
+                        'p.idempotency_key',
+                        'i.direction as invoice_direction',
+                        's.payment_method as sale_payment_method',
+                    ])
+                    ->keyBy('id')
+                    ->all();
+            }
+
             foreach ($entries as $entryLines) {
-                $refType = (string) ($entryLines->first()->reference_type ?? '');
+                $head = $entryLines->first();
+                $refType = (string) ($head->reference_type ?? '');
+                $refId = (int) ($head->reference_id ?? 0);
                 $cashDebit = BigDecimal::zero();
                 $cashCredit = BigDecimal::zero();
                 $nonCashLines = [];
@@ -455,9 +481,23 @@ class AccountingReportService
                         $key = 'ADVANCE_REFUND';
                         $label = 'Pengembalian Sisa Uang Muka Sopir';
                         $activity = 'operating';
+                    } elseif ($refType === 'v2_purchase_return') {
+                        $key = 'PURCHASE_RETURN';
+                        $label = 'Pengembalian Dana Retur Pembelian';
+                        $activity = 'operating';
                     } elseif ($refType === 'v2_payment') {
-                        $key = 'AR_COLLECTION';
-                        $label = 'Penerimaan Pelunasan Piutang Pelanggan';
+                        $meta = $v2PaymentMeta[$refId] ?? null;
+                        $isDirectPosPayment = $meta !== null && (
+                            in_array((string) ($meta->sale_payment_method ?? ''), ['cash', 'transfer'], true)
+                            || str_ends_with((string) ($meta->idempotency_key ?? ''), ':payment')
+                        );
+                        if ($isDirectPosPayment) {
+                            $key = 'CASH_SALE';
+                            $label = 'Penerimaan dari Penjualan Tunai / Uang Muka';
+                        } else {
+                            $key = 'AR_COLLECTION';
+                            $label = 'Penerimaan Pelunasan Piutang Pelanggan';
+                        }
                         $activity = 'operating';
                     } else {
                         // Fallback inspection of non-cash counter lines
@@ -551,6 +591,10 @@ class AccountingReportService
                     } elseif ($refType === 'v2_driver_advance') {
                         $key = 'ADVANCE';
                         $label = 'Pengeluaran Uang Muka Sopir & Pengiriman';
+                        $activity = 'operating';
+                    } elseif ($refType === 'v2_sale_return') {
+                        $key = 'SALE_RETURN';
+                        $label = 'Pengembalian Dana Retur Penjualan';
                         $activity = 'operating';
                     } elseif ($refType === 'v2_payment') {
                         $key = 'AP_PAYMENT';

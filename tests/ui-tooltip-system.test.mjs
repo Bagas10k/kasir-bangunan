@@ -61,6 +61,7 @@ function createFakeElement(tag) {
             return null;
         },
         contains(other) { return other === this || children.includes(other); },
+        querySelector(selector) { return children.find((child) => child.classList?.contains(selector.slice(1))); },
         showPopover() { this._popoverOpen = true; },
         hidePopover() { this._popoverOpen = false; },
         getBoundingClientRect: () => ({ left: 120, right: 140, top: 200, bottom: 220, width: 20, height: 20 }),
@@ -68,7 +69,7 @@ function createFakeElement(tag) {
     };
 }
 
-function setupTooltipRuntime() {
+function setupTooltipRuntime(pageHelp = null) {
     const docListeners = {};
     const winListeners = {};
     const body = createFakeElement('body');
@@ -76,6 +77,7 @@ function setupTooltipRuntime() {
     const document = {
         body,
         createElement: (tag) => createFakeElement(tag),
+        getElementById: (id) => id === 'contextual-help-trigger' ? pageHelp : null,
         querySelector: () => null,
         addEventListener: (type, fn) => { docListeners[type] = fn; },
     };
@@ -152,4 +154,132 @@ test('master produk menampilkan info-tip pada form margin, header tabel, detail 
     assert.match(masterDetail, /key="margin_keuntungan"/);
     assert.match(masterItem, /data-hover-card/);
     assert.match(masterItem, /data-hc-rows/);
+});
+
+test('dynamic page help renders title, body and divided note through the shared tooltip', () => {
+    const { docListeners, document } = setupTooltipRuntime();
+    const btn = createFakeElement('button');
+    btn.className = 'ui-info-btn';
+    btn.setAttribute('data-toggletip', '');
+    btn.dataset.tipTitle = 'Kas Harian Toko';
+    btn.dataset.tip = 'Satu catatan laci bersama per tanggal.';
+    btn.dataset.tipNote = 'Penjualan hanya dapat disimpan selama kas aktif.';
+    btn.isConnected = true;
+    docListeners.click({ target: btn, preventDefault() {}, stopPropagation() {} });
+    const tip = document.body.children.find(el => el.id === 'ui-tooltip');
+    assert.deepEqual(tip.children.map(el => el.className), ['ui-tip-title', 'ui-tip-body', 'ui-tip-note']);
+    assert.equal(tip.children[0].textContent, btn.dataset.tipTitle);
+    assert.equal(tip.children[1].textContent, btn.dataset.tip);
+    assert.equal(tip.children[2].textContent, btn.dataset.tipNote);
+});
+
+test('keyboard focus opens page help without moving focus into a modal, and blur dismisses it', () => {
+    const { docListeners, document } = setupTooltipRuntime();
+    const btn = createFakeElement('button');
+    btn.className = 'ui-info-btn';
+    btn.setAttribute('data-toggletip', '');
+    btn.dataset.tip = 'Panduan halaman singkat.';
+    btn._focusVisible = true;
+    docListeners.focusin({ target: btn });
+    const tip = document.body.children.find(el => el.id === 'ui-tooltip');
+    assert.equal(tip.hidden, false);
+    assert.equal(btn._focused, undefined);
+    assert.equal(btn.getAttribute('aria-describedby'), 'ui-tooltip');
+    docListeners.focusout({ target: btn });
+    assert.equal(tip.hidden, true);
+    assert.equal(btn.getAttribute('aria-describedby'), null);
+});
+
+test('info tips use the current help article unless they specify a destination', () => {
+    const pageHelp = { dataset: { tipArticle: 'https://example.test/panduan/akun' } };
+    const { window, document } = setupTooltipRuntime(pageHelp);
+    const btn = createFakeElement('button');
+    btn.setAttribute('data-toggletip', '');
+    btn.dataset.tip = 'Keterangan singkat.';
+    window.uiTooltip.show(btn);
+    const tip = document.body.children.find(el => el.id === 'ui-tooltip');
+    assert.equal(tip.querySelector('.ui-tip-article').href, pageHelp.dataset.tipArticle);
+    window.uiTooltip.hide();
+    btn.dataset.tipArticle = 'https://example.test/panduan/master-supplier';
+    window.uiTooltip.show(btn);
+    assert.equal(tip.querySelector('.ui-tip-article').href, btn.dataset.tipArticle);
+});
+
+test('leaving before one second cancels a tooltip and its hover card', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { docListeners, document } = setupTooltipRuntime();
+    const anchor = createFakeElement('button');
+    anchor.setAttribute('data-toggletip', '');
+    anchor.setAttribute('data-hover-card', '');
+    anchor.dataset.tip = 'Keterangan singkat.';
+    anchor.dataset.hcTitle = 'Rincian relasi';
+    docListeners.pointerover({ target: anchor, pointerType: 'mouse' });
+    t.mock.timers.tick(700);
+    docListeners.pointerout({ target: anchor, relatedTarget: null, pointerType: 'mouse' });
+    t.mock.timers.tick(1000);
+    assert.equal(document.body.children.length, 0);
+});
+
+test('contextual article link reads Baca selengkapnya on focus and is focused on keyboard activation', () => {
+    const { docListeners, document } = setupTooltipRuntime();
+    const btn = createFakeElement('button');
+    btn.setAttribute('data-toggletip', '');
+    btn.dataset.tip = 'Panduan halaman singkat.';
+    btn.dataset.tipArticle = 'https://example.test/pos/v2/panduan/kasir';
+    btn._focusVisible = true;
+    btn.isConnected = true;
+    docListeners.focusin({ target: btn });
+    const tip = document.body.children.find(el => el.id === 'ui-tooltip');
+    assert.equal(tip.querySelector('.ui-tip-article').textContent, 'Baca selengkapnya');
+    assert.equal(tip.classList.contains('is-interactive'), true);
+    docListeners.click({ target: btn, detail: 0, preventDefault() {}, stopPropagation() {} });
+    const link = tip.querySelector('.ui-tip-article');
+    assert.equal(link.href, btn.dataset.tipArticle);
+    assert.equal(link.target, '_blank');
+    assert.equal(link._focused, true);
+    docListeners.keydown({ key: 'Escape' });
+    assert.equal(btn._focused, true);
+    assert.equal(btn.getAttribute('aria-describedby'), null);
+});
+
+test('mouse hover opens compact help and leaving the icon dismisses it', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { docListeners, document } = setupTooltipRuntime();
+    const btn = createFakeElement('button');
+    btn.className = 'ui-info-btn';
+    btn.setAttribute('data-toggletip', '');
+    btn.dataset.tipTitle = 'Kas Harian Toko';
+    btn.dataset.tip = 'Satu catatan laci bersama.';
+    docListeners.pointerover({ target: btn, pointerType: 'mouse' });
+    t.mock.timers.tick(999);
+    assert.equal(document.body.children.length, 0);
+    t.mock.timers.tick(1);
+    const tip = document.body.children.find(el => el.id === 'ui-tooltip');
+    assert.equal(tip.hidden, false);
+    assert.equal(tip.classList.contains('is-pinned'), false);
+    docListeners.pointerout({ target: btn, relatedTarget: null });
+    assert.equal(tip.hidden, true);
+});
+
+test('a linked help tooltip stays open while the pointer moves into it, then closes after leaving', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { docListeners, document } = setupTooltipRuntime();
+    const btn = createFakeElement('button');
+    btn.className = 'ui-info-btn';
+    btn.setAttribute('data-toggletip', '');
+    btn.dataset.tip = 'Panduan halaman singkat.';
+    btn.dataset.tipArticle = 'https://example.test/panduan/kasir';
+    docListeners.pointerover({ target: btn, pointerType: 'mouse' });
+    t.mock.timers.tick(1000);
+    const tip = document.body.children.find(el => el.id === 'ui-tooltip');
+    const link = tip.querySelector('.ui-tip-article');
+    docListeners.pointerout({ target: btn, relatedTarget: link });
+    docListeners.pointerover({ target: link, pointerType: 'mouse' });
+    t.mock.timers.tick(500);
+    assert.equal(tip.hidden, false);
+    docListeners.pointerout({ target: link, relatedTarget: null });
+    t.mock.timers.tick(249);
+    assert.equal(tip.hidden, false);
+    t.mock.timers.tick(1);
+    assert.equal(tip.hidden, true);
 });

@@ -172,3 +172,91 @@ test('server internals are not shown for auth or server failures', async () => {
         assert.equal(app.error.hidden, false);
     }
 });
+
+test('transfer form keeps idempotency_key across password re-entry and supports duplicate confirmation', async () => {
+    const error = { hidden: true, textContent: '', focus() { this.focused = true; } };
+    const dupBox = { hidden: true, hasAttribute: a => a === 'data-transfer-duplicate' };
+    const dupBtn = { listeners: {}, hasAttribute: a => a === 'data-transfer-confirm-duplicate', addEventListener(t, fn) { this.listeners[t] = fn; } };
+    const password = { name: 'password', type: 'password', value: 'password' };
+    const keyField = { name: 'idempotency_key', value: '' };
+    const confirmField = { name: 'confirm_duplicate', value: '0' };
+    const button = { disabled: false };
+    const form = {
+        id: 'transfer-form',
+        dataset: {},
+        action: 'http://example.test/v2/journals/transfers',
+        listeners: {},
+        reportValidity: () => true,
+        elements: {
+            namedItem: name => ({ password, idempotency_key: keyField, confirm_duplicate: confirmField, _token: { value: 'synthetic-csrf' } }[name] ?? null),
+        },
+        querySelector: sel => ({
+            '[data-adjustment-error]': error,
+            '[data-transfer-duplicate]': dupBox,
+            '[data-transfer-confirm-duplicate]': dupBtn,
+        }[sel] ?? null),
+        querySelectorAll: () => [button],
+        closest: () => null,
+        addEventListener(type, fn) { this.listeners[type] = fn; },
+        setAttribute() {},
+        removeAttribute() {},
+        focus() {},
+    };
+    const box = { hidden: true, textContent: '' };
+    const root = {
+        dataset: { refreshUrl: 'http://example.test/journals' },
+        box,
+        querySelector: sel => sel === '#transfer-form' ? form : (sel === '[data-journal-feedback]' ? box : null),
+        querySelectorAll: () => [],
+        closest: () => null,
+        replaceWith() {},
+    };
+    const document = {
+        querySelector: sel => sel === '[data-journal-root]' ? root : (sel === 'meta[name=csrf-token]' ? { content: 'synthetic-csrf' } : null),
+        dispatchEvent() {},
+    };
+    const posts = [];
+    let responder = async () => ({
+        ok: false, status: 422, json: async () => ({ errors: { duplicate_transfer: ['Pindah dana serupa sudah tercatat sebagai Jurnal #12.'] } }),
+    });
+    class FakeFormData {
+        constructor() { this.map = new Map(); }
+        set(k, v) { this.map.set(k, v); }
+        get(k) { return this.map.get(k); }
+    }
+    vm.runInNewContext(source, {
+        window: { enhanceSelects() {}, uiMotion: { enter() {} } },
+        document,
+        location: { href: 'http://example.test/#jurnal' },
+        URL,
+        FormData: FakeFormData,
+        DOMParser: class { parseFromString() { return { querySelector: () => root }; } },
+        CustomEvent: class { constructor(type, opts) { this.type = type; Object.assign(this, opts); } },
+        fetch: (_url, options) => {
+            if (options.method === 'POST') posts.push(options.body);
+            return responder(_url, options);
+        },
+    });
+
+    const initialKey = keyField.value;
+    assert.ok(initialKey.length >= 8);
+
+    await form.listeners.submit({ preventDefault() {} });
+    assert.equal(dupBox.hidden, false);
+    assert.equal(posts[0].get('idempotency_key'), initialKey);
+    assert.equal(posts[0].get('confirm_duplicate'), '0');
+
+    // Mengetik ulang password tidak boleh merotasi kunci atau menyembunyikan tombol konfirmasi.
+    form.listeners.input({ target: password });
+    assert.equal(keyField.value, initialKey);
+    assert.equal(dupBox.hidden, false);
+
+    // Klik konfirmasi duplikat mengirim confirm_duplicate=1 dengan kunci yang sama lalu merotasi kunci sesudah sukses.
+    responder = async (_url, options) => options.method === 'POST'
+        ? { ok: true, status: 201, json: async () => ({ message: 'Pindah dana tersimpan.' }) }
+        : { ok: true, text: async () => '' };
+    await dupBtn.listeners.click();
+    assert.equal(posts[1].get('idempotency_key'), initialKey);
+    assert.equal(posts[1].get('confirm_duplicate'), '1');
+    assert.notEqual(keyField.value, initialKey);
+});

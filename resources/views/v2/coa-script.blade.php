@@ -20,6 +20,12 @@ async function refresh(message){
     const filters=root.querySelector('form.master-toolbar');
     const draft=filters?Array.from(new FormData(filters)):[];
     root.replaceWith(next);root=next;
+    const nextPresets=doc.getElementById?.('coa-presets-wrap');
+    const curPresets=document.getElementById('coa-presets-wrap');
+    if(nextPresets&&curPresets)curPresets.replaceWith(nextPresets);
+    const nextUsed=doc.getElementById?.('coa-used-codes');
+    const curUsed=document.getElementById('coa-used-codes');
+    if(nextUsed&&curUsed)curUsed.replaceWith(nextUsed);
     for(const [name,value]of draft){
         const field=root.querySelector('form.master-toolbar')?.elements.namedItem(name);
         if(field)field.value=value;
@@ -45,15 +51,16 @@ async function save(target){
         const data=await response.json().catch(()=>({}));
         if(!response.ok||response.redirected){
             const message=response.status>=500?'Server belum dapat menyimpan akun. Coba lagi nanti.':
+                (response.status===401||response.status===419||response.redirected?'Sesi login habis. Muat ulang halaman lalu masuk kembali.':
                 Object.values(data.errors||{}).flat().join(' ')||
-                (response.status===401||response.status===403||response.redirected?'Sesi atau izin tidak aktif. Masuk kembali sebagai admin.':'Akun belum dapat disimpan. Periksa isian.');
+                (response.status===403?'Akses ditolak. Masuk kembali sebagai admin.':'Akun belum dapat disimpan. Periksa isian.'));
             if(editing){
                 error.textContent=message;error.hidden=false;
                 window.v2FormFeedback?.errors(form,data.errors||{});error.focus();
             }else feedback(message);
             return;
         }
-        document.dispatchEvent(new CustomEvent('ui-remote:changed',{detail:{url:root.dataset.refreshUrl}}));
+        document.dispatchEvent(new CustomEvent('ui-remote:changed',{detail:{url:root.dataset.refreshUrl,all:true}}));
         window.uiLive?.refresh?.();
         if(document.getElementById('coa-form')!==form)return;
         if(editing)window.closeModal('modal-coa');

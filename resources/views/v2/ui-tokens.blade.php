@@ -27,5 +27,7 @@
   --ui-number-duration:var(--ui-morph-duration);
   --ui-supplier-history-height:50dvh;
   --ui-overview-plot-height:clamp(6rem,14dvh,9rem);
+  --ui-help-reading-width:68ch;--ui-help-nav-width:16rem;--ui-help-toc-width:13rem;
+  --ui-help-page-width:88rem;--ui-help-title-size:clamp(1.75rem,3vw,2.625rem);
 }
 </style>

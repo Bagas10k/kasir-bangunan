@@ -181,6 +181,6 @@ async function saved(form,opts={}){
   }
   return refresh();
 }
-window.uiLive={refresh,saved,onPatch:fn=>{hooks.push(fn);}};
+window.uiLive={refresh,saved,runHooks,onPatch:fn=>{hooks.push(fn);}};
 })();
 </script>

@@ -1,7 +1,7 @@
 ---
 judul: Dokumentasi Sistem Kasir Bangunan (tb01)
 versi_sistem: V2 (V2_ENABLED=true)
-terakhir_diperbarui: 2026-11-24
+terakhir_diperbarui: 2026-11-28
 sumber_kebenaran: kode di repositori ini (app/Services/V2, app/Http, routes, database/migrations)
 ---
 
@@ -95,7 +95,7 @@ Pil status di kepala ringkasan memakai gaya badge tema: latar lembut, titik warn
 
 Submenu gabungan (**Supplier/Pelanggan**, **Satuan/Kategori**) mengganti panel di tempat tanpa memuat ulang data atau memutar ulang animasi masuk; isinya memakai transisi opacity/geser singkat. Perpindahan menu sidebar tetap memakai animasi dan mengembalikan gulir ke atas.
 
-**Pengeluaran** (Keuangan, admin) membuka pencatatan biaya operasional toko yang tidak berasal dari penjualan, piutang, atau laci kasir. Akun beban dipilih dari COA aktif (di luar HPP/persediaan), sumber dana Kas Tunai (1101) atau salah satu Rekening Bank aktif (bawaan 1102 dan akun aset bertanda Rekening Bank di COA). Nominal diformat Rupiah saat diketik dan dikirim sebagai angka mentah. Simpan mengirim ke endpoint V2 `/v2/expenses` (bukan rute arsip lama yang menolak penulisan), memposting jurnal seimbang beban bertambah dan Kas/Bank terpilih berkurang, lalu jurnal dikunci. Tampilan memakai tema ruang kerja: kartu ringkas, empat fakta (total, transaksi, tunai, bank), filter tanggal/akun/sumber, dan tabel transaksi; daftar terakhir menampilkan sumber dana dan status Terkunci. Halaman ini tersedia sebagai panel workspace dan tetap dapat dibuka penuh lewat URL `/expenses`.
+**Pengeluaran** (Keuangan, admin) membuka pencatatan biaya operasional toko yang tidak berasal dari penjualan, piutang, atau laci kasir. Akun beban dipilih dari COA aktif (di luar HPP/persediaan), sumber dana Kas Tunai (1101) atau salah satu Rekening Bank aktif (bawaan 1102 dan akun aset bertanda Rekening Bank di COA). Nominal diformat Rupiah saat diketik dan dikirim sebagai angka mentah. Simpan mengirim ke endpoint V2 `/v2/expenses` (bukan rute arsip lama yang menolak penulisan), memposting jurnal seimbang beban bertambah dan Kas/Bank terpilih berkurang, lalu jurnal dikunci. Tampilan memakai tema ruang kerja: kartu ringkas, empat fakta (total, transaksi, tunai, bank), filter tanggal/akun/sumber/jumlah baris (`10/25/50`), pagination server penuh (`partials.pagination`), dan tabel transaksi; daftar menampilkan sumber dana dan status Terkunci. Halaman ini tersedia sebagai panel workspace dan tetap dapat dibuka penuh lewat URL `/expenses`.
 
 Untuk kasir, menu "Kas & laporan" bernama "Shift & laporan saya" dan hanya berisi data miliknya sendiri.
 
@@ -111,15 +111,41 @@ Kontrol dipindahkan apa adanya, bukan disalin: listener, nilai form, kunci idemp
 
 Tooltip tunggal dipakai di ruang kerja V2, halaman laporan lama, dan halaman login. Sumber teks: `data-tip`, `title` lama (dibaca sekali saat hover/fokus lalu dikembalikan), atau teks terpotong (`data-tip-truncate`, hanya bila benar-benar terpotong). Muncul saat hover dengan jeda singkat dan saat fokus keyboard; Escape, blur, klik luar, gulir, atau ubah ukuran menutupnya. Posisi dijaga di dalam layar dan dibalik bila ruang tidak cukup. `aria-describedby` dipasang sementara. Navigasi/rail, kalender, dan `[data-tip-skip]` dikecualikan. Pada layar sentuh tooltip tidak menutupi tombol beraksi; teks terpotong tetap bisa dibaca lewat tip. Cetak menyembunyikan tooltip. Peringatan penting (checkout, pembayaran, arsip) tetap berupa teks, bukan tooltip.
 
-### 1.5 Pil aksi cepat mobile
+### 1.5 Kapsul navigasi cepat mobile dan morfosis bar keranjang
 
-Pada layar ≤900px tersedia pil aksi cepat di tengah bawah, maksimal tiga tombol tanpa menu tambahan. Lebarnya maksimal 400 px, dan menyusut pada ponsel agar tetap berjarak dari tepi layar. Tampilannya berupa pil hijau gelap berisi ikon saja; aksi aktif/utama berada di lingkaran lime dengan ikon hijau gelap, sedangkan label lengkap tetap tersedia untuk pembaca layar.
-- **Admin**: Buat orderan (Kasir + fokus pencarian katalog), Barang masuk (Penerimaan + dialog Catat penerimaan), Pengeluaran (halaman pengeluaran + modal Catat pengeluaran).
-- **Kasir**: Kasir (fokus katalog), Riwayat (Riwayat penjualan), Status bayar (Status pembayaran).
+Pada layar ≤900px tersedia kapsul navigasi cepat di tengah bawah (`.mqa-dock` / `.mqa`) dengan gradasi opasitas halus pada latar bawah. Kapsul berisi 4 tujuan halaman per peran: tombol nonaktif berbentuk lingkaran gelap berikon saja (`48×48px`), sedangkan halaman aktif melebar menjadi kapsul limau berisi ikon + label yang meluncur mulus saat berpindah halaman. Klik tombol hanya berpindah halaman (`location.hash`) tanpa membuka modal form otomatis.
+- **Admin**: Ringkasan (`#ringkasan`), Masuk (`#penerimaan`), Biaya (`#pengeluaran`), Kasir (`#kasir`).
+- **Kasir**: Riwayat (`#riwayat-penjualan`), Tagihan (`#tagihan`), Bayar (`#persetujuan`), Kasir (`#kasir`).
 
-Pil tidak tampil di halaman Kasir karena bar keranjang sudah menjadi aksi utama. Setiap aksi satu ketukan dan memakai kontrol/form yang sudah ada; tidak ada alur baru. Penanda aktif bergeser dan berubah bentuk secara halus, atau berpindah langsung jika *reduced motion* aktif. Pil punya area sendiri di bawah konten: konten bergulir di atasnya, bukan di belakangnya. Pil disembunyikan saat dialog/modal terbuka, lembar keranjang, drawer sidebar, kolom isian fokus, atau mencetak. Desktop di atas 900 px tidak menampilkan pil.
+Di halaman Kasir (`#kasir`), kapsul tetap tampil saat keranjang kosong agar animasi geser 4 tab tidak terputus. Kapsul navigasi (`.mqa`) dan bar keranjang mobile (`.pm-bar`) berbagi satu cangkang pil solid bersama (`.mqa-shell`) di atas satu lapis gradasi bawah (`.mqa-scrim`) dengan gulir halaman utama tunggal (tanpa gulir bersarang). Begitu keranjang berisi barang (`pm-has-cart`), cangkang pil melebar mulus dari lebar kapsul (`306px`) menjadi bar keranjang (`356px`) tanpa memudar/berkedip sambil isi di dalamnya bergeser halus menjadi tombol bulat 4-kotak kiri (`.pm-nav-toggle`), ringkasan jumlah/total, dan tombol limau kanan `Lihat keranjang` (`132px`). Saat pindah dari menu lain ke Kasir ketika keranjang sudah terisi, pil limau mendarat dulu di `Kasir` (`mqa-landing`) lalu cangkang melebar menjadi bar keranjang. Mengetuk `.pm-nav-toggle` membuka kapsul kembali sementara (`mqa-peek`) dengan lencana jumlah item pada tombol Kasir; mengetuk `Kasir` lagi, menekan `Escape`, atau mengubah isi keranjang akan menyempitkan/mengembalikan bar keranjang secara halus. Penanda aktif dan transisi cangkang langsung berpindah tanpa animasi bila *reduced motion* aktif. Kapsul dan cangkangnya disembunyikan saat dialog/modal terbuka, lembar keranjang terbuka, drawer sidebar terbuka, kolom isian fokus, mencetak, atau desktop di atas 900 px.
 
 ---
+
+### 1.6 Bantuan kontekstual
+
+Ikon informasi kecil berada di sisi atas judul halaman untuk setiap menu aktif, termasuk Supplier/Pelanggan, Satuan/Kategori, dan keenam menu Keuangan. Halaman Keuangan yang dibuka penuh juga membaca konteks dari nama rutenya; bantuan tidak bergantung pada hash URL saja.
+
+Hover atau fokus keyboard menampilkan kartu tooltip ringkas: judul lime, penjelasan singkat, dan catatan penting di bawah garis tipis pada latar hijau tua. Tidak ada dialog modal, daftar langkah panjang, atau tombol Bantuan berlabel. Isinya mengikuti menu, bukan panduan umum yang sama untuk semua halaman. Pada Status pembayaran, kasir mendapat petunjuk memantau pengajuan sendiri, bukan instruksi menyetujui pembayaran. Membuka/menutup bantuan tidak mengirim permintaan data, tidak mengubah transaksi, dan tidak mengosongkan keranjang atau isian.
+
+Klik/ketuk ikon mengunci kartu terbuka dan menampilkan **Baca panduan lengkap (tab baru)**. Aktivasi lewat keyboard memfokuskan tautan; Escape menutup dan mengembalikan fokus ke ikon. Klik ulang, klik luar, atau pindah menu menutup kartu. Ikon memakai komponen informasi bersama, termasuk area sentuh tambahan di ponsel dan nama aksesibel sesuai fitur. Konteks yang tidak dikenal, JavaScript yang tidak aktif, atau tooltip yang tidak tersedia tidak menampilkan tombol mati. Halaman arsip lama di luar konteks operasional/Keuangan tidak diberi panduan V2 yang berpotensi menyesatkan.
+
+Isi dan pemetaan konteks berada di `resources/views/partials/contextual-help.blade.php`, dipasang melalui `partials/workspace-header.blade.php`. Render dan interaksi memakai `components/ui/info-tip.blade.php` + `v2/ui-tooltip.blade.php` yang sudah ada; catatan dinamis dibaca dari `data-tip-note`. Perubahan alur fitur wajib diikuti penyesuaian topik bantuan terkait dan uji `tests/contextual-help.test.mjs`.
+
+### 1.7 Pusat Bantuan POS
+
+- Buka **Pusat Bantuan** tepat di atas **Keluar** di sidebar. Ikon info di POS menyediakan **Baca selengkapnya** menuju panduan terkait atau beranda bantuan. Arahkan kursor selama satu detik, fokuskan dengan keyboard, atau klik/ketuk ikon untuk membuka petunjuk. Tautan panduan membuka tab baru agar kerja di tab POS tetap utuh. Dari artikel, **Buka fitur (tab baru)** menuju panel yang sesuai tanpa mengubah data.
+- Pusat Bantuan memakai alamat `/panduan` dan tidak menampilkan label versi. Tautan lama `/v2/panduan` dialihkan ke alamat baru, termasuk tujuan artikel dan kata pencarian yang sudah dibagikan.
+- Panduan mencakup 41 artikel pada **Mulai di sini, Operasional, Stok & pembelian, Master data, dan Keuangan**. Beranda menampilkan daftar dan jumlah artikel berdasarkan peran, bukan jumlah seluruh katalog untuk semua pengguna. Artikel menjelaskan fungsi menu, langkah, kejadian yang membingungkan, dan langkah berikutnya dengan bahasa pengguna. Panduan khusus tersedia untuk transaksi tertahan, harga kontraktor, transfer ditolak, pembayaran dan sumber dana supplier, perubahan draf penerimaan, impor Excel, aktivasi data arsip, dan koreksi saldo Kas/Bank.
+- Pencarian membaca judul, ringkasan, langkah, pertanyaan, dan jawaban. Pencarian mengenali istilah *shift* sebagai *kas harian*. Artikel mempunyai URL sendiri, subjudul `#langkah`/`#kendala`, panduan terkait, serta tampilan baca/cetak. Untuk PDF gunakan cetak bawaan browser.
+- Artikel dalam satu modul tersedia pada halaman baca yang sama. Artikel yang dibuka langsung berada di urutan pertama pada isi halaman dan daftar modul. Pilihan di daftar modul atau panduan terkait menggulir ke artikel tujuan tanpa muat ulang dan memperbarui tautan fragmen. Saat pengguna menggulir manual, daftar modul menandai artikel yang sedang dibaca dan menjaga pilihannya terlihat tanpa mengubah URL. Memilih modul lain membuka halaman baru. URL langsung ke setiap artikel tetap berlaku; cetak mengikuti artikel aktif.
+- Teks panduan memakai penanda (`App\Support\HelpText`): sebutan menu yang punya panduan sendiri menjadi **tag tautan** (sekali per paragraf; satu modul cukup digulir; tidak ditampilkan sebagai tautan bila peran tidak boleh membuka panduannya), kalimat penting berlatar kuning lembut (`!!…!!` di konfigurasi), istilah dicetak miring, dan bagian opsional diredupkan (`((…))`). Daftar tag dan istilah ada di `help-center.markup`; pencarian membaca teks tanpa penanda.
+- Seluruh 41 artikel memiliki ilustrasi di bagian **Langkah singkat**. Label yang dibahas disorot, sedangkan kontrol lain disederhanakan menjadi skeleton statis. Ilustrasi bukan tangkapan layar toko, tidak memuat data transaksi, dan tidak bisa diklik. Keterangan teks menjelaskan letak kontrol; **Buka fitur** tetap menuju layar aslinya.
+- Interaksi baca: saran judul muncul saat mengetik di kolom cari (pintasan `/` atau Ctrl/Cmd+K; Enter tetap mencari seluruh isi). Jawaban **Jika bingung** dapat dibuka-tutup, dan setiap artikel punya tombol **Cetak** (hanya artikel itu, semua jawaban ikut tercetak). Pada halaman artikel dan hasil pencarian, kolom cari berada di bagian atas kartu menu samping; di beranda tetap di blok pembuka. Saran pencarian memakai daftar artikel yang sudah dibatasi sesuai peran.
+- Pada layar lebar (mulai 1280 px) kolom kanan **Di halaman ini** menampilkan bagian artikel yang sedang dibaca dan menandai bagian aktif sesuai posisi gulir. Tidak ada deretan tombol daftar isi di dalam artikel.
+- Pencarian mencocokkan **per kata**, bukan kalimat utuh: artikel tampil bila minimal satu kata cocok, diurutkan dari yang paling banyak kata cocok (judul paling berbobot). Kata tanya umum diabaikan, imbuhan dibuang (membayar → bayar, pembayaran → bayar), dan sinonim disamakan (bayar/lunas/cicil, nota/struk, kas/laci, utang/hutang, dll., di `help-center.search`). Saran saat mengetik memakai pencarian server yang sama (respons JSON, maks. 6, sesuai peran).
+- Setiap artikel memiliki bagian **Penjelasan** (1–2 paragraf, `help-center.details`) yang menerangkan cara kerja fitur dan akibatnya pada stok, uang, tagihan, atau pembukuan dengan bahasa pengguna. Penjelasan ikut dicari oleh pencarian panduan dan tercantum di daftar isi artikel.
+- Hanya akun POS aktif yang dapat membuka panduan. Server membatasi artikel, daftar modul, pencarian, dan tautan terkait sesuai peran; membuka URL artikel khusus admin melalui akun kasir menghasilkan 404. Panduan tidak memberi akses tambahan ke fitur POS.
+- Isi panduan disimpan di `config/help-center.php`. Saat alur fitur berubah, tinjau artikel yang terkait dan perbarui tanggal peninjauan.
 
 ## 2. Istilah penting
 
@@ -317,17 +343,17 @@ Tombol Filter berada di kanan kolom pencarian dalam kepala katalog; popover kate
 
 Jumlah di tengah tombol−/+ pada katalog dapat diketik langsung, termasuk pecahan dengan koma/titik hingga4desimal. Nilai positif diteruskan ke input keranjang existing dan mengikuti validasi stok/perhitungan yang sama. Nilai kosong,0, negatif, teks atau terlalu banyak desimal tidak diterapkan; blur/Enter mengembalikan nilai sah terakhir. Angka0 tidak menghapus barang diam-diam; penghapusan tetap lewat kontrol yang tersedia.
 
-1. Cari barang di katalog (nama atau SKU, minimal 2 huruf; tekan `/` untuk langsung ke kolom cari), lalu tekan **+ Pilih**. Barang yang sama ditekan lagi menambah jumlahnya.
+1. Cari barang di katalog (nama atau SKU, minimal 2 huruf; tekan `/` untuk langsung ke kolom cari; menekan `Enter` memprioritaskan kecocokan SKU persis), lalu tekan **+ Pilih**. Barang yang sama ditekan lagi menambah jumlahnya. Tombol **Segarkan stok** dan sinkronisasi otomatis lewat `GET /v2/pos/catalog` (`private, no-store`, tanpa membocorkan HPP) menjaga stok & harga katalog tetap segar tanpa `F5`.
 2. Atur jumlah dengan tombol − dan +, atau ketik langsung (boleh desimal sampai 4 angka, misalnya 2,5 m³).
-3. (Opsional) Diskon per barang: nominal (Rp) atau persen.
-4. Isi nama pembeli. Kosongkan untuk **pelanggan umum**. Mengetik nama memunculkan saran pelanggan terdaftar; nama baru bisa langsung disimpan sebagai pelanggan baru (kode `CUS-0001` dan seterusnya).
-5. Pilih harga **Eceran** atau **Kontraktor** (bagian 7.2).
-6. Tekan **Checkout & Pembayaran**, lalu pilih metode Tunai, Transfer, atau Kredit dan isi nominal.
-7. (Opsional) Buka "Diskon nota & pengiriman": diskon nota, cara penyerahan (diambil atau dikirim), tujuan kirim, ongkir.
-8. **Tinjau Pembayaran**, lalu **Konfirmasi & Simpan Transaksi**.
-9. Setelah tersimpan, muncul popup **Penjualan berhasil** berisi nomor nota, total, kembalian, status, dan tombol Cetak nota (serta Surat jalan bila dikirim). Menutup popup langsung menyiapkan transaksi berikutnya tanpa memuat ulang halaman: keranjang kosong, stok di katalog sudah berkurang, ringkasan penjualan diperbarui.
+3. (Opsional) Diskon per barang: nominal (Rp) atau persen. Bila pemilik mengaktifkan batas margin kasir lewat `config/v2.php` (`V2_CASHIER_MAX_DISCOUNT_PERCENT` / `V2_BLOCK_CASHIER_BELOW_COST`), server menolak transaksi peran `cashier` yang melampaui batas diskon atau di bawah HPP tanpa membocorkan angka HPP; peran `admin` tetap diizinkan.
+4. Isi nama pembeli. Kosongkan untuk **pelanggan umum** (hanya untuk tunai; transfer & kredit wajib pelanggan terdaftar). Mengetik nama memunculkan saran pelanggan terdaftar beserta ringkasan piutang terbuka/lewat tempo (`CustomerLookup::search`); nama baru bisa langsung disimpan sebagai pelanggan baru (kode `CUS-0001` dan seterusnya).
+5. Pilih harga **Eceran** atau **Kontraktor** (bagian 7.2). Bila pembeli menunda transaksi, gunakan tombol **Tahan transaksi** (maks. 10 draf sementara di peramban, tidak memotong stok) dan panggil kembali lewat tombol **Tertahan (N)**.
+6. Tekan **Checkout & Pembayaran**, lalu pilih metode Tunai, Transfer, atau Kredit dan isi nominal. Foto bukti transfer divalidasi cepat sebelum masuk modal Tinjau.
+7. (Opsional) Buka "Diskon nota, catatan & pengiriman": diskon nota, catatan nota/instruksi kirim (`v2_sales.notes`, maks. 500 karakter), cara penyerahan (diambil atau dikirim), tujuan kirim, ongkir.
+8. **Tinjau Pembayaran** (menampilkan rincian subtotal barang, total diskon, ongkir, catatan, dan pembayaran), lalu **Konfirmasi & Simpan Transaksi**.
+9. Setelah tersimpan, muncul popup **Penjualan berhasil** berisi nomor nota, total, kembalian, status, catatan menunggu verifikasi untuk transfer maupun DP transfer, dan tombol Cetak nota (serta Surat jalan bila dikirim) yang terbuka di tab baru. Menutup popup langsung menyiapkan transaksi berikutnya tanpa memuat ulang halaman: keranjang kosong, stok di katalog disinkronkan, ringkasan penjualan diperbarui.
 
-Isi keranjang disimpan di browser, jadi tidak hilang bila halaman tertutup sebelum disimpan.
+Konteks keranjang (barang, pelanggan terpilih, jenis harga, diskon nota, dan catatan) disimpan di browser, jadi tidak hilang bila halaman tertutup sebelum disimpan.
 
 Di HP dan tablet tegak, keranjang tampil sebagai bar di bawah layar yang membuka lembar atau laci; aturan dan perhitungannya sama.
 
@@ -422,7 +448,7 @@ Setiap nota punya kunci unik dari browser. Bila tombol simpan tertekan dua kali 
 
 ### 7.8 Cetak nota dan surat jalan
 
-`/v2/documents/{id}/receipt` (nota) dan `/v2/documents/{id}/delivery` (surat jalan). Hanya membaca data. Admin dan kasir aktif dapat membuka dokumen transaksi bersama di POS, termasuk transaksi petugas lain dan shift historis. Ini tidak memberi kasir izin mengirim/menyelesaikan surat jalan petugas lain, menyetujui pembayaran, atau mengubah transaksi. Akun tanpa peran atau nonaktif ditolak.
+`/v2/documents/{id}/receipt` (nota) dan `/v2/documents/{id}/delivery` (surat jalan). Hanya membaca data (`private, no-store`). Admin dan kasir aktif dapat membuka dokumen transaksi bersama di POS, termasuk transaksi petugas lain dan shift historis. Ini tidak memberi kasir izin mengirim/menyelesaikan surat jalan petugas lain, menyetujui pembayaran, atau mengubah transaksi. Akun tanpa peran atau nonaktif ditolak. Tampilan cetak memuat kop identitas toko dari `config/v2.php` (`V2_STORE_NAME`, `V2_STORE_ADDRESS`, `V2_STORE_PHONE`, `V2_STORE_FOOTER`), nama kasir, tanggal kas harian, jenis harga kontraktor (bila berlaku), jatuh tempo kredit, catatan nota (`v2_sales.notes`), jumlah barang beserta satuan rapi, blok tanda tangan pada Surat Jalan (tanpa harga), serta pemilih ukuran kertas cetak **A4 / Struk 80mm**. HPP tidak pernah ditampilkan.
 
 ### 7.9 Ringkasan penjualan di atas katalog
 
@@ -458,7 +484,7 @@ Scrollbar keranjang dan katalog mengikuti warna tema. Pada HP, nama produk memak
 - **Ringkasan Admin** ditata padat agar informasi utama muat satu layar desktop: tindak lanjut, empat KPI, chart, terlaris dan status operasional tetap tersedia. Laptop pendek menampilkan Uang/Pengiriman/Stok sebagai ringkasan bernilai/status yang dapat dibuka lewat **Rincian**; membuka rincian boleh menambah gulir, tidak membuang informasi. Desktop tinggi membuka rincian langsung; ponsel tetap memakai gulir vertikal, bukan pemotongan isi. Perhitungan/periode/hak akses tidak berubah.
 - Navigasi membersihkan parameter workspace yang tidak relevan: **date** hanya ditampilkan pada menu Laporan harian; **master_kind** lama dan **partial** tidak dibawa ke alamat menu. Contoh produk cukup `/#master-product`. Saat kembali ke Laporan dalam halaman yang sama, URL memakai tanggal yang sudah diterapkan dari server, bukan tanggal yang masih diketik. Pembaruan uiLive tetap meminta tanggal laporan terapan secara internal agar laporan tidak diam-diam berganti ke hari ini. Path/subpath dan parameter lain yang tidak dikenal tetap dipertahankan; filter terapan menu dan isi form tidak direset. Setelah muat ulang tautan produk yang bersih, tanggal laporan yang tidak aktif kembali mengikuti default server; tautan Laporan sendiri tetap membawa tanggal.
 - Bila kas harian belum dibuka, sudah ditutup, atau statusnya belum dapat diperiksa, keterangan **Belum bisa checkout** tampil dekat tombol keranjang. Untuk keranjang terisi dan valid, klik Checkout menampilkan penjelasan yang dapat difokuskan, bukan tombol diam; pembayaran tidak dibuka. Admin diarahkan ke menu Kas harian, kasir diminta menunggu/menghubungi admin; kas yang sudah ditutup menunggu hari berikutnya. Keranjang tetap tersimpan dan pemberitahuan mengikuti status shift lintas sesi. Keranjang kosong/isian tidak valid tetap menonaktifkan checkout; validasi server tetap berlaku.
-- Klik nama pada daftar ringkas atau tabel membuka satu dialog Detail melalui `GET /v2/sales/{id}/detail`. Identitas nota/nama dan status tampil di atas; barang ditampilkan dalam tabel jumlah/harga/diskon/subtotal. Total, terbayar, sisa, diskon nota/ongkir bila ada serta riwayat cicilan dikelompokkan dengan jelas; setiap pembayaran memiliki nominal/status, waktu, petugas, referensi, alasan penolakan dan tautan foto bila tersedia. **Cetak struk/nota** berada di footer untuk nota aktif bersama tombol Tutup; aksi cetak lama dibersihkan saat memuat detail lain atau menutup dialog. Bila masih ada sisa, form **Catat pembayaran** menggunakan endpoint, kunci idempotensi, dan penjaga entri dobel yang sama dengan Tagihan; tidak membuat salinan invoice. Tunai langsung tercatat; transfer baru berpengaruh sesudah verifikasi admin.
+- Klik nama pada daftar ringkas, atau tombol **Detail** di kolom **Aksi** pada Riwayat penjualan, untuk membuka dialog melalui `GET /v2/sales/{id}/detail`. Identitas nota/nama dan status tampil di atas; barang ditampilkan dalam tabel jumlah/harga/diskon/subtotal. Total, terbayar, sisa, diskon nota/ongkir bila ada serta riwayat cicilan dikelompokkan dengan jelas; setiap pembayaran memiliki nominal/status, waktu, petugas, referensi, alasan penolakan dan tautan foto bila tersedia. **Cetak struk/nota** berada di footer untuk nota aktif bersama tombol Tutup. Jika masih ada barang yang bisa diretur, footer admin juga menampilkan **Catat retur** untuk membuka bagian retur. Bila masih ada sisa, form **Catat pembayaran** memakai aturan yang sama dengan Tagihan. Tunai langsung tercatat; transfer baru berpengaruh sesudah verifikasi admin.
 - Pembayaran selesai akan memperbarui riwayat/saldo lewat uiLive. Tidak mencetak bukti cicilan khusus; nota yang dicetak membaca pembayaran tercatat dan sisa terbaru. Foto hanya untuk transfer pelanggan, per pembayaran (bagian8.7).
 - Detail/fragmen memeriksa peran admin/kasir aktif. Respons detail lama tidak boleh mengganti penjualan lain atau dialog yang sudah ditutup. Galat mempertahankan hasil lama, tidak membocorkan rincian server, dan memungkinkan membuka ulang. Semua endpoint baca hanya membaca; izin persetujuan, pengiriman dan laporan per petugas tidak diperluas.
 
@@ -487,7 +513,7 @@ Status tagihan: **Terbuka** (`open`) atau **Lunas** (`paid`). Sisa = nilai − s
 ### 8.3 Pembayaran utang supplier
 
 - Tombol di baris tagihan supplier: **Bayar ke supplier** (admin) atau **Ajukan pembayaran** (kasir).
-- **Sumber dana** yang dipilih di popup: **Kas Utama** (`main`, akun 1101), **Bank Utama / Rekening Bank** (`transfer`, akun 1102 atau rekening bank aktif COA lewat `bank_account_code`), atau **Laci shift** (`cash`, akun 1101 dengan uang laci shift yang sedang terbuka).
+- **Sumber dana** yang dipilih di popup: **Kas Utama** (`main`, akun 1101), **Rekening Bank** (`transfer`; wajib memilih rekening aktif secara eksplisit di form), atau **Laci Kas Harian** (`cash`, akun 1101 dengan uang laci shift yang sedang terbuka). Form menjelaskan dampak sumber dana yang dipilih.
 - **Admin**: pembayaran langsung tercatat (`posted`) dan mengurangi utang. Kas Utama dan Bank Utama memakai saldo toko, tidak memerlukan shift, dan tidak mengubah hitungan laci. Laci shift memakai uang laci shift admin sendiri (harus terbuka dan cukup) dan mencatat uang keluar di laci itu.
 - **Kasir**: dicatat sebagai **pengajuan** (`proposed`) tanpa jurnal dan baru mengurangi utang setelah admin menyetujui. Sumber Laci shift memakai shift toko yang aktif saat pengajuan; Kas Utama dan Bank Utama tidak perlu shift. Pengajuan laci pada shift yang sudah ditutup tidak boleh dipindah diam-diam ke shift berikutnya; ajukan ulang.
 - Saldo akun 1101 atau rekening bank terpilih tidak boleh menjadi negatif; jurnal debit 2101, kredit 1101 atau rekening bank terpilih.
@@ -724,7 +750,7 @@ Daftar master menampilkan **Frekuensi belanja** (jumlah nota penjualan yang terh
 
 Kode, nama, catatan. Menekan nama supplier menampilkan produk yang dipasoknya dan riwayat transaksinya. Kolom "Utang berjalan" menunjukkan sisa utang ke supplier itu.
 
-Dialog rincian menampilkan strip fakta ringkas (utang berjalan ditonjolkan, lalu sudah dibayar, menunggu verifikasi, dan jumlah produk), **aktivitas tagihan dan pembayaran lebih dulu**, kemudian produk yang dipasok dengan peran Utama/Alternatif. Rentang aktivitas memakai dua tanggal, tombol Tampilkan, dan tautan cetak semua; tabel memakai badge status dan header lengket. Blok riwayat mati tidak lagi dirender. Tidak ada perubahan perhitungan/utang.
+Dialog membedakan **Posisi supplier · semua tanggal** (sisa utang saat ini, pembayaran terverifikasi, pengajuan, dan jumlah produk) dari **Riwayat tagihan & pembayaran** yang bisa disaring. Pilih **Rentang tanggal** lalu **Tampilkan**; tanggal filter tidak mengubah posisi supplier. Daftar menampilkan maksimal 20 aktivitas per halaman; **Sebelumnya** dan **Berikutnya** mempertahankan rentang terpilih. **Cetak periode** mencetak semua aktivitas dalam rentang tersebut. Bagian **Produk yang dipasok** tetap menunjukkan peran Utama/Alternatif.
 
 Detail supplier khusus admin memuat aktivitas tagihan dan pembayaran berdasarkan **tanggal pencatatan**, default30hari terakhir, maksimal366hari sampai hari ini. Daftar20aktivitas per halaman, tanpa batas8aktivitas lama. Ringkasan membedakan tagihan, pembayaran terverifikasi, pengajuan menunggu dalam rentang, dan **utang berjalan saat ini** seluruh tanggal. Tagihan dibatalkan tidak menambah utang/ringkasan tagihan; aktivitasnya tetap dapat ditelusuri.
 
@@ -812,12 +838,14 @@ Kode: `Ledger::post`.
 | 1301 | Persediaan | Aset | Debit | Nilai stok barang (berdasarkan HPP) |
 | 2101 | Utang usaha | Kewajiban | Kredit | Tagihan dari supplier |
 | 3101 | Modal awal | Ekuitas | Kredit | Penyeimbang saldo awal |
-| 4101 | Penjualan | Pendapatan | Kredit | Penjualan barang bersih |
+| 4101 | Penjualan | Pendapatan | Kredit | Penjualan barang (kotor jika 4103 aktif, bersih bila tanpa 4103) |
 | 4102 | Pendapatan ongkir | Pendapatan | Kredit | Ongkir yang ditagih ke pelanggan |
+| 4103 | Potongan Penjualan | Pendapatan (Pengurang) | Debit | Pengurang otomatis diskon item & diskon nota POS |
+| 4104 | Retur Penjualan | Pendapatan (Pengurang) | Debit | Pengurang otomatis retur penjualan |
 | 5101 | HPP | Beban | Debit | Modal barang yang terjual |
-| 6101 | Biaya perjalanan | Beban | Debit | Uang muka yang terpakai dan biaya ritase |
+| 6101 | Beban Operasional Toko | Beban | Debit | Pengeluaran operasional umum toko |
 
-Akun lain di bagan akun (mis. 5201, 6102–6199, 6201, 7101) berasal dari sistem lama dan tidak dipakai jurnal otomatis V2.
+Akun lain di bagan akun yang dipakai V2: `5201` (Beban Selisih Opname) untuk penyusutan stok opname, `7101` (atau `4201` bila aktif) untuk selisih lebih stok opname, `6102`–`6199` / `8xxx` pada Pengeluaran Operasional, serta `6201` (Beban Transportasi & Ritase Armada) untuk uang muka terpakai dan biaya ritase.
 
 Nama akun di database bisa berbeda dengan tabel ini (lihat bagian 21); kodenya yang menentukan.
 
@@ -825,16 +853,19 @@ Nama akun di database bisa berbeda dengan tabel ini (lihat bagian 21); kodenya y
 
 | Kejadian | Debit | Kredit | Jenis referensi |
 |---|---|---|---|
-| Penjualan (semua metode) | 1103 total; 5101 HPP | 4101 barang bersih; 4102 ongkir; 1301 HPP | `v2_sale` |
+| Penjualan (semua metode) | 1103 total; 4103 total diskon (bila 4103 aktif); 5101 HPP | 4101 barang kotor (atau bersih bila tanpa 4103); 4102 ongkir; 1301 HPP | `v2_sale` |
 | Penjualan tunai / DP tunai / pelunasan piutang tunai | 1101 | 1103 | `v2_payment` |
 | Verifikasi transfer pelanggan | 1102 | 1103 | `v2_payment` |
 | Persetujuan bayar supplier | 2101 | 1101 atau 1102 | `v2_payment` |
 | Konfirmasi penerimaan barang (bukan simpan draf) | 1301 | 2101 | `v2_receipt` |
 | Pembatalan penerimaan historis (jalur baru dinonaktifkan) | 2101 | 1301 | `v2_receipt_void` |
 | Uang muka sopir | 1191 | 1101 atau 1102 | `v2_driver_advance` |
-| Penyelesaian uang muka | 6101 biaya; 1101/1102 sisa | 1191 | `v2_driver_advance_settlement` |
-| Biaya ritase langsung | 6101 | 1101 atau 1102 | `v2_trip` |
+| Penyelesaian uang muka | 6201 biaya; 1101/1102 sisa | 1191 | `v2_driver_advance_settlement` |
+| Biaya ritase langsung | 6201 | 1101 atau 1102 | `v2_trip` |
 | Saldo awal | 1101, 1102, 1301, 1103 (+3101 bila defisit) | 2101, 3101 | `v2_opening_balance` |
+| Stok opname V2 (admin) | 5201 (kurang) / 1301 (neto lebih) | 1301 (neto kurang) / 7101 atau 4201 (lebih) | `v2_stock_opname` |
+| Retur penjualan V2 (admin) | 4104 (atau 4101) total retur; 1301 HPP | 1103 (potong piutang), 1101/Bank (refund); 5101 HPP | `v2_sale_return` |
+| Retur pembelian V2 (admin) | 2101 (potong utang), 1101/Bank (refund supplier) | 1301 nilai persediaan (+5101 selisih HPP bila ada) | `v2_purchase_return` |
 
 Tidak membuat jurnal: buka/tutup shift, selisih shift, pengajuan bayar supplier, transfer menunggu, penolakan, pengiriman, perubahan master.
 
@@ -849,12 +880,16 @@ Tidak membuat jurnal: buka/tutup shift, selisih shift, pengajuan bayar supplier,
 
 ### 14.4 Mengelola bagan akun (admin)
 
-- Admin dapat menambah akun secara manual, mengubah nama/status akun dan mengarsipkan akun non-inti dari menu Bagan akun. Kode harus unik; kelompok kode, klasifikasi dan saldo normal harus sesuai.
-- **Multi-rekening bank (`chart_of_accounts.is_bank_account`)**: akun Aset (`asset`) bersaldo normal Debet (`debit`) non-inti dapat ditandai sebagai **Rekening Bank** saat ditambah atau diubah di Bagan Akun. Akun inti `1102` selalu bertanda rekening bank dan tidak dapat dimatikan. Akun rekening bank aktif otomatis muncul pada pilihan rekening tujuan/sumber untuk transaksi Transfer/Bank di **Kasir (POS)**, **Tagihan & Pembayaran**, **Pengeluaran Operasional**, **Uang Muka/Realisasi Sopir**, **Biaya Ritase**, **Ongkir Penerimaan Barang**, **Penyesuaian Saldo**, **Ringkasan Admin**, dan **Laporan Arus Kas**. Jika parameter `bank_account_code` tidak dikirim, sistem otomatis memakai `1102`.
+- **Batasan fitur Bagan Akun V2**: untuk menjaga kesederhanaan dan mencegah kesalahan klasifikasi akuntansi, pada mode aktif (`V2_ENABLED=true`) admin hanya dapat menambah **dua jenis akun kustom**:
+  1. **Rekening Bank tambahan** (`asset`, saldo normal `debit`, `is_bank_account = true`, kode awalan `1xxx` non-sistem) — otomatis muncul di pilihan rekening Transfer pada Kasir, Tagihan, Pengeluaran, Pengiriman, Pindah Dana, Penyesuaian Saldo, dan Arus Kas.
+  2. **Beban / Pengeluaran Operasional di luar sistem** (`expense`, saldo normal `debit`, kode awalan `6xxx` atau `8xxx` non-sistem) — otomatis muncul di pilihan kategori menu **Pengeluaran Operasional** (Listrik & Air, Servis, ATK, Gaji, Internet, Konsumsi & Reimburse, dll.).
+- **Akun Terhubung Sistem (16 akun, termasuk akun pengurang/kontra sistem)**: seluruh akun transaksi inti (`1101`, `1102`, `1103`, `1191`, `1301`, `2101`, `3101`, `4101`, `4102`, `4103`, `4104`, `5101`, `5201`, `6101`, `6201`, `7101`) disiapkan sistem melalui `php artisan v2:prepare --accounts-only --apply` dan terkunci kode, klasifikasi, saldo normal, status pengurang (`is_contra`), dan status aktifnya (admin hanya dapat menyesuaikan nama tampilan akun). **Akun pengurang (`is_contra = true`) dikelola sepenuhnya oleh sistem** (`4103` Potongan Penjualan untuk diskon POS dan `4104` Retur Penjualan untuk retur penjualan) dan tidak dibuat manual oleh pengguna di V2.
+- **Kemudahan pengguna non-akuntan**: modal **Tambah Akun** menyediakan pilihan jenis akun (*Beban Operasional* atau *Rekening Bank Tambahan*) serta contoh cepat opsional yang otomatis mengisi nomor kode kosong berikutnya dan mengunci klasifikasi/saldo normal. Saran yang kode atau namanya sudah terdaftar otomatis disembunyikan dan langsung diperbarui setelah simpan tanpa muat ulang.
+- **Multi-rekening bank (`chart_of_accounts.is_bank_account`)**: akun inti `1102` selalu bertanda rekening bank dan tidak dapat dimatikan. Akun rekening bank aktif otomatis muncul pada pilihan rekening tujuan/sumber untuk transaksi Transfer/Bank di **Kasir (POS)**, **Tagihan & Pembayaran**, **Pengeluaran Operasional**, **Uang Muka/Realisasi Sopir**, **Biaya Ritase**, **Ongkir Penerimaan Barang**, **Penyesuaian Saldo**, **Ringkasan Admin**, dan **Laporan Arus Kas**. Jika parameter `bank_account_code` tidak dikirim, sistem otomatis memakai `1102`.
 - Form pada mode aktif memakai `POST /v2/chart-of-accounts`, `PUT /v2/chart-of-accounts/{id}` dan `PATCH /v2/chart-of-accounts/{id}/archive`. Ketiganya memeriksa admin di server dan memakai autentikasi, CSRF serta pembatasan frekuensi. Kasir dan akun tanpa peran ditolak.
-- Akun inti, termasuk1191,4102 dan6101, tidak boleh diubah nomornya atau dinonaktifkan, sekalipun belum pernah dipakai. Membuat akun inti dalam status tidak aktif juga ditolak.
+- Akun inti tidak boleh dibuat manual di jalur V2, tidak boleh diubah nomornya atau dinonaktifkan, sekalipun belum pernah dipakai.
 - Akun yang sudah dipakai jurnal tidak boleh diubah kode, jenis atau saldo normalnya. Nama boleh diperbarui; nama pada jurnal historis tetap snapshot lama. Akun non-inti boleh diarsipkan dan diaktifkan kembali melalui Ubah. Tidak ada penghapusan akun pada jalur V2.
-- Simpan/arsip memakai respons JSON dan memperbarui isi Bagan akun tanpa muat ulang dokumen. Filter yang diterapkan tetap, draft filter tidak ditimpa; cache panel lama diinvalidasi. Bila penyimpanan berhasil tetapi pemuatan daftar gagal, pesan menyebut data sudah tersimpan agar tidak disimpan ulang secara buta.
+- Simpan/arsip memakai respons JSON dan memperbarui isi Bagan akun tanpa muat ulang dokumen. Filter yang diterapkan tetap, draft filter tidak ditimpa; cache panel jarak jauh (termasuk Pengeluaran) ikut diinvalidasi. Bila penyimpanan berhasil tetapi pemuatan daftar gagal, pesan menyebut data sudah tersimpan agar tidak disimpan ulang secara buta.
 - Galat mempertahankan isian dan membuka kembali tombol. Aksi COA dicatat di log aplikasi dengan ID pelaku, ID/kode akun dan status, bukan password. Menambah/mengubah/arsip akun tidak membuat jurnal atau mengubah nilai saldo.
 - Membuka halaman Bagan akun saat V2 aktif tidak otomatis melakukan seeding. Akun wajib dilengkapi secara eksplisit melalui proses persiapan atau mode pemeliharaan akun di bagian4.
 
@@ -878,6 +913,8 @@ Kode: `CashBankAdjustments`. Menu: **Keuangan › Jurnal umum**, panel "Sesuaika
 
 ## 15. Laporan dan rekap keuangan
 
+Tanggal laporan menyaring perhitungan berdasarkan tanggal jurnal: Neraca sampai tanggal yang dipilih (inklusif), Laba Rugi dan Arus Kas antara tanggal awal dan akhir. Ini tidak menutup buku atau mengunci pemasukan jurnal mundur ke suatu periode; penjagaan per transaksi tetap berlaku.
+
 Semua laporan **hanya membaca** data. Angka dijumlahkan dengan desimal pasti di PHP, tidak dengan SUM SQL atau float.
 
 ### 15.1 Laporan harian
@@ -894,7 +931,7 @@ Kode: `ReportsDocuments::daily`. Menu: **Kas & laporan › Laporan harian**. Pil
 | Bank | Transfer terverifikasi (menurut tanggal verifikasi) dan transfer menunggu (menurut tanggal pengajuan) |
 | Shift | Jumlah shift: terbuka, selesai, perlu diperiksa |
 
-Penjualan kredit tidak dihitung sebagai uang kas masuk. Transfer tidak dihitung sebagai uang laci.
+Penjualan kredit tidak dihitung sebagai uang kas masuk. Transfer tidak dihitung sebagai uang laci. Pengembalian dana retur penjualan tunai dari laci tercatat di baris **Uang keluar** laci (`v2_shift_movements`), sedangkan pengurang pendapatan retur dicatat di **Laba rugi** (`4104`/`4101`).
 
 ### 15.2 Ringkasan di atas setiap menu Operasional
 
@@ -949,12 +986,13 @@ Kode: `generateCashFlow`. Metode langsung, dari seluruh jurnal yang menyentuh `1
 
 | Arus | Kelompok | Asal |
 |---|---|---|
-| Masuk: pelunasan piutang | Operasi | `v2_payment` (tunai/transfer dari pelanggan), atau lawan 1103 |
-| Masuk: penjualan/pendapatan | Operasi | lawan akun 4xxx |
+| Masuk: pelunasan piutang | Operasi | `v2_payment` pelunasan tagihan piutang setelah checkout (`collect`/verifikasi kredit), atau lawan 1103 |
+| Masuk: penjualan/pendapatan | Operasi | `v2_sale`, `sale`, `v2_payment` penjualan tunai/transfer/DP langsung saat checkout POS, atau lawan akun 4xxx |
 | Masuk: setoran modal | Pendanaan | `v2_opening_balance`, `opening_balance`, atau lawan 3xxx |
 | Masuk: pinjaman | Pendanaan | lawan 2xxx |
 | Masuk: penjualan aset tetap | Investasi | lawan 12xx/15xx/16xx |
-| Masuk: lainnya | Operasi | mis. sisa uang muka sopir yang dikembalikan |
+| Masuk: lainnya | Operasi | mis. sisa uang muka sopir (`v2_driver_advance`) atau dana retur supplier (`v2_purchase_return`) |
+| Keluar: retur penjualan | Operasi | `v2_sale_return` (pengembalian dana kas/bank ke pelanggan) |
 | Keluar: bayar utang supplier | Operasi | `v2_payment` |
 | Keluar: uang muka sopir | Operasi | `v2_driver_advance` |
 | Keluar: biaya ritase | Operasi | `v2_trip`, `ritase` |
@@ -972,13 +1010,19 @@ Kode: `generateCashFlow`. Metode langsung, dari seluruh jurnal yang menyentuh `1
 | Penerimaan dari supplier | Bertambah | Rata-rata tertimbang | `v2_receipt` |
 | Pembatalan penerimaan historis (bukan draf) | Berkurang | Kembali ke sebelum penerimaan | `v2_receipt_void` |
 | Penjualan | Berkurang | Tetap | `v2_sale` |
+| Stok opname V2 | Menyesuaikan ke jumlah fisik | Tetap | `v2_stock_opname` |
+| Retur penjualan V2 | Bertambah kembali | Rata-rata tertimbang (HPP historis nota) | `v2_sale_return` |
+| Retur pembelian V2 | Berkurang | Menyesuaikan nilai sisa persediaan | `v2_purchase_return` |
 | Pengiriman | Tetap | Tetap | – |
 | Ubah master produk | Tidak bisa | Hanya bila belum ada stok/mutasi | – |
 
 - Jumlah memakai 4 angka desimal (mis. 2,5 m³).
 - Stok tidak bisa menjadi negatif lewat V2: penjualan yang melebihi stok ditolak server.
 - Setiap mutasi menyimpan perubahan dan saldo sesudahnya, jadi riwayat stok bisa ditelusuri.
-- Tidak ada stok opname, retur, atau penyesuaian stok di V2 (lihat bagian 21).
+- Menu **Stok opname** (khusus admin) dan aksi **Retur penjualan / Retur pembelian** (khusus admin) kini tersedia secara atomik dan idempoten di V2 (bagian 14.2).
+- Stok opname membandingkan jumlah stok sistem dari pemilihan barang dengan stok yang dikunci saat posting. Jika berubah, admin harus memilih ulang barang dan memeriksa kembali jumlah fisik sebelum mengirim.
+- Nilai retur sebagian dihitung dari jumlah barang yang sudah diretur secara kumulatif. Pecahan sen ditahan sampai nilainya dapat dicatat tanpa melebihi nilai asli baris. Retur yang nilainya masih di bawah Rp 0,01 tidak diposting. HPP retur penjualan memakai pembagian kumulatif yang sama sehingga total HPP yang dikembalikan tidak melebihi HPP baris asli.
+- Retur tunai mengambil kunci shift sebelum kunci produk, mengikuti urutan checkout, agar retur dan penjualan bersamaan tidak saling menunggu.
 
 ---
 
@@ -991,6 +1035,9 @@ Kode: `generateCashFlow`. Metode langsung, dari seluruh jurnal yang menyentuh `1
 | Nota penjualan | `INV-YYYYMMDD-NNNNN` | INV-20261108-00012 |
 | Tagihan piutang dari penjualan | `AR-YYYYMMDD-NNNNN` | AR-20261108-00012 |
 | Surat jalan | `SJ-YYYYMMDD-NNNNN` | SJ-20261108-00003 |
+| Stok opname V2 | `OPN-YYYYMMDD-NNNNN` | OPN-20261126-00001 |
+| Retur penjualan V2 | `RET-YYYYMMDD-NNNNN` | RET-20261126-00001 |
+| Retur pembelian V2 | `RTP-YYYYMMDD-NNNNN` | RTP-20261126-00001 |
 | Penerimaan barang | `RCV-NNNNNN` | RCV-000045 |
 | Tagihan utang dari penerimaan | `AP-NNNNNN` | AP-000045 |
 | Pelanggan dari kasir | `CUS-NNNN` | CUS-0007 |
@@ -1020,7 +1067,7 @@ Angka `NNNNN` adalah nomor urut internal (ID), jadi tidak kembali ke 1 setiap ha
 - **Peran**: setiap aksi memeriksa peran di server, bukan hanya menyembunyikan tombol.
 - **Arsip lama**: setelah V2 aktif, semua halaman lama hanya bisa dibaca admin (`V2Cutover`). Halaman `/demo-setup` dimatikan.
 - **Transaksi atomik**: setiap aksi berjalan dalam satu transaksi database dengan penguncian baris (`lockForUpdate`). Bila satu bagian gagal, semuanya dibatalkan.
-- **Anti-ganda (idempotensi)**: penjualan, pembayaran, uang muka, penyelesaian, penerimaan, ritase, saldo awal, dan impor memakai kunci unik. Pengulangan dengan isi sama mengembalikan hasil sebelumnya; isi berbeda ditolak.
+- **Anti-ganda (idempotensi & konfirmasi dobel)**: penjualan, pembayaran, uang muka, penyelesaian, penerimaan, ritase, stok opname, retur jual/beli, saldo awal, impor, **pengeluaran operasional**, dan **pindah dana Kas/Bank** memakai kunci idempotensi unik (`v2_operation_idempotencies` untuk pengeluaran & pindah dana, tetap aman bila migrasi belum dijalankan). Generator kunci di peramban (`window.v2Uuid` dan cadangan `crypto.getRandomValues`) tahan koneksi HTTP non-HTTPS maupun perangkat kasir versi lama. Pengulangan dengan kunci dan isi sama mengembalikan hasil sebelumnya; isi berbeda ditolak (`422`), dan lintas aktor ditolak (`403`). Selain itu, pengeluaran identik (tanggal, akun beban, sumber dana, nominal, keterangan sama) dan pindah dana identik (tanggal, akun sumber/tujuan, nominal sama dalam 15 menit atau keterangan sama) ditahan dengan peringatan lembut (`422`) dan tombol konfirmasi eksplisit (`confirm_duplicate`) agar tidak tercatat ganda tanpa sengaja.
 - **Uang**: tidak pernah memakai float. Semua uang disimpan `DECIMAL(19,2)`, jumlah barang `DECIMAL(19,4)`, HPP `DECIMAL(19,4)`.
 - **Tidak ada hapus**: master diarsipkan; transaksi dan jurnal tidak diubah atau dihapus oleh alur V2.
 
@@ -1043,7 +1090,11 @@ Angka `NNNNN` adalah nomor urut internal (ID), jadi tidak kembali ke 1 setiap ha
 | `v2_product_suppliers` | Tautan produk ke supplier (dan supplier utama) |
 | `v2_import_batches` | Pratinjau dan hasil impor Excel |
 | `v2_opening_batches` | Saldo awal V2 (satu baris) |
+| `v2_stock_opnames`, `v2_stock_opname_items` | Stok opname fisik gudang V2 (admin) |
+| `v2_sale_returns`, `v2_sale_return_items` | Retur penjualan barang & penyesuaian piutang/refund |
+| `v2_purchase_returns`, `v2_purchase_return_items` | Retur pembelian ke supplier & penyesuaian utang/refund |
 | `v2_requests` | Catatan anti-ganda untuk uang muka, penyelesaian, penerimaan, ritase |
+| `v2_operation_idempotencies` | Catatan anti-ganda (`scope`, `idempotency_key`, `request_hash`, payload replay) untuk pengeluaran operasional & pindah dana Kas/Bank |
 | `products`, `product_options` | Produk, satuan, kategori (bersama) |
 | `stock_movements` | Mutasi stok (bersama) |
 | `vehicles` | Mobil (bersama) |
@@ -1058,13 +1109,14 @@ Angka `NNNNN` adalah nomor urut internal (ID), jadi tidak kembali ke 1 setiap ha
 
 | Bagian | Lokasi |
 |---|---|
-| Rute V2 | `routes/v2.php` (prefix `/v2`), halaman utama `/` lewat `PosController::index` |
+| Rute V2 | `routes/v2.php` (prefix `/v2`), halaman utama `/` lewat `PosController::index`, fragmen tabel berpaginasi `GET /v2/tables/{table}` (`WorkspaceTables`) |
 | Kontroler V2 | `app/Http/Controllers/V2/WorkspaceController.php`, `AccountController.php` |
 | Shift, penjualan, tagihan, persetujuan | `app/Services/V2/Operations.php` |
 | Jurnal | `app/Services/V2/Ledger.php` |
 | Uang dan diskon | `app/Services/V2/Money.php` |
 | Pengiriman, uang muka | `app/Services/V2/DeliveryTrips.php`, `TransportAssignment.php` |
 | Penerimaan barang, ritase | `app/Services/V2/SupplyTrips.php` |
+| Stok opname, retur penjualan/pembelian | `app/Services/V2/StockOpnames.php`, `SalesReturns.php`, `PurchaseReturns.php` |
 | Saldo awal | `app/Services/V2/OpeningBalances.php` |
 | Master | `app/Services/V2/MasterData.php`, `MasterRelations.php`, `MasterInsights.php`, `app/Support/V2/FormCatalog.php` |
 | Pelanggan dari kasir | `app/Services/V2/CustomerLookup.php` |
@@ -1088,17 +1140,17 @@ APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: DB_URL= CACHE_STORE=ar
 
 Daftar ini jujur tentang apa yang belum ditangani sistem. Butir bertanda **[cek data]** ditemukan pada database lokal per 8 November 2026.
 
-1. **[cek data] Nama akun 6101 berbeda.** Di database lokal 6101 bernama "Beban Operasional Toko", padahal V2 memakainya untuk biaya perjalanan sopir. Akun 6201 "Beban Transportasi & Ritase Armada" tidak dipakai V2. Perlu diputuskan: ganti nama 6101, atau ubah V2 agar memakai 6201.
-2. **Jalur saldo awal dan penyesuaian lama masih terkunci.** Jalur lama ditolak403 setelah V2 aktif. Saldo awal V2 dan penyesuaian kas/bank mempunyai jalur V2 sendiri (bagian13 dan14.5). Penyesuaian akun selain Kas/Bank belum tersedia.
+1. **Status beban transportasi (`6201`) vs operasional (`6101`) sudah dirapikan.** Biaya ritase dan realisasi uang muka sopir kini langsung memposting ke `6201`, terpisah dari `6101` Beban Operasional Toko.
+2. **Jalur penyesuaian/mutasi lama terkunci permanen oleh `V2Cutover` (`403`).** Semua rute tulis V1 (`/pos/checkout`, `/stock-opname`, `/expenses`, `/inventory/receipts`, `/ritase`, `/coa`, `/journals/adjustments`, `/journals/opening-balance`, `/products`, `/vehicles`, `/product-options`) dan seluruh rute GET V1 bagi kasir ditolak `403` saat `V2_ENABLED=true`. Saldo awal V2, penyesuaian kas/bank, stok opname V2, dan retur V2 memakai rute `/v2/*`. Penyesuaian akun non-Kas/Bank selain stok opname belum memiliki formulir tersendiri.
 3. **Selisih kas shift tidak dijurnal.** Bila uang fisik kurang atau lebih, buku besar Kas tetap memakai angka seharusnya. Selisih hanya dicatat di shift dengan alasan dari admin.
-4. **Belum ada beban operasional di V2.** Listrik, gaji, perlengkapan, dan beban lain (6102–6199) hanya ada di halaman lama, yang sekarang hanya bisa dibaca.
-5. **Belum ada retur atau pembatalan nota penjualan.** Nota yang sudah disimpan tidak bisa dibatalkan atau dikembalikan lewat sistem. Penerimaan final juga terkunci; koreksi/retur belum tersedia. Hanya draf penerimaan yang bisa diubah/dibatalkan (bagian 11.3).
-6. **Belum ada stok opname atau penyesuaian stok di V2.** Stok hanya berubah lewat saldo awal, penerimaan, dan penjualan.
+4. **Pengeluaran operasional V2 sudah tersedia melalui `POST /v2/expenses`.** Admin dapat mencatat biaya listrik, gaji, perlengkapan, dan beban umum (6101–6199) dari kas/bank tanpa memakai jalur legacy yang terkunci.
+5. **Retur penjualan & retur pembelian V2 sudah tersedia untuk admin.** Retur penjualan dilakukan dari detail nota (`POST /v2/sales/{id}/returns`) dan otomatis memotong piutang lebih dulu sebelum mengembalikan kelebihan dana via laci/Kas/Bank; retur pembelian dilakukan dari baris Riwayat penerimaan (`POST /v2/receipts/{id}/returns`) dengan penjagaan stok gudang tersisa. Nota atau penerimaan lama tetap tidak bisa dihapus langsung.
+6. **Stok opname V2 sudah tersedia di menu Stok opname (admin).** Penyesuaian stok fisik dicatat pada `v2_stock_opnames` disertai mutasi stok (`v2_stock_opname`) dan jurnal selisih otomatis (`5201` / `7101` atau `4201`).
 7. **Jatuh tempo penjualan kredit bersifat opsional.** Kasir dapat mengisi tanggal jatuh tempo saat checkout kredit; bila dikosongkan, tagihan tidak memiliki batas jatuh tempo.
-8. **Biaya perjalanan melebihi uang muka belum didukung.** Selisih lebih harus dicatat terpisah, padahal jalur pengeluaran terpisah belum ada (lihat butir 4).
+8. **Biaya perjalanan melebihi uang muka belum didukung dalam satu formulir.** Selisih lebih perlu dicatat terpisah pada menu Pengeluaran Operasional.
 9. **Penerimaan barang selalu kredit.** Pembelian tunai dicatat sebagai utang lalu dibayar lewat pengajuan pembayaran supplier.
 11. **Dua pola kode pelanggan**: `CUS-` (dibuat dari kasir) dan `PLG-` (dari form master).
-12. **Jenis harga (eceran/kontraktor) belum tampil** di riwayat transaksi dan cetak nota, walaupun sudah tersimpan.
+12. **Jenis harga (eceran/kontraktor) sudah tampil pada cetak nota**, namun belum ditampilkan sebagai kolom terpisah di tabel riwayat transaksi.
 13. **Laporan harian memakai tanggal shift dibuka.** Shift yang melewati tengah malam dihitung ke tanggal buka.
 
 ---
@@ -1119,6 +1171,25 @@ Daftar ini jujur tentang apa yang belum ditangani sistem. Butir bertanda **[cek 
 
 | Tanggal | Perubahan |
 |---|---|
+| 2026-11-28 | Cegah stok opname berdasarkan jumlah sistem yang kedaluwarsa, batasi pembulatan retur sebagian pada nilai asli baris, dan samakan urutan penguncian retur penjualan dengan pembayaran (bagian 16). |
+| 2026-11-28 | Tambah tombol Detail dan pintasan Catat retur untuk admin; pisahkan posisi dan riwayat supplier; wajibkan pemilihan rekening bank sumber di form bayar supplier; label sumber Jurnal memakai nama aktivitas. |
+| 2026-11-28 | Daftar modul mengikuti urutan baca, tombol daftar isi di dalam artikel dihapus, dan panduan Bagan Akun menjelaskan bahwa uang laci termasuk akun 1101 (bagian 1.7 dan 6.1). |
+| 2026-11-28 | Pusat Bantuan dipindah ke atas Keluar; ikon info menautkan panduan terkait. Petunjuk Akun login diringkas, dan rincian supplier memakai satu kolom tanggal serta navigasi halaman yang lebih jelas (bagian 1.7 dan Master Supplier). |
+| 2026-11-27 | Tambah ilustrasi satu sorotan dengan skeleton statis pada 15 artikel Pusat Bantuan (bagian 1.7). |
+| 2026-11-27 | Pusat Bantuan menambah sembilan panduan tugas menjadi 41 artikel dan menampilkan semua modul yang bisa diakses beserta jumlahnya di beranda (bagian 1.7). |
+| 2026-11-27 | Pusat Bantuan memakai `/panduan` tanpa label versi pada UI; alamat lama dialihkan. Penanda artikel mengikuti posisi gulir dan tidak mengganti URL saat dibaca manual (bagian 1.7). |
+| 2026-11-27 | Pusat Bantuan POS V2: 32 artikel sesuai peran, pencarian isi, modul dan kendala umum, tautan dari ikon informasi serta ke panel POS, dan tampilan cetak (bagian 1.6–1.7). |
+| 2026-11-27 | Penutupan 2 sisa celah anti-pencatatan dobel di sisi server untuk **Pengeluaran Operasional** (`POST /v2/expenses`, `OperatingExpenses`) dan **Pindah Dana Kas/Bank** (`POST /v2/journals/transfers`, `CashBankTransfers`): migrasi aditif `2026_11_27_105000_create_v2_operation_idempotencies` + helper `App\Services\V2\OperationIdempotency` (idempotent replay, tolak hash berbeda `422`, isolasi aktor `403`, aman bila tabel belum dimigrasi) serta penjaga duplikat lembut (`duplicate_expense` / `duplicate_transfer`) dengan tombol konfirmasi eksplisit di UI tanpa reload (`expense-script.blade.php`, `journal-adjustment-script.blade.php`) (bagian 18, 19, 20). |
+| 2026-11-27 | Pagination server penuh (Paket B lengkap) untuk seluruh daftar transaksi & riwayat operasional: **Pengeluaran** (`ExpenseController::index` diubah dari `limit(10)` menjadi `paginate(10/25/50)` + `partials.pagination` tanpa membocorkan `partial=1`); 8 tabel operasional workspace (**Persetujuan/Status Pembayaran**, **Pengiriman/Surat Jalan**, **Kas Harian**, **Riwayat Penerimaan**, **Draf Penerimaan**, **Stok Opname**, **Retur Penjualan**, **Retur Pembelian**) dilayani oleh layanan `App\Services\V2\WorkspaceTables` melalui `GET /v2/tables/{table}` (`private, no-store`, otorisasi peran ketat, default `10` baris + pilih `10/25/50` + cari/filter server tanpa reload lewat `ui-server-tables.blade.php`) sehingga antrean pending pembayaran & surat jalan aktif tidak pernah terpotong `limit(30/50)`; ditambah pagination ringan di browser untuk **Akun login** dan **Uang muka sopir terbuka** (bagian 1.2, 20). |
+| 2026-11-27 | Penyempurnaan & pengamanan modul Kasir (Tahap 1–3 + 4A): pengerasan generator kunci anti-duplikat (`window.v2Uuid` dengan cadangan `crypto.getRandomValues`) pada Kasir, Penerimaan restok, dan Operasi sopir; penyelarasan wajib pelanggan terdaftar untuk Transfer & Kredit + validasi cepat bukti transfer sebelum Tinjau; rincian subtotal/diskon/ongkir/catatan di modal Tinjau; perbaikan catatan menunggu verifikasi untuk Transfer & Kredit DP Transfer; prioritas SKU persis pada `Enter` dan persistensi konteks keranjang; dokumen cetak Nota & Surat Jalan siap produksi (kop toko via `config/v2.php`, kasir, satuan rapi, harga kontraktor, jatuh tempo, tanda tangan Surat Jalan, mode **A4 / Struk 80mm**); endpoint sinkronisasi stok katalog `GET /v2/pos/catalog` (tanpa HPP) + fitur **Tahan transaksi** di browser; aturan opsional batas diskon kasir & guard jual di bawah HPP di server (`Operations::checkout`); ringkasan piutang terbuka/lewat tempo pada pencarian pelanggan Kasir (`CustomerLookup`); serta kolom opsional catatan nota/instruksi kirim (`v2_sales.notes`, migrasi `2026_11_27_092231_add_notes_to_v2_sales`) (bagian 7.1, 7.8, 18, 21). |
+| 2026-11-26 | Pembatasan fitur Bagan Akun V2 & otomasi diskon POS: admin hanya membuat **Rekening Bank tambahan (`1xxx`)** atau **Beban Operasional (`6xxx`/`8xxx`)** dengan penomoran otomatis dan tanpa opsi kontra manual; 16 akun inti sistem (termasuk akun pengurang sistem `4103` Potongan Penjualan & `4104` Retur Penjualan) dikelola otomatis oleh `v2:prepare`; checkout Kasir POS (`Operations::checkout`) otomatis mencatat diskon item/nota ke `4103` (Debet) terhadap penjualan kotor `4101` (Kredit) bila `4103` aktif (bagian 14.1, 14.2, 14.4). |
+| 2026-11-26 | Penyederhanaan bantuan sesuai referensi pemilik: dialog diganti ikon informasi kecil di dekat judul; hover/fokus/tap memakai tooltip bersama hijau tua, judul lime, deskripsi dan catatan bergaris tanpa daftar langkah (bagian 1.6). |
+| 2026-11-26 | Tahap 3 audit cutover & konsistensi dokumen: verifikasi seluruh rute tulis legacy (`/pos/checkout`, `/stock-opname`, `/expenses`, `/inventory/receipts`, `/ritase`, `/coa`, `/journals/*`, `/vehicles`, `/product-options`) dan otorisasi `403` untuk kasir pada rute V2 admin baru (`V2CutoverTest`), pemeriksaan paritas cangkang `V2ShellParityTest` + `V2ReportsDocumentsTest`, preflight baca-saja `v2:prepare --accounts-only` pada 14 akun wajib, serta penyelarasan dokumentasi laporan harian & batasan cutover (bagian 15.1, 21). |
+| 2026-11-26 | Bantuan kontekstual terpusat untuk 24 konteks menu: panduan penggunaan/catatan penting, penyesuaian Status pembayaran kasir, konteks halaman Keuangan mandiri, dialog keyboard, dan pergantian konteks tanpa request/mutasi data (bagian 1.6). |
+| 2026-11-26 | Tahap 2 kelengkapan operasional & pembukuan V2: implementasi **Stok Opname V2** (`App\Services\V2\StockOpnames`, menu `Stok opname` admin, `POST /v2/stock-opnames`), **Retur Penjualan V2** (`App\Services\V2\SalesReturns`, aksi di detail nota admin, `POST /v2/sales/{id}/returns`, akun kontra `4104` dengan fallback `4101`), dan **Retur Pembelian V2** (`App\Services\V2\PurchaseReturns`, aksi di riwayat penerimaan admin, `POST /v2/receipts/{id}/returns`), lengkap dengan migrasi additif `2026_11_26_090000_create_v2_stock_opname_and_returns`, pemisahan arus kas retur, pembaruan `V2Prepare` (`5201`, `7101`), dan notifikasi `uiResult` (bagian 14.1, 14.2, 15.7, 16, 17.1, 19, 20, 21). |
+| 2026-11-26 | Perapian pembukuan & laporan tahap 1: biaya perjalanan & ritase (`DeliveryTrips::settle`, `SupplyTrips::trip`) dipindah dari `6101` ke `6201` (Beban Transportasi & Ritase Armada) agar terpisah dari `6101` Beban Operasional Toko (`V2Prepare` & `SYSTEM_ACCOUNT_ROLES` ikut disesuaikan); Laporan Arus Kas (`AccountingReportService::generateCashFlow`) memisahkan penerimaan kas/transfer/DP langsung saat checkout POS (`Penerimaan dari Penjualan Tunai / Uang Muka`) dari pelunasan piutang pelanggan setelah transaksi (`Penerimaan Pelunasan Piutang Pelanggan`); pembaruan catatan bagian 21 yang telah terselesaikan (bagian 14.1, 14.2, 15.7, 21). |
+| 2026-11-25 | Pengelolaan Bagan Akun (COA) diperluas sesuai standar akuntansi: batas tegas akun **Terhubung sistem** (kode, klasifikasi, saldo normal, kontra, dan status aktif terkunci meski belum dijurnal; nama tetap bisa disesuaikan) vs akun **Dapat disesuaikan**, dukungan penuh **Akun Kontra (`is_contra`, migrasi `2026_11_25_191200_add_contra_account_support_to_chart_of_accounts`)** (Akumulasi Penyusutan, Prive, Potongan/Retur Penjualan, Cadangan Piutang, Potongan Pembelian), filter pengelolaan (`system`/`custom`), daftar opsional contoh akun standar SAK EMKM di modal Tambah Akun, serta pemblokiran akun kontra beban dari form pengeluaran kas operasional (bagian 14.4). |
+| 2026-11-24 | Kapsul navigasi cepat mobile diperbarui menjadi 4 tab pindah-halaman-saja bergaya tombol bulat nonaktif + pil aktif limau meluncur, dengan morfosis Opsi 2 pada `#kasir` (tetap tampil saat keranjang kosong, bermorfosis menjadi bar keranjang pil saat terisi dengan tombol kiri `.pm-nav-toggle` untuk membuka kapsul sementara/`mqa-peek`, serta lencana jumlah item pada tombol Kasir) (bagian 1.5). |
 | 2026-11-24 | Detail master dan penerimaan dikelompokkan menurut konteks; pelanggan mendapat riwayat berperiode. Katalog Kasir baku Tersedia, periode riwayat digabung dengan filter, dan aksi biaya sopir dikelompokkan di atas. Isian Pindah Dana dan Penyesuaian Saldo dibuka lewat popup. |
 | 2026-11-24 | Pil aksi mobile mendapat animasi morph dan area bawah terpisah. Jurnal Umum dibatasi 25 entri per halaman, filter tetap terbawa, dan aktivitas baru hanya memunculkan pemberitahuan. |
 | 2026-11-24 | Saldo awal pembukuan menampilkan status sebelum form dibuka, rincian opsional per baris tanpa JSON, dan pratinjau Rupiah terpisah sebelum posting (bagian 13). |

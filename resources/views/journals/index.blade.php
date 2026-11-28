@@ -16,7 +16,21 @@
         'inventory_receipt' => 'Penerimaan Barang',
         'stock_opname' => 'Stok Opname',
         'adjustment' => 'Penyesuaian',
+        'cash_bank_transfer' => 'Pindah Dana',
+        'operating_expense' => 'Pengeluaran Operasional',
+        'v2_opening_balance' => 'Saldo Pembukaan',
+        'v2_sale' => 'Penjualan',
+        'v2_payment' => 'Pembayaran Tagihan',
+        'v2_receipt' => 'Penerimaan Barang',
+        'v2_trip' => 'Biaya Perjalanan',
+        'v2_driver_advance' => 'Uang Muka Sopir',
+        'v2_driver_advance_settlement' => 'Realisasi Uang Muka Sopir',
+        'v2_sale_return' => 'Retur Penjualan',
+        'v2_purchase_return' => 'Retur Pembelian',
+        'v2_stock_opname' => 'Stok Opname',
     ];
+    $sourceLabel = fn (string $value): string => $sourceLabels[$value]
+        ?? ucfirst(str_replace('_', ' ', preg_replace('/^v\d+_/', '', $value)));
     $openingStatus = $opening?->status ?? 'not_started';
     $formatMoney = function ($value) {
         $decimal = \Brick\Math\BigDecimal::of((string) $value)->toScale(2, \Brick\Math\RoundingMode::HalfUp);
@@ -203,7 +217,12 @@
     <div class="popup-content">
     <form id="transfer-form" method="POST" action="{{ route('v2.journals.transfers.store') }}">
         @csrf
+        <input type="hidden" name="idempotency_key" value="">
+        <input type="hidden" name="confirm_duplicate" value="0">
         <p class="err" data-adjustment-error role="alert" tabindex="-1" hidden></p>
+        <div class="transfer-dup-confirm" data-transfer-duplicate hidden>
+            <button class="btn" type="button" data-transfer-confirm-duplicate>Ya, tetap pindahkan dana</button>
+        </div>
         <div class="adjustment-grid">
             <div class="form-group"><label for="transfer-from">Dari akun (sumber)</label><select class="form-control" id="transfer-from" name="from_account_code" data-native-select required><option value="">Pilih akun sumber</option>@foreach($adjustmentAccounts as $account)<option value="{{ $account->account_code }}">{{ $account->account_code }} — {{ $account->account_name }}</option>@endforeach</select></div>
             <div class="form-group"><label for="transfer-to">Ke akun (tujuan)</label><select class="form-control" id="transfer-to" name="to_account_code" data-native-select required><option value="">Pilih akun tujuan</option>@foreach($adjustmentAccounts as $account)<option value="{{ $account->account_code }}">{{ $account->account_code }} — {{ $account->account_name }}</option>@endforeach</select></div>
@@ -274,6 +293,10 @@
     }
     .journal-popup .popup-content>.section-title{display:none}
     .journal-popup .uf-dialog-sub{margin:0}
+    .transfer-dup-confirm{margin:0 0 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .transfer-dup-confirm[hidden]{display:none !important}
+    .transfer-dup-confirm .btn{min-height:44px;border:1px solid #b45309;background:#fff7ed;color:#9a3412}
+    .transfer-dup-confirm .btn:hover{background:#ffedd5}
     .adjustment-panel { margin-bottom:16px; padding:0; overflow:hidden; }
     .adjustment-summary { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 20px; min-height:44px; cursor:pointer; list-style:none; }
     .adjustment-summary::-webkit-details-marker { display:none; }
@@ -389,7 +412,7 @@
             <select class="form-control" id="source" name="source">
                 <option value="">Semua sumber</option>
                 @foreach($sources as $source)
-                    <option value="{{ $source }}" @selected(($filters['source'] ?? '') === $source)>{{ $sourceLabels[$source] ?? ucfirst(str_replace('_', ' ', $source)) }}</option>
+                    <option value="{{ $source }}" @selected(($filters['source'] ?? '') === $source)>{{ $sourceLabel($source) }}</option>
                 @endforeach
             </select>
         </div>
@@ -416,7 +439,7 @@
                 <div class="journal-date">{{ \Carbon\Carbon::parse($entry['transaction_date'])->format('d/m/Y') }}</div>
                 <div class="journal-desc">
                     <strong>{{ $entry['description'] }}</strong>
-                    <span>{{ $sourceLabels[$entry['reference_type']] ?? str_replace('_', ' ', $entry['reference_type']) }} · #{{ $entry['id'] }}</span>
+                    <span>{{ $sourceLabel($entry['reference_type'] ?? '') }} · #{{ $entry['id'] }}</span>
                 </div>
                 <div class="balance-state">{{ $entry['is_balanced'] ? 'Seimbang' : 'Tidak Seimbang' }}</div>
             </header>

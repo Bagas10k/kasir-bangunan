@@ -16,6 +16,7 @@
   .pm-bar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:60;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 10px 10px 12px;border-radius:16px;background:#102A1D;box-shadow:0 18px 40px -12px rgba(4,12,8,.55);font-family:'Inter Kasir',-apple-system,'Segoe UI',sans-serif;animation:ui-rise .3s var(--ui-ease-out,ease-out)}
   .pm-bar[hidden]{display:none}
   body.pm-cart-open .pm-bar{visibility:hidden;pointer-events:none}
+  .pm-nav-toggle{display:none}
   .pm-bar-icon{position:relative;display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:#14532D;color:#C8F26B}
   .pm-bar-badge{position:absolute;top:-7px;right:-7px;display:grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:#C8F26B;color:#102A1D;font-size:12px;font-weight:800}
   .pm-bar-meta{display:flex;flex-direction:column;min-width:0}
@@ -79,7 +80,6 @@
   html body .pm-quick button{min-height:40px !important;height:40px;padding:0 6px !important;border:1px solid #DFE6E1 !important;border-radius:999px !important;background:#fff !important;color:#14532D !important;font-size:14px !important;font-weight:700 !important;box-shadow:none !important;font-variant-numeric:tabular-nums}
   html body .pm-quick button[aria-pressed=true]{border-color:#14532D !important;background:#14532D !important;color:#fff !important}
 }
-@media(max-width:380px){html body #panel-kasir #kasir .pos-cart-pane details.line-discount .discount-controls{grid-template-columns:1fr}}
 @media (max-width:760px){
   /* lembar bawah pembayaran */
   html :is(body#ui-dna-strong,body) #payment-modal-overlay[open]{inset:auto 0 0 0 !important;width:100vw !important;max-width:none !important;height:auto !important;max-height:94dvh !important;margin:0 !important;border-radius:20px 20px 0 0 !important;animation:pm-sheet-up .32s cubic-bezier(.22,.8,.24,1) !important}
@@ -126,9 +126,37 @@ html body .pm-bar[inert]{display:none}
   html body .pm-bar{width:min(var(--ui-cart-bar-width),calc(100% - var(--ui-space-panel) * 2));right:var(--ui-space-panel);bottom:var(--ui-space-panel);font-family:var(--font-body)}
 }
 html body #panel-kasir #kasir .pos-cart-pane{transform:none !important;transition:none !important}
+@media(max-width:900px){
+  html body .pm-bar{left:50%;right:auto;bottom:calc(12px + env(safe-area-inset-bottom));width:min(356px,calc(100vw - 24px));max-width:none;height:60px;margin:0;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;padding:6px;box-sizing:border-box;border-radius:999px;background:var(--ui-side,#0f2a1d);box-shadow:0 14px 32px -12px rgba(9,30,18,.52),0 4px 12px -4px rgba(9,30,18,.22);animation:none;transform:translate3d(-50%,0,0);visibility:visible;transition:visibility 0s linear 0s}
+  html body.mqa-on .pm-bar{background:transparent;box-shadow:none}
+  html body[data-active-task="kasir"] .pm-bar[hidden]{display:grid;pointer-events:none;visibility:hidden;transition:visibility 0s linear 160ms}
+  html body .pm-bar .pm-bar-icon{display:none}
+  html body .pm-bar .pm-nav-toggle{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;min-width:48px;min-height:48px;padding:0;border:0;border-radius:999px;background:rgb(255 255 255 / .12);color:#e7f3ec;cursor:pointer;touch-action:manipulation;opacity:1;transform:translate3d(0,0,0) scale(1);transition:transform 260ms cubic-bezier(.22,1,.36,1) 50ms,opacity 190ms ease 50ms,background-color .16s ease;will-change:transform,opacity}
+  html body .pm-bar .pm-nav-toggle:hover{background:rgb(255 255 255 / .2)}
+  html body .pm-bar .pm-nav-toggle:active{transform:scale(.93)}
+  html body .pm-bar .pm-nav-toggle:focus-visible{outline:2px solid var(--ui-lime,#c8f26b);outline-offset:2px}
+  html body .pm-bar .pm-bar-meta{padding-left:2px;opacity:1;transform:translate3d(0,0,0);transition:transform 260ms cubic-bezier(.22,1,.36,1) 75ms,opacity 190ms ease 75ms;will-change:transform,opacity}
+  html body .pm-bar .pm-bar-meta small{font-size:12px;line-height:1.25}
+  html body .pm-bar .pm-bar-meta strong{font-size:17px;line-height:22px}
+  html body .pm-bar .pm-bar-open{min-width:132px;min-height:48px !important;height:48px;padding:0 14px !important;border-radius:999px !important;font-size:13.5px !important;opacity:1;transform:translate3d(0,0,0);transition:transform 280ms cubic-bezier(.22,1,.36,1) 35ms,opacity 190ms ease 35ms;will-change:transform,opacity}
+  body.mqa-peek .pm-bar,body.mqa-landing .pm-bar{visibility:hidden;pointer-events:none;transition:visibility 0s linear 160ms}
+  html body[data-active-task="kasir"] .pm-bar[hidden] .pm-nav-toggle,body.mqa-peek .pm-bar .pm-nav-toggle,body.mqa-landing .pm-bar .pm-nav-toggle{opacity:0;transform:translate3d(12px,0,0) scale(.9);transition:transform 150ms cubic-bezier(.4,0,1,1),opacity 110ms ease}
+  html body[data-active-task="kasir"] .pm-bar[hidden] .pm-bar-meta,body.mqa-peek .pm-bar .pm-bar-meta,body.mqa-landing .pm-bar .pm-bar-meta{opacity:0;transform:translate3d(0,5px,0);transition:transform 140ms cubic-bezier(.4,0,1,1),opacity 100ms ease}
+  html body[data-active-task="kasir"] .pm-bar[hidden] .pm-bar-open,body.mqa-peek .pm-bar .pm-bar-open,body.mqa-landing .pm-bar .pm-bar-open{opacity:0;transform:translate3d(-18px,0,0);transition:transform 160ms cubic-bezier(.4,0,1,1),opacity 120ms ease}
+  body.pm-cart-open .pm-bar{visibility:hidden;pointer-events:none;transition:none}
+}
+@media(max-width:360px){
+  html body .pm-bar{height:56px}
+  html body .pm-bar .pm-nav-toggle{width:44px;height:44px;min-width:44px;min-height:44px}
+  html body .pm-bar .pm-bar-open{min-width:118px;min-height:44px !important;height:44px;padding:0 12px !important;font-size:13px !important}
+  html body .pm-bar .pm-bar-meta strong{font-size:16px}
+}
+@media(max-width:380px){
+  html body #panel-kasir #kasir .pos-cart-pane details.line-discount .discount-controls{grid-template-columns:1fr}
+}
 @keyframes pm-sheet-up{from{transform:translateY(100%)}to{transform:none}}
 @media (prefers-reduced-motion:reduce){
-  .pm-bar,html body #kasir .pos-cart-pane,.pm-backdrop{animation:none !important;transition:none !important}
+  .pm-bar,html body .pm-bar,html body .pm-bar :is(.pm-nav-toggle,.pm-bar-meta,.pm-bar-open),html body[data-active-task="kasir"] .pm-bar[hidden],body.mqa-peek .pm-bar,body.mqa-landing .pm-bar,html body #kasir .pos-cart-pane,.pm-backdrop{animation:none !important;transition:none !important}
   html :is(body#ui-dna-strong,body) #payment-modal-overlay[open]{animation:none !important}
 }
 </style>
@@ -145,8 +173,12 @@ const qtyText=v=>String(v||'0').replace('.',',');
 let last={count:0,qty:'0',gross:0n,discount:0n,total:0n,valid:true};
 // --- bar keranjang ---
 const bar=document.createElement('div');bar.className='pm-bar';bar.hidden=true;bar.setAttribute('role','region');bar.setAttribute('aria-label','Ringkasan keranjang');
-bar.innerHTML='<span class="pm-bar-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 7H6"/></svg><span class="pm-bar-badge"></span></span><span class="pm-bar-meta"><small></small><strong aria-live="polite"></strong></span><button type="button" class="pm-bar-open" aria-haspopup="dialog">Lihat keranjang</button>';
+bar.innerHTML='<button type="button" class="pm-nav-toggle" aria-label="Tampilkan navigasi cepat" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></button><span class="pm-bar-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L21 7H6"/></svg><span class="pm-bar-badge"></span></span><span class="pm-bar-meta"><small></small><strong aria-live="polite"></strong></span><button type="button" class="pm-bar-open" aria-haspopup="dialog">Lihat keranjang</button>';
 document.body.append(bar);
+const navToggle=bar.querySelector('.pm-nav-toggle');
+navToggle?.addEventListener('click',()=>{
+ document.dispatchEvent(new CustomEvent('mqa:peek'));
+});
 const backdrop=document.createElement('div');backdrop.className='pm-backdrop';document.body.append(backdrop);
 const openButton=bar.querySelector('.pm-bar-open'),panel=kasir.closest('.task-panel');
 pane.id='pos-cart-drawer';pane.inert=true;
@@ -260,7 +292,8 @@ let cartClosing=false;
 function openSheet(){
   if(panel?.hidden||last.count===0)return;
   const bounds=bar.getBoundingClientRect?.();
-  const origin=bounds?.width&&bounds?.height?{left:bounds.left,top:bounds.top,width:bounds.width,height:bounds.height,borderRadius:getComputedStyle(bar).borderRadius,background:getComputedStyle(bar).backgroundColor}:cartOrigin;
+  const bgSource=document.querySelector?.('.mqa-shell:not([hidden])')||bar;
+  const origin=bounds?.width&&bounds?.height?{left:bounds.left,top:bounds.top,width:bounds.width,height:bounds.height,borderRadius:getComputedStyle(bar).borderRadius,background:getComputedStyle(bgSource).backgroundColor}:cartOrigin;
   cartMotion?.cancel();
   document.body.classList.remove('pm-cart-closing');
   cartClosing=false;

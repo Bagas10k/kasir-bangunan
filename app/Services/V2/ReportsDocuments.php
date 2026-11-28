@@ -219,13 +219,15 @@ final class ReportsDocuments
             $this->fail('Penjualan tidak ditemukan.');
         }
 
-        $items = DB::table('v2_sale_items')
-            ->where('sale_id', $saleId)
-            ->orderBy('id')
-            ->get(['product_id', 'name', 'quantity', 'unit_price', 'cost_price', 'discount', 'subtotal'])
+        $items = DB::table('v2_sale_items as si')
+            ->leftJoin('products as p', 'p.id', '=', 'si.product_id')
+            ->where('si.sale_id', $saleId)
+            ->orderBy('si.id')
+            ->get(['si.product_id', 'si.name', 'si.quantity', 'si.unit_price', 'si.cost_price', 'si.discount', 'si.subtotal', 'p.unit'])
             ->map(fn ($item) => [
                 'product_id' => (int) $item->product_id,
                 'name' => (string) $item->name,
+                'unit' => (string) ($item->unit ?? ''),
                 'quantity' => $this->str($this->money($item->quantity, 4), 4),
                 'unit_price' => $this->str($this->money($item->unit_price)),
                 'cost_price' => $this->str($this->money($item->cost_price, 4), 4),
@@ -241,6 +243,14 @@ final class ReportsDocuments
                 $customer = ['id' => (int) $party->id, 'code' => (string) $party->code, 'name' => (string) $party->name];
             }
         }
+
+        $cashierName = (string) (DB::table('users')->where('id', $sale->user_id)->value('name') ?? '');
+        $shiftRow = DB::table('v2_shifts')->where('id', $sale->shift_id)->first(['business_date', 'opened_at']);
+        $cashDay = $shiftRow
+            ? (string) ($shiftRow->business_date ?: substr((string) $shiftRow->opened_at, 0, 10))
+            : substr((string) $sale->created_at, 0, 10);
+        $dueDate = DB::table('v2_invoices')->where('sale_id', $saleId)->value('due_date');
+        $dueDate = $dueDate !== null && $dueDate !== '' ? (string) $dueDate : null;
 
         $deliveryRow = DB::table('v2_deliveries')->where('sale_id', $saleId)->first();
         $delivery = $deliveryRow === null ? null : [
@@ -261,12 +271,26 @@ final class ReportsDocuments
 
         return [
             'kind' => $kind,
+            'store' => [
+                'name' => (string) config('v2.store.name', 'Toko Bahan Bangunan'),
+                'address' => (string) config('v2.store.address', ''),
+                'phone' => (string) config('v2.store.phone', ''),
+                'footer' => (string) config('v2.store.footer', ''),
+            ],
             'sale' => [
                 'id' => (int) $sale->id,
                 'number' => (string) $sale->number,
                 'date' => substr((string) $sale->created_at, 0, 10),
+                'created_at' => (string) $sale->created_at,
                 'shift_id' => (int) $sale->shift_id,
+                'cash_day' => $cashDay,
                 'cashier_id' => (int) $sale->user_id,
+                'cashier_name' => $cashierName,
+                'price_tier' => (string) ($sale->price_tier ?? 'retail'),
+                'due_date' => $dueDate,
+                'notes' => property_exists($sale, 'notes') && $sale->notes !== null && trim((string) $sale->notes) !== ''
+                    ? (string) $sale->notes
+                    : null,
                 'status' => (string) $sale->status,
                 'payment_method' => (string) $sale->payment_method,
                 'fulfillment' => (string) $sale->fulfillment,

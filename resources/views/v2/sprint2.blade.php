@@ -96,58 +96,19 @@
 <section class="card" id="receipt-history" aria-labelledby="h-receipt-history">
 <h2 id="h-receipt-history">Riwayat penerimaan</h2>
 <p class="note">Total nilai halaman ini: <strong data-receipt-page-total data-live-skip>{{ \App\Services\V2\Money::display('0') }}</strong></p>
-@php
-    $receiptTypes = ['purchase' => ['Pembelian', 'ok'], 'opening' => ['Stok awal', 'mute'], 'restock' => ['Tambah stok', 'info']];
-    $receiptItems = $receiptItems ?? collect();
-    // Qty tampil tanpa nol di belakang koma, ribuan pakai titik (3.000; 2,5).
-    $qty = function ($value): string {
-        [$int, $frac] = array_pad(explode('.', (string) $value), 2, '');
-        $frac = rtrim($frac, '0');
-        return preg_replace('/\B(?=(\d{3})+(?!\d))/', '.', ltrim($int, '0') === '' ? '0' : ltrim($int, '0')).($frac !== '' ? ','.$frac : '');
-    };
-    $receiptPay = ['2101' => ['payable', 'Utang supplier'], '1101' => ['cash', 'Tunai'], '1102' => ['bank', 'Bank'], '3101' => ['equity', 'Modal awal']];
-@endphp
 <x-ui.toolbar search="Cari nomor, pemasok, atau produk" label="Cari penerimaan" :chips="['Semua' => 'all', 'Pembelian' => 'type:purchase,restock', 'Stok awal' => 'type:opening', 'Utang supplier' => 'pay:payable', 'Tunai atau bank' => 'pay:cash,bank']"/>
-<div class="ui-table-wrap scroll" data-ui-table data-ui-noun="penerimaan" tabindex="0" role="region" aria-label="Riwayat penerimaan barang">
-<table class="ui-table">
-<caption class="sr">Riwayat penerimaan barang</caption>
-<thead><tr><th scope="col">Tanggal</th><th scope="col">Nomor dan pemasok</th><th scope="col">Produk</th><th scope="col">Tipe</th><th scope="col" class="ui-num">Total</th><th scope="col" class="ui-actions">Aksi</th></tr></thead>
-<tbody>
-@forelse($receiptHistory as $receipt)
-@php [$payKey, $payLabel] = $receiptPay[$receipt->credit_account ?? ''] ?? ['other', (string) ($receipt->credit_account ?? '—')]; @endphp
-@php
-    [$typeLabel, $typeTone] = $receiptTypes[$receipt->receipt_type ?? ''] ?? [(string) ($receipt->receipt_type ?? '—'), 'mute'];
-    $lines = $receiptItems->get($receipt->id, collect());
-    $account = (string) ($receipt->credit_account ?? '');
-@endphp
-@php $voided = $receipt->voided_at !== null; @endphp
-<tr data-pay="{{ $payKey }}" data-type="{{ $receipt->receipt_type }}" data-ui-search-text="{{ $lines->pluck('product_name')->implode(' ') }}" data-amount="{{ $voided ? '0' : $receipt->total_amount }}" @class(['rh-void' => $voided])>
-<td data-label="Tanggal" class="ui-nowrap rh-date">{{ \Carbon\Carbon::parse($receipt->receipt_date)->locale('id')->translatedFormat('d M Y') }}</td>
-<td data-label="Nomor" class="ui-primary rh-number">{{ $receipt->receipt_number ?: '#'.$receipt->id }}<span class="ui-sub">{{ $receipt->supplier_name ? 'Pemasok: '.$receipt->supplier_name : ($receipt->receipt_type === 'opening' ? 'Stok awal gudang' : 'Tanpa pemasok') }}@if(! empty($receipt->supplier_invoice_number))<span class="rh-ref"> · Nota {{ $receipt->supplier_invoice_number }}</span>@endif
-@if($receipt->notes)<span class="rh-ref"> · {{ \Illuminate\Support\Str::limit($receipt->notes, 40) }}</span>@endif</span></td>
-<td data-label="Produk" class="rh-product">@if($lines->isNotEmpty())<strong>{{ $lines->count() }} jenis barang</strong><span class="ui-sub">{{ $lines->first()->product_name }}@if($lines->count() > 1) + {{ $lines->count() - 1 }} lainnya @endif</span>@else<span class="ui-muted">—</span>@endif</td>
-<td data-label="Tipe" class="rh-type">@if($voided)<span class="ui-badge ui-badge--bad">Dibatalkan</span><span class="ui-sub rh-void-note">{{ \Carbon\Carbon::parse($receipt->voided_at)->locale('id')->translatedFormat('d M Y H:i') }}{{ $receipt->voided_by_name ? ' · '.$receipt->voided_by_name : '' }} · {{ $receipt->void_reason }}</span>@else<span class="ui-badge ui-badge--{{ $typeTone }}">{{ $typeLabel }}</span>@endif<span class="ui-sub" data-tip="{{ $payLabel }}">Akun {{ $account !== '' ? $account : '—' }} · {{ $payLabel }}</span></td>
-<td data-label="Total" class="ui-num rh-total"><strong>{{ \App\Services\V2\Money::display($receipt->total_amount) }}</strong>@if(\Brick\Math\BigDecimal::of((string) ($receipt->freight_amount ?? '0'))->isPositive())<span class="ui-sub">Nilai barang</span><span class="ui-sub">Ongkir {{ \App\Services\V2\Money::display($receipt->freight_amount) }} · {{ ['supplier'=>'Utang supplier','cash'=>'Kas','bank'=>'Bank'][$receipt->freight_method] ?? '—' }}</span>@endif</td>
-<td data-label="Aksi" class="ui-actions">
-    <button type="button" class="btn-action-pill" data-open-popup="receipt-detail-{{ $receipt->id }}">Detail</button>
-    @include('v2.receipt-history-detail')
-</td>
-</tr>
-@empty
-<tr data-ui-empty-static><td colspan="6" class="ui-empty"><strong>Belum ada penerimaan barang.</strong>Tekan "Catat penerimaan" untuk mencatat barang masuk pertama.</td></tr>
-@endforelse
-</tbody>
-</table>
-</div>
+<div data-server-table="receipts" data-ui-noun="penerimaan" data-table-url="{{ route('v2.tables.show', 'receipts') }}" data-table-default-filter="all" data-live-skip aria-live="polite">@include('v2.tables.receipts-results')</div>
 <script>
 /* Total nilai baris yang sedang tampil. Dijumlah dalam sen (BigInt) dari atribut data-amount, bukan float; hanya tampilan. */
-(()=>{const wrap=document.querySelector('#receipt-history [data-ui-table]');const out=document.querySelector('[data-receipt-page-total]');if(!wrap||!out)return;
+(()=>{const wrap=document.querySelector('#receipt-history [data-server-table], #receipt-history [data-ui-table]');const out=document.querySelector('[data-receipt-page-total]');if(!wrap||!out)return;
  const cents=v=>{const [i,f='']=String(v||'0').split('.');return BigInt(i||'0')*100n+BigInt((f+'00').slice(0,2));};
  const fmt=c=>{const neg=c<0n;if(neg)c=-c;const i=(c/100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.'),f=(c%100n).toString().padStart(2,'0');return (neg?'-':'')+'Rp '+i+(f==='00'?'':','+f);};
  const update=()=>{let sum=0n;for(const r of wrap.querySelectorAll('tbody tr[data-amount]'))if(!r.hidden)sum+=cents(r.dataset.amount);out.textContent=fmt(sum);};
  wrap.addEventListener('ui-table:render',update);update();})();
 </script>
 </section>
+@include('v2.purchase-returns')
+@include('v2.stock-opname')
 
 <template id="receipt-tpl">
 <div class="rc-row">
@@ -242,7 +203,7 @@
 @if ($role === 'admin')
 <section class="card" aria-labelledby="reject-heading">
 <h2 id="reject-heading">Tolak pengajuan / transfer</h2>
-@php $waitingPayments = collect($payments)->filter(fn ($p) => in_array(($p->status ?? ''), ['pending', 'proposed'], true))->values()->all(); @endphp
+@php $waitingPayments = isset($pendingRejectPayments) ? collect($pendingRejectPayments)->values()->all() : collect($payments)->filter(fn ($p) => in_array(($p->status ?? ''), ['pending', 'proposed'], true))->values()->all(); @endphp
 <div data-live-list>
 @if (count($waitingPayments) === 0)
     <p class="note">Tidak ada pengajuan menunggu.</p>

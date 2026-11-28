@@ -334,7 +334,7 @@ class V2PosDashboardTest extends TestCase
         // Baris katalog tidak dirender server (dibuat bertahap oleh JS), jadi HTML tidak membengkak.
         // Batas ini penjaga markup per baris, bukan anggaran CSS/JS tetap; naikkan bila lapis UI bersama bertambah.
         $this->assertSame(0, substr_count($html, 'data-add-product='));
-        $this->assertLessThan(2_800_000, strlen($html));
+        $this->assertLessThan(2_900_000, strlen($html));
         $this->assertLessThan(8.0, $service, 'Ringkasan harus cepat walau transaksi ribuan.');
     }
 }

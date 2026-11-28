@@ -19,6 +19,11 @@
     $selectedBankCode = old('bank_account_code', (string) $activeBankAccounts->first()->account_code);
     $bankNamesMap = $bankAccountNames ?? $activeBankAccounts->pluck('account_name', 'account_code')->all();
     $bankBalancesMap = $bankBalances ?? ['1102' => $bankBalance ?? '0.00'];
+    $paginatedExpenses = $expenses instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator;
+    $expenseCount = $expenses->count();
+    $firstExpense = $paginatedExpenses ? ($expenses->firstItem() ?? 0) : (int) ($expenseCount > 0);
+    $lastExpense = $paginatedExpenses ? ($expenses->lastItem() ?? 0) : $expenseCount;
+    $totalExpenses = $paginatedExpenses ? $expenses->total() : $expenseCount;
 @endphp
 <div class="expenses-page ui-dna-ops" data-expense-root data-refresh-url="{{ route('expenses.index') }}">
     @if(session('success'))
@@ -63,7 +68,7 @@
         <div class="exp-head">
             <div>
                 <h2 id="exp-list-heading">Daftar pengeluaran</h2>
-                <p class="exp-summary-sub">10 transaksi terakhir · {{ $expenseSummary['period_label'] ?? 'bulan ini' }}</p>
+                <p class="exp-summary-sub">Menampilkan {{ $firstExpense }}–{{ $lastExpense }} dari {{ $totalExpenses }} pengeluaran · {{ $expenseSummary['period_label'] ?? 'bulan ini' }}</p>
             </div>
             <form method="GET" action="{{ route('expenses.index') }}" class="exp-filter">
                 <div class="field field-date-range">
@@ -92,6 +97,14 @@
                                 <option value="{{ $bankOpt }}" @selected(request('payment_method') === $bankOpt)>{{ $bankAcc->account_code }} · {{ $bankAcc->account_name }}</option>
                             @endforeach
                         @endif
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="expense-filter-per-page">Jumlah baris</label>
+                    <select id="expense-filter-per-page" name="per_page">
+                        @foreach([10, 25, 50] as $perPageOption)
+                            <option value="{{ $perPageOption }}" @selected((int) request('per_page', 10) === $perPageOption)>{{ $perPageOption }} baris</option>
+                        @endforeach
                     </select>
                 </div>
                 <div class="exp-filter-actions">
@@ -144,6 +157,9 @@
                 </tbody>
             </table>
         </div>
+        @if($paginatedExpenses)
+            @include('partials.pagination', ['paginator' => $expenses])
+        @endif
     </section>
 
     <div id="modal-expense" class="modal-overlay {{ $errors->any() ? 'open' : '' }}" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
@@ -160,8 +176,13 @@
 
             <form action="{{ route('v2.expenses.store') }}" method="POST" id="expense-form" style="display:flex;flex-direction:column;flex:1;overflow:hidden;margin:0;">
                 @csrf
+                <input type="hidden" name="idempotency_key" value="">
+                <input type="hidden" name="confirm_duplicate" value="0">
                 <div class="modal-body">
                     <p class="exp-alert exp-alert--bad" data-expense-error role="alert" tabindex="-1" hidden></p>
+                    <div class="exp-dup-confirm" data-expense-duplicate hidden>
+                        <button type="button" class="btn exp-dup-btn" data-expense-confirm-duplicate>Ya, tetap simpan pengeluaran</button>
+                    </div>
                     @if($errors->any())
                         <p class="exp-alert exp-alert--bad" role="alert">{{ $errors->first() }}</p>
                     @endif

@@ -63,6 +63,7 @@ test('COA save uses CSRF and original form data then refreshes only its content 
     assert.equal(app.document.root.box.textContent, 'Akun tersimpan.');
     assert.deepEqual(app.window.closeCalls, ['modal-coa']);
     assert.equal(app.document.events[0].type, 'ui-remote:changed');
+    assert.equal(app.document.events[0].detail.all, true);
     assert.equal(app.button.disabled, false);
 });
 
@@ -174,4 +175,99 @@ test('a finance fetch started before a save cannot overwrite the refreshed remot
     pending[0]({ ok: true, text: async () => 'old accounts' });
     await old;
     assert.equal(remoteCache.get('bagan-akun').html, 'fresh accounts');
+});
+
+test('COA refresh updates recommendation presets wrap outside data-coa-root', async () => {
+    let presetsNode = { id: 'coa-presets-wrap', version: 'old', replaceWith(next) { presetsNode = next; } };
+    const nextPresetsNode = { id: 'coa-presets-wrap', version: 'fresh' };
+    const error = { hidden: true, textContent: '', focus() {} };
+    const form = {
+        dataset: {}, action: 'http://example.test/v2/chart-of-accounts',
+        values: { account_name: 'Beban Air', account_code: '6102', _method: 'POST' },
+        listeners: {}, reportValidity: () => true,
+        querySelector: () => error, querySelectorAll: () => [{ disabled: false }],
+        setAttribute() {}, removeAttribute() {},
+        addEventListener(type, fn) { this.listeners[type] = fn; },
+    };
+    const makeRoot = () => ({
+        dataset: { refreshUrl: 'http://example.test/coa' },
+        querySelector: s => s === '[data-coa-feedback]' ? { hidden: true, textContent: '' } : null,
+        replaceWith(next) { doc.root = next; },
+        addEventListener() {},
+    });
+    const doc = {
+        root: null,
+        getElementById: id => id === 'coa-form' ? form : (id === 'coa-presets-wrap' ? presetsNode : null),
+        querySelector: s => s === '[data-coa-root]' ? doc.root : { content: 'csrf' },
+        dispatchEvent() {},
+    };
+    doc.root = makeRoot();
+    vm.runInNewContext(source, {
+        window: { closeModal() {}, uiTableFilters: { scan() {} }, uiMotion: { enter() {} } },
+        document: doc,
+        location: { href: 'http://example.test/#bagan-akun' },
+        URL,
+        FormData: class { constructor(t) { this.t = t; } },
+        DOMParser: class {
+            parseFromString() {
+                return {
+                    querySelector: () => makeRoot(),
+                    getElementById: id => id === 'coa-presets-wrap' ? nextPresetsNode : null,
+                };
+            }
+        },
+        CustomEvent: class { constructor(t, o) { this.type = t; Object.assign(this, o); } },
+        fetch: async (_u, o) => o.method === 'POST'
+            ? { ok: true, status: 201, json: async () => ({ message: 'Akun tersimpan.' }) }
+            : { ok: true, text: async () => '<fixture>' },
+    });
+    await form.listeners.submit({ preventDefault() {} });
+    assert.equal(presetsNode.version, 'fresh');
+});
+
+test('COA modal auto-assigns unused account codes in bounded V2 mode and warns on out-of-scope prefixes', () => {
+    const coaBlade = readFileSync(new URL('../resources/views/coa/index.blade.php', import.meta.url), 'utf8');
+    const modalScriptMatch = coaBlade.match(/<script>\s*(function setSelectLocked[\s\S]*?)<\/script>/);
+    assert.ok(modalScriptMatch, 'COA modal script block found');
+    const hintClasses = new Set();
+    const els = {
+        'coa-form': { dataset: { bounded: '1' } },
+        'coa-used-codes': { dataset: { codes: JSON.stringify(['1101', '1102', '1103', '1104', '1191', '6101', '6102', '6201']) } },
+        'form-method': { value: 'POST' },
+        'account_code': { value: '', readOnly: false, dataset: { isSystem: '0' } },
+        'account_name': { value: '', focus() {} },
+        'account_type': { value: '', name: 'account_type', disabled: false },
+        'account_type_locked': { value: '', name: '', disabled: true, removeAttribute() { this.name = ''; } },
+        'normal_balance': { value: 'debit', name: 'normal_balance', disabled: false },
+        'normal_balance_locked': { value: '', name: '', disabled: true, removeAttribute() { this.name = ''; } },
+        'account-contra': { checked: false, onclick: null },
+        'account-contra-hidden': { value: '0' },
+        'account-bank': { checked: false, onclick: null },
+        'coa-bank-wrap': { hidden: true },
+        'coa-code-hint': { textContent: '', classList: { remove: c => hintClasses.delete(c), add: c => hintClasses.add(c) } },
+    };
+    const purposeBtns = ['expense', 'bank'].map(p => ({ dataset: { purpose: p }, classList: { toggle() {} } }));
+    const document = {
+        getElementById: id => els[id] || null,
+        querySelectorAll: sel => (sel === '.coa-purpose-btn' ? purposeBtns : []),
+    };
+    const ctx = { window: {}, document };
+    ctx.window = ctx;
+    vm.runInNewContext(modalScriptMatch[1], ctx);
+
+    ctx.applyCoaPurpose(purposeBtns[0]); // expense
+    assert.equal(els.account_code.value, '6103');
+    assert.equal(els.account_type.value, 'expense');
+    assert.equal(els.normal_balance.value, 'debit');
+    assert.equal(els.account_type.disabled, true);
+
+    ctx.applyCoaPurpose(purposeBtns[1]); // bank
+    assert.equal(els.account_code.value, '1105');
+    assert.equal(els.account_type.value, 'asset');
+    assert.equal(els['account-bank'].checked, true);
+
+    els.account_code.value = '2105';
+    ctx.onAccountCodeInput();
+    assert.equal(hintClasses.has('is-warn'), true);
+    assert.match(els['coa-code-hint'].textContent, /awalan 1.*6\/8/i);
 });

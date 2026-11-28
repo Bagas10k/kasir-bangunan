@@ -17,6 +17,7 @@
         'shift' => ['Ringkasan kas', 'Riwayat selisih bulanan dan pemeriksaan yang belum selesai', $m['shifts']['review'] > 0 ? [$m['shifts']['review'].' shift perlu diperiksa', 'warn'] : null],
         'laporan' => ['Ringkasan harian', 'Tunai, transfer terverifikasi, dan transfer menunggu dipisahkan', null],
         'penerimaan' => ['Ringkasan penerimaan', 'Barang masuk bulan ini: pembelian dan stok awal', ['Khusus admin', 'ok']],
+        'stok-opname' => ['Ringkasan stok opname', 'Pencatatan dan selisih stok bulan ini', null],
     ];
 
     $monitoringPages = [
@@ -55,6 +56,12 @@
             ['Pembelian / restock', $m['receipts_month']['purchase'], 'transaksi masuk', null],
             ['Saldo / stok awal', $m['receipts_month']['opening'], 'stok awal dicatat', null],
             ['Total nilai penerimaan', $rp($m['receipts_month']['total']), 'masuk ke persediaan', null],
+        ];
+        $monitoringPages['stok-opname'] = [
+            ['Total opname', ($m['stock_opnames']['count'] ?? 0).' dokumen', $monthLabel, 'hero'],
+            ['Selisih lebih', $rp($m['stock_opnames']['gain_total'] ?? '0'), 'penambahan nilai persediaan', null],
+            ['Selisih kurang', $rp($m['stock_opnames']['loss_total'] ?? '0'), 'penyusutan / rusak', $attention($m['stock_opnames']['loss_total'] ?? '0')],
+            ['Stok perlu perhatian', ($m['stock']['out'] + $m['stock']['low']).' barang', $m['stock']['out'].' habis · '.$m['stock']['low'].' menipis', $attention($m['stock']['out'] + $m['stock']['low'])],
         ];
     }
 @endphp

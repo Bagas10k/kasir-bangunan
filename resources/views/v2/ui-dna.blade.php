@@ -1,3 +1,4 @@
+@include('v2.ui-dna-tokens')
 <style>
 /* ============================================================
    DNA TAMPILAN (acuan: referensi FlowAI dari pengguna, warna tetap hijau sidebar)
@@ -11,20 +12,7 @@
    - Saringan: kolom cari + kontrol bersegmen (satu wadah), sama di semua tabel dan laporan.
    - Aksi baris tabel: tombol garis kecil, bukan tombol penuh.
    ============================================================ */
-:root{
-  --dna-canvas:#f6f8f7;
-  --dna-card:#fff;
-  --dna-line:#e4ebe6;
-  --dna-line-2:#edf2ee;
-  --dna-panel:#f5f8f6;
-  --dna-head:#f1f5f2;
-  --dna-hover:#f8fbf9;
-  --dna-r-ctl:8px;
-  --dna-r-card:12px;
-  --dna-r-dlg:16px;
-  --dna-shadow:0 1px 2px rgb(16 40 28 / .04),0 6px 18px rgb(16 40 28 / .04);
-  --dna-ctl-h:38px;
-}
+/* Token DNA ada di v2/ui-dna-tokens (dipakai juga oleh Pusat Bantuan). */
 
 /* ---------- 0. kanvas ---------- */
 html body{background:var(--dna-canvas)}
@@ -78,6 +66,10 @@ html body :is([data-remote-content],.main-content) table:not(.report-table) thea
 html body .ui-table thead th:last-child,
 html body :is([data-remote-content],.main-content) table:not(.report-table) thead th:last-child{border-radius:0 var(--dna-r-ctl) var(--dna-r-ctl) 0}
 html body .ui-table tbody tr{border:0}
+@media (max-width:639px){
+  html body table.ui-table tbody tr{border:1px solid var(--ui-line,#dbe5de)}
+  html body table.ui-table tbody tr td:last-child{border-bottom:0}
+}
 html body .ui-table tbody td,
 html body :is([data-remote-content],.main-content) table:not(.report-table) tbody td{border:0;border-bottom:1px solid var(--dna-line-2);padding:12px;vertical-align:middle}
 html body .ui-table tbody tr:last-child td,
@@ -305,10 +297,14 @@ html body:has(#kasir) .main-topbar .top-context strong{font-family:'Bricolage Ka
 html body #panel-kasir #kasir,html body #panel-kasir #kasir :is(input,select,button,textarea){font-family:'Inter Kasir',sans-serif}
 /* Judul katalog Bricolage 24px. Warna menunggu konfirmasi pengguna. */
 html body #panel-kasir #kasir .pos-catalog-card h2{font-family:'Bricolage Kasir',sans-serif;font-size:24px;font-weight:700}
-/* Kartu Keranjang: hijau #14532D, judul Bricolage 36px lime. */
-html body #panel-kasir #kasir .pos-cart-pane>section.card{background:#14532D !important;border-color:#1F3D2D}
+/* Kartu Keranjang: gradasi hijau gelap + tekstur titik/grid tema (--ui-side #0f2a1d), judul Bricolage 36px lime. */
+html body #panel-kasir #kasir .pos-cart-pane>section.card{background-color:var(--ui-side,#0f2a1d) !important;background-image:radial-gradient(110% 55% at 15% 100%,rgba(200,242,107,.14),transparent 62%),radial-gradient(85% 42% at 92% 6%,rgba(74,222,128,.10),transparent 58%),linear-gradient(170deg,#0b2116 0%,#0f2a1d 45%,#133825 84%,#17452c 100%) !important;border-color:var(--ui-side-line,#1F3D2D);isolation:isolate}
+html body #panel-kasir #kasir .pos-cart-pane>section.card::before{z-index:2}
+html body #panel-kasir #kasir .pos-cart-pane>section.card::after{content:'';position:absolute;inset:0;z-index:0;border-radius:inherit;pointer-events:none;background-image:radial-gradient(rgba(231,243,236,.08) 1px,transparent 1.6px),linear-gradient(rgba(200,242,107,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(200,242,107,.06) 1px,transparent 1px);background-size:24px 24px,32px 32px,32px 32px;background-position:left bottom;-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.18) 0%,rgba(0,0,0,.12) 28%,rgba(0,0,0,.48) 65%,rgba(0,0,0,.92) 100%);mask-image:linear-gradient(to bottom,rgba(0,0,0,.18) 0%,rgba(0,0,0,.12) 28%,rgba(0,0,0,.48) 65%,rgba(0,0,0,.92) 100%)}
+html body #panel-kasir #kasir .pos-cart-pane>section.card>:not(.pm-sheet-close){position:relative;z-index:1}
+html body #panel-kasir #kasir .pos-cart-pane>section.card>.pm-sheet-close{z-index:2}
 html body #panel-kasir #kasir #h-checkout{font-family:'Bricolage Kasir',sans-serif;font-size:36px;font-weight:600;line-height:1.2;color:#C8F26B}
-html body #panel-kasir #kasir .cart-column-header{background:#14532D;color:#E7F3EC;border-radius:4px}
+html body #panel-kasir #kasir .cart-column-header{background:var(--ui-side,#0f2a1d);color:#E7F3EC;border-radius:4px}
 /* Nama pembeli: label 15px tebal, kolom input lebar 220px dan tinggi 41px sesuai desain. */
 html body #panel-kasir #kasir #form-checkout>.pos-buyer-card .pos-buyer-title{font-size:15px;font-weight:700;color:#E7F3EC}
 html body #panel-kasir #kasir #form-checkout>.pos-buyer-card .pos-combo-input{width:220px;max-width:100%;height:41px;background:#F7FAF8}
@@ -713,7 +709,6 @@ html body #panel-kasir #kasir .pd-top .pd-top-bar{display:none !important}
   html body:has(#kasir) #workspace-sidebar .workspace-menu-group:has([aria-current=page])>summary,html body:has(#kasir) #workspace-sidebar .workspace-menu-group:has([aria-current=page])>summary svg{color:#C8F26B}
   html body:has(#kasir) #workspace-sidebar .workspace-submenu a[aria-current=page]{background:#2B4829;color:#C8F26B;font-weight:700}
   html body:has(#kasir) #workspace-sidebar .sidebar-footer{border-top:1px solid #2C4438}
-  html body:has(#kasir) .sidebar-overlay{position:fixed;inset:0;z-index:95;width:100%;height:100%;padding:0;border:0;border-radius:0;background:rgba(4,12,8,.6) !important;cursor:pointer;animation:none !important}
 }
 /* ---------- 16. kontrak gerak permukaan mengambang (desain.md bagian 6) ----------
    Satu animasi untuk semua yang muncul di atas halaman: dropdown pilihan, combobox, kalender,
@@ -888,7 +883,7 @@ html :is(body#ui-dna-strong,body) dialog.input-dialog[id^="input-popup-"] :is(.o
 /* Operasional di HP (<=760px): ringkasan 2 kolom dengan ubin utama selebar kartu, chip bisa digeser,
    baris tabel menjadi kartu label-nilai yang rapat, aksi selebar kartu, popup hampir layar penuh. */
 @media (max-width:760px){
-  html body:is([data-active-task=tagihan],[data-active-task=pengiriman],[data-active-task=penerimaan],[data-active-task=shift],[data-active-task=laporan],[data-active-task=persetujuan],[data-active-task=master-product],[data-active-task=master-supplier],[data-active-task=master-customer],[data-active-task=master-employee],[data-active-task=master-vehicle],[data-active-task=master-unit],[data-active-task=master-category]) main.wrap{padding:12px 12px 24px !important}
+  html body:is([data-active-task=tagihan],[data-active-task=pengiriman],[data-active-task=penerimaan],[data-active-task=stok-opname],[data-active-task=shift],[data-active-task=laporan],[data-active-task=persetujuan],[data-active-task=master-product],[data-active-task=master-supplier],[data-active-task=master-customer],[data-active-task=master-employee],[data-active-task=master-vehicle],[data-active-task=master-unit],[data-active-task=master-category]) main.wrap{padding:12px 12px 24px !important}
   html body :is(.ui-dna-ops,#ui-dna-ops) :is(section.card,.ui-monitor--card){padding:16px !important;border-radius:12px !important}
   html body :is(.ui-dna-ops,#ui-dna-ops) .ui-monitor-head{flex-wrap:wrap;gap:8px}
   html body :is(.ui-dna-ops,#ui-dna-ops) .ui-monitor-head .ui-pill{order:3}

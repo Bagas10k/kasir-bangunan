@@ -42,7 +42,38 @@ class V2CutoverTest extends TestCase
         $this->postJson(route('v2.payments.approve', 999))->assertForbidden();
         $this->postJson(route('v2.shifts.resolve', 999), ['reason' => 'Catatan sintetis pemeriksaan'])->assertForbidden();
         $this->actingAs($admin)->postJson('/products', ['sku' => 'SYN-BYPASS'])->assertForbidden();
-        $this->get('/products')->assertOk();
+        foreach ([
+            ['POST', '/pos/checkout'],
+            ['POST', '/stock-opname'],
+            ['POST', '/expenses'],
+            ['PUT', '/expenses/1'],
+            ['DELETE', '/expenses/1'],
+            ['POST', '/inventory/receipts'],
+            ['POST', '/ritase'],
+            ['PATCH', '/ritase/1/details'],
+            ['POST', '/coa'],
+            ['PUT', '/coa/1'],
+            ['DELETE', '/coa/1'],
+            ['POST', '/journals/adjustments'],
+            ['POST', '/journals/opening-balance'],
+            ['POST', '/journals/opening-balance/post'],
+            ['POST', '/vehicles'],
+            ['POST', '/product-options'],
+            ['DELETE', '/product-options/1'],
+        ] as [$method, $uri]) {
+            $this->actingAs($admin)->json($method, $uri, [])->assertForbidden();
+            $this->actingAs($cashier)->json($method, $uri, [])->assertForbidden();
+        }
+        foreach ([
+            ['GET', route('v2.stock-opnames.products')],
+            ['POST', route('v2.stock-opnames.store')],
+            ['POST', route('v2.sales.returns.store', 999)],
+            ['GET', route('v2.receipts.returnable', 999)],
+            ['POST', route('v2.receipts.returns.store', 999)],
+        ] as [$method, $uri]) {
+            $this->actingAs($cashier)->json($method, $uri, [])->assertForbidden();
+        }
+        $this->actingAs($admin)->get('/products')->assertOk();
         $this->get('/v2')->assertRedirect(route('pos.index'));
         $this->get('/')->assertOk()->assertSee('Ruang kerja Admin')->assertSee('data-task="akun"', false);
         $this->get('/demo-setup')->assertNotFound();
@@ -84,10 +115,15 @@ class V2CutoverTest extends TestCase
         $this->assertDatabaseCount('v2_user_roles', 0);
         $this->assertSame(0, Artisan::call('v2:prepare', ['--admin' => (string) $u->id, '--apply' => true]));
         $this->assertDatabaseHas('v2_user_roles', ['user_id' => $u->id, 'role' => 'admin']);
-        $this->assertDatabaseCount('chart_of_accounts', 11);
+        $this->assertDatabaseCount('chart_of_accounts', 16);
+        $this->assertDatabaseHas('chart_of_accounts', ['account_code' => '4103', 'normal_balance' => 'debit', 'is_contra' => true]);
+        $this->assertDatabaseHas('chart_of_accounts', ['account_code' => '4104', 'normal_balance' => 'debit', 'is_contra' => true]);
+        $this->assertDatabaseHas('chart_of_accounts', ['account_code' => '6201']);
+        $this->assertDatabaseHas('chart_of_accounts', ['account_code' => '5201']);
+        $this->assertDatabaseHas('chart_of_accounts', ['account_code' => '7101']);
         $this->assertDatabaseCount('journal_entries', 0);
         $this->assertSame(0, Artisan::call('v2:prepare', ['--admin' => (string) $u->id, '--apply' => true]));
-        $this->assertDatabaseCount('chart_of_accounts', 11);
+        $this->assertDatabaseCount('chart_of_accounts', 16);
     }
 
     public function test_prepare_refuses_unmapped_legacy_receivable_without_writes(): void

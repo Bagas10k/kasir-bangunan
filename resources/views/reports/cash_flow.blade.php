@@ -35,7 +35,7 @@
     $isPresetActive = fn ($s, $e) => (($startDate ?? '') === $s && ($endDate ?? '') === $e);
 @endphp
 
-<div class="card report-shell">
+<div class="card report-shell cash-flow-report">
     <header class="statement-header">
         <div class="statement-title">
             <nav class="breadcrumb no-print" aria-label="Breadcrumb">Laporan Keuangan<span class="sep" aria-hidden="true">›</span>Arus Kas (Cash Flow)</nav>
@@ -119,7 +119,7 @@
                 <tr><th scope="row" colspan="3" class="section-title">1. Arus Kas dari Aktivitas Operasi</th></tr>
                 @forelse($report['operating_activities']['inflows'] as $in)
                 <tr>
-                    <td class="code"><span class="sku-code">Penerimaan</span></td>
+                    <td class="code"><span class="sku-code"><span class="cash-flow-kind-full">Penerimaan</span><span class="cash-flow-kind-short">Masuk</span></span></td>
                     <td>{{ $in['label'] }}</td>
                     <td class="amount">{{ $num($in['amount']) }}</td>
                 </tr>
@@ -128,7 +128,7 @@
 
                 @forelse($report['operating_activities']['outflows'] as $out)
                 <tr>
-                    <td class="code"><span class="sku-code">Pengeluaran</span></td>
+                    <td class="code"><span class="sku-code"><span class="cash-flow-kind-full">Pengeluaran</span><span class="cash-flow-kind-short">Keluar</span></span></td>
                     <td>{{ $out['label'] }}</td>
                     <td class="amount neg">-{{ $num($out['amount']) }}</td>
                 </tr>
@@ -147,7 +147,7 @@
                 <tr><th scope="row" colspan="3" class="section-title">2. Arus Kas dari Aktivitas Investasi</th></tr>
                 @forelse($report['investing_activities']['inflows'] as $in)
                 <tr>
-                    <td class="code"><span class="sku-code">Penerimaan</span></td>
+                    <td class="code"><span class="sku-code"><span class="cash-flow-kind-full">Penerimaan</span><span class="cash-flow-kind-short">Masuk</span></span></td>
                     <td>{{ $in['label'] }}</td>
                     <td class="amount">{{ $num($in['amount']) }}</td>
                 </tr>
@@ -156,7 +156,7 @@
 
                 @forelse($report['investing_activities']['outflows'] as $out)
                 <tr>
-                    <td class="code"><span class="sku-code">Pengeluaran</span></td>
+                    <td class="code"><span class="sku-code"><span class="cash-flow-kind-full">Pengeluaran</span><span class="cash-flow-kind-short">Keluar</span></span></td>
                     <td>{{ $out['label'] }}</td>
                     <td class="amount neg">-{{ $num($out['amount']) }}</td>
                 </tr>
@@ -175,7 +175,7 @@
                 <tr><th scope="row" colspan="3" class="section-title">3. Arus Kas dari Aktivitas Pendanaan</th></tr>
                 @forelse($report['financing_activities']['inflows'] as $in)
                 <tr>
-                    <td class="code"><span class="sku-code">Penerimaan</span></td>
+                    <td class="code"><span class="sku-code"><span class="cash-flow-kind-full">Penerimaan</span><span class="cash-flow-kind-short">Masuk</span></span></td>
                     <td>{{ $in['label'] }}</td>
                     <td class="amount">{{ $num($in['amount']) }}</td>
                 </tr>
@@ -184,7 +184,7 @@
 
                 @forelse($report['financing_activities']['outflows'] as $out)
                 <tr>
-                    <td class="code"><span class="sku-code">Pengeluaran</span></td>
+                    <td class="code"><span class="sku-code"><span class="cash-flow-kind-full">Pengeluaran</span><span class="cash-flow-kind-short">Keluar</span></span></td>
                     <td>{{ $out['label'] }}</td>
                     <td class="amount neg">-{{ $num($out['amount']) }}</td>
                 </tr>

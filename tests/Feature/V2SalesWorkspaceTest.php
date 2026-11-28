@@ -71,6 +71,8 @@ class V2SalesWorkspaceTest extends TestCase
         $response = $this->actingAs($cashier)->getJson(route('v2.sales.history', ['sale_search' => 'Pembeli Sintetis cicilan', 'sale_status' => 'unpaid', 'start_date' => '', 'end_date' => '']))->assertOk();
         $html = $response->json('html');
         $this->assertStringContainsString('Pembeli Sintetis cicilan', $html);
+        $this->assertStringContainsString('aria-controls="input-popup-sale-detail" aria-label="Detail nota', $html);
+        $this->assertStringContainsString('data-label="Aksi"', $html);
         $this->assertStringContainsString('Rp 80', $html);
         $this->assertStringContainsString('Menunggu verifikasi', $html);
         $this->assertStringNotContainsString('Pembeli Sintetis lunas', $html);

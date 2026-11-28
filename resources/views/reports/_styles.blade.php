@@ -114,6 +114,22 @@
         .report-table td.amount { font-size: 10.5px; }
     }
 
+    .cash-flow-kind-short { display: none; }
+
+    @media screen and (max-width: 720px) {
+        .cash-flow-report .ledger-caption { flex-wrap: wrap; }
+        .cash-flow-report .ledger-caption strong { white-space: normal; overflow-wrap: anywhere; }
+        .cash-flow-report .ledger-caption span { text-align: start; }
+        .cash-flow-report .report-table :is(thead th:first-child, td.code) {
+            width: calc(6ch + var(--ui-space-control, .5rem)) !important;
+            overflow-wrap: anywhere;
+        }
+        .cash-flow-report .report-table :is(th.num, td.amount) { width: min(42%, 15ch); }
+        .cash-flow-report .report-table td.code .sku-code { white-space: normal; }
+        .cash-flow-kind-full { display: none; }
+        .cash-flow-kind-short { display: inline; }
+    }
+
     @media print {
         header, nav, .sidebar-wrapper, .topbar, .report-toolbar, .breadcrumb, .no-print { display: none !important; }
         .app-layout { display: block !important; }

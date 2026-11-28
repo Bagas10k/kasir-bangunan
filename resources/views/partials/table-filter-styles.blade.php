@@ -1,5 +1,6 @@
 <style id="ui-table-filter-dna">
 /* Satu pola filter untuk tabel V2, katalog, riwayat, dan halaman server. */
+:root{--ui-filter-control-height:44px}
 html body :is([data-filter-ready],#u#u#u){
     display:flex !important;flex-wrap:wrap !important;align-items:center !important;gap:10px !important;
     grid-template:none !important;position:relative;overflow:visible;
@@ -11,14 +12,27 @@ html body :is([data-filter-ready],#u#u#u)>[data-filter-search]>label{
     position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;
 }
 html body :is([data-filter-ready],#u#u#u)>[data-filter-search] input{
-    box-sizing:border-box;width:100%;max-width:100%;min-height:44px !important;height:44px !important;
+    box-sizing:border-box;width:100%;max-width:100%;min-height:var(--ui-filter-control-height) !important;height:var(--ui-filter-control-height) !important;
     padding:0 12px !important;border:1px solid #dce5de;border-radius:9px;background:#fff;color:#102a1d;font:inherit;font-size:14px !important;
 }
-html body :is([data-filter-ready],#u#u#u)>:is(.ui-search,.table-search)[data-filter-search] input{padding-left:38px !important}
+html body :is([data-filter-ready],#u#u#u)>.table-search[data-filter-search] input{padding-left:38px !important}
+html body :is([data-filter-ready],#u#u#u)>.ui-search[data-filter-search]{
+    display:flex;align-items:center;gap:var(--ui-space-control);box-sizing:border-box;
+    height:var(--ui-filter-control-height);min-height:var(--ui-filter-control-height);padding-inline:var(--ui-space-group);
+    border:var(--ui-stroke) solid var(--ui-line);border-radius:var(--ui-radius);background:var(--ui-surface);
+}
+html body :is([data-filter-ready],#u#u#u)>.ui-search[data-filter-search]:focus-within{outline:var(--ui-stroke) solid var(--ui-focus)}
+html body :is([data-filter-ready],#u#u#u)>.ui-search[data-filter-search]>svg{
+    position:static;transform:none;flex:none;width:var(--ui-t-body);height:var(--ui-t-body);
+}
+html body :is([data-filter-ready],#u#u#u)>.ui-search[data-filter-search] input{
+    flex:1;min-width:0;height:100% !important;min-height:0 !important;
+    padding:0 !important;border:0 !important;background:transparent !important;box-shadow:none !important;
+}
 html body :is([data-filter-ready],#u#u#u)>.ui-toolbar-actions{margin-left:auto}
 html body .ui-filter-owner{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0;max-width:100%}
 html body :is(.ui-filter-trigger,.ui-filter-search-submit,#u#u#u){
-    display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;height:44px;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:var(--ui-filter-control-height);height:var(--ui-filter-control-height);
     width:auto;padding:0 14px;border:1px solid #dce5de;border-radius:9px;background:#fff;color:#14532d;
     font-family:inherit;font-size:14px;font-weight:600;line-height:1.3;white-space:nowrap;cursor:pointer;box-shadow:0 1px 2px rgb(15 42 29 / .03);
 }
@@ -51,7 +65,7 @@ html body :is([data-table-filter-panel],#u#u#u) .ui-filter-close{
 }
 html body :is([data-table-filter-panel],#u#u#u) .ui-filter-close:hover{background:#f2f6f3}
 html body :is([data-table-filter-panel],#u#u#u) .ui-filter-fields{
-    display:flex;flex-direction:column;gap:16px;min-height:0;overflow:auto;overscroll-behavior:contain;padding:18px 20px;
+    display:flex;flex-direction:column;gap:16px;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;padding:18px 20px;
 }
 html body :is([data-table-filter-panel],#u#u#u) .ui-filter-fields :is(.field,.form-group,.master-control,.table-perpage,.filter-cluster,.preset-cluster,.custom-period,.date-cluster,.report-filter-form){
     display:flex !important;flex-direction:column !important;align-items:stretch !important;gap:7px !important;
@@ -72,7 +86,7 @@ html body :is([data-table-filter-panel],#u#u#u) :is(.date-field,.select-shell){w
 html body :is([data-table-filter-panel],#u#u#u) .date-field--range>input[type=date],
 html body :is([data-table-filter-panel],#u#u#u) .select-shell.is-enhanced>select{position:absolute;width:1px;height:1px !important;min-height:0 !important;padding:0 !important;opacity:0;pointer-events:none}
 html body :is([data-table-filter-panel],#u#u#u) .range-sep{display:none}
-html body :is([data-table-filter-panel],#u#u#u) :is(.ui-chips,.period-presets){display:grid;grid-template-columns:minmax(0,1fr);gap:5px;overflow:visible;padding:0;margin:0}
+html body :is([data-table-filter-panel],#u#u#u) :is(.ui-chips,.period-presets){display:grid !important;grid-template-columns:minmax(0,1fr) !important;gap:6px !important;width:100% !important;overflow:visible !important;padding:0 !important;margin:0 !important}
 html body :is([data-table-filter-panel],#u#u#u) :is(.ui-chip,.preset-btn){
     display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;max-width:100%;min-height:44px;
     margin:0;padding:10px 12px;border:1px solid transparent;border-radius:8px;background:#f6f8f6;color:#3c4a42;

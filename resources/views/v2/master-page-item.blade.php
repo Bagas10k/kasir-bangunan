@@ -89,7 +89,7 @@
         $monitorHead = match ($kind) {
             'product' => ['Ringkasan produk', 'Katalog barang, batas stok minimum, dan barang yang perlu dipesan ulang', $m['stock']['out'] > 0 ? [$m['stock']['out'].' produk stok habis', 'bad'] : ($m['stock']['low'] > 0 ? [$m['stock']['low'].' produk stok menipis', 'warn'] : null)],
             'customer' => ['Ringkasan pelanggan', 'Pelanggan tetap dan piutang yang belum lunas', $m['receivable']['count'] > 0 ? [$m['receivable']['count'].' tagihan belum lunas', 'warn'] : null],
-            'supplier' => ['Ringkasan supplier', 'Pemasok barang dan utang yang belum dibayar', $m['payable']['count'] > 0 ? [$m['payable']['count'].' tagihan supplier belum lunas', 'warn'] : null],
+            'supplier' => ['Ringkasan supplier', 'Pemasok aktif dan sisa utang', $m['payable']['count'] > 0 ? [$m['payable']['count'].' tagihan belum lunas', 'warn'] : null],
             'employee' => ['Ringkasan karyawan', 'Staf toko yang terdaftar', null],
             default => ['Ringkasan mobil', 'Armada untuk pengiriman barang', null],
         };

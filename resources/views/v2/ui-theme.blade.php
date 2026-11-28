@@ -1,3 +1,4 @@
+@include('v2.ui-font-tokens')
 <style>
 /* ============================================================
    TEMA V2 — latar putih, sidebar gelap kehijauan, aksen hijau terang + tipografi
@@ -9,11 +10,11 @@
   --ui-side:#0f2a1d;--ui-side-2:#143826;--ui-side-line:rgb(255 255 255 / .12);
   --ui-side-tree:rgb(255 255 255 / .24);--ui-side-ink:#e7f3ec;--ui-side-mute:#9fb8a9;
   --ui-side-active:#c8f26b;--ui-side-active-bg:rgb(200 242 107 / .15);
+  --ui-sidebar-backdrop:rgb(4 12 8 / .6);
   --ui-accent:#4ade80;--ui-accent-2:#36c46d;--ui-accent-soft:#e3f9ea;--ui-on-accent:#0f2a1d;
   --ui-canvas:#fff;--bg:#fff;--canvas:#fff;
   --ui-line:#dbe5de;--ui-line-soft:#eaf0ec;--ui-head:#f3f7f4;--ui-hover:#f6faf7;
-  --font-display:'Plus Jakarta Sans','Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
-  --font-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  /* --font-display dan --font-body ada di v2/ui-font-tokens (dipakai juga oleh Pusat Bantuan). */
   --font-sans:var(--font-body);
 }
 
@@ -61,7 +62,9 @@ body :is(.uf-section-title){color:var(--ui-green)}
 body :focus-visible{outline-color:#0b5cab}
 
 /* ---------- sidebar gelap kehijauan ---------- */
-#workspace-sidebar.app-sidebar{background:var(--ui-side)!important;border-right:0!important;color:var(--ui-side-ink)}
+#workspace-sidebar.app-sidebar{background:var(--ui-side)!important;border-right:0!important;color:var(--ui-side-ink);isolation:isolate}
+#workspace-sidebar.app-sidebar>*{position:relative;z-index:1}
+#workspace-sidebar.app-sidebar::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(rgba(231,243,236,.07) 1px,transparent 1.6px),linear-gradient(rgba(200,242,107,.065) 1px,transparent 1px),linear-gradient(90deg,rgba(200,242,107,.065) 1px,transparent 1px),radial-gradient(125% 65% at 18% 100%,rgba(200,242,107,.16),transparent 62%);background-size:24px 24px,32px 32px,32px 32px,100% 100%;background-position:left bottom;-webkit-mask-image:linear-gradient(to bottom,transparent 0%,transparent 48%,rgba(0,0,0,.22) 66%,rgba(0,0,0,.78) 86%,#000 100%);mask-image:linear-gradient(to bottom,transparent 0%,transparent 48%,rgba(0,0,0,.22) 66%,rgba(0,0,0,.78) 86%,#000 100%)}
 #workspace-sidebar .sidebar-brand{background:transparent;border-bottom:1px solid var(--ui-side-line)}
 #workspace-sidebar .brand-mark{background:var(--ui-accent);color:var(--ui-on-accent);box-shadow:none}
 #workspace-sidebar .sidebar-brand-text strong{color:#fff;font-family:var(--font-display);font-weight:700;letter-spacing:0;word-spacing:.08em}
@@ -75,14 +78,21 @@ body :focus-visible{outline-color:#0b5cab}
 #workspace-sidebar .sidebar-nav .workspace-submenu a{color:var(--ui-side-ink);font-weight:500}
 #workspace-sidebar .sidebar-nav .workspace-submenu a:hover{background:rgb(255 255 255 / .07);color:#fff}
 #workspace-sidebar .sidebar-nav .workspace-submenu a[aria-current=page]{background:var(--ui-side-active-bg);color:var(--ui-side-active);font-weight:650}
-#workspace-sidebar .sidebar-footer{border-top:1px solid var(--ui-side-line);background:transparent}
-#workspace-sidebar .sidebar-footer form button{color:var(--ui-side-ink);background:transparent}
-#workspace-sidebar .sidebar-footer form button:hover{background:rgb(255 255 255 / .07);color:#fff}
+html body #workspace-sidebar .sidebar-footer{border-top:1px solid var(--ui-side-line);background:#0a2015;padding:12px 10px calc(12px + env(safe-area-inset-bottom))}
+html body #workspace-sidebar .sidebar-footer form button{color:var(--ui-side,#0f2a1d) !important;background:var(--ui-side-active,#c8f26b) !important;font-weight:700;border-radius:10px;box-shadow:0 6px 16px -8px rgba(200,242,107,.45);transition:background-color .16s ease,width var(--ui-sidebar-duration,.2s) var(--ui-ease-out,ease-out),transform .12s ease}
+html body #workspace-sidebar .sidebar-footer form button :is(svg,span){color:inherit !important}
+html body #workspace-sidebar .sidebar-footer form button svg{margin-left:0}
+html body #workspace-sidebar .sidebar-footer form button:hover{background:#d8f890 !important;color:var(--ui-side,#0f2a1d) !important}
+html body #workspace-sidebar .sidebar-footer form button:active{transform:scale(.98)}
+html body #workspace-sidebar .sidebar-footer form button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#workspace-sidebar .sidebar-footer .sidebar-help{color:color-mix(in srgb,var(--ui-side-active) 60%,var(--ui-side-mute))}
+#workspace-sidebar .sidebar-footer .sidebar-help:is(:hover,:focus-visible){background:transparent}
+#workspace-sidebar .sidebar-footer .sidebar-help:is(:hover,:focus-visible) span{color:var(--ui-side-active)}
 #workspace-sidebar :focus-visible{outline-color:var(--ui-side-active)}
 #workspace-sidebar{scrollbar-width:thin;scrollbar-color:rgb(255 255 255 / .25) transparent}
 @media (min-width:901px){
   #workspace-sidebar:not(.pinned) .workspace-menu-group:has([aria-current=page])>summary{background:var(--ui-side-active-bg)}
   #workspace-sidebar:not(.pinned) .workspace-menu-group:has([aria-current=page])>summary::before{background:var(--ui-side-active)}
+  #workspace-sidebar:not(.pinned) .sidebar-footer form button{width:48px}
 }
-@media (max-width:900px){#sidebar-overlay{background:rgb(15 42 29 / .5)}}
 </style>

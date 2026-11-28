@@ -29,7 +29,7 @@ class SupplyTrips
 
     private const PAYABLE = '2101';
 
-    private const TRIP_EXPENSE = '6101';
+    private const TRIP_EXPENSE = '6201';
 
     public function __construct(private TransportAssignment $assignment) {}
 
@@ -288,7 +288,7 @@ class SupplyTrips
     }
 
     /**
-     * Biaya perjalanan: DR 6101, CR kas/bank. Beban terpisah dari pendapatan
+     * Biaya perjalanan: DR 6201, CR kas/bank. Beban terpisah dari pendapatan
      * ongkir 4102 (tidak saling memotong). Trip tunai wajib shift admin terbuka.
      *
      * @return array{trip_id:int, total:string, journal_entry_id:int}

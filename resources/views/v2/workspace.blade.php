@@ -71,7 +71,7 @@
 <aside id="workspace-sidebar" class="workspace-sidebar app-sidebar collapsed" aria-label="Navigasi aplikasi">
     <div class="sidebar-brand sidebar-header"><div class="brand-mark" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4zM8 8h8M8 12h3M8 16h8"/></svg></div><div class="sidebar-brand-text"><strong>Kasir Bangunan</strong><small>Terminal Material</small></div><button type="button" class="sidebar-close secondary" aria-label="Tutup menu">×</button></div>
     @include('partials.workspace-navigation', ['workspacePage' => true])
-    <div class="sidebar-footer"><span class="role-label">{{ $isAdmin ? 'Admin' : 'Kasir' }}</span><form method="post" action="{{ route('logout') }}">@csrf<button class="secondary" title="Keluar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 4H4v16h5M13 7l5 5-5 5M8 12h10"/></svg><span>Keluar</span></button></form></div>
+    <div class="sidebar-footer"><span class="role-label">{{ $isAdmin ? 'Admin' : 'Kasir' }}</span>@include('partials.sidebar-help-link')<form method="post" action="{{ route('logout') }}">@csrf<button class="secondary" title="Keluar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 4H4v16h5M13 7l5 5-5 5M8 12h10"/></svg><span>Keluar</span></button></form></div>
 </aside>
 @include('partials.workspace-header', ['workspacePage' => true])
 
@@ -143,51 +143,7 @@
 
                 <h3 class="ui-subhead">Riwayat kas harian</h3>
                 <x-ui.toolbar search="Cari tanggal atau pembuka kas" label="Cari kas harian" :chips="['Semua' => 'all', 'Terbuka' => 'status:open', 'Perlu diperiksa' => 'status:review', 'Ditutup' => 'status:closed']"/>
-                <div class="ui-table-wrap scroll" data-ui-table tabindex="0" role="region" aria-label="Riwayat kas harian">
-                    <table class="ui-table">
-                        <caption class="sr">Riwayat kas per tanggal, termasuk catatan lama yang tetap disimpan</caption>
-                        <thead><tr><th scope="col">Tanggal kas</th><th scope="col">Dibuka oleh</th><th scope="col">Dibuka</th><th scope="col" class="ui-num">Kas awal</th><th scope="col" class="ui-num">Perkiraan</th><th scope="col" class="ui-num">Uang fisik</th><th scope="col" class="ui-num">Selisih</th><th scope="col">Status</th><th scope="col" class="ui-actions">Aksi</th></tr></thead>
-                        <tbody>
-                        @forelse ($shifts as $s)
-                            <tr data-status="{{ $s->status ?? '' }}">
-                                <td class="ui-primary ui-nowrap" data-label="Tanggal kas">{{ substr((string) $s->opened_at, 0, 10) }}<span class="ui-sub">{{ !empty($s->business_date) ? 'Kas harian' : 'Catatan lama' }} · {{ $sourceLabel[$s->source ?? ''] ?? '' }}</span></td>
-                                <td data-label="Dibuka oleh">{{ $s->user_name ?? '—' }}</td>
-                                <td data-label="Dibuka" class="ui-nowrap">{{ $when($s->opened_at ?? null) }}</td>
-                                <td data-label="Kas awal" class="ui-num">{{ $rp($s->opening_cash ?? null) }}</td>
-                                <td data-label="Perkiraan" class="ui-num">{{ $rp($s->expected_cash ?? null) }}</td>
-                                <td data-label="Uang fisik" class="ui-num">{{ ($s->counted_cash ?? null) === null ? 'Belum dihitung' : $rp($s->counted_cash) }}</td>
-                                <td data-label="Selisih" class="ui-num @if(($s->difference ?? null) !== null && (float) $s->difference !== 0.0) ui-neg @endif">{{ ($s->difference ?? null) === null ? '—' : $rp($s->difference) }}</td>
-                                <td data-label="Status"><x-ui.status :status="$s->status ?? ''"/></td>
-                                <td class="ui-actions">
-                                @if ($isAdmin && ($s->status ?? '') === 'open')
-                                    <form class="form-close" action="{{ route('v2.shifts.close', ['id' => $s->id]) }}" data-shift="{{ $s->id }}" novalidate>
-                                        <h3 class="sr">Tutup kas harian {{ substr((string) $s->opened_at, 0, 10) }}</h3>
-                                        <div class="close-recap" data-close-recap hidden></div>
-                                        <div class="row">
-                                            <div class="field">
-                                                <label for="counted-{{ $s->id }}">Uang fisik dihitung ({{ substr((string) $s->opened_at, 0, 10) }})</label>
-                                                <input id="counted-{{ $s->id }}" name="counted" type="text" data-money inputmode="decimal" autocomplete="off" maxlength="30" pattern="[0-9]+([.][0-9]{1,2})?" aria-describedby="counted-help-{{ $s->id }}" required>
-                                                <p class="note" id="counted-help-{{ $s->id }}">Angka otomatis di atas menunjukkan yang seharusnya ada di laci. Hitung uang fisik, lalu isi hasilnya di sini untuk dibandingkan.</p>
-                                                <p class="close-match" data-close-match hidden></p>
-                                            </div>
-                                            <div class="field" style="flex:0 0 auto">
-                                                <button type="submit" class="secondary">Tutup kas harian</button>
-                                            </div>
-                                        </div>
-                                        <p class="err" data-error tabindex="-1" hidden></p>
-                                        <p class="ok" data-ok hidden></p>
-                                    </form>
-                                @else
-                                    <span class="ui-muted">—</span>
-                                @endif
-                                </td>
-                            </tr>
-                        @empty
-                            <tr data-ui-empty-static><td colspan="9" class="ui-empty"><strong>Belum ada kas harian.</strong>{{ $isAdmin ? 'Tekan Buka kas harian untuk memulai.' : 'Menunggu admin membuka kas harian.' }}</td></tr>
-                        @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                <div data-server-table="shifts" data-table-url="{{ route('v2.tables.show', 'shifts') }}" data-table-default-filter="all" data-live-skip aria-live="polite">@include('v2.tables.shifts-results')</div>
             </section>
 
             @include('v2.pos-cashier')
@@ -204,47 +160,7 @@
                     <p class="note" id="payment-verification-help">Pantau transfer pelanggan dan pengajuan pembayaran supplier Anda. Pembayaran yang menunggu diperiksa oleh admin; tunai pelanggan langsung tercatat.</p>
                 @endif
                 <x-ui.toolbar search="Cari tagihan, nama, atau pengaju" label="Cari pembayaran" default="Menunggu verifikasi" :chips="['Menunggu verifikasi' => 'status:pending,proposed', 'Terverifikasi' => 'status:posted', 'Ditolak' => 'status:rejected', 'Semua' => 'all']"/>
-                <div class="ui-table-wrap scroll" data-ui-table tabindex="0" role="region" aria-label="Daftar pembayaran">
-                    <table class="ui-table">
-                        <caption class="sr">Daftar pembayaran yang diajukan</caption>
-                        <thead><tr><th scope="col">Tanggal</th><th scope="col">Tagihan</th><th scope="col">Nama</th><th scope="col">Sumber dana</th><th scope="col" class="ui-num">Jumlah</th>@if($isAdmin)<th scope="col">Pengaju</th>@endif<th scope="col">Status</th>@if($isAdmin)<th scope="col" class="ui-actions">Aksi</th>@endif</tr></thead>
-                        <tbody>
-                        @forelse ($payments as $pm)
-                            <tr data-status="{{ $pm->status ?? '' }}">
-                                <td data-label="Tanggal" class="ui-nowrap">{{ $when($pm->created_at ?? null) }}</td>
-                                <td data-label="Tagihan" class="ui-primary ui-nowrap">{{ $pm->invoice_number ?? ('#'.($pm->invoice_id ?? '')) }}<span class="ui-sub">{{ ($pm->invoice_direction ?? '') === 'payable' ? 'Utang supplier' : 'Piutang pelanggan' }}</span></td>
-                                <td data-label="Nama">{{ $pm->party_name ?? '—' }}</td>
-                                <td data-label="Sumber dana">{{ $sourceLabel[$pm->method ?? ''] ?? '—' }}@if(($pm->method ?? '') === 'transfer' && !empty($pm->bank_account_code))<span class="ui-sub">{{ $pm->bank_account_code }}{{ isset($bankAccountNames[$pm->bank_account_code]) ? ' · '.$bankAccountNames[$pm->bank_account_code] : '' }}</span>@endif @if($pm->proof_id)<span class="ui-sub"><a href="{{ route('v2.payments.proof', $pm->id) }}" target="_blank" rel="noopener">Lihat bukti transfer</a></span>@endif</td>
-                                <td data-label="Jumlah" class="ui-num">{{ $rp($pm->amount ?? null) }}</td>
-                                @if($isAdmin)<td data-label="Pengaju">{{ $pm->requester_name ?? '—' }}</td>@endif
-                                <td data-label="Status"><x-ui.status :status="$pm->status ?? ''"/></td>
-                                @if($isAdmin)<td class="ui-actions">
-                                @if ($isAdmin && in_array(($pm->status ?? ''), ['pending', 'proposed'], true))
-                                    <form class="form-approve" action="{{ route('v2.payments.approve', ['id' => $pm->id]) }}" novalidate>
-                                        @if(($pm->method ?? '') === 'transfer' && count($bankAccounts ?? []) > 1)
-                                            @php $selectedApproveBank = trim((string) ($pm->bank_account_code ?? '')) ?: '1102'; @endphp
-                                            <label class="sr" for="approve-bank-{{ $pm->id }}">Rekening bank verifikasi</label>
-                                            <select id="approve-bank-{{ $pm->id }}" name="bank_account_code" style="margin-bottom:6px;max-width:210px">
-                                                @foreach($bankAccounts as $bankAcc)
-                                                    <option value="{{ $bankAcc->account_code }}" @selected($selectedApproveBank === (string) $bankAcc->account_code)>{{ $bankAcc->account_code }} · {{ $bankAcc->account_name }}</option>
-                                                @endforeach
-                                            </select>
-                                        @endif
-                                        <p><button type="submit" class="secondary">Verifikasi pembayaran</button></p>
-                                        <p class="err" data-error tabindex="-1" hidden></p>
-                                        <p class="ok" data-ok hidden></p>
-                                    </form>
-                                @else
-                                    <span class="ui-muted">—</span>
-                                @endif
-                                </td>@endif
-                            </tr>
-                        @empty
-                            <tr data-ui-empty-static><td colspan="{{ $isAdmin ? 8 : 6 }}" class="ui-empty"><strong>Belum ada pembayaran untuk diperiksa.</strong>Transfer pelanggan dan pengajuan pembayaran supplier akan muncul di sini. Pembayaran tunai pelanggan tidak perlu menunggu verifikasi.</td></tr>
-                        @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                <div data-server-table="payments" data-table-url="{{ route('v2.tables.show', 'payments') }}" data-table-default-filter="status:pending,proposed" data-live-skip aria-live="polite">@include('v2.tables.payments-results')</div>
             </section>
 
             @include('v2.sales-history')
@@ -342,6 +258,8 @@
     function freshKey() { return 'wf-' + uuid(); }
 
     function setKey(input) { if (input) { input.value = freshKey(); } }
+    window.v2Uuid = uuid;
+    window.v2FreshKey = freshKey;
 
     function showErr(form, text, errors) {
         var box = form.querySelector('[data-error]');
@@ -545,6 +463,8 @@
             var cid = val(checkout, 'customer_id');
             payload.customer_id = cid === '' ? null : cid;
             payload.destination = payload.fulfillment === 'delivery' ? val(checkout, 'destination') : null;
+            var notesVal = val(checkout, 'notes');
+            if (notesVal !== '') { payload.notes = notesVal; }
             var dt = document.getElementById('inv-disc-type').value;
             var dv = val(checkout, 'discount_value');
             if (dv !== '') { payload.discount = { type: dt, value: dv }; }
@@ -571,7 +491,19 @@
                     link.href = docsBase + '/' + encodeURIComponent(saleId) + '/receipt';
                     link.textContent = 'Buka nota penjualan';
                     link.style.fontWeight = '600';
+                    link.target = '_blank';
+                    link.rel = 'noopener';
                     result.appendChild(link);
+                    if (data.delivery_number) {
+                        result.appendChild(document.createTextNode(' · '));
+                        var deliveryLink = document.createElement('a');
+                        deliveryLink.href = docsBase + '/' + encodeURIComponent(saleId) + '/delivery';
+                        deliveryLink.target = '_blank';
+                        deliveryLink.rel = 'noopener';
+                        deliveryLink.textContent = 'Buka surat jalan';
+                        deliveryLink.style.fontWeight = '600';
+                        result.appendChild(deliveryLink);
+                    }
                 }
                 setKey(document.getElementById('checkout-key'));
                 while (itemsBox.firstChild) { itemsBox.removeChild(itemsBox.firstChild); }
@@ -608,6 +540,10 @@
         if (!form) { return; }
         {
             ev.preventDefault();
+            if (form.dataset.direction === 'payable' && val(form, 'method') === 'transfer' && !val(form, 'bank_account_code')) {
+                showErr(form, 'Pilih rekening bank sumber sebelum mencatat pembayaran.');
+                return;
+            }
             if (!val(form, 'idempotency_key')) { setKey(form.elements['idempotency_key']); }
             var payload = {
                 amount: val(form, 'amount'),
@@ -737,6 +673,7 @@
 @include('v2.shared-date-picker')
 @include('partials.filter-disclosure-script')
 @include('v2.ui-tables')
+@include('v2.ui-server-tables')
 @include('v2.ui-motion')
 @include('v2.ui-forms')
 @include('v2.ui-result')

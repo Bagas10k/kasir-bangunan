@@ -4,6 +4,7 @@ namespace App\Services\V2;
 
 use App\Services\AccountBalanceService;
 use App\Support\SafeLog;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +22,7 @@ final class CashBankTransfers
         private AccountBalanceService $balances,
         private Operations $operations,
         private BankAccounts $bankAccounts,
+        private OperationIdempotency $idempotency,
     ) {}
 
     /**
@@ -76,7 +78,25 @@ final class CashBankTransfers
             throw ValidationException::withMessages(['description' => 'Keterangan wajib diisi (maksimal 200 karakter).']);
         }
 
-        $result = DB::transaction(function () use ($actor, $date, $fromCode, $toCode, $amount, $reason): array {
+        $idempotencyKey = $this->idempotency->normalizeKey($data['idempotency_key'] ?? null);
+        $confirmDuplicate = filter_var($data['confirm_duplicate'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $requestHash = $this->idempotency->hashPayload([
+            'transaction_date' => $date,
+            'from_account_code' => $fromCode,
+            'to_account_code' => $toCode,
+            'amount' => (string) $amount,
+            'description' => $reason,
+        ]);
+
+        $wasReplayed = false;
+        $result = DB::transaction(function () use ($actor, $date, $fromCode, $toCode, $amount, $reason, $idempotencyKey, $confirmDuplicate, $requestHash, &$wasReplayed): array {
+            $replayed = $this->idempotency->replay('cash_bank_transfer', $actor, $idempotencyKey, $requestHash);
+            if ($replayed !== null) {
+                $wasReplayed = true;
+
+                return $replayed;
+            }
+
             $this->assertBookkeepingStarted();
 
             $accounts = DB::table('chart_of_accounts')
@@ -104,6 +124,46 @@ final class CashBankTransfers
                 0,
                 255
             );
+
+            if (! $confirmDuplicate) {
+                $recentCutoff = now()->subMinutes(15);
+                $normalizedDesc = mb_strtolower(trim($description));
+                $candidates = DB::table('journal_entries as je')
+                    ->where('je.reference_type', 'cash_bank_transfer')
+                    ->where('je.transaction_date', $date)
+                    ->whereExists(function ($query) use ($toCode, $amount): void {
+                        $query->selectRaw('1')
+                            ->from('journal_entry_lines as l1')
+                            ->whereColumn('l1.journal_entry_id', 'je.id')
+                            ->where('l1.account_code', $toCode)
+                            ->where('l1.debit', (string) $amount);
+                    })
+                    ->whereExists(function ($query) use ($fromCode, $amount): void {
+                        $query->selectRaw('1')
+                            ->from('journal_entry_lines as l2')
+                            ->whereColumn('l2.journal_entry_id', 'je.id')
+                            ->where('l2.account_code', $fromCode)
+                            ->where('l2.credit', (string) $amount);
+                    })
+                    ->orderByDesc('je.id')
+                    ->get(['je.id', 'je.transaction_date', 'je.description', 'je.created_at']);
+
+                $duplicate = $candidates->first(function ($entry) use ($normalizedDesc, $recentCutoff): bool {
+                    if (mb_strtolower(trim((string) ($entry->description ?? ''))) === $normalizedDesc) {
+                        return true;
+                    }
+
+                    return $entry->created_at !== null && Carbon::parse($entry->created_at)->greaterThanOrEqualTo($recentCutoff);
+                });
+
+                if ($duplicate) {
+                    $dateText = Carbon::parse($duplicate->transaction_date)->locale('id')->translatedFormat('j M Y');
+                    throw ValidationException::withMessages([
+                        'duplicate_transfer' => 'Pindah dana serupa dari '.$fromCode.' ke '.$toCode.' sebesar '.Money::display((string) $amount).' pada '.$dateText.' sudah tercatat sebagai Jurnal #'.$duplicate->id.'. Bila memang ada pindah dana kedua yang sama, tekan tombol "Ya, tetap pindahkan dana".',
+                    ]);
+                }
+            }
+
             $now = now();
             $journalId = DB::table('journal_entries')->insertGetId([
                 'reference_type' => 'cash_bank_transfer',
@@ -128,7 +188,7 @@ final class CashBankTransfers
                 ]);
             }
 
-            return [
+            $payload = [
                 'status' => 'posted',
                 'journal_entry_id' => $journalId,
                 'from_account_code' => $fromCode,
@@ -136,15 +196,21 @@ final class CashBankTransfers
                 'amount' => (string) $amount,
                 'message' => 'Pindah dana dari '.$fromCode.' ke '.$toCode.' tersimpan dan jurnalnya dikunci.',
             ];
+
+            $this->idempotency->record('cash_bank_transfer', $actor, $idempotencyKey, $requestHash, $journalId, $payload);
+
+            return $payload;
         });
 
-        SafeLog::info('cash_bank_transfer.posted', [
-            'actor_id' => $actor,
-            'journal_entry_id' => $result['journal_entry_id'],
-            'from_account_code' => $fromCode,
-            'to_account_code' => $toCode,
-            'amount' => $result['amount'],
-        ]);
+        if (! $wasReplayed) {
+            SafeLog::info('cash_bank_transfer.posted', [
+                'actor_id' => $actor,
+                'journal_entry_id' => $result['journal_entry_id'],
+                'from_account_code' => $fromCode,
+                'to_account_code' => $toCode,
+                'amount' => $result['amount'],
+            ]);
+        }
 
         return $result;
     }

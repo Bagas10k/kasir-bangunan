@@ -286,12 +286,6 @@ dialog.input-dialog::backdrop{background:rgb(23 43 32 / .35)}
   body.sidebar-open{overflow:hidden}
   .sidebar-close{display:inline-flex}
   .mobile-menu-toggle{display:inline-flex}
-  .sidebar-overlay{
-    display:none;position:fixed;inset:0;z-index:30;
-    width:100%;height:100%;min-height:0;padding:0;border:0;border-radius:0;
-    background:rgb(23 43 32 / .35);cursor:pointer;
-  }
-  body.sidebar-open .sidebar-overlay{display:block}
 }
 
 @media(max-width:700px){

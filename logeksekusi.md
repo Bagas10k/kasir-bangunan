@@ -1836,3 +1836,746 @@ Setiap agen yang menyelesaikan tugas pada repositori ini wajib menambahkan entri
 - **Pelaksana**: OpenCode / GPT-6.2 Sol. `resources/views/v2/pos-theme.blade.php`: stepper tidak lagi berlebar tetap 110 px; angka `min-width:3ch`, tombol 36 px tanpa latar, `overflow` tidak memotong, dan baris keranjang sempit memakai `minmax(0,1fr) auto 30px` agar subtotal tidak terjepit. `desain.md` bagian 65 ditambahkan.
 - **Verifikasi**: Chromium fixture CSS asli 18 kasus (280-430 px, nilai 12/120/1.500, font akar 16 dan 20 px, tombol 40 px dipaksa seperti perangkat sentuh) - angka muat dan terlihat, subtotal minimal 78 px, tanpa overflow halaman; desktop 620 px tetap 124 px (exit 0). PHPUnit 93/93, 944 asersi (exit 0); Node 179/179 (exit 0).
 - **Batas**: Hanya tampilan keranjang Kasir; tidak mengubah perhitungan, validasi, atau data. Belum push/deploy.
+
+
+## [2026-11-24 19:02 WIB] - Perapian Tata Letak Bagian Harga & Margin pada Detail Produk V2
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Merapikan tata letak bagian **Harga dan margin** (`section.detail-section`) pada dialog Detail Produk di `#master-product` sesuai anotasi pratinjau pengguna.
+- **Berkas yang Diubah**:
+  - `resources/views/v2/master-product-detail.blade.php`: Memindahkan label satuan (`per <unit>`) menjadi pill ringkas di header bagian `Harga dan margin` agar label tiap metrik tidak berulang/patah baris; mengelompokkan 4 metrik harga & margin ke grid 2×2 `.detail-facts-pricing` dengan penanda visual untung/rugi pada kartu margin serta kotak catatan kunci HPP berikon gembok SVG inline (tanpa emoji).
+  - `resources/views/v2/responsive-refinements.blade.php`: Menambahkan border halus dan latar `var(--ui-hover, #f6faf7)` pada `.detail-facts>div` (karena `--ui-canvas` ditimpa `#fff` oleh tema), meratakan `<dt>` dan ikon `.ui-info-btn` sejajar satu baris agar ikon tidak jatuh ke baris baru, serta menambahkan grid 2 kolom (1 kolom di layar <=640px) untuk `.detail-facts-pricing` dan styling `.detail-lock-note`.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - `php artisan test --compact tests/Feature/V2UiUxAndExpenseTest.php tests/Feature/V2WorkspaceViewTest.php` (Exit code: `0`; **6/6** tes, **157 asersi** lulus)
+  - `node --test tests/ui-tooltip-system.test.mjs` (Exit code: `0`; **4/4** tes lulus)
+  - `git diff --check -- resources/views/v2/master-product-detail.blade.php resources/views/v2/responsive-refinements.blade.php` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Silakan muat ulang halaman `#master-product` di pratinjau untuk melihat hasil terbaru.
+
+
+## [2026-11-24 19:05 WIB] - Tekstur Latar Bawah Sidebar Bergaya Halaman Login dengan Gradasi Opasitas
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Menampilkan tekstur titik + grid halus + pijar hijau limau seperti latar halaman login pada bagian bawah sidebar gelap (`#workspace-sidebar.app-sidebar`) dengan gradasi opasitas agar hanya terlihat halus di area bawah dan tetap bersih di area menu atas.
+- **Berkas yang Diubah**:
+  - `resources/views/v2/ui-theme.blade.php`: Menambahkan `isolation: isolate` pada `#workspace-sidebar.app-sidebar`, menempatkan anak langsung pada `position: relative; z-index: 1`, dan menambahkan pseudo-elemen `::before` (`pointer-events: none; z-index: 0`) dengan pola dot + grid 24px/32px + radial glow limau di sisi bawah yang di-mask dari transparan (`0%–48%`) hingga penuh di bagian bawah (`100%`). Berlaku seragam di workspace V2 maupun halaman cangkang terpadu (`/journals`, `/coa`, `/expenses`, `/reports/*`).
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - `php artisan test --compact tests/Feature/V2WorkspaceViewTest.php` (Exit code: `0`; **3/3** tes, **142 asersi** lulus)
+  - `git diff --check -- resources/views/v2/ui-theme.blade.php` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Silakan muat ulang halaman untuk melihat tekstur latar bawah sidebar.
+
+
+## [2026-11-24 19:07 WIB] - Gradasi Opasitas Halus pada Dock Aksi Cepat Mobile (`.mqa-dock`)
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Menghilangkan garis potong keras di tepi atas `.mqa-dock` pada tampilan mobile dengan gradasi opasitas mulus yang memudarkan konten gulir di bawah pil aksi cepat.
+- **Berkas yang Diubah**:
+  - `resources/views/v2/mobile-quick-actions.blade.php`: Mengubah latar solid `.mqa-dock` menjadi `linear-gradient` multi-stop dari transparan (`0%`) hingga warna kanvas (`100%`) dengan `margin-top: -36px; padding-top: 36px; pointer-events: none` (serta `pointer-events: auto` pada `.mqa`), memperhalus bayangan pil, dan menambah `padding-bottom` pada `body.mqa-on > main.main-content` agar item paling bawah tetap dapat digulir penuh di atas dock.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - `node --test tests/mobile-quick-actions.test.mjs` (Exit code: `0`; **4/4** tes lulus)
+  - `git diff --check -- resources/views/v2/mobile-quick-actions.blade.php` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Silakan muat ulang pratinjau mobile untuk melihat transisi gradasinya.
+
+
+## [2026-11-24 19:13 WIB] - Kapsul Navigasi Cepat Mobile Bergaya Tombol Bulat + Kapsul Aktif Meluncur (Pindah Halaman Saja)
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Mengubah dock aksi cepat mobile (`.mqa-dock` / `.mqa`) mengikuti referensi kapsul navigasi pengguna: tombol nonaktif berbentuk lingkaran gelap berikon saja, tombol aktif melebar menjadi kapsul terang (limau `#c8f26b`) berisi ikon + label yang meluncur mulus saat pindah halaman, serta menghapus pembukaan form modal/fokus otomatis saat klik agar perpindahan halaman dan animasi kapsul berjalan mulus.
+- **Berkas yang Diubah**:
+  - `resources/views/v2/mobile-quick-actions.blade.php`:
+    - Menata ulang kapsul menjadi 4 tujuan navigasi per peran: Admin (`Ringkasan`, `Masuk`, `Biaya`, `Kasir`) dan Kasir (`Riwayat`, `Tagihan`, `Bayar`, `Kasir`).
+    - Mengubah klik menjadi murni navigasi halaman (`location.hash = '#' + action.task`) dengan penerapan slot aktif instan (`applySlot`) tanpa membuka modal form (`click:`) maupun memicu fokus input (`focus:`).
+    - Menerapkan animasi kapsul meluncur 60fps tanpa *layout shift* (lebar luar tetap konstan saat berpindah antar tab aktif: tombol nonaktif `48×48px` bulat gelap, tombol aktif melebar ke `132×48px` sejajar dengan `.mqa-indicator` limau yang bergeser via `translate3d` `340ms cubic-bezier(.22,1,.36,1)` + mikro-elastis WAAPI pada `.mqa-spot`, menghormati `prefers-reduced-motion`).
+  - `tests/mobile-quick-actions.test.mjs`: Memperbarui 4 pengujian kontrak sesuai perilaku navigasi kapsul baru.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - `node --test tests/*.test.mjs` (Exit code: `0`; **180/180** tes lulus)
+  - `git diff --check -- resources/views/v2/mobile-quick-actions.blade.php tests/mobile-quick-actions.test.mjs` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Silakan muat ulang pratinjau mobile dan coba pindah antar tab pada kapsul bawah.
+
+
+## [2026-11-24 19:22 WIB] - Transisi Morfosis Opsi 2 Kapsul Navigasi Mobile ↔ Bar Keranjang Kasir
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Menerapkan Opsi 2 untuk transisi kapsul navigasi mobile (`.mqa-dock` / `.mqa`) dan bar keranjang mobile (`.pm-bar`) pada halaman `#kasir` (`<= 900px`) agar animasi 4 tab tetap utuh saat keranjang kosong, bermorfosis halus menjadi bar keranjang berbentuk pil saat keranjang terisi, dan tetap menyediakan pemicu ke menu kapsul saat keranjang aktif.
+- **Berkas yang Diubah**:
+  - `resources/views/v2/pos-mobile.blade.php`: Menambahkan tombol pemicu navigasi bulat di sisi kiri bar keranjang mobile (`.pm-nav-toggle`, tersembunyi di desktop `> 900px`), menyesuaikan `.pm-bar` pada `<= 900px` menjadi pil gelap serasi kapsul (ditempatkan setelah aturan `@media(min-width:761px)` dengan `width:auto` agar tidak tertimpa pada rentang tablet `761–900px`) lengkap dengan gradasi kabut bawah (`::after`) dan aturan `body.mqa-peek .pm-bar { visibility:hidden; pointer-events:none }`; menambahkan animasi FLIP WAAPI `morphBarFrom(origin)` saat keranjang berubah `0 → >0` maupun kembali dari `mqa:unpeek`, serta memancarkan event `mqa:peek` dan `mqa:cart-emptied`.
+  - `resources/views/v2/mobile-quick-actions.blade.php`: Mengubah aturan tampil kapsul menjadi `mobileShell && (task !== 'kasir' || !hasCart || peeking)` sambil menjaga `body.mqa-on` tetap aktif di seluruh layar `<= 900px` agar posisi gulir katalog tidak melompat saat keranjang terisi/peek; menambahkan lencana jumlah item (`.mqa-badge`) pada tombol `Kasir`, animasi FLIP `morphCapsuleFrom(origin)`, dukungan `mqa:peek`, `mqa:cart-emptied`, tombol `Kasir` / `Escape` / perubahan isi keranjang untuk kembali ke `.pm-bar` (`mqa:unpeek`), serta menghormati `prefers-reduced-motion`.
+  - `tests/mobile-quick-actions.test.mjs`: Memperbarui 5 pengujian kontrak kapsul 4 tab & morfosis Opsi 2.
+  - `tests/Feature/V2WorkspaceViewTest.php`: Menyelaraskan asersi render HTML kapsul navigasi mobile terbaru (`Halaman Ringkasan`, `Halaman Penerimaan barang`, `Halaman Pengeluaran operasional`, `Halaman Kasir`, `pm-nav-toggle`).
+  - `docs/dokumentasi-sistem.md`: Memperbarui bagian 1.5 dan tabel riwayat perubahan sesuai perilaku kapsul 4 tab dan morfosis Opsi 2.
+- **Perintah Verifikasi & Exit Code**:
+  - `vendor/bin/pint --dirty --format agent` (Exit code: `0`; `passed`)
+  - `php artisan view:clear` (Exit code: `0`)
+  - `node --test tests/*.test.mjs` (Exit code: `0`; **181/181** tes lulus, termasuk `mobile-quick-actions.test.mjs`, `cart-drawer.test.mjs`, `catalog-quantity.test.mjs`, dan `pos-refinements.test.mjs`)
+  - `php artisan test --compact tests/Feature/V2WorkspaceViewTest.php` (Exit code: `0`; **3/3** tes, **144 asersi** lulus)
+  - `git diff --check -- resources/views/v2/pos-mobile.blade.php resources/views/v2/mobile-quick-actions.blade.php tests/mobile-quick-actions.test.mjs tests/Feature/V2WorkspaceViewTest.php docs/dokumentasi-sistem.md` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Alur desktop/tablet (`> 900px`), morph lembar bawah/laci keranjang, dan seluruh aturan transaksi/checkout tetap utuh. Silakan muat ulang pratinjau mobile untuk mencoba alur `Ringkasan → Kasir → tambah barang → klik tombol kiri bar keranjang → pindah tab / klik Kasir lagi / kosongkan keranjang`.
+
+
+## [2026-11-24 19:31 WIB] - Optimasi 60fps Animasi Kapsul Mobile & Morfosis GPU `clip-path` ke Bar Keranjang
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Menghilangkan patah-patah (jank/reflow/1-frame flash/distorsi skala) pada animasi perpindahan tab kapsul navigasi mobile dan morfosis kapsul ↔ bar keranjang Kasir.
+- **Berkas yang Diubah**:
+  - `resources/views/v2/mobile-quick-actions.blade.php`:
+    - Menghapus seluruh animasi properti layout (`width`, `max-inline-size`, `margin-inline-start`) pada tombol kapsul dan menggantinya dengan posisi slot absolut berdimensi tetap (`contain: layout size style`) yang hanya menggerakkan `transform: translate3d(...)` + `opacity` pada GPU compositor thread.
+    - Memindahkan `.mqa-dock` ke `position: fixed` dengan satu lapisan gradasi bawah persisten (`.mqa-scrim`) agar tampil/sembunyi kapsul tidak memicu reflow tinggi `main.main-content` maupun kedipan latar.
+    - Membangun pengendali morfosis bersama `window.__mqaPillMorph` (`capture`, `play`, `cancel`) yang berjalan sinkron sebelum paint (menghilangkan 1-frame flash), memorfosis cangkang pil memakai `clip-path: inset(... round 999px)` pada GPU tanpa menskalakan/menggepengkan teks dan ikon (1:1 crisp), dengan crossfade halus konten keluar (`95ms`) dan konten masuk (`210ms`, delay `60ms`) serta dukungan interupsi mid-flight bila diklik cepat.
+    - Menunda `location.hash` 1 `requestAnimationFrame` saat klik tab agar animasi geser GPU langsung berjalan sebelum panel baru dirender, serta membiarkan `mqa-peek` dibersihkan oleh `sync()` sesudah pindah halaman agar `.pm-bar` tidak berkedip.
+  - `resources/views/v2/pos-mobile.blade.php`: Menyelaraskan tinggi mobile `.pm-bar` (`60px` / `56px` di `<=360px`, `padding: 6px`, tombol `48×48px` / `44×44px`) agar presisi 1:1 dengan `.mqa`, mengganti `scale()`+`rAF` dengan `window.__mqaPillMorph` sinkron, menghapus duplikat gradien `::after`, serta membatalkan morfosis pil secara bersih saat lembar keranjang dibuka atau berpindah dari `#kasir`.
+  - `tests/mobile-quick-actions.test.mjs`: Menambahkan verifikasi bahwa tidak ada transisi CSS `width`/`max-inline-size`, verifikasi `position: fixed`, `is-after` `translate3d`, dan kontrak `window.__mqaPillMorph` + `clipPath`.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - Validasi sintaks JS (`vm.Script`) untuk `mobile-quick-actions.blade.php` & `pos-mobile.blade.php` (Exit code: `0`; `JS_SYNTAX_OK`)
+  - `node --test tests/*.test.mjs` (Exit code: `0`; **181/181** tes lulus)
+  - `php artisan test --compact tests/Feature/V2WorkspaceViewTest.php` (Exit code: `0`; **3/3** tes, **144 asersi** lulus)
+  - `git diff --check -- resources/views/v2/mobile-quick-actions.blade.php resources/views/v2/pos-mobile.blade.php tests/mobile-quick-actions.test.mjs` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Silakan muat ulang pratinjau mobile untuk merasakan perbedaannya pada perpindahan tab dan morfosis kapsul ↔ bar keranjang.
+
+
+## [2026-11-24 19:38 WIB] - Penyederhanaan Ringan Transisi Kapsul ↔ Bar Keranjang Mobile (Pure CSS + Landing Tab Kasir)
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Membuat transisi kapsul mobile ↔ bar keranjang jauh lebih ringan dan halus (menghilangkan `filter: drop-shadow` dan `cloneNode` yang berat, serta memperbaiki transisi saat pindah dari tab lain ke tab Kasir yang keranjangnya sudah terisi).
+- **Berkas yang Diubah**:
+  - `resources/views/v2/mobile-quick-actions.blade.php`:
+    - Menghapus seluruh overlay `cloneNode` + `filter: drop-shadow` + `clip-path` JS yang berat; transisi kapsul ↔ bar keranjang kini murni CSS `transform: translate3d(0,0,0) scale(1 ↔ .94)` + `opacity` lewat kelas `.mqa-dock.is-cart` (dengan `bar.inert = isCartMode` untuk aksesibilitas).
+    - Menambahkan state `mqa-landing` (`270ms`, dilewati pada `prefers-reduced-motion`) saat mengetuk tab `Kasir` dari menu lain ketika keranjang sudah terisi, agar pil limau mendarat mulus di `Kasir` terlebih dahulu sebelum berganti halus menjadi bar keranjang (tidak lagi terpotong mendadak di tengah luncuran).
+  - `resources/views/v2/pos-mobile.blade.php`:
+    - Menyeragamkan proporsi bar keranjang mobile (`max-width: 356px`, `gap: 8px`, `padding: 6px`, tinggi `60px` / `56px` di `≤ 360px`) agar sejajar dengan ukuran kapsul (`306px`).
+    - Mempertahankan `.pm-bar[hidden]` di DOM khusus pada `#kasir` mobile (`display: grid; opacity: 0; scale(.94); visibility: hidden; pointer-events: none`) agar transisi `0 ↔ 1` item, `mqa-peek`, dan `mqa-landing` seluruhnya berjalan halus di GPU tanpa kedipan 1-frame; tetap mematikan transisi saat `body.pm-cart-open` agar tidak berbenturan dengan morph lembar bawah keranjang.
+  - `tests/mobile-quick-actions.test.mjs`: Memperbarui 5 tes kontrak termasuk jaminan bebas `filter: drop-shadow`, bebas `cloneNode`, serta kontrak `mqa-landing` dan `.mqa-dock.is-cart`.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - Validasi sintaks JS (`vm.Script`) untuk `mobile-quick-actions.blade.php` & `pos-mobile.blade.php` (Exit code: `0`; `JS_SYNTAX_OK`)
+  - `node --test tests/*.test.mjs` (Exit code: `0`; **181/181** tes lulus)
+  - `php artisan test --compact tests/Feature/V2WorkspaceViewTest.php` (Exit code: `0`; **3/3** tes, **144 asersi** lulus)
+  - `git diff --check -- resources/views/v2/mobile-quick-actions.blade.php resources/views/v2/pos-mobile.blade.php tests/mobile-quick-actions.test.mjs` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Silakan muat ulang pratinjau mobile dan coba pindah dari menu lain ke Kasir saat keranjang terisi, maupun tambah/hapus barang dan buka tutup tombol kiri bar keranjang.
+
+
+## [2026-11-24 19:42 WIB] - Perbaikan Scrollbar Ganda pada Tampilan Mobile (`body.mqa-on`)
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Menghilangkan scrollbar ganda di sisi kanan layar mobile (`html` + `main.main-content`) yang muncul karena aturan lama `body.mqa-on` masih memaksa `main.main-content` menjadi kontainer gulir bersarang (`overflow: auto`).
+- **Berkas yang Diubah**:
+  - `resources/views/v2/mobile-quick-actions.blade.php`: Menghapus aturan flex/inner-scroll bersarang (`body.mqa-on { height: 100dvh; overflow: hidden }` & `main.main-content { overflow: auto }`) karena `.mqa-dock` sudah `position: fixed` dan `.main-topbar` sudah `position: sticky; top: 0`; mempertahankan ruang bawah `padding-bottom: calc(96px + env(safe-area-inset-bottom))` dan `scroll-padding-bottom` pada `html`, serta mengganti reset scroll pindah tab menjadi `window.scrollTo(0, 0)`.
+  - `tests/mobile-quick-actions.test.mjs`: Memastikan `body.mqa-on>main.main-content` tidak lagi memakai `overflow: auto` dan tetap memberi ruang bawah untuk kapsul mengambang.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - Cek sintaks JS (`vm.Script`) untuk `mobile-quick-actions.blade.php` (Exit code: `0`; `JS_SYNTAX_OK`)
+  - `node --test tests/*.test.mjs` (Exit code: `0`; **181/181** tes lulus)
+  - `git diff --check -- resources/views/v2/mobile-quick-actions.blade.php tests/mobile-quick-actions.test.mjs` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Kini halaman mobile hanya menggunakan satu scrollbar utama bawaan browser.
+
+
+## [2026-11-24 19:47 WIB] - Cangkang Pil Solid Bersama (`.mqa-shell`) untuk Transisi Mulus Menu → Bar Keranjang Mobile
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Memperhalus transisi perubahan dari kapsul navigasi ke bar keranjang `.pm-bar` sesuai anotasi pratinjau pengguna agar pil gelap tidak ikut memudar/transparan atau berkedip saat berganti mode.
+- **Berkas yang Diubah**:
+  - `resources/views/v2/mobile-quick-actions.blade.php`: Menambahkan satu cangkang pil gelap solid persisten (`.mqa-shell`, `z-index: 59`, `contain: strict`) yang tidak pernah memudar dan hanya melebar/menyempit mulus (`306px ↔ 356px`, `320ms cubic-bezier(.22,1,.36,1)`) antara mode kapsul dan mode keranjang; latar `.mqa` dibuat transparan di atas cangkang sehingga saat pindah ke keranjang, 3 ikon menu kiri menyusut halus ke kiri sementara pil limau kanan meluncur ke tepi kanan yang melebar; jeda `mqa-landing` disetel ke `240ms`.
+  - `resources/views/v2/pos-mobile.blade.php`: Membuat `body.mqa-on .pm-bar` menumpang transparan di atas `.mqa-shell` dengan posisi/dimensi identik (`left: 50%; transform: translate3d(-50%,0,0); width: min(356px, calc(100vw - 24px)); height: 60px;`, tombol kanan `min-width: 132px` menyamai pil limau `Kasir`), menganimasikan masing-masing kontrol dalam bar (`.pm-nav-toggle`, `.pm-bar-meta`, `.pm-bar-open`) secara terarah murni `transform` + `opacity`, serta memastikan `openSheet()` mengambil warna latar morph lembar keranjang dari `.mqa-shell` bila aktif.
+  - `tests/mobile-quick-actions.test.mjs` & `docs/dokumentasi-sistem.md`: Memperbarui pengujian kontrak dan dokumentasi bagian 1.5 sesuai arsitektur `.mqa-shell`.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - Validasi sintaks JS (`vm.Script`) untuk `mobile-quick-actions.blade.php` & `pos-mobile.blade.php` (Exit code: `0`; `JS_SYNTAX_OK`)
+  - `node --test tests/*.test.mjs` (Exit code: `0`; **181/181** tes lulus)
+  - `php artisan test --compact tests/Feature/V2WorkspaceViewTest.php` (Exit code: `0`; **3/3** tes, **144 asersi** lulus)
+  - `git diff --check -- resources/views/v2/mobile-quick-actions.blade.php resources/views/v2/pos-mobile.blade.php tests/mobile-quick-actions.test.mjs` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Silakan muat ulang pratinjau mobile untuk mencoba transisi ke bar keranjang dari menu lain, saat tambah barang, maupun saat membuka/menutup tombol kiri bar keranjang.
+
+
+## [2026-11-24 19:51 WIB] - Perbaikan Ruang Bawah Konten Tertutup Kapsul & Warna Latar Gelap Panel Keranjang
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Memperbaiki bagian bawah halaman (seperti kartu `Saldo awal pembukuan` di `#shift`) yang masih tertutup kapsul navigasi mobile, serta menggelapkan warna latar lembar/panel Keranjang (`#pos-cart-drawer > section.card`) agar serasi dengan tema gelap aplikasi.
+- **Berkas yang Diubah**:
+  - `resources/views/v2/mobile-quick-actions.blade.php`: Meningkatkan spesifisitas dan menambahkan `!important` pada `html body.mqa-on>main.wrap.main-content, html body.mqa-on>main.main-content { padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important }` agar tidak lagi tertimpa aturan `padding: 12px 12px 24px !important` di `ui-dna.blade.php:891` pada menu operasional/master (`shift`, `tagihan`, `pengiriman`, `penerimaan`, `laporan`, `persetujuan`, `master-*`).
+  - `resources/views/v2/ui-dna.blade.php`: Mengubah latar `#panel-kasir #kasir .pos-cart-pane > section.card` dan `.cart-column-header` dari `#14532D` menjadi `var(--ui-side, #0f2a1d)` dengan garis `var(--ui-side-line, #1F3D2D)` agar serasi dengan sidebar, topbar mobile, kapsul, dan bar keranjang (sekaligus menghilangkan perbedaan warna saat morph dari bar ke lembar keranjang).
+  - `tests/mobile-quick-actions.test.mjs`: Memperbarui asersi kontrak `padding-bottom` mobile.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - `node --test tests/*.test.mjs` (Exit code: `0`; **181/181** tes lulus)
+  - `git diff --check -- resources/views/v2/mobile-quick-actions.blade.php resources/views/v2/ui-dna.blade.php tests/mobile-quick-actions.test.mjs` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Silakan muat ulang pratinjau mobile untuk mengecek gulir paling bawah di `Kas & laporan` serta warna latar gelap panel Keranjang.
+
+
+## [2026-11-24 19:53 WIB] - Latar Tersendiri pada Footer Sidebar & Tombol Keluar Hijau Terang Tema
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Memberi latar belakang solid tersendiri pada `.sidebar-footer` agar terpisah bersih dari tekstur bawah sidebar, serta mengubah tombol `Keluar` menjadi warna hijau terang tema (`--ui-side-active` / `#c8f26b`).
+- **Berkas yang Diubah**:
+  - `resources/views/v2/ui-theme.blade.php`: Memberi `#workspace-sidebar .sidebar-footer` latar solid gelap tersendiri (`#0a2015`) dengan padding rapi dan garis pemisah atas; mengubah tombol `Keluar` (`.sidebar-footer form button`) menjadi hijau limau terang (`var(--ui-side-active, #c8f26b)`) berteks gelap (`#0f2a1d`, kontras AAA) dengan hover `#d8f890`, mereset `margin-left: 0` pada ikon SVG agar sejajar dengan ikon menu sidebar, serta menyesuaikan lebar tombol `48px` saat sidebar diciutkan ke mode rail (`68px`) agar tidak terpotong di tepi kanan.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - `php artisan test --compact tests/Feature/V2WorkspaceViewTest.php` (Exit code: `0`; **3/3** tes, **144 asersi** lulus)
+  - `node --test tests/sidebar*.test.mjs` (Exit code: `0`; **1/1** tes lulus)
+  - `git diff --check -- resources/views/v2/ui-theme.blade.php` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Berlaku seragam di workspace V2 maupun halaman cangkang terpadu.
+
+
+## [2026-11-24 19:56 WIB] - Gradasi Gelap & Tekstur Titik/Grid Tema pada Panel Keranjang (`#pos-cart-drawer > .card`)
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Menambahkan gradasi hijau gelap dan tekstur titik + grid halus bergaya tema login/sidebar pada latar panel/lembar Keranjang (`#pos-cart-drawer > section.card`).
+- **Berkas yang Diubah**:
+  - `resources/views/v2/ui-dna.blade.php`: Menambahkan `background-image` gradasi hijau gelap (`#0b2116 → #0f2a1d → #133825 → #17452c`) dengan pendar lembut limau di bawah-kiri dan zamrud di atas-kanan (tetap mempertahankan `background-color: var(--ui-side, #0f2a1d)` untuk kompatibilitas morph `openSheet`), serta pseudo-elemen `::after` (`border-radius: inherit; pointer-events: none; z-index: 0`) berisi tekstur titik `24px` + grid limau `32px` dengan *mask* opasitas halus yang memudar ke arah atas; menjaga posisi pegangan geser `::before` dan tombol tutup `.pm-sheet-close` di `z-index: 2` serta konten utama di `z-index: 1`.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - `node --test tests/cart-drawer.test.mjs tests/cart-morph.test.mjs` (Exit code: `0`; **13/13** tes lulus)
+  - `git diff --check -- resources/views/v2/ui-dna.blade.php` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Silakan muat ulang pratinjau dan buka lembar Keranjang untuk melihat gradasi dan teksturnya.
+
+
+## [2026-11-24 20:01 WIB] - Perbaikan Teks Gelap Tombol Keluar, Filter Status Tanpa Scroll Samping, dan Stroke Tipis Kartu Mobile
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Menangani 3 anotasi pratinjau pengguna: teks tombol `Keluar` gelap kontras tinggi pada latar limau terang, pilihan status di popover filter (`#payment-verification` dkk.) tampil penuh tanpa scroll horizontal, dan kartu baris tabel mobile (`.master-clean-table` / `#accounts-body`) memiliki garis tepi tipis.
+- **Berkas yang Diubah**:
+  - `resources/views/v2/ui-theme.blade.php`: Meningkatkan spesifisitas + `!important` pada `html body #workspace-sidebar .sidebar-footer form button` (serta `svg`, `span`, dan `:hover`) agar teks dan ikon `Keluar` tetap hijau gelap (`#0f2a1d`) di atas latar limau terang (`#c8f26b` / `#d8f890`).
+  - `resources/views/partials/table-filter-styles.blade.php`: Mengunci `.ui-filter-fields` ke `overflow-x: hidden; overflow-y: auto` dan menegakkan `display: grid !important; grid-template-columns: minmax(0,1fr) !important; width: 100% !important; overflow: visible !important; margin: 0 !important; padding: 0 !important` pada `:is(.ui-chips, .period-presets)` di dalam `[data-table-filter-panel]` agar aturan mobile `flex-wrap: nowrap !important` dari `ui-dna.blade.php` tidak lagi membuat scroll menyamping.
+  - `resources/views/v2/ui-dna.blade.php`: Menambahkan `@media (max-width:639px) { html body table.ui-table tbody tr { border: 1px solid var(--ui-line, #dbe5de) } }` (plus menghapus garis bawah berlebih pada `td:last-child`) agar kartu tabel mobile seperti `#accounts-body` memiliki stroke tipis yang rapi.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - `node --test tests/table-filter*.test.mjs tests/sidebar*.test.mjs` (Exit code: `0`; **13/13** tes lulus)
+  - `git diff --check -- resources/views/v2/ui-theme.blade.php resources/views/partials/table-filter-styles.blade.php resources/views/v2/ui-dna.blade.php` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Silakan muat ulang pratinjau untuk memeriksa tombol `Keluar`, popover filter di `#persetujuan`, dan kartu daftar akun di `#akun`.
+
+
+## [2026-11-24 20:04 WIB] - Perbaikan Token Warna Teks Gelap Tombol Keluar (`--ui-side` Alih-alih `--ui-on-accent`)
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Memperbaiki teks & ikon tombol `Keluar` yang masih tampil putih karena `--ui-on-accent` ditimpa menjadi `#fff` oleh `ui-minimal.blade.php:12`.
+- **Berkas yang Diubah**:
+  - `resources/views/v2/ui-theme.blade.php`: Mengganti `var(--ui-on-accent, #0f2a1d)` pada `#workspace-sidebar .sidebar-footer form button` (dan `:hover`) menjadi `var(--ui-side, #0f2a1d) !important` agar teks dan ikon `Keluar` selalu hijau gelap (`#0f2a1d`) di atas latar limau terang (`#c8f26b` / `#d8f890`).
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - `git diff --check -- resources/views/v2/ui-theme.blade.php` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Silakan muat ulang halaman untuk memeriksa warna teks gelap pada tombol `Keluar`.
+
+
+## [2026-11-25 19:18 WIB] - Fleksibilitas Penyesuaian COA Non-Sistem, Dukungan Akun Kontra, dan Saran Akun Standar SAK EMKM
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Memungkinkan penyesuaian dan penambahan akun COA sesuai standar akuntansi (termasuk akun kontra & saran akun standar opsional) sambil mengunci secara tegas hanya akun yang terhubung langsung dengan transaksi otomatis sistem.
+- **Berkas yang Dibuat**:
+  - `database/migrations/2026_11_25_191200_add_contra_account_support_to_chart_of_accounts.php`: Migrasi additif kolom `chart_of_accounts.is_contra` (boolean default `false`, aman dan backward-compatible bila belum dijalankan di MySQL lokal karena controller juga dapat menurunkan status kontra dari perbandingan saldo normal terhadap jenis akun).
+- **Berkas yang Diubah**:
+  - `app/Http/Controllers/ChartOfAccountController.php`: Menambahkan peta peran integrasi sistem (`SYSTEM_ACCOUNT_ROLES`), daftar saran akun standar opsional (`RECOMMENDED_PRESETS` yang otomatis menyembunyikan kode yang sudah terdaftar), filter pengelolaan (`scope=system|custom`), dukungan penuh akun kontra (`is_contra` membalik validasi saldo normal secara sah dan ditolak pada akun inti sistem maupun rekening bank), serta penguncian tegas kode/klasifikasi/saldo normal/kontra/aktif untuk `SYSTEM_ACCOUNTS` meski belum memiliki jurnal (nama akun tetap dapat disesuaikan).
+  - `app/Services/V2/OperatingExpenses.php` & `app/Http/Controllers/ExpenseController.php`: Menolak akun beban kontra (`normal_balance !== 'debit'`) pada pencatatan pengeluaran kas operasional agar saldo normal selalu konsisten.
+  - `resources/views/coa/index.blade.php`: Menampilkan keterangan status pengelolaan (`Terhubung sistem (...)` vs `Dapat disesuaikan`), badge `Kontra`, filter **Pengelolaan**, panel opsional **Contoh akun standar akuntansi** di modal Tambah Akun (klik 1x mengisi form dan tetap bebas diedit), checkbox **Akun kontra (pengurang kelompok)** yang otomatis menyesuaikan saldo normal & menyembunyikan opsi Rekening Bank, serta penguncian visual field terstruktur pada akun sistem atau akun sudah dijurnal dengan hidden mirror agar `FormData` tetap terkirim utuh.
+  - `tests/Feature/V2ChartOfAccountsTest.php`: Menambahkan 2 pengujian regresi komprehensif mencakup akun kontra di Laba Rugi & Neraca (`AccountingReportService`), penolakan akun kontra di pengeluaran operasional & rekening bank, penguncian struktur akun sistem vs kebebasan ubah akun kustom, filter `scope`, dan penyaringan preset.
+  - `docs/dokumentasi-sistem.md`: Memperbarui bagian 14.4 dan tabel riwayat perubahan.
+- **Perintah Verifikasi & Exit Code**:
+  - `vendor/bin/pint --dirty --format agent` (Exit code: `0`; `fixed` import di `V2ChartOfAccountsTest.php`)
+  - `php artisan view:clear` (Exit code: `0`)
+  - Cek sintaks JS inline (`vm.Script`) untuk `resources/views/coa/index.blade.php` (Exit code: `0`; `COA_JS_SYNTAX_OK`)
+  - `node --test tests/coa-operational.test.mjs` (Exit code: `0`; **9/9** tes lulus)
+  - `php artisan test --compact tests/Feature/V2ChartOfAccountsTest.php tests/Feature/CoaManagementTest.php tests/Feature/MasterDataManagementTest.php tests/Feature/V2OperatingExpensesTest.php tests/Feature/V2MultiBankAccountsTest.php tests/Feature/ExpensesCrudTest.php` pada SQLite `:memory:` (Exit code: `0`; **59/59** tes, **473 asersi** lulus)
+  - `git diff --check` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Migrasi `2026_11_25_191200_add_contra_account_support_to_chart_of_accounts.php` sudah diuji pada SQLite `:memory:` dan belum dijalankan pada database MySQL lokal (sesuai aturan kehati-hatian database aktif; fitur tetap berjalan aman dengan fallback penurunan `is_contra` sampai migrasi dijalankan).
+
+
+## [2026-11-25 19:28 WIB] - Panduan Cara Pakai & Contoh Penggunaan Bagan Akun / Akun Kontra di UI
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Menambahkan panduan cara pakai dan contoh penggunaan nyata (khususnya akun kontra toko bangunan) langsung di halaman Bagan Akun dan modal Tambah Akun agar mudah dipahami tanpa mengganggu kepadatan daftar akun.
+- **Berkas yang Diubah**:
+  - `resources/views/coa/index.blade.php`: Menambahkan panel lipat (`<details class="card coa-guide" id="coa-guide">`, tertutup secara bawaan) berisi 4 langkah singkat cara pakai (akun sistem vs kustom, tambah dari preset, kapan centang akun kontra, dan rekening bank tambahan), 3 kartu contoh angka sintetis toko bangunan (Kontra Aset Penyusutan Truk `1591`, Kontra Pendapatan Diskon/Retur `4103`/`4104`, Kontra Ekuitas Prive `3102`) dengan tombol isi-cepat `openGuidePreset(this)` (otomatis berubah menjadi status `Kode ... sudah ada di daftar` bila kode sudah terdaftar), serta tabel ringkas arah saldo normal Biasa vs Kontra. Menambahkan tombol info-tip `coa_akun_kontra` di samping opsi **Akun kontra** pada modal Tambah/Ubah Akun menggunakan wadah `.coa-status-box` agar tombol tooltip tidak berada di dalam `<label>`.
+  - `resources/views/v2/ui-tooltip.blade.php`: Menambahkan entri kamus tooltip `coa_akun_kontra` dan menyelaraskan keterangan `coa_akun_inti` dengan aturan fleksibilitas penamaan akun sistem serta kebebasan penyesuaian akun non-sistem.
+  - `tests/Feature/V2ChartOfAccountsTest.php`: Menambahkan asersi tampilan panel **Cara Pakai & Contoh Penggunaan Bagan Akun**, status kode `3102` yang sudah ada vs tombol isi-cepat `1591`, dan referensi tooltip `coa_akun_kontra`.
+  - `docs/dokumentasi-sistem.md`: Memperbarui bagian 14.4 untuk mendokumentasikan panel panduan cara pakai & contoh penggunaan di Bagan Akun serta tooltip `coa_akun_kontra`.
+- **Perintah Verifikasi & Exit Code**:
+  - `vendor/bin/pint --dirty --format agent` (Exit code: `0`)
+  - `php artisan view:clear` (Exit code: `0`)
+  - Cek sintaks JS inline (`vm.Script`) untuk `resources/views/coa/index.blade.php` dan `resources/views/v2/ui-tooltip.blade.php` (Exit code: `0`; `COA_JS_OK 1`, `TIP_JS_OK 1`)
+  - `node --test tests/coa-operational.test.mjs` (Exit code: `0`; **9/9** tes lulus)
+  - `php artisan test --compact tests/Feature/V2ChartOfAccountsTest.php tests/Feature/CoaManagementTest.php` pada SQLite `:memory:` (Exit code: `0`; **30/30** tes, **263 asersi** lulus)
+  - `git diff --check` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Panel panduan tertutup secara bawaan sehingga tidak memakan ruang kerja harian, responsif untuk desktop dan ponsel (tanpa emoji, angka `tabular-nums`, tombol isi-cepat minimal 44px di mobile), dan terhubung langsung ke modal Tambah Akun.
+
+
+## [2026-11-25 19:32 WIB] - Pembatalan Panel Panduan di Halaman Bagan Akun (Klarifikasi Pengguna)
+- **Pelaksana**: Antigravity (Gemini 4 Neon)
+- **Target Tugas**: Mengembalikan halaman Bagan Akun ke kondisi sebelum penambahan panel panduan in-page sesuai klarifikasi pengguna (pengguna hanya meminta penjelasan cara pakai & contoh penggunaan di chat).
+- **Berkas yang Diubah**:
+  - `resources/views/coa/index.blade.php`, `resources/views/v2/ui-tooltip.blade.php`, `tests/Feature/V2ChartOfAccountsTest.php`, `docs/dokumentasi-sistem.md`: Menghapus seluruh perubahan panel panduan in-page dan tooltip `coa_akun_kontra` yang dibuat pada sesi sebelumnya.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - `php artisan test --compact tests/Feature/V2ChartOfAccountsTest.php` (Exit code: `0`; **16/16** tes, **166 asersi** lulus)
+  - `git diff --check` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Halaman Bagan Akun kembali bersih tanpa panel panduan tambahan.
+
+
+## [2026-11-26 08:22 WIB] - Tahap 1 Penguatan Akuntansi: Pemisahan Beban 6101 vs 6201, Klasifikasi Arus Kas POS vs Piutang, dan Migrasi `is_contra`
+- **Pelaksana**: Antigravity
+- **Target Tugas**: Melaksanakan Tahap 1 rencana penyempurnaan akuntansi sesuai persetujuan pengguna: (1) memindahkan jurnal biaya ritase (`DeliveryTrips` & `SupplyTrips`) dari `6101` ke `6201` dan menyelaraskan `V2Prepare` serta `ChartOfAccountController`, (2) memisahkan label arus kas masuk penjualan tunai/transfer/DP POS dari pelunasan piutang pada `AccountingReportService::generateCashFlow`, (3) menjalankan migrasi additif `is_contra` pada MySQL lokal setelah uji terisolasi lulus, dan (4) memperbarui `docs/dokumentasi-sistem.md`.
+- **Berkas yang Dibuat**: Tidak ada berkas baru (migrasi `2026_11_25_191200_add_contra_account_support_to_chart_of_accounts.php` telah dibuat pada entri sebelumnya).
+- **Berkas yang Diubah**:
+  - `app/Services/V2/DeliveryTrips.php`: Mengubah `TRIP_EXPENSE` dari `'6101'` ke `'6201'` dan memperbarui docblock settlement.
+  - `app/Services/V2/SupplyTrips.php`: Mengubah `TRIP_EXPENSE` dari `'6101'` ke `'6201'` dan memperbarui docblock biaya perjalanan.
+  - `app/Console/Commands/V2Prepare.php`: Menyelaraskan akun wajib `'6101'` menjadi `'Beban Operasional Toko'` dan menambahkan `'6201' => ['Beban Transportasi & Ritase Armada', 'expense', 'debit']` (total 12 akun wajib V2).
+  - `app/Http/Controllers/ChartOfAccountController.php`: Memperbarui keterangan `SYSTEM_ACCOUNT_ROLES['6101']` menjadi `'Beban operasional toko'`.
+  - `app/Services/AccountingReportService.php`: Pada `generateCashFlow()`, melakukan pre-lookup batch `v2_payments` + `v2_invoices` + `v2_sales` untuk jurnal `v2_payment`; pembayaran saat checkout/DP (`sale_payment_method` `cash`/`transfer` atau `idempotency_key` berakhiran `':payment'`) diklasifikasikan sebagai `CASH_SALE` (`'Penerimaan dari Penjualan Tunai / Uang Muka'`), sedangkan pelunasan piutang berikutnya tetap `AR_COLLECTION` (`'Penerimaan Pelunasan Piutang Pelanggan'`).
+  - `tests/Feature/V2DeliveryTripsTest.php`, `tests/Feature/V2SupplyTripsTest.php`, `tests/Feature/V2MultiBankAccountsTest.php`, `tests/Feature/V2OperationalRelationsTest.php`, `tests/Feature/V2RelationFormsTest.php`, `tests/Feature/V2ChartOfAccountsTest.php`, `tests/Feature/V2CutoverTest.php`, `tests/Feature/CashFlowReportTest.php`: Menambahkan seed/asersi akun `6201`, menyesuaikan jumlah akun wajib `V2Prepare` (`12`), serta menambahkan uji `test_cash_flow_separates_v2_pos_cash_sales_from_receivable_collections`.
+  - `docs/dokumentasi-sistem.md`: Memperbarui bagian 14.1, 14.2, 15.7, 21, dan 23 (changelog).
+- **Perintah Verifikasi & Exit Code**:
+  - `vendor\bin\pint --dirty --format agent` (Exit code: `0`)
+  - `php artisan test --compact` pada SQLite `:memory:` (Exit code: `0`; **644/652** tes lulus, **8 skipped** khusus MariaDB, **4.635 asersi** lulus, durasi 85.527 ms)
+  - `php artisan migrate --path=database/migrations/2026_11_25_191200_add_contra_account_support_to_chart_of_accounts.php --no-interaction` pada MySQL lokal (Exit code: `0`; `[13] Ran` dalam 381.19 ms)
+  - `php artisan migrate:status` dan verifikasi Tinker `Schema::hasColumn('chart_of_accounts', 'is_contra')` (Exit code: `0`; `{"has_is_contra":true,"connection":"mysql"}`)
+  - `php artisan view:clear ; git diff --check` (Exit code: `0`)
+- **Bukti & Hasil Pengujian Empiris**:
+  - Seluruh 644 tes non-skipped PHPUnit lulus 100% setelah seluruh perubahan kode dan tes diselesaikan; 8 tes yang dilewati adalah tes spesifik driver MariaDB pada lingkungan uji SQLite.
+  - Kolom `chart_of_accounts.is_contra` terkonfirmasi aktif di database MySQL lokal tanpa menyentuh tabel atau data transaksi eksisting.
+- **Status & Catatan Akhir**: SELESAI. Siap melanjutkan ke Tahap 2 (Stok Opname V2 & Retur Penjualan/Pembelian) apabila disetujui pengguna.
+
+
+## [2026-11-26 08:43 WIB] - Tahap 2 Operasional & Pembukuan V2: Stok Opname V2, Retur Penjualan V2, dan Retur Pembelian V2
+- **Pelaksana**: Antigravity
+- **Target Tugas**: Membangun tiga fitur operasional akuntansi V2 sesuai persetujuan pengguna: (1) **Stok Opname V2** atomik dengan mutasi `v2_stock_opname` dan jurnal selisih (`5201` / `7101` atau `4201`), (2) **Retur Penjualan V2** dari detail nota admin dengan pemulihan stok & HPP tertimbang, pemotongan piutang otomatis / pengembalian kelebihan dana via laci shift, Kas Utama, atau rekening bank, dan jurnal ke akun kontra `4104` (fallback `4101`), serta (3) **Retur Pembelian V2** dari riwayat penerimaan admin dengan penjagaan stok gudang tersisa, pengurangan utang supplier / refund dana supplier, dan jurnal balik seimbang.
+- **Berkas yang Dibuat**:
+  - `database/migrations/2026_11_26_090000_create_v2_stock_opname_and_returns.php`: Migrasi additif 6 tabel V2 (`v2_stock_opnames`, `v2_stock_opname_items`, `v2_sale_returns`, `v2_sale_return_items`, `v2_purchase_returns`, `v2_purchase_return_items`) lengkap dengan `CHECK` constraints MySQL/MariaDB dan trigger SQLite.
+  - `app/Services/V2/StockOpnames.php`, `app/Services/V2/SalesReturns.php`, `app/Services/V2/PurchaseReturns.php`: Layanan domain atomik, `BigDecimal`, `lockForUpdate()`, dan idempotensi unik.
+  - `resources/views/v2/stock-opname.blade.php` & `resources/views/v2/purchase-returns.blade.php`: Antarmuka V2 ringkas (tanpa emoji, `uiPick` pencarian server, dialog modal terpusat, kompatibel `uiLive`).
+  - `tests/Feature/V2StockOpnameAndReturnsTest.php`: Pengujian komprehensif fitur Stok Opname V2, Retur Penjualan V2, dan Retur Pembelian V2 (otorisasi admin vs kasir `403`, idempotensi, mutasi stok, rekonsiliasi Laba Rugi, Neraca, dan Arus Kas).
+- **Berkas yang Diubah**:
+  - `routes/v2.php` & `app/Http/Controllers/V2/WorkspaceController.php`: Rute dan handler `v2.stock-opnames.products`, `v2.stock-opnames.store`, `v2.sales.returns.store`, `v2.receipts.returnable`, `v2.receipts.returns.store`, serta injeksi data riwayat V2 ke workspace dan `saleDetail`.
+  - `app/Console/Commands/V2Prepare.php`: Menambahkan `'5201'` dan `'7101'` dalam daftar akun wajib `v2:prepare` (total 14 akun).
+  - `app/Services/AccountingReportService.php`: Menambahkan klasifikasi arus kas masuk `v2_purchase_return` (`Pengembalian Dana Retur Pembelian`) dan keluar `v2_sale_return` (`Pengembalian Dana Retur Penjualan`).
+  - `app/Services/V2/MonitorMetrics.php` & `resources/views/v2/workspace-monitoring.blade.php`: Menambahkan ringkasan stok opname bulanan pada kartu monitor admin.
+  - `resources/views/partials/workspace-navigation.blade.php`, `resources/views/v2/ui-workspace.blade.php`, `resources/views/v2/sprint2.blade.php`, `resources/views/v2/sales-history.blade.php`, `resources/views/v2/sale-detail.blade.php`, `resources/views/v2/sale-detail-script.blade.php`, `resources/views/v2/ui-result.blade.php`: Navigasi menu `Stok opname` (khusus admin), tombol `Retur` di riwayat penerimaan & form retur di detail nota admin, riwayat retur, serta 3 aturan toast `uiResult`.
+  - `tests/Feature/V2CutoverTest.php`, `tests/Feature/V2ChartOfAccountsTest.php`, `tests/Feature/V2WorkspaceViewTest.php`, `tests/Feature/V2PosDashboardTest.php`, `tests/ui-result.test.mjs`: Penyesuaian jumlah akun wajib `V2Prepare`, keterjangkauan tugas `'stok-opname'` admin, batas ukuran HTML tetap pasca penambahan komponen UI baru, dan uji toast retur/opname.
+  - `docs/dokumentasi-sistem.md`: Pembaruan bagian 14.1, 14.2, 15.7, 16, 17.1, 19, 20, 21, dan 23 (changelog).
+- **Perintah Verifikasi & Exit Code**:
+  - `vendor\bin\pint --dirty --format agent` (Exit code: `0`)
+  - `node -e "... vm.Script ..."` pada `stock-opname.blade.php` & `purchase-returns.blade.php` (Exit code: `0`; `JS_OK`)
+  - `php artisan test --compact` pada SQLite `:memory:` (Exit code: `0`; **649/657** tes lulus, **8 skipped** khusus MariaDB, **4.707 asersi** lulus, durasi 120.654 ms)
+  - `node --test tests\*.test.mjs` (Exit code: `0`; **182/182** tes UI lulus)
+  - `php artisan migrate --path=database/migrations/2026_11_26_090000_create_v2_stock_opname_and_returns.php --no-interaction` (Exit code: `0`; `[14] Ran` dalam 3s)
+  - Verifikasi Tinker `Schema::hasTable(...)` keenam tabel di MySQL lokal (Exit code: `0`; `[true,true,true,true,true,true]`)
+  - `php artisan view:clear ; git diff --check` (Exit code: `0`)
+- **Bukti & Hasil Pengujian Empiris**:
+  - Seluruh 649 tes PHPUnit non-skipped dan 182 tes Node JS UI lulus 100% tanpa kegagalan; Laba Rugi, Neraca (`is_balanced`), dan Arus Kas (`is_reconciled`) terkonfirmasi seimbang untuk selisih lebih/kurang opname, retur penjualan (`4104` & fallback `4101`), serta retur pembelian (termasuk saat stok mencapai nol).
+  - Keenam tabel V2 baru terkonfirmasi terbuat di MySQL lokal tanpa menyentuh tabel arsip lama.
+- **Status & Catatan Akhir**: SELESAI. Interaksi visual penuh di browser tidak dijalankan langsung (untested browser gate), seluruh jalur backend, render DOM, dan skrip UI terverifikasi otomatis. Siap melanjutkan ke Tahap 3 (pengamanan `403` / penghentian jalur legacy jika diminta).
+
+
+## [2026-11-26 08:52 WIB] - Tahap 3 Audit Keamanan Cutover, Otorisasi Rute Legacy/V2, & Konsistensi Dokumentasi
+- **Pelaksana**: Antigravity
+- **Target Tugas**: Menuntaskan Tahap 3: memverifikasi pemblokiran `403` pada seluruh rute tulis legacy oleh `V2Cutover`, memverifikasi otorisasi admin vs kasir pada seluruh rute V2 baru, memeriksa paritas cangkang & preflight akun wajib pada MySQL lokal (`v2:prepare --accounts-only`), dan menyelaraskan `docs/dokumentasi-sistem.md`.
+- **Berkas yang Dibuat**: Tidak ada.
+- **Berkas yang Diubah**:
+  - `tests/Feature/V2CutoverTest.php`: Menambahkan matriks uji `403` untuk 18 titik akhir mutasi legacy (`/pos/checkout`, `/stock-opname`, `/expenses`, `/inventory/receipts`, `/ritase`, `/coa`, `/journals/*`, `/vehicles`, `/product-options`) bagi admin dan kasir, serta verifikasi `403` bagi kasir pada seluruh rute V2 Tahap 2 (`stock-opnames`, `sales.returns`, `receipts.returnable`, `receipts.returns`).
+  - `docs/dokumentasi-sistem.md`: Menyelaraskan catatan Laporan Harian (bagian 15.1) mengenai kas keluar retur tunai laci vs pengurang pendapatan di Laba Rugi, memperinci daftar rute legacy yang dikunci `V2Cutover` (bagian 21), serta mencatat perubahan pada bagian 23.
+- **Perintah Verifikasi & Exit Code**:
+  - `vendor\bin\pint --dirty --format agent` (Exit code: `0`)
+  - `php artisan test --compact tests\Feature\V2CutoverTest.php tests\Feature\V2ShellParityTest.php tests\Feature\V2ReportsDocumentsTest.php` pada SQLite `:memory:` (Exit code: `0`; **10/10** tes, **309 asersi** lulus)
+  - `php artisan v2:prepare --accounts-only --admin=1` (read-only preflight pada MySQL lokal, Exit code: `0`; `accounts_preflight_ok`, `missing_accounts: []`)
+  - `git diff --check` (Exit code: `0`)
+- **Bukti & Hasil Pengujian Empiris**:
+  - Seluruh 18 jalur mutasi legacy terkonfirmasi mengembalikan HTTP `403` saat `V2_ENABLED=true`, seluruh 5 rute V2 Tahap 2 mengembalikan HTTP `403` untuk kasir, dan seluruh 12 rute GET legacy cangkang terpadu lulus paritas sidebar/shell (`V2ShellParityTest`).
+  - Preflight baca-saja COA mengonfirmasi seluruh 14 akun wajib tersedia dan valid di database MySQL lokal tanpa menyentuh saldo, peran, atau jurnal.
+- **Status & Catatan Akhir**: SELESAI. Seluruh 3 tahap roadmap penyempurnaan akuntansi & operasional V2 telah selesai terverifikasi.
+
+## [2026-11-26] - Bantuan kontekstual per menu
+- **Pelaksana**: OpenCode / GPT-6.1 Sol.
+- **Target Tugas**: Menata bantuan fitur yang relevan, mudah ditemukan, dan tidak mengganggu pekerjaan pengguna.
+- **Temuan**: Belum ditemukan komponen panduan halaman terpusat atau pemetaan bantuan per menu; tooltip istilah existing tetap dipertahankan.
+- **Berkas yang Dibuat**:
+  - `resources/views/partials/contextual-help.blade.php`: dialog native dengan 24 topik, langkah/catatan penting, konteks dari menu aktif atau rute Keuangan, penyesuaian petunjuk kasir, fokus dan reduced-motion; hanya memakai token existing.
+  - `tests/contextual-help.test.mjs`: enam uji perilaku/cakupan bantuan menggunakan skrip implementasi melalui Node VM.
+- **Berkas yang Diubah**:
+  - `resources/views/partials/workspace-header.blade.php`: tombol bantuan bersama dan pemasangan partial.
+  - `docs/dokumentasi-sistem.md`: bagian 1.6 dan riwayat perubahan; perubahan pekerjaan lain dipertahankan.
+  - `logeksekusi.md`: entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `node --test tests/contextual-help.test.mjs` (Exit code: `0`; 6/6 lulus).
+  - `APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: php artisan test --compact tests/Feature/V2WorkspaceViewTest.php` (variabel diatur melalui PowerShell; Exit code: `0`; 3 tes, 144 asersi).
+  - `node --test tests/*.test.mjs` (Exit code: `0`; 188/188 lulus).
+  - `python C:\Users\bagas\.config\opencode\skills\design-token-system\scripts\check_tokens.py resources/views/partials/contextual-help.blade.php resources/views/partials/workspace-header.blade.php` (Exit code: `0`; 0 error, 0 warning).
+  - `git diff --check -- resources/views/partials/workspace-header.blade.php resources/views/partials/contextual-help.blade.php tests/contextual-help.test.mjs` (Exit code: `0`).
+- **Bukti & Hasil Pengujian Empiris**: Seluruh menu/submenu memiliki topik; membuka/menutup dialog, pergantian konteks, nama aksesibel, panduan kasir, keenam rute Keuangan mandiri, serta konteks tidak dikenal diuji. Render workspace existing tetap lulus. Tidak ada endpoint, dependensi, transaksi, atau skema yang diubah.
+- **Status & Catatan Akhir**: Implementasi dan uji otomatis selesai. Browser membuka alamat aplikasi hasil Boost (`http://localhost:8000/`) tetapi mendapat `502 Bad Gateway`; tampilan/interaksi native di desktop dan ponsel belum diverifikasi secara visual. Uji VM tidak membuktikan layout atau perangkap fokus native browser.
+
+## [2026-11-26] - Penyederhanaan UI bantuan menjadi ikon hover
+- **Pelaksana**: OpenCode / GPT-6.1 Sol.
+- **Target Tugas**: Mengikuti koreksi pemilik: ikon kecil dekat bagian atas judul dan tooltip sederhana sesuai referensi hijau tua, judul lime, penjelasan dan catatan bergaris.
+- **Berkas yang Diubah**:
+  - `resources/views/partials/workspace-header.blade.php`: mengganti tombol Bantuan terpisah dengan komponen `x-ui.info-tip` di sisi judul.
+  - `resources/views/partials/contextual-help.blade.php`: menghapus dialog, langkah panjang, dan CSS dialog; 24 konteks dipadatkan menjadi judul/deskripsi/catatan dan memakai tooltip bersama. Konteks tidak dikenal membersihkan payload; pergantian menu menutup tooltip lama.
+  - `resources/views/v2/ui-tooltip.blade.php`: dukungan catatan dinamis `data-tip-note`, tanpa mengganti gaya/interaksi tooltip existing.
+  - `tests/contextual-help.test.mjs`, `tests/ui-tooltip-system.test.mjs`: memperbarui kontrak bantuan ringkas; uji payload, konteks peran/rute, hover dengan waktu virtual, fokus/blur, dan klik/Escape.
+  - `docs/dokumentasi-sistem.md`: bagian 1.6 diperbarui mengikuti UI baru; entri log ini append-only.
+- **Perintah Verifikasi & Exit Code**:
+  - `node --test tests/contextual-help.test.mjs tests/ui-tooltip-system.test.mjs` (Exit code: `0`; 13/13 lulus).
+  - `node --test tests/*.test.mjs` (Exit code: `0`; 191/191 lulus).
+  - `APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: php artisan test --compact tests/Feature/V2WorkspaceViewTest.php` (variabel melalui PowerShell; Exit code: `0`; 3 tes/144 asersi).
+  - `python C:\Users\bagas\.config\opencode\skills\design-token-system\scripts\check_tokens.py resources/views/partials/contextual-help.blade.php resources/views/partials/workspace-header.blade.php` (Exit code: `0`; 0 error/0 warning).
+  - `git diff --check -- resources/views/partials/workspace-header.blade.php resources/views/v2/ui-tooltip.blade.php docs/dokumentasi-sistem.md logeksekusi.md` (Exit code: `0`; hanya peringatan normalisasi CRLF).
+- **Bukti & Hasil Pengujian Empiris**: Tooltip memakai renderer existing dengan tiga elemen judul, isi dan catatan. Hover membuka tanpa modal; fokus keyboard tidak dipindahkan; klik/Escape memakai penangan bersama. Render Blade workspace tetap lulus. Tidak ada token, dependensi, endpoint, atau transaksi baru.
+- **Status & Catatan Akhir**: Implementasi dan pengujian otomatis selesai. Pemeriksaan visual live desktop/mobile belum dilakukan pada revisi ini; akses browser aplikasi pada tahap sebelumnya mengembalikan 502. Uji VM tidak membuktikan penempatan piksel atau ukuran target sentuh aktual.
+
+## [2026-11-26] - Penyelarasan ikon bantuan di judul
+- **Pelaksana**: OpenCode.
+- **Target Tugas**: Rapikan susunan judul dan ikon bantuan tanpa mengubah kartu tooltip.
+- **Berkas yang Diubah**: `resources/views/partials/contextual-help.blade.php` dan `tests/contextual-help.test.mjs`. Arah baris ditetapkan eksplisit untuk mengatasi aturan dasar `flex-direction:column`; judul panjang memakai elipsis dan ikon tidak menyusut.
+- **Verifikasi**: `node --test tests/contextual-help.test.mjs tests/ui-tooltip-system.test.mjs` (exit 0; 14/14); `check_tokens.py resources/views/partials/contextual-help.blade.php` (exit 0; 0 error/0 warning).
+- **Status & Catatan Akhir**: Kontrak CSS dan interaksi bantuan lulus pengujian; tata letak visual browser belum diperiksa.
+
+## [2026-11-26] - Draf teks Help Center POS
+- **Pelaksana**: OpenCode.
+- **Target Tugas**: Usulan integrasi, prioritas fitur, daftar artikel, dan contoh panduan untuk koreksi pemilik sebelum membuat layout.
+- **Berkas yang Dibuat**: `docs/draf-help-center-pos.md`.
+- **Verifikasi**: Cakupan dan contoh transaksi diperiksa terhadap menu ruang kerja dan bagian penjualan dokumentasi sistem. `git diff --no-index --check -- NUL docs/draf-help-center-pos.md` tidak melaporkan masalah whitespace; exit 1 karena berkas baru berbeda dari NUL.
+- **Status & Catatan Akhir**: Draf siap dikoreksi. Tidak ada layout, rute, atau kode aplikasi yang dibuat; tes runtime tidak diperlukan untuk draf teks.
+
+
+## [2026-11-26 09:23 WIB] - Perbaikan Dialog & Respons Klien Retur Pembelian, Retur Penjualan, dan Stok Opname V2
+- **Pelaksana**: Antigravity
+- **Target Tugas**: Memperbaiki bug UI yang membuat alur retur macet tanpa respons di browser (`#purchase-return-dialog` dan `#stock-opname-dialog` tertinggal di `#admin`, validasi `reportValidity()` yang diam saat elemen tanggal/baris dibungkus, hilangnya blok `catch` pada `fetch`, serta urutan `dialog.close()` sebelum `uiLive.saved`).
+- **Berkas yang Dibuat**:
+  - `tests/returns-ui.test.mjs`: Pengujian struktural penempatan `<dialog>` di dalam `<section>` workspace serta simulasi alur Retur Pembelian dan Retur Penjualan (validasi eksplisit Bahasa Indonesia, fallback pindah dialog ke `document.body`, pemulihan gagal jaringan, dan urutan `uiLive.saved`).
+- **Berkas yang Diubah**:
+  - `resources/views/v2/purchase-returns.blade.php`: Memindahkan `<dialog id="purchase-return-dialog">` ke dalam `<section id="purchase-returns-history">`, menambah penjaga `ensureVisibleHost()` bila terdeteksi induk tersembunyi/`#admin`, validasi eksplisit tanggal/qty/alasan ke `[data-error]`, blok `catch`, deteksi sesi berakhir (`res.redirected`), serta fallback aman `window.crypto?.randomUUID`.
+  - `resources/views/v2/sale-detail.blade.php` & `resources/views/v2/sale-detail-script.blade.php`: Mengganti penolakan diam `reportValidity()` dengan pesan validasi eksplisit ke `[data-error]`, menambah `role="alert"`, menjaga `max` tanggal agar tidak di bawah tanggal nota, menambah blok `catch`, serta memanggil `uiLive.saved(form)` sebelum `dialog.close()` mengosongkan kontainer.
+  - `resources/views/v2/stock-opname.blade.php`: Memindahkan `<dialog id="stock-opname-dialog">` ke dalam `<section id="stock-opname-history">`, mengganti `reportValidity()` dengan validasi eksplisit baris/tanggal, menambah blok `catch`, serta fallback aman `window.crypto?.randomUUID`.
+  - `logeksekusi.md`: Entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan view:clear` (Exit code: `0`)
+  - `node --test tests\*.test.mjs` (Exit code: `0`; **195/195** tes UI lulus, termasuk `tests\returns-ui.test.mjs` dan `tests\sale-detail.test.mjs`)
+  - `php artisan test --compact tests\Feature\V2StockOpnameAndReturnsTest.php tests\Feature\V2WorkspaceViewTest.php` pada SQLite `:memory:` (Exit code: `0`; **8/8** tes, **211 asersi** lulus)
+  - `php artisan test --compact --filter=V2PosDashboardTest` (Exit code: `0`; **7/7** tes, **121 asersi**, HTML `2763 KB`)
+  - `git diff --check` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Akar masalah macetnya dialog retur di workspace (`#admin` tersembunyi + `reportValidity()` tanpa pesan + `try/finally` tanpa `catch`) telah diperbaiki dan diverifikasi via Blade render tests serta Node UI VM tests; pengujian klik manual di browser pengguna siap diulang kembali.
+
+
+## [2026-11-26 09:33 WIB] - Tooltip Peran Sistem Bagan Akun, Penyegaran Saran Tambah Akun, & Penyederhanaan Penjelasan Akun Kontra/Beban
+- **Pelaksana**: Antigravity
+- **Target Tugas**: Memindahkan keterangan fungsi otomatis `(system_role)` di Bagan Akun ke tooltip, menyembunyikan saran akun yang sudah ada secara langsung setelah simpan tanpa reload, mendahulukan contoh akun Beban Operasional/Reimburse (`61xx`) & Bank untuk pengguna awam, serta menyederhanakan penjelasan akun kontra dan saldo normal.
+- **Berkas yang Diubah**:
+  - `resources/views/coa/index.blade.php`: Mengganti teks sejajar `({{ $acc->system_role }})` menjadi `<x-ui.info-tip>` di sebelah label `Terhubung sistem`; membungkus saran preset ke `#coa-presets-wrap` dengan bahasa ringkas pemula; mendukung `data-preset-bank` untuk rekening bank tambahan; menambahkan tooltip `coa_saldo_normal` dan `coa_akun_kontra` serta teks panduan awam pada kotak `Akun pengurang kelompok (Kontra) — opsional`.
+  - `resources/views/v2/ui-tooltip.blade.php`: Menambahkan entri `coa_saldo_normal` dan `coa_akun_kontra` ke `CATALOG`.
+  - `app/Http/Controllers/ChartOfAccountController.php`: Menata ulang `RECOMMENDED_PRESETS` agar beban operasional sehari-hari (`6102`–`6107`, termasuk Listrik & Air, Servis, ATK, Gaji, Internet, Konsumsi & Reimburse) dan rekening bank tambahan (`1105`) tampil di awal; menyaring saran berdasarkan kode maupun nama akun yang sudah ada (`mb_strtolower(trim(...))`).
+  - `resources/views/v2/coa-script.blade.php` & `resources/views/v2/ui-workspace.blade.php`: Menyinkronkan `#coa-presets-wrap` saat `refresh()` COA berhasil menyimpan dan memancarkan `ui-remote:changed` dengan `all: true` agar tab jarak jauh seperti Pengeluaran ikut tersegarkan.
+  - `tests/Feature/V2ChartOfAccountsTest.php` & `tests/coa-operational.test.mjs`: Menambahkan asersi pemindahan `system_role` ke tooltip, penyaringan saran berbasis nama duplikat, penyegaran `#coa-presets-wrap`, serta invalidasi cache remote menyeluruh.
+  - `logeksekusi.md`: Entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `vendor\bin\pint --dirty --format agent` (Exit code: `0`; `passed`)
+  - `php artisan view:clear` (Exit code: `0`)
+  - `node --test tests\*.test.mjs` (Exit code: `0`; **196/196** tes UI lulus)
+  - `php artisan test --compact tests\Feature\V2ChartOfAccountsTest.php tests\Feature\CoaManagementTest.php tests\Feature\V2WorkspaceViewTest.php` pada SQLite `:memory:` (Exit code: `0`; **33/33** tes, **410 asersi** lulus)
+  - `git diff --check` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Tampilan Bagan Akun dan modal Tambah Akun kini lebih ringkas bagi pengguna non-akuntan serta saran duplikat langsung hilang setelah simpan tanpa reload.
+
+
+## [2026-11-26 09:40 WIB] - Penomoran Kode Akun Otomatis Dua Arah untuk Pengguna Non-Akuntan
+- **Pelaksana**: Antigravity
+- **Target Tugas**: Membantu pengguna yang belum hafal pengelompokan nomor akun (1xxx/2xxx/3xxx/4xxx/6xxx) saat menambah akun di Bagan Akun.
+- **Berkas yang Diubah**:
+  - `app/Http/Controllers/ChartOfAccountController.php`: Mengirim `existingAccountCodes` (seluruh kode akun terdaftar di seluruh halaman/status) ke view `coa.index`.
+  - `resources/views/coa/index.blade.php`: Menambahkan pemilih keperluan cepat `#coa-purpose-box` (Biaya/Pengeluaran Toko `61xx`, Rekening Bank `11xx` tercentang bank, Kas Kecil, Aset Tetap `15xx`, Utang `21xx`, Modal `31xx`, Pemasukan `71xx`), menyusun urutan kolom dari `Nama Akun` & `Klasifikasi` terlebih dahulu, menambah tombol `Otomatis` + petunjuk langsung `#coa-code-hint`, serta sinkronisasi dua arah JS (memilih keperluan/klasifikasi mengisi nomor kosong berikutnya; mengetik awalan kode otomatis menyesuaikan klasifikasi & saldo normal).
+  - `resources/views/v2/coa-script.blade.php`: Menyegarkan daftar `#coa-used-codes` setelah simpan agar penomor otomatis selalu mengetahui kode baru.
+  - `tests/coa-operational.test.mjs` & `tests/Feature/V2ChartOfAccountsTest.php`: Menambahkan uji penomoran otomatis dan sinkronisasi dua arah klasifikasi serta ketersediaan `existingAccountCodes`.
+  - `logeksekusi.md`: Entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `vendor\bin\pint --dirty --format agent` (Exit code: `0`; `passed`)
+  - `php artisan view:clear` (Exit code: `0`)
+  - `node --test tests\*.test.mjs` (Exit code: `0`; **197/197** tes UI lulus)
+  - `php artisan test --compact tests\Feature\V2ChartOfAccountsTest.php tests\Feature\CoaManagementTest.php tests\Feature\V2WorkspaceViewTest.php` pada SQLite `:memory:` (Exit code: `0`; **33/33** tes, **411 asersi** lulus)
+  - `git diff --check` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Pengguna tidak lagi perlu menghafal aturan digit depan atau menebak kode kosong saat menambah akun baru.
+
+
+## [2026-11-26 13:44 WIB] - Pembatasan Fitur Bagan Akun V2 (Bank & Beban Operasional) + Otomasi Akun Pengurang Sistem 4103/4104
+- **Pelaksana**: Antigravity
+- **Target Tugas**: Menetapkan batasan fitur Bagan Akun V2 sesuai keputusan pemilik: pengguna hanya dapat menambah **Rekening Bank tambahan (`1xxx`)** dan **Beban Operasional (`6xxx`/`8xxx`)** di luar sistem; seluruh akun inti dan akun pengurang (`4103` Potongan Penjualan & `4104` Retur Penjualan) dikelola otomatis oleh sistem; menyambungkan diskon item/nota Kasir POS ke `4103`.
+- **Berkas yang Diubah**:
+  - `app/Http/Controllers/ChartOfAccountController.php`: Menambahkan `4103`, `4104`, dan `7101` ke `SYSTEM_ACCOUNTS` (16 akun inti), menambahkan `SYSTEM_CONTRA_ACCOUNTS` (`4103`, `4104`), menyederhanakan `RECOMMENDED_PRESETS` hanya untuk Beban Operasional (`6102`–`6107`) & Rekening Bank tambahan (`1104`–`1106`), serta menegakkan `v2CustomScopeError()` pada rute `/v2/chart-of-accounts` agar admin hanya membuat Rekening Bank tambahan atau Beban Operasional non-sistem dan tidak membuat akun kontra manual.
+  - `app/Services/V2/Operations.php`: Menyambungkan diskon item + diskon nota pada `checkout()` agar menjurnal penjualan kotor ke `4101` (Kredit) dan total diskon ke `4103` (Debet) bila akun `4103` aktif (dengan fallback nilai bersih ke `4101` bila `4103` tidak ada).
+  - `app/Console/Commands/V2Prepare.php`: Menambahkan `4103` (Potongan Penjualan, `is_contra=true`) dan `4104` (Retur Penjualan, `is_contra=true`) ke daftar 16 akun wajib sistem.
+  - `resources/views/coa/index.blade.php` & `resources/views/v2/ui-tooltip.blade.php`: Menyederhanakan modal Tambah Akun mode V2 menjadi 2 pilihan jelas (Beban Operasional vs Rekening Bank Tambahan), menyembunyikan kotak centang Kontra manual di V2, mengunci klasifikasi/saldo normal otomatis sesuai pilihan, dan mengganti lencana tabel `Kontra` menjadi `Pengurang`.
+  - `tests/Feature/V2ChartOfAccountsTest.php`, `tests/Feature/V2CutoverTest.php`, `tests/Feature/V2OperationsTest.php`, `tests/coa-operational.test.mjs`: Menambahkan dan menyelaraskan uji batasan fitur COA V2, 16 akun sistem `v2:prepare`, jurnal diskon POS ke `4103`, serta validasi modal terikat V2.
+  - `docs/dokumentasi-sistem.md`: Memperbarui bagian 14.1, 14.2, 14.4, dan 23 (Riwayat perubahan).
+  - `logeksekusi.md`: Entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `php artisan v2:prepare --accounts-only --admin=1 --apply` pada MySQL lokal (Exit code: `0`; `accounts_prepared`, menambahkan `4104` tanpa mengubah peran/jurnal)
+  - `php artisan v2:prepare --accounts-only --admin=1` (Exit code: `0`; `accounts_preflight_ok`, `missing_accounts: []`)
+  - `vendor\bin\pint --dirty --format agent` (Exit code: `0`; `passed`)
+  - `php artisan view:clear` (Exit code: `0`)
+  - `node --test tests\*.test.mjs` (Exit code: `0`; **197/197** tes UI lulus)
+  - `php artisan test --compact` pada `CoaManagementTest`, `V2CutoverTest`, `V2OperationsTest`, `V2MultiBankAccountsTest`, `V2StockOpnameAndReturnsTest`, `V2WorkspaceViewTest` (46/46 lulus pada run sebelumnya tanpa perubahan kode aplikasi) + `tests\Feature\V2ChartOfAccountsTest.php` (Exit code: `0`; **16/16** tes, **204 asersi** lulus; total **62/62** lulus)
+  - `git diff --check` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Batasan fitur Bagan Akun V2 aktif di UI maupun validasi server, akun pengurang sistem `4103` & `4104` sudah terpasang di database lokal, dan diskon POS otomatis tercatat ke `4103`.
+
+
+## [2026-11-27 08:51 WIB] - Lokalisasi Pesan Sesi Login Habis (401/419) ke Bahasa Indonesia
+- **Pelaksana**: Antigravity
+- **Target Tugas**: Mengganti pesan bawaan `Unauthenticated.` / `CSRF token mismatch.` pada galat sesi login habis (`401`/`419`) menjadi pesan Bahasa Indonesia yang jelas (`Sesi login habis. Muat ulang halaman lalu masuk kembali.`).
+- **Berkas yang Diubah**:
+  - `bootstrap/app.php`: Menambahkan renderer pengecualian JSON untuk `AuthenticationException` (`401`), `TokenMismatchException` (`419`), dan `HttpExceptionInterface` (`419`) dengan pesan Bahasa Indonesia.
+  - `resources/views/v2/expense-script.blade.php` & `resources/views/v2/coa-script.blade.php`: Memprioritaskan pemeriksaan status `401`/`419`/redirect sebelum `data.message` agar pesan sesi habis konsisten dalam Bahasa Indonesia.
+  - `tests/expense-operational.test.mjs` & `tests/Feature/V2ChartOfAccountsTest.php`: Menambahkan uji respons `401`/`419` menampilkan `Sesi login habis...` dan bukan `Unauthenticated.`.
+  - `logeksekusi.md`: Entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `vendor\bin\pint --dirty --format agent` (Exit code: `0`; `fixed` pada `bootstrap/app.php`)
+  - `php artisan view:clear` (Exit code: `0`)
+  - `node --test tests\*.test.mjs` (Exit code: `0`; **198/198** tes UI lulus)
+  - `php artisan test --compact tests\Feature\V2ChartOfAccountsTest.php tests\Feature\V2UiUxAndExpenseTest.php tests\Feature\V2OperationsTest.php` pada SQLite `:memory:` (Exit code: `0`; **29/29** tes, **290 asersi** lulus)
+  - `git diff --check` (Exit code: `0`)
+- **Status & Catatan Akhir**: SELESAI. Seluruh respons JSON sesi habis (`401`/`419`) maupun modal Pengeluaran/COA kini menampilkan pesan Bahasa Indonesia yang jelas.
+
+
+
+## [2026-11-27 09:35 WIB] - Penyempurnaan & Pengamanan Modul Kasir (POS) Tahap 1–3 & 4A
+- **Pelaksana**: Antigravity
+- **Target Tugas**: Melaksanakan plan eksekusi modul Kasir (`implementation_plan.md`) untuk Tahap 1 (pengerasan kunci idempotensi lintas koneksi/perangkat, validasi fail-fast transfer/bukti, dokumen cetak siap produksi), Tahap 2 (sinkronisasi stok katalog otomatis & fitur Tahan transaksi), Tahap 3 (kontrol margin kasir di server & ringkasan piutang terbuka/lewat tempo pelanggan), dan Tahap 4A (kolom opsional catatan nota/instruksi kirim).
+- **Berkas yang Dibuat**:
+  - `database/migrations/2026_11_27_092231_add_notes_to_v2_sales.php`: Migrasi aditif kolom `v2_sales.notes` (`string(500)` nullable).
+  - `tests/Feature/V2PosEnhancementsTest.php`: Uji fitur PHPUnit terisolasi (endpoint katalog tanpa bocor HPP, batas diskon & guard HPP per peran, ringkasan piutang pelanggan, catatan nota, serta cetak Nota/Surat Jalan).
+  - `tests/pos-enhancements.test.mjs`: Uji UI Node untuk fallback UUID non-HTTPS/legacy, validasi fail-fast transfer/bukti, prioritas SKU persis, modal review, dialog sukses transfer & Kredit DP transfer, dan layout cetak A4/80mm.
+- **Berkas yang Diubah**:
+  - `config/v2.php`: Menambahkan konfigurasi profil toko (`V2_STORE_NAME`, `V2_STORE_ADDRESS`, `V2_STORE_PHONE`, `V2_STORE_FOOTER`) dan kebijakan margin kasir opsional (`V2_CASHIER_MAX_DISCOUNT_PERCENT`, `V2_BLOCK_CASHIER_BELOW_COST`).
+  - `routes/v2.php` & `app/Http/Controllers/V2/WorkspaceController.php`: Menambahkan rute baca `GET /v2/pos/catalog` (`throttle:60,1`, `private, no-store`, format `Money::value`, tanpa `cost_price`), validasi `notes` di `checkout()`, dan injeksi `posPolicy` ke view workspace.
+  - `app/Services/V2/Operations.php`: Menambahkan validasi & penyimpanan `v2_sales.notes` (dengan penjaga `Schema::hasColumn`) serta penegakan `enforceCashierMarginPolicy()` berbasis `BigDecimal` khusus peran `cashier` tanpa membocorkan HPP.
+  - `app/Services/V2/ReportsDocuments.php`: Memperkaya payload `document()` dengan `unit` per item, `cashier_name`, `cash_day`, `created_at`, `price_tier`, `due_date`, `notes`, dan profil `store`.
+  - `app/Services/V2/CustomerLookup.php`: Menambahkan ringkasan agregat piutang terbuka & lewat tempo (`open_invoices_count`, `open_balance`, `overdue_count`, `overdue_balance`) dengan satu query agregat + `BigDecimal`.
+  - `resources/views/v2/document.blade.php`: Menghapus label `Pratinjau V2` & `Shift #`, menambahkan kop toko, format qty + satuan rapi, nama kasir, kas harian, badge Harga Kontraktor, jatuh tempo, catatan, kolom tanda tangan Surat Jalan, dan pemilih mode cetak **A4 / Struk 80mm**.
+  - `resources/views/v2/workspace.blade.php`, `resources/views/v2/receipt-restock-script.blade.php`, `resources/views/v2/driver-operations.blade.php`: Mengekspos helper `window.v2Uuid` dan memasang cadangan `crypto.getRandomValues` di seluruh generator kunci idempotensi; mengirim `notes` saat checkout; melengkapi tautan fallback `#checkout-result` dengan `target="_blank" rel="noopener"` dan tautan Surat Jalan.
+  - `resources/views/v2/ui-result.blade.php`: Memperbaiki catatan menunggu verifikasi admin pada popup sukses agar tampil untuk metode `transfer` maupun `credit` dengan DP `transfer`.
+  - `resources/views/v2/pos-cashier.blade.php`, `resources/views/v2/pos-cashier-script.blade.php`, `resources/views/v2/pos-cashier-styles.blade.php`, `resources/views/v2/pos-customer-combo.blade.php`: Menyelaraskan wajib pelanggan terdaftar untuk Transfer & Kredit, fail-fast validasi foto bukti transfer (tipe/ukuran), rincian subtotal/diskon/ongkir/catatan di modal Tinjau, prioritas SKU persis pada `Enter`, persistensi konteks keranjang v2 di `localStorage`, tombol & sinkronisasi otomatis stok katalog, fitur **Tahan transaksi** + dialog `Tertahan`, banner piutang terbuka/lewat tempo pelanggan, serta input catatan nota.
+  - `resources/views/partials/contextual-help.blade.php` & `docs/dokumentasi-sistem.md`: Menyelaraskan bantuan kontekstual Kasir serta dokumentasi perilaku sistem (bagian 7.1, 7.8, 18, 21, 23).
+- **Perintah Verifikasi & Exit Code**:
+  - `vendor\bin\pint --dirty --format agent` (Exit code: `0`; `passed`)
+  - `php artisan view:clear` (Exit code: `0`)
+  - `node --test tests\*.test.mjs` (Exit code: `0`; **203/203** tes UI lulus)
+  - `php artisan test --compact tests/Feature/V2PosEnhancementsTest.php tests/Feature/V2ReportsDocumentsTest.php tests/Feature/V2OperationsTest.php tests/Feature/V2CustomerLookupTest.php tests/Feature/V2TransferProofTest.php tests/Feature/V2ContractorPricingTest.php tests/Feature/V2WorkspaceViewTest.php tests/Feature/V2SalesWorkspaceTest.php tests/Feature/V2SharedStoreShiftTest.php` pada SQLite `:memory:` (Exit code: `0`; **57/57** tes, **575 asersi** lulus)
+  - `git diff --check` (Exit code: `0`)
+- **Bukti & Hasil Pengujian Empiris**:
+  - Seluruh 57 tes PHPUnit (575 asersi) lulus pada SQLite `:memory:` termasuk uji kebocoran HPP pada `GET /v2/pos/catalog` dan pesan galat margin kasir, validasi diskon/HPP per peran, agregat piutang terbuka/lewat tempo, penyimpanan catatan, serta pratinjau cetak Nota & Surat Jalan.
+  - Seluruh 203 tes Node UI (`tests/*.test.mjs`) lulus termasuk verifikasi fallback `safeUuid()` tanpa `crypto.randomUUID` dan tanpa objek `crypto`, serta tampilan catatan menunggu verifikasi pada Transfer dan Kredit DP Transfer.
+  - Catatan keterbatasan (*untested gate*): migrasi `2026_11_27_092231_add_notes_to_v2_sales` belum dijalankan ke database MySQL aktif/VPS (hanya teruji penuh di SQLite `:memory:`), dan kode telah dijaga `Schema::hasColumn('v2_sales', 'notes')` sehingga tetap aman sebelum `php artisan migrate` dijalankan.
+- **Status & Catatan Akhir**: SELESAI untuk Tahap 1, 2, 3, dan 4A. Tahap 4B (*Split Payment* Tunai + Transfer) belum dieksekusi dan tetap opsional menunggu konfirmasi pemilik toko.
+
+
+## [2026-11-27 10:20 WIB] - Implementasi Pagination Menyeluruh (Paket B: Pengeluaran + 8 Tabel Operasional Server-Side + 2 Tabel Ringan)
+- **Pelaksana**: Antigravity
+- **Target Tugas**: Menghilangkan pemotongan data `limit(10)` pada menu Pengeluaran dan `limit(30)`/`limit(50)` pada 8 tabel operasional workspace agar seluruh riwayat dapat diakses penuh sambil menjaga muat halaman awal tetap ringan (10 baris per halaman) dengan pemilih `10 / 25 / 50` baris.
+- **Berkas yang Dibuat**:
+  - `app/Services/V2/WorkspaceTables.php`: Layanan terpusat pagination, pencarian, dan penyaringan server-side untuk 8 tabel operasional (`payments`, `deliveries`, `shifts`, `receipts`, `receipt-drafts`, `stock-opnames`, `sale-returns`, `purchase-returns`), lengkap dengan isolasi peran (`ADMIN_ONLY` -> `403` untuk kasir), `pendingRejectPayments()`, serta eager loading per halaman.
+  - `resources/views/v2/ui-server-tables.blade.php`: Pengendali AJAX `[data-server-table]` (pencarian debounced, filter chip & kartu monitor, ganti jumlah baris `10/25/50`, pindah halaman tanpa reload, penundaan muat ulang saat dialog baris terbuka, sinkronisasi `ui-live:patched`, dan rebind hook/action/select/motion).
+  - `resources/views/v2/tables/pagination.blade.php` serta 8 fragmen tabel: `payments-results.blade.php`, `deliveries-results.blade.php`, `shifts-results.blade.php`, `receipts-results.blade.php`, `receipt-drafts-results.blade.php`, `stock-opnames-results.blade.php`, `sale-returns-results.blade.php`, `purchase-returns-results.blade.php`.
+  - `tests/Feature/V2PaginationTest.php`: Uji fitur PHPUnit terisolasi untuk pagination Pengeluaran (`10/25/50` + filter + partial workspace), Persetujuan Pembayaran (prioritas default `pending/proposed` + seluruh antrean penolakan), Pengiriman (query langsung `v2_deliveries` dengan prioritas `prepared/sent` + isolasi kasir), dan 6 tabel operasional lainnya + batas peran (`403`).
+  - `tests/server-tables-pagination.test.mjs`: Uji UI Node untuk markup pagination di Pengeluaran/Akun/Uang Muka/Tabel Operasional serta perilaku pengendali AJAX `[data-server-table]`.
+- **Berkas yang Diubah**:
+  - `routes/v2.php` & `app/Http/Controllers/V2/WorkspaceController.php`: Menambahkan rute `GET /v2/tables/{table}` (`v2.tables.show`, `throttle:120,1`, `private, no-store`), mengganti kueri `limit(30)`/`limit(50)` di `index()` dengan `WorkspaceTables::build()`, dan menyediakan `$pendingRejectPayments`.
+  - `app/Http/Controllers/ExpenseController.php`: Mengganti `limit(10)->get()` menjadi `paginate($perPage)` (`10|25|50`, default `10`) dengan mempertahankan parameter filter (`search`, `source`, `category`, `start_date`, `end_date`, `per_page`) tanpa mencemari `partial`/`page`.
+  - `resources/views/expenses/index.blade.php`, `resources/views/expenses/theme-styles.blade.php`, `resources/views/v2/expense-script.blade.php`: Menambahkan pemilih jumlah baris per halaman, indikator rentang data, tautan `@include('partials.pagination')`, gaya pagination mandiri, dan pemanggilan `window.uiRemoteRebind?.(root)`.
+  - `resources/views/v2/ui-live.blade.php` & `resources/views/v2/ui-workspace.blade.php`: Mengekspos `window.uiLive.runHooks` dan `window.uiRemoteRebind` serta mendaftarkan pendengar `ui-server-table:render`.
+  - `resources/views/v2/workspace.blade.php`, `resources/views/v2/driver-operations.blade.php`, `resources/views/v2/sprint2.blade.php`, `resources/views/v2/receipt-drafts.blade.php`, `resources/views/v2/stock-opname.blade.php`, `resources/views/v2/sales-history.blade.php`, `resources/views/v2/purchase-returns.blade.php`, `resources/views/v2/accounts.blade.php`: Menghubungkan 8 tabel operasional ke `[data-server-table]`, menambahkan pagination ringan pada **Uang Muka Sopir Terbuka** (`data-ui-table`) dan **Akun Login** (`#accounts-pager` / `#accounts-page-size`).
+  - `docs/dokumentasi-sistem.md`: Memperbarui dokumentasi perilaku sistem (bagian 1.2, 20, dan 23).
+  - `logeksekusi.md`: Entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `vendor\bin\pint --dirty --format agent` (Exit code: `0`; `passed`)
+  - `php artisan view:cache` lalu `php artisan view:clear` (Exit code: `0`; seluruh template Blade terkompilasi tanpa galat)
+  - `node --test (Get-ChildItem tests\*.test.mjs | ForEach-Object { $_.FullName })` (Exit code: `0`; **205/205** tes UI lulus)
+  - `php artisan test --compact tests/Feature/V2PaginationTest.php tests/Feature/V2WorkspaceViewTest.php tests/Feature/V2OperatingExpenseMenuTest.php tests/Feature/V2OperatingExpensesTest.php tests/Feature/V2UiUxAndExpenseTest.php tests/Feature/V2MultiBankAccountsTest.php tests/Feature/V2ReceiptDraftsTest.php tests/Feature/V2StockOpnameAndReturnsTest.php tests/Feature/V2DeliveryTripsTest.php tests/Feature/V2SharedStoreShiftTest.php tests/Feature/V2AccountManagementTest.php tests/Feature/V2PosEnhancementsTest.php tests/Feature/ExpensesCrudTest.php tests/Feature/ExpensesSummaryCardsTest.php` pada SQLite `:memory:` (Exit code: `0`; **97/97** tes, **898 asersi** lulus)
+  - `git diff --check` (Exit code: `0`)
+- **Bukti & Hasil Pengujian Empiris**:
+  - Tidak ada perubahan skema/migrasi database pada paket ini; seluruh pengujian dijalankan terisolasi pada SQLite `:memory:`.
+  - Terverifikasi secara empiris bahwa 14 pengeluaran kini diakses penuh antar-halaman dengan filter tetap terbawa, transfer `pending/proposed` tetap muncul di halaman pertama Persetujuan meskipun terdapat puluhan transaksi tunai `posted`, surat jalan lama berstatus `prepared` tetap tampil di atas surat jalan `received`, dan seluruh endpoint tabel admin mengembalikan `403` untuk peran kasir maupun akun tanpa peran.
+- **Status & Catatan Akhir**: SELESAI. Seluruh daftar/tabel pada aplikasi kini telah dilengkapi pagination yang menjaga performa muat awal dan mencegah data lama terpotong.
+
+
+## [2026-11-27 11:00 WIB] - Penjaga Anti-Pencatatan Dobel Server-Side (Pengeluaran Operasional & Pindah Dana)
+- **Pelaksana**: Antigravity
+- **Target Tugas**: Menutup 2 sisa celah anti-pencatatan dobel di sisi server untuk **Pengeluaran Operasional** (`POST /v2/expenses`) dan **Pindah Dana Kas/Bank** (`POST /v2/journals/transfers`) dengan `idempotency_key` + `request_hash` dan konfirmasi lembut duplikat bisnis (`confirm_duplicate`), tanpa mengubah tabel jurnal yang immutable atau merusak alur lama.
+- **Berkas yang Dibuat**:
+  - `database/migrations/2026_11_27_105000_create_v2_operation_idempotencies.php`: Migrasi aditif tabel `v2_operation_idempotencies` (`unique(scope, idempotency_key)`, `actor_id`, `request_hash`, `resource_id`, `response_payload`).
+  - `app/Services/V2/OperationIdempotency.php`: Helper terpusat normalisasi kunci, hash payload kanonis, `replay()` dengan `lockForUpdate()` + isolasi aktor (`403`) + tolak isi berbeda (`422`), dan `record()` dalam transaksi yang sama (aman bila migrasi belum dijalankan via `Schema::hasTable`).
+- **Berkas yang Diubah**:
+  - `app/Services/V2/OperatingExpenses.php` & `app/Http/Controllers/V2/OperatingExpenseController.php`: Menambahkan validasi `idempotency_key` & `confirm_duplicate`, replay idempoten, serta deteksi duplikat lembut (`duplicate_expense`) untuk tanggal + akun beban + sumber dana (+ rekening bank) + nominal + keterangan identik.
+  - `app/Services/V2/CashBankTransfers.php` & `app/Http/Controllers/V2/CashBankTransferController.php`: Menambahkan validasi `idempotency_key` & `confirm_duplicate`, replay idempoten (tanpa menggandakan log), serta deteksi duplikat lembut (`duplicate_transfer`) untuk tanggal + akun sumber/tujuan + nominal identik dalam 15 menit terakhir atau keterangan sama.
+  - `resources/views/expenses/index.blade.php`, `resources/views/expenses/theme-styles.blade.php`, `resources/views/v2/expense-script.blade.php`: Menambahkan field tersembunyi `idempotency_key`/`confirm_duplicate`, generator kunci aman (tahan non-HTTPS), tombol konfirmasi duplikat (`>= 44px`), rotasi kunci setelah sukses/ubah isian, dan mempertahankan kunci saat retry jaringan.
+  - `resources/views/journals/index.blade.php` & `resources/views/v2/journal-adjustment-script.blade.php`: Menambahkan field `idempotency_key`/`confirm_duplicate` dan tombol konfirmasi duplikat pada `#transfer-form`; mengetik ulang password konfirmasi mempertahankan `idempotency_key` dan status konfirmasi duplikat.
+  - `tests/Feature/V2DuplicateEntryGuardTest.php`, `tests/expense-operational.test.mjs`, `tests/journal-adjustment.test.mjs`: Menambahkan pengujian fitur dan UI untuk replay idempoten, tolak hash berbeda (`422`), isolasi lintas aktor (`403`), konfirmasi duplikat (`confirm_duplicate`), dan rotasi kunci setelah sukses.
+  - `docs/dokumentasi-sistem.md` & `logeksekusi.md`: Memperbarui dokumentasi perilaku sistem (bagian 18, 19, 23) dan entri append-only ini.
+- **Perintah Verifikasi & Exit Code**:
+  - `vendor\bin\pint --dirty --format agent` (Exit code: `0`; `passed`)
+  - `php artisan view:cache` lalu `php artisan view:clear` (Exit code: `0`)
+  - `node --test (Get-ChildItem tests\*.test.mjs | ForEach-Object { $_.FullName })` (Exit code: `0`; **207/207** tes UI lulus)
+  - `php artisan test --compact tests/Feature/V2DuplicateEntryGuardTest.php tests/Feature/V2OperatingExpensesTest.php tests/Feature/V2OperatingExpenseMenuTest.php tests/Feature/V2UiUxAndExpenseTest.php tests/Feature/V2MultiBankAccountsTest.php tests/Feature/V2CashBankAdjustmentTest.php tests/Feature/V2PaginationTest.php tests/Feature/ExpensesCrudTest.php tests/Feature/ExpensesSummaryCardsTest.php` pada SQLite `:memory:` (Exit code: `0`; **53/53** tes, **430 asersi** lulus)
+  - `git diff --check` (Exit code: `0`)
+- **Bukti & Hasil Pengujian Empiris**:
+  - Terverifikasi secara empiris pada SQLite `:memory:` bahwa kirim ulang `POST /v2/expenses` dan `POST /v2/journals/transfers` dengan `idempotency_key` & isi sama hanya membuat 1 baris dan 1 jurnal, isi berbeda ditolak `422`, lintas admin ditolak `403`, entri identik dengan kunci baru ditahan `422` (`duplicate_expense` / `duplicate_transfer`) dan berhasil tersimpan setelah `confirm_duplicate=true`.
+  - Catatan keterbatasan (*untested gate*): migrasi aditif `2026_11_27_105000_create_v2_operation_idempotencies` belum dijalankan ke database MySQL aktif/VPS; layanan telah dijaga `Schema::hasTable('v2_operation_idempotencies')` sehingga tetap aman berjalan sebelum `php artisan migrate` dijalankan (dan penjaga duplikat lembut langsung aktif meski tanpa migrasi).
+- **Status & Catatan Akhir**: SELESAI. Seluruh alur transaksi keuangan V2 kini terlindungi dari pencatatan dobel baik di browser maupun di server.
+
+## [2026-11-27] - Pusat Bantuan terintegrasi dengan POS V2
+- **Pelaksana**: OpenCode.
+- **Target**: Panduan baca-saja untuk kasir/admin dengan langkah ringkas, jawaban kendala, pencarian, dan tautan langsung ke fitur.
+- **Berkas dibuat**: `config/help-center.php` (32 artikel), `app/Http/Controllers/V2/HelpCenterController.php` (akses dan pencarian), `resources/views/v2/help-center.blade.php` (halaman baca/cetak), `tests/Feature/V2HelpCenterTest.php`.
+- **Berkas diubah**: `routes/v2.php`; `resources/views/partials/{workspace-navigation,workspace-header,contextual-help}.blade.php`; `resources/views/v2/{ui-sidebar-js,ui-tooltip}.blade.php`; `tests/{contextual-help,ui-tooltip-system}.test.mjs`; `docs/dokumentasi-sistem.md` bagian 1.6–1.7.
+- **Perintah verifikasi**: PHPUnit `V2HelpCenterTest.php` + `V2WorkspaceViewTest.php` pada SQLite `:memory:` (exit 0; 7 tes/177 asersi); `node --test tests/*.test.mjs` (exit 0; 208 tes); Pint dibatasi jalur perubahan (exit 0); pemeriksa token pada halaman dan dua partial baru/terkait (exit 0; 0 temuan).
+- **Bukti browser**: Chrome headless pada fixture artikel Blade, wadah 1440 dan 390 px: tidak ada overflow horizontal; desktop menempatkan navigasi berdampingan, ponsel menampilkan artikel sebelum daftar modul; tautan fitur menuju `#kasir`.
+- **Status**: Implementasi lokal selesai. Login produksi dan perpindahan dua tab pada sesi browser terautentikasi belum diuji. Tidak ada data toko, transaksi, atau deployment yang diubah.
+
+## [2026-11-27] - Poles tampilan baca Pusat Bantuan
+- **Pelaksana**: OpenCode.
+- **Target**: Selaraskan hierarki, pencarian, navigasi, dan konten baca dengan prinsip visual POS.
+- **Berkas diubah**: `resources/views/v2/help-center.blade.php`, `resources/views/v2/ui-tokens.blade.php` (token lebar baca dan navigasi), `desain.md` bagian 66.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest.php` dan `V2WorkspaceViewTest.php` pada SQLite `:memory:` (exit 0; 7 tes, 177 asersi). Pemeriksa token (exit 0; 0 error dan 2 peringatan nilai duplikat existing yang tidak terkait dua token baru).
+- **Bukti browser**: Chrome headless merender fixture Blade untuk beranda, artikel, dan hasil kosong (kueri 100 karakter) pada 1440 dan 390 px. Keenam skenario lulus: tidak ada overflow horizontal, artikel tampil lebih dulu di ponsel, sidebar sejajar pada desktop, kolom cari dan tombol sebaris, dan kontrol yang diperiksa minimum 44 × 44 px.
+- **Status**: Polesan lokal selesai. Uji browser menggunakan fixture, bukan login produksi. Tidak ada perubahan izin, alur POS, atau data.
+
+## [2026-11-27] - Navigasi gulir dalam satu modul Pusat Bantuan
+- **Pelaksana**: OpenCode.
+- **Berkas**: `resources/views/v2/help-center.blade.php`, `resources/views/v2/help-article.blade.php`, `tests/Feature/V2HelpCenterTest.php`, `desain.md`, `docs/dokumentasi-sistem.md`.
+- **Perubahan**: Artikel satu modul menjadi tujuan gulir lokal, artikel pilihan ditandai dan dipilih untuk cetak, URL ke artikel dan lintas modul tetap aktif. Hanya artikel sesuai peran yang dirender.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest.php` dan `V2WorkspaceViewTest.php` pada SQLite in-memory (exit 0; 8 tes, 187 asersi); Pint dan pemeriksa token (exit 0). Chrome headless pada fixture Blade: klik Kas harian dari Kasir benar-benar menggulir, tidak mengganti path, menetapkan `#panduan-shift`, dan memperbarui status artikel aktif.
+- **Batas**: Uji browser memakai fixture, bukan sesi produksi.
+
+## [2026-11-27] - Sederhanakan nama Pusat Bantuan dan ikuti posisi baca
+- **Pelaksana**: OpenCode.
+- **Perubahan**: Label versi dihapus dari UI Pusat Bantuan. `routes/web.php` menyediakan `/panduan`, rute di `routes/v2.php` tetap berfungsi sebagai pengalihan lama. `HelpCenterController` dan dua view bantuan dipindahkan keluar dari folder versi; header dan navigasi mengarah ke alamat baru. Penanda artikel mengikuti posisi gulir dan menjaga pilihan terlihat di dalam sidebar. Perubahan tidak menyentuh rute transaksi.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest.php`, `V2WorkspaceViewTest.php`, `V2CutoverTest.php` di SQLite `:memory:` (exit 0; 14 tes, 320 asersi); Node (exit 0; 208 tes); Pint terbatas scope (exit 0); pemeriksa token pada dua view (exit 0; tanpa temuan).
+- **Bukti browser**: Chrome headless pada fixture Blade dengan jadwal frame dideterministikkan: gulir turun menandai Laporan harian, daftar ikut bergeser saat perlu, gulir balik menandai Kasir, hash tidak berubah. Browser produksi tidak diuji.
+
+## [2026-11-27] - Lengkapi panduan tugas dan katalog modul
+- **Pelaksana**: OpenCode.
+- **Berkas**: `config/help-center.php` (sembilan panduan tugas), `resources/views/help-center.blade.php` (daftar modul beserta jumlahnya), `tests/Feature/V2HelpCenterTest.php`, dan `docs/dokumentasi-sistem.md`.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest.php`, `V2WorkspaceViewTest.php`, `V2CutoverTest.php` pada SQLite in-memory (exit 0; 16 tes/356 asersi); Pint terbatas pada dua berkas PHP (exit 0); pemeriksa token view (exit 0; tanpa temuan).
+- **Bukti**: Admin melihat 41 panduan pada lima modul; kasir 13 pada dua modul. Sembilan tautan menuju panel terkait, pencarian menemukan topik baru, dan akses langsung ke empat artikel tambahan khusus admin tetap ditolak bagi kasir. Chrome headless pada fixture beranda admin/kasir di lebar 1440 dan 390 px: semua kartu menuju panduan, target minimal 44 × 44 px, tanpa overflow horizontal.
+- **Batas**: Fixture Chrome bukan sesi produksi. Tidak mengubah transaksi atau aturan akses POS.
+
+## [2026-11-27] - Ilustrasi panduan dengan skeleton statis
+- **Pelaksana**: OpenCode.
+- **Berkas**: `config/help-center.php`, `resources/views/help-center.blade.php`, `resources/views/partials/{help-article,help-illustration}.blade.php`, `tests/Feature/V2HelpCenterTest.php`, `desain.md`, `docs/dokumentasi-sistem.md`.
+- **Perubahan**: 15 artikel memakai ilustrasi di bagian langkah. Satu kontrol/area berlabel asli disorot lime; tampilan lain menjadi skeleton statis, tanpa tangkapan layar data toko. Keterangan teks terpisah dari ilustrasi noninteraktif.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest.php`, `V2WorkspaceViewTest.php`, `V2CutoverTest.php` pada SQLite in-memory (exit 0, 17 tes/361 asersi); Pint dua berkas PHP (exit 0), pemeriksa tiga view (exit 0, 0 temuan).
+- **Bukti browser**: Chrome headless pada delapan fixture Blade (empat modul × 1440/390 px) memeriksa 15 ilustrasi di masing-masing lebar: satu sorotan terlihat utuh, skeleton tidak dianimasikan, ilustrasi tidak memuat tautan/tombol, dan tidak ada overflow horizontal. Bukan uji browser produksi.
+
+## [2026-11-27] - Lebarkan tampilan baca dan sejajarkan ilustrasi
+- **Pelaksana**: OpenCode.
+- **Berkas**: `resources/views/help-center.blade.php`, `resources/views/partials/help-article.blade.php`, `resources/views/v2/ui-tokens.blade.php`, dan `desain.md`.
+- **Perubahan**: Lebar halaman khusus bantuan menjadi 88rem, ringkasan tetap dibatasi untuk keterbacaan, hierarki judul dan aksi dipisahkan, langkah dan ilustrasi sejajar di desktop, kendala menjadi kartu dua kolom. Pada ponsel dan cetak tetap satu kolom.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest.php` dan `V2WorkspaceViewTest.php` pada SQLite `:memory:` (exit 0; 12 tes/237 asersi). Pemeriksa token (exit 0; 0 error; 2 peringatan pasangan nilai lama pada token global).
+- **Bukti browser**: Chrome headless beranda dan artikel fixture pada 1440, 1080, 1024, 390 px: delapan skenario tanpa overflow horizontal; area isi 968 px pada 1440; langkah dan ilustrasi sejajar pada lebar besar, bertumpuk pada lebar sempit; aksi tetap minimal 44 px. Uji memakai fixture, bukan browser produksi.
+
+## [2026-11-27] - Perjelas prioritas baca Pusat Bantuan
+- **Pelaksana**: OpenCode.
+- **Berkas**: `resources/views/help-center.blade.php`, `resources/views/partials/{help-search,help-article,help-illustration}.blade.php`, `desain.md`.
+- **Perubahan**: Pencarian beranda ada di blok pembuka hijau dengan empat jalur cepat; kartu modul berisi ringkasan dan jumlah. Artikel menampilkan petunjuk posisi baca dan jumlah langkah/jawaban tanpa menambah interaksi atau mengubah URL.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest.php` + `V2WorkspaceViewTest.php` (exit 0; 12 tes/237 asersi) di SQLite in-memory; pemeriksa token empat view (exit 0, tanpa temuan).
+- **Bukti browser**: Chrome headless untuk beranda, artikel, dan hasil kosong pada 1440/1024/390 px (9 skenario): tidak ada overflow, satu pencarian per halaman, jalur cepat dan langkah menyesuaikan lebar layar. Uji memakai fixture Blade.
+
+## [2026-11-27] - Interaksi Pusat Bantuan
+- **Pelaksana**: OpenCode.
+- **Berkas**: `resources/views/help-center.blade.php`, `resources/views/partials/{help-search,help-article,help-interactions}.blade.php` (baru: help-interactions), `tests/Feature/V2HelpCenterTest.php`, `desain.md`, `docs/dokumentasi-sistem.md`.
+- **Perubahan**: Saran pencarian langsung dari indeks artikel sesuai peran (combobox ARIA, pintasan `/` dan Ctrl/Cmd+K); langkah bisa ditandai selesai dengan kemajuan dan Ulangi (sessionStorage); kendala menjadi akordeon; tombol Salin tautan dan Cetak per artikel (cetak hanya artikel terpilih, semua jawaban dibuka). Tombol interaktif tersembunyi bila JavaScript tidak aktif. Tidak ada perubahan rute, akses, atau POS.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest.php` + `V2WorkspaceViewTest.php` di SQLite `:memory:` (exit 0; 13 tes/248 asersi, termasuk indeks saran kasir tanpa artikel admin); Pint (exit 0); pemeriksa token empat view (exit 0, 0 temuan).
+- **Bukti browser**: Chrome headless fixture artikel Kasir pada 1440 dan 390 px: pintasan `/`, saran muncul, panah memilih opsi, Escape menutup, hasil kosong informatif, tanda langkah 2 dari 6 lalu Ulangi, akordeon, tombol alat dan langkah ≥44 px, tanpa overflow. Dialog cetak dan clipboard nyata tidak diuji di headless.
+
+## [2026-11-27] - Selaraskan kartu dan submenu Pusat Bantuan dengan dashboard
+- **Pelaksana**: OpenCode.
+- **Berkas**: `resources/views/v2/ui-dna-tokens.blade.php` (baru, token DNA dipindah apa adanya dari `ui-dna` + `--dna-card-title`), `resources/views/v2/ui-dna.blade.php` (memuat partial token), `resources/views/help-center.blade.php`, `desain.md`.
+- **Perubahan**: Kartu, panel dalam, dan submenu bantuan mengikuti DNA dashboard/sidebar. Warna tidak diubah. Nilai token DNA tidak berubah sehingga tampilan ruang kerja tetap sama.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest` + `V2WorkspaceViewTest` SQLite `:memory:` (exit 0; 13 tes/248 asersi); `node --test tests/*.test.mjs` (exit 0; 208 lulus); pemeriksa token dua berkas (exit 0; 0 temuan).
+- **Bukti browser**: Chrome headless fixture beranda, artikel Kasir, dan hasil kosong pada 1440/390 px (6 skenario): semua kartu putih radius 12 dengan bayangan, garis cabang submenu, grup berikon tanpa penanda bawaan, target ≥44 px, interaksi langkah tetap jalan, tanpa overflow. Bukan sesi produksi.
+
+## [2026-11-27] - Kerapian baca Pusat Bantuan
+- **Pelaksana**: OpenCode.
+- **Berkas**: `resources/views/v2/ui-font-tokens.blade.php` (baru; `--font-display`/`--font-body` dipindah dari `ui-theme` tanpa mengubah nilai), `resources/views/v2/ui-theme.blade.php`, `resources/views/help-center.blade.php`, `desain.md`.
+- **Perubahan**: Font aplikasi dipakai di bantuan, judul/paragraf seimbang, kata tidak dipotong di tengah, jawaban kendala satu kolom dengan lebar baca terbatas, ringkasan sedikit lebih besar, judul artikel sekunder lebih kecil.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest` + `V2WorkspaceViewTest` SQLite `:memory:` (exit 0; 13/248); `node --test tests/*.test.mjs` (exit 0; 208); token checker (exit 0; 0 temuan).
+- **Bukti browser**: Chrome headless fixture artikel Kasir pada 1440/1024/390 px: Inter dan Plus Jakarta Sans terpakai, baris langkah 61/74/34 karakter, jawaban satu kolom, nomor langkah sejajar teks, tanpa overflow. Bukan sesi produksi.
+
+## [2026-11-27] - Kurangi kartu Pusat Bantuan
+- **Pelaksana**: OpenCode. **Berkas**: `resources/views/help-center.blade.php`, `desain.md`.
+- **Perubahan**: Artikel menjadi satu kartu; bagian di dalamnya dipisah garis, akordeon kendala tanpa kotak, daftar isi tanpa bingkai.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest` + `V2WorkspaceViewTest` SQLite `:memory:` (exit 0; 13/248); token checker (exit 0, 0 temuan). Chrome headless fixture artikel Kasir 1440/390: 0 elemen berbayang di dalam kartu artikel, kendala tanpa latar, bagian bergaris pemisah, tanpa overflow.
+
+## [2026-11-27] - Petunjuk bantuan jadi tooltip, tautan isi jadi tombol
+- **Pelaksana**: OpenCode. **Berkas**: `resources/views/help-center.blade.php`, `resources/views/partials/{help-search,help-article,help-interactions}.blade.php`.
+- **Perubahan**: Lencana `/` dihapus; petunjuk pencarian dan cara menandai langkah dipindah ke `x-ui.info-tip` (tooltip POS, `v2.ui-tooltip` dimuat di halaman bantuan); status kemajuan menjadi `N dari M langkah ditandai`; tautan daftar isi bergaya tombol garis 44 px.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest` + `V2WorkspaceViewTest` SQLite `:memory:` (exit 0; 13/248); Node 208/208; token checker 0 temuan. Browser terautentikasi pemilik `/panduan/neraca`: tanpa `kbd` dan paragraf petunjuk, tooltip pencarian tampil saat ikon diklik, tombol daftar isi 44 px, tanpa overflow, konsol tanpa error.
+
+## [2026-11-27] - Kolom kanan Di halaman ini
+- **Pelaksana**: OpenCode. **Berkas**: `resources/views/help-center.blade.php`, `resources/views/partials/help-article.blade.php` (id `terkait`), `resources/views/v2/ui-tokens.blade.php` (`--ui-help-toc-width`), `tests/Feature/V2HelpCenterTest.php`, `desain.md`, `docs/dokumentasi-sistem.md`.
+- **Perubahan**: Mulai 1280 px tampil kolom kanan menempel berisi bagian artikel aktif dengan penanda posisi gulir; tombol daftar isi di bawah judul disembunyikan pada lebar itu. Di bawah 1280 px tidak berubah.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest` + `V2WorkspaceViewTest` SQLite `:memory:` (exit 0; 14 tes/253 asersi; percobaan pertama gagal karena asersi spasi atribut `hidden`, diperbaiki); Pint dan token checker (exit 0, 0 temuan).
+- **Bukti browser**: Tab terautentikasi pemilik (972 px): kolom tersembunyi sesuai desain, penanda berpindah Ringkasan → Jika bingung → artikel berikutnya saat digulir, konsol bersih. Chrome headless fixture: 1440/1280 px kolom tampil di kanan, isi 810/676 px, tautan ≥44 px, tanpa overflow; 1024 px kembali ke tombol.
+
+## [2026-11-27] - Penjelasan artikel dan perbaikan garis submenu bantuan
+- **Pelaksana**: OpenCode.
+- **Berkas**: `config/help-center.php` (`details` untuk 41 artikel), `app/Http/Controllers/HelpCenterController.php` (penjelasan ikut pencarian), `resources/views/partials/{help-article,help-interactions}.blade.php`, `resources/views/help-center.blade.php` (garis cabang pertama dimulai di tepi atas submenu; gaya paragraf penjelasan; tautan Penjelasan di kolom kanan), `tests/Feature/V2HelpCenterTest.php`, `docs/dokumentasi-sistem.md`.
+- **Isi**: Penjelasan disusun dari perilaku yang tercatat di dokumentasi sistem (kas harian, metode bayar, draf/konfirmasi penerimaan, retur, opname, saldo awal, laporan). Tidak ada perubahan perilaku POS.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest` + `V2WorkspaceViewTest` SQLite `:memory:` (exit 0; 15 tes/302 asersi; satu asersi lama dipersempit karena penjelasan kasir menyebut kata "Master data"); Pint dan token checker (exit 0, 0 temuan).
+- **Bukti browser**: Tab terautentikasi pemilik `/panduan/pengeluaran`: garis cabang mulai 2 px di bawah judul grup (tidak menabrak), bagian Penjelasan 2 paragraf, daftar isi Penjelasan/Langkah singkat/Jika bingung, tanpa overflow, konsol bersih.
+
+## [2026-11-27] - Sederhanakan header, pencarian, dan aksi Pusat Bantuan
+- **Pelaksana**: OpenCode.
+- **Berkas**: `resources/views/help-center.blade.php`, `resources/views/partials/{help-article,help-interactions}.blade.php`, `tests/Feature/V2HelpCenterTest.php`, `desain.md`, `docs/dokumentasi-sistem.md`.
+- **Perubahan**: Header tanpa latar; pencarian pindah ke kartu menu samping (beranda tetap di hero); penanda langkah beserta skrip sessionStorage dan tombol Salin tautan beserta skrip clipboard dihapus. Tautan pintas di HP menjadi "Cari atau pilih panduan lain".
+- **Verifikasi**: PHPUnit `V2HelpCenterTest` + `V2WorkspaceViewTest` SQLite `:memory:` (exit 0; 15 tes/303 asersi); Pint dan token checker (exit 0, 0 temuan).
+- **Bukti browser**: Tab terautentikasi pemilik `/panduan/kasir` (1448 px): header transparan, satu kolom cari di kartu menu, saran pencarian tampil utuh di atas daftar modul, tanpa penanda langkah/Salin tautan, Cetak tetap ada, tanpa overflow, konsol bersih.
+
+## [2026-11-27] - Pencarian per kata, scrollbar minimalis, dan tur POS dari Pusat Bantuan
+- **Pelaksana**: OpenCode.
+- **Berkas**: `app/Http/Controllers/HelpCenterController.php` (peringkat per kata, imbuhan, sinonim, respons JSON saran, tautan fitur `?tur=`), `config/help-center.php` (`search`, `tour_targets`), `resources/views/partials/help-interactions.blade.php` (saran via fetch server, indeks lokal dihapus), `resources/views/help-center.blade.php` (scrollbar), `resources/views/v2/help-tour.blade.php` (baru), `resources/views/v2/workspace.blade.php` (memuat tur), `tests/Feature/V2HelpCenterTest.php`, `desain.md`, `docs/dokumentasi-sistem.md`.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest` + `V2WorkspaceViewTest` SQLite `:memory:` (exit 0; 17 tes/333 asersi; tes baru: pencarian per kata/imbuhan/sinonim, JSON sesuai peran, tur dengan cek peran dan parameter tidak valid). Node 208/208; Pint dan token checker (exit 0, 0 temuan).
+- **Bukti browser**: Tab terautentikasi pemilik. Tur `/?tur=kasir#kasir`: mulai otomatis, parameter hilang dari URL, 7 langkah, sorotan tepat pada kolom cari katalog setelah gulir selesai (selisih 0 px), kartu tidak menutupi sorotan, Escape menutup, konsol bersih. Saran "cara bayar tagihan": Catat cicilan dan cek tagihan, Bayar utang supplier, Pantau status pembayaran, dst. Scrollbar tipis aktif.
+- **Belum diuji**: Tampilan tur pada layar HP (lembar bawah) di browser nyata.
+
+## [2026-11-27] - Tur dibatalkan, ilustrasi dilengkapi untuk semua artikel
+- **Pelaksana**: OpenCode.
+- **Berkas**: dihapus `resources/views/v2/help-tour.blade.php`; diubah `resources/views/v2/workspace.blade.php` (include tur dilepas), `app/Http/Controllers/HelpCenterController.php` (tautan fitur tanpa `?tur`), `config/help-center.php` (`tour_targets` dihapus; 26 ilustrasi baru), `tests/Feature/V2HelpCenterTest.php`, `desain.md`, `docs/dokumentasi-sistem.md`.
+- **Sumber label**: teks tombol/judul dicocokkan dengan view POS (mis. Tambah produk, Tutup kas harian, Verifikasi pembayaran, Kirim barang, Simpan realisasi, Tampilkan laporan, Catat retur penjualan, + Catat pengeluaran, Tambah Akun).
+- **Verifikasi**: PHPUnit `V2HelpCenterTest` + `V2WorkspaceViewTest` SQLite `:memory:` (exit 0; 16 tes/360 asersi, termasuk cek 41 artikel berilustrasi); Pint dan token checker (exit 0, 0 temuan).
+- **Bukti browser**: Tab terautentikasi pemilik, modul Keuangan (9/9), Master data (9/9), Operasional (15/15) berilustrasi; tiap ilustrasi satu sorotan utuh, tautan fitur tanpa parameter tur, tanpa overflow, konsol bersih.
+
+## [2026-11-27] - Penanda teks panduan: tag tautan, penting, istilah, opsional
+- **Pelaksana**: OpenCode.
+- **Berkas**: `app/Support/HelpText.php` (baru; perender dengan escaping penuh), `config/help-center.php` (`markup.links`, `markup.terms`; 15 kalimat penting dan 13 bagian opsional ditandai), `app/Http/Controllers/HelpCenterController.php` (pencarian membaca teks polos), `resources/views/partials/help-article.blade.php`, `resources/views/help-center.blade.php`, `tests/Feature/V2HelpCenterTest.php`, `desain.md`, `docs/dokumentasi-sistem.md`.
+- **Verifikasi**: PHPUnit `V2HelpCenterTest` + `V2WorkspaceViewTest` SQLite `:memory:` (exit 0; 17 tes/373 asersi; termasuk tag tidak menautkan panduan admin untuk kasir, escaping HTML, teks polos). Satu asersi awal terlalu luas (`((` juga ada di kode JS) lalu dipersempit. Pint dan token checker (exit 0, 0 temuan).
+- **Bukti browser**: Tab terautentikasi pemilik `/panduan/kasir`: 15 tag, 8 penting, 28 istilah, 6 opsional; tag satu modul mengarah ke `#panduan-…`; tidak ada penanda mentah di teks; tanpa overflow; konsol bersih.
+
+## [2026-11-28] - Sidebar bantuan, tooltip Akun login, dan aktivitas supplier
+- **Pelaksana**: OpenCode.
+- **Perubahan**: Tautan Pusat Bantuan di atas Keluar pada kedua sidebar workspace; tooltip bersama menunggu satu detik saat hover dan ikon info membuka panduan melalui Baca selengkapnya. Paragraf Akun login dipindah ke ikon info dan artikel terkait. Teks langkah membungkus tag dalam satu sel grid. Aktivitas supplier memakai satu kolom Rentang tanggal, strip ringkasan, hitungan baris, dan navigasi per 20 aktivitas; Cetak periode tetap mencetak seluruh rentang.
+- **Berkas**: `config/help-center.php`, `resources/views/partials/{help-article,sidebar-help-link,workspace-navigation}.blade.php`, `resources/views/v2/{accounts,master-insights,responsive-refinements,shell-sidebar,supplier-activity-results,supplier-activity-script,ui-sidebar,ui-tooltip,workspace}.blade.php`, `tests/Feature/V2SupplierActivityTest.php`, `tests/ui-tooltip-system.test.mjs`, `desain.md`, `docs/dokumentasi-sistem.md`.
+- **Verifikasi**: PHPUnit `V2SupplierActivityTest`, `V2HelpCenterTest`, `V2WorkspaceViewTest` dengan SQLite `:memory:` (exit 0; 19 tes, 408 asersi); `node --test tests/ui-tooltip-system.test.mjs tests/contextual-help.test.mjs tests/ui-refinements.test.mjs` (exit 0; 23 tes); Pint dan `git diff --check` (exit 0). Pemeriksa token pada partial yang bersih (exit 0); pemindaian berkas bersama (exit 1; 47 temuan di deklarasi lama atau perubahan lain di luar cakupan tugas).
+- **Bukti browser**: Pusat Bantuan diikuti Keluar; langkah Kasir menampilkan tag di dalam kalimat dan ilustrasi berdampingan tanpa overflow. Tooltip akun belum tampil pada 750 ms dan sudah tampil pada 1.100 ms, tautan bertahan ketika kursor pindah ke tooltip. Dialog supplier menampilkan satu kolom tanggal, kalender terbuka, hasil dan cetak dimuat; ikon info di dialog dapat difokuskan dan Escape mengembalikan fokus tanpa menutup dialog. Konsol kedua tab tanpa error. Supplier yang diperiksa hanya punya satu aktivitas; perpindahan halaman 1–2 dan tautan yang mempertahankan rentang terbukti pada tes terisolasi dengan 23 aktivitas.
+
+## [2026-11-28] - Urutan artikel dan panduan akun laci
+- **Pelaksana**: OpenCode.
+- **Berkas**: `config/help-center.php`, `resources/views/help-center.blade.php`, `resources/views/partials/help-article.blade.php`, `tests/Feature/V2HelpCenterTest.php`, `desain.md`, `docs/dokumentasi-sistem.md`.
+- **Hasil**: Urutan daftar modul sama dengan urutan baca. Daftar isi di dalam kartu dihapus. Tanya jawab Bagan Akun menjelaskan hubungan laci dengan akun 1101 berdasarkan kode pembukuan dan rekap Kas Harian yang ada.
+- **Verifikasi**: `php vendor/bin/phpunit tests/Feature/V2HelpCenterTest.php tests/Feature/V2WorkspaceViewTest.php` dengan SQLite `:memory:` (exit 0; 17 tes, 375 asersi). Pint, pemeriksa token dua view, dan `git diff --check` (exit 0). Browser `/panduan/bagan-akun`: semua tautan sidebar sesuai urutan artikel, Bagan Akun pertama dan aktif, tanya jawab akun 1101 terbuka, tidak ada daftar isi di kartu, tidak ada overflow atau error konsol.
+
+## [2026-11-28] - Penyempurnaan riwayat, supplier, Pengeluaran, dan Jurnal
+- **Pelaksana**: OpenCode.
+- **Berkas**: `resources/views/v2/{invoice-payment-form,workspace,ui-workspace,ui-tooltip,master-insights,supplier-activity-results,responsive-refinements,sales-history,sales-history-results,sale-detail,sale-detail-script,sale-detail-styles}.blade.php`, `resources/views/{expenses/theme-styles,journals/index}.blade.php`, `config/help-center.php`, `tests/Feature/{V2MultiBankAccountsTest,V2SalesWorkspaceTest,V2StockOpnameAndReturnsTest}.php`, `desain.md`, `docs/dokumentasi-sistem.md`.
+- **Temuan**: Penyaringan laporan memakai tanggal jurnal; penguncian periode tutup buku tidak ditemukan. Form bank sebelumnya dapat memilih rekening pertama tanpa tindakan pengguna. Pilihan sumber kini menjelaskan dampaknya dan form menolak transfer supplier tanpa rekening terpilih. Kode sumber Jurnal dipertahankan untuk filter; hanya label tampilannya diterjemahkan.
+- **Verifikasi**: PHPUnit `V2SalesWorkspaceTest`, `V2StockOpnameAndReturnsTest`, `V2MultiBankAccountsTest`, `V2SupplierActivityTest`, `CashFlowReportTest`, `V2HistoryFiltersTest`, dan `V2HelpCenterTest` pada SQLite `:memory:` (exit 0; 51 tes, 599 asersi). Node `returns-ui`, `sale-detail`, `sales-history-live`, `expense-operational`, `ui-refinements`, `journal-adjustment`, `ui-tooltip-system` (exit 0; 49 tes unik). Pint, pemeriksa token untuk tiga partial, dan `git diff --check` (exit 0).
+- **Bukti browser**: Tombol Detail membuka nota dan Catat retur membuka bagian retur dengan fokus pada judul. Dialog supplier menampilkan posisi, riwayat dan produk tanpa overflow. Pembayaran supplier menampilkan daftar rekening yang awalnya kosong, memberi pesan saat rekening belum dipilih, dan menonaktifkan rekening ketika sumber diganti ke laci. Tidak mengirim pembayaran atau retur dari browser. Nominal Pengeluaran terhitung 16 px/rata kanan. Label Jurnal berbahasa Indonesia dengan kode filter asli dan tanpa awalan V2.
+
+## [2026-11-28] - Warna tautan dan transisi sidebar mobile
+- **Pelaksana**: OpenCode.
+- **Berkas**: `resources/views/v2/{ui-sidebar,ui-theme,ui-dna,ui-legacy-pages,ui-styles,mobile-quick-actions}.blade.php`, `tests/mobile-quick-actions.test.mjs`, `desain.md`.
+- **Hasil**: Hanya teks Pusat Bantuan menjadi lebih terang saat hover/fokus; latar transparan. Pil navigasi turun dan memudar saat menu terbuka, tidak menerima input, lalu kembali saat menu ditutup. Latar redup sidebar memakai satu aturan di workspace dan halaman COA penuh.
+- **Verifikasi**: PHPUnit `V2WorkspaceViewTest`, `V2ChartOfAccountsTest`, `V2HelpCenterTest` SQLite `:memory:` (exit 0; 33 tes, 580 asersi); Node `mobile-quick-actions` dan `ui-refinements` (exit 0; 10 tes); `git diff --check` (exit 0). Pemindaian token seluruh tiga view terkait melaporkan 53 error dan 3 peringatan pada deklarasi lama. Warna latar baru disimpan pada token `--ui-sidebar-backdrop`.
+- **Bukti browser**: Viewport 390 px untuk Ringkasan, Bagan Akun workspace, dan `/coa` penuh. Latar meredup, menerima klik di luar sidebar, lalu hilang; pada workspace pil masih dirender di tengah animasi dan bergeser turun, nonaktif saat menu terbuka, lalu kembali. Hover nyata pada Pusat Bantuan menghasilkan teks lime, ikon tetap redup, dan latar tetap transparan.
+
+## [2026-11-28] - Panel sidebar mobile tidak lagi transparan pada COA
+- **Pelaksana**: OpenCode.
+- **Berkas**: `resources/views/partials/master-data-styles.blade.php`. Aturan visibilitas menu lama tidak lagi mengenai `#workspace-sidebar`.
+- **Sebab**: Gaya dari fragmen Bagan Akun menetapkan `visibility:hidden` pada sidebar karena menu baru memakai `body.sidebar-open` alih-alih `.app-sidebar.open`. Sebagian label menetapkan visibilitas sendiri, sehingga teks mengambang di atas halaman.
+- **Verifikasi**: Browser pada tab asal di Bagan Akun (496 CSS px) menunjukkan panel awalnya tersembunyi. Sesudah perbaikan, tangkapan menunjukkan panel hijau solid, titik di dalam panel mengenai sidebar, titik di luar mengenai latar redup, dan ketuk luar menutup panel serta memulihkan fokus. Konsol tanpa error. PHPUnit `V2ChartOfAccountsTest` dan `V2WorkspaceViewTest` SQLite `:memory:` (exit 0; 19 tes/349 asersi); Node `mobile-quick-actions` dan `coa-operational` (exit 0; 16 tes); `git diff --check` (exit 0).
+
+## [2026-11-28] - Tabel Arus Kas mobile tidak tumpang tindih
+- **Pelaksana**: OpenCode.
+- **Berkas**: `resources/views/reports/{cash_flow,_styles}.blade.php`, `resources/views/v2/finance-dna.blade.php`, `desain.md`.
+- **Sebab dan hasil**: Kolom pertama 54 px menampung label selebar 75 px, dan judul dipaksa satu baris. Arus Kas kini memakai label singkat, pembagian lebar dan ruang dalam yang lebih sesuai, serta pembungkusan pada judul dan teks panjang. Nominal tetap rata kanan.
+- **Verifikasi**: Browser pada tab asal dan viewport 320, 390, 496, dan 1080 CSS px: tidak ada teks melewati batas sel atau gulir horizontal halaman; judul muat dan nominal rata kanan; label lengkap pada desktop, tanpa error konsol. PHPUnit `CashFlowReportTest` dan `V2WorkspaceViewTest` SQLite `:memory:` (exit 0; 9 tes/187 asersi). `git diff --check` exit 0. Pemindaian token menyeluruh masih menemukan literal/style lama di ketiga view (154 temuan); perubahan tidak menambah warna.
+
+## [2026-11-28] - Ringkasan mobile Stok Opname, Supplier, dan pencarian master
+- **Pelaksana**: OpenCode.
+- **Berkas**: `resources/views/v2/{sales-history-results,stock-opname,workspace-monitoring,master-page-item,responsive-refinements,ui-dna}.blade.php`, `resources/views/v2/tables/stock-opnames-results.blade.php`, `resources/views/partials/table-filter-styles.blade.php`, `tests/Feature/V2StockOpnameAndReturnsTest.php`, `desain.md`.
+- **Hasil**: Tooltip cakupan yang berdiri sendiri di Riwayat Penjualan dilepas. Ringkasan Stok Opname menjadi dua kali dua di ponsel, tombol catat selebar kartu, dan Detail dikenali oleh gaya aksi tabel mobile. Badge supplier diletakkan di bawah deskripsi. Ikon pencarian terpusat vertikal, dengan satu jarak konsisten sebelum teks.
+- **Verifikasi**: PHPUnit `V2StockOpnameAndReturnsTest`, `V2SalesWorkspaceTest`, `V2WorkspaceViewTest`, `V2PaginationTest` SQLite `:memory:` (exit 0; 15 tes/314 asersi). Node `table-filter`, `ui-refinements`, `sales-history-live`, `server-tables-pagination`, `returns-ui` (exit 0; 32 tes). Pint dan `git diff --check` (exit 0).
+- **Bukti browser**: Lebar 320 dan 390 CSS px: pencarian 44 px, ikon sejajar dengan teks, badge utang muat, ringkasan opname dua baris dan tombol membuka dialog, tanpa overflow. Detail untuk catatan yang sudah tersimpan diverifikasi melalui respons server dengan data sintetis di PHPUnit karena daftar browser lokal kosong.
+
+## [2026-11-28] - Perbaikan temuan review sebelum push
+- **Pelaksana**: OpenCode.
+- **Berkas**: `app/Services/V2/{Money,PurchaseReturns,SalesReturns,StockOpnames}.php`, `resources/views/v2/stock-opname.blade.php`, `resources/views/expenses/index.blade.php`, `resources/views/help-center.blade.php`, `tests/Feature/V2StockOpnameAndReturnsTest.php`, dan `docs/dokumentasi-sistem.md`.
+- **Hasil**: Opname baru yang memakai jumlah stok sistem lama ditolak sebelum menulis mutasi atau jurnal. Retur sebagian menghitung dari nilai kumulatif dengan pembulatan ke bawah sehingga tidak menghabiskan nilai baris sebelum unit terakhir, dan HPP retur memakai pembagian kumulatif yang sama agar total HPP kembali tidak melebihi HPP baris asli. Retur penjualan memperoleh kunci tagihan sebelum kunci penjualan seperti pembayaran, dan retur tunai mengambil kunci shift sebelum kunci produk seperti checkout. View Pengeluaran menerima paginator atau koleksi.
+- **Verifikasi terarah**: `php vendor/bin/phpunit tests/Feature/V2StockOpnameAndReturnsTest.php tests/Feature/FinanceAuditCorrectionsTest.php` SQLite `:memory:` (exit 0; 15 tes/106 asersi); seluruh tes Node (exit 0; 211 tes); Pint pada PHP yang diperbaiki, lint PHP, dan pemeriksaan whitespace (exit 0). Urutan kunci diperiksa dari alur kode; pengujian SQLite tidak menyimulasikan konflik kunci MySQL.

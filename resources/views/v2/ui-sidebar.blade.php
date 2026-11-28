@@ -37,9 +37,9 @@
 #workspace-sidebar .sidebar-footer{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:8px 10px 12px;border-top:1px solid var(--ui-line-soft)}
 #workspace-sidebar .sidebar-footer .role-label{display:none}
 #workspace-sidebar .sidebar-footer form{margin:0}
-#workspace-sidebar .sidebar-footer form button{display:flex;align-items:center;gap:12px;width:100%;height:40px;min-height:40px;padding:0 14px;border:0;border-radius:10px;background:transparent;color:var(--side-ink);font-size:.8125rem;font-weight:600;white-space:nowrap;cursor:pointer;justify-content:flex-start}
+#workspace-sidebar :is(.sidebar-footer form button,.sidebar-footer .sidebar-help){text-decoration:none;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;height:40px;min-height:40px;padding:0 14px;border:0;border-radius:10px;background:transparent;color:var(--side-ink);font-size:.8125rem;font-weight:600;white-space:nowrap;cursor:pointer;justify-content:flex-start}
 #workspace-sidebar .sidebar-footer form button:hover{background:var(--ui-hover)}
-#workspace-sidebar .sidebar-footer form button svg{width:20px;height:20px;flex:0 0 20px}
+#workspace-sidebar :is(.sidebar-footer form button,.sidebar-footer .sidebar-help) svg{width:20px;height:20px;flex:0 0 20px}
 
 /* tombol buka/ciutkan di tepi sidebar */
 .sidebar-edge{display:none}
@@ -80,10 +80,10 @@ body .task-panel>.ui-subtabs{width:auto!important}
   #workspace-sidebar .sidebar-close{display:none}
   /* rail: hanya ikon grup; sub-menu tampil lewat kartu hover */
   #workspace-sidebar:not(.pinned) .workspace-submenu{display:none!important}
-  #workspace-sidebar:not(.pinned) :is(.workspace-menu-group>summary>span,.workspace-menu-group>summary::after,.sidebar-brand-text,.sidebar-footer form button span){opacity:0!important}
+  #workspace-sidebar:not(.pinned) :is(.workspace-menu-group>summary>span,.workspace-menu-group>summary::after,.sidebar-brand-text,.sidebar-footer form button span,.sidebar-footer .sidebar-help span){opacity:0!important}
   #workspace-sidebar:not(.pinned) .workspace-menu-group:has([aria-current=page])>summary{background:var(--ui-green-soft)}
   #workspace-sidebar:not(.pinned) .workspace-menu-group:has([aria-current=page])>summary::before{content:'';position:absolute;left:-10px;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--ui-green)}
-  #workspace-sidebar.pinned :is(.workspace-menu-group>summary>span,.sidebar-brand-text,.sidebar-footer form button span){opacity:1!important;visibility:visible!important}
+  #workspace-sidebar.pinned :is(.workspace-menu-group>summary>span,.sidebar-brand-text,.sidebar-footer form button span,.sidebar-footer .sidebar-help span){opacity:1!important;visibility:visible!important}
   .sidebar-edge{display:flex;position:fixed;top:19px;left:calc(var(--side-rail) - 14px);z-index:110;width:28px;height:28px;padding:0;align-items:center;justify-content:center;border-radius:50%;background:#fff;color:#0f2a1d;border:1px solid var(--ui-line);box-shadow:0 2px 10px rgb(15 42 29 / .22);cursor:pointer;transition:left .2s cubic-bezier(.2,0,0,1),background-color .15s}
   body.sidebar-pinned .sidebar-edge{left:calc(var(--side-open) - 14px)}
   .sidebar-edge:hover{background:var(--ui-accent-soft,#e3f9ea)}
@@ -92,8 +92,17 @@ body .task-panel>.ui-subtabs{width:auto!important}
 }
 @media (max-width:900px){
   .rail-tip,.rail-flyout{display:none!important}
-  #workspace-sidebar .workspace-menu-group>summary,#workspace-sidebar .sidebar-nav .workspace-submenu a,#workspace-sidebar .sidebar-footer form button{min-height:44px}
+  #workspace-sidebar .workspace-menu-group>summary,#workspace-sidebar .sidebar-nav .workspace-submenu a,#workspace-sidebar :is(.sidebar-footer form button,.sidebar-footer .sidebar-help){min-height:44px}
   #workspace-sidebar .workspace-menu-group>summary>span{opacity:1!important}
+  html body #sidebar-overlay.sidebar-overlay{
+    display:block;position:fixed;inset:0;z-index:95;width:100%;height:100%;min-height:0;
+    padding:0;border:0;border-radius:0;box-shadow:none;background:var(--ui-sidebar-backdrop);
+    opacity:0;visibility:hidden;pointer-events:none;cursor:pointer;
+    transition:opacity var(--ui-sidebar-duration) var(--ui-ease-out),visibility 0s var(--ui-sidebar-duration);
+  }
+  html body.sidebar-open #sidebar-overlay.sidebar-overlay{
+    opacity:1;visibility:visible;pointer-events:auto;transition-delay:0s;
+  }
 }
 @media (prefers-reduced-motion:reduce){#workspace-sidebar.app-sidebar,body:has(#workspace-sidebar),.sidebar-edge,.rail-flyout{transition:none!important;animation:none!important}}
 /* Sidebar yang dikunci terbuka langsung lebar sejak gambar pertama, tanpa melompat. */
@@ -101,7 +110,7 @@ body .task-panel>.ui-subtabs{width:auto!important}
   html body:has(#workspace-sidebar){transition:padding-left var(--ui-sidebar-duration) var(--ui-ease-out)}
   html body #workspace-sidebar.app-sidebar{transition:width var(--ui-sidebar-duration) var(--ui-ease-out),min-width var(--ui-sidebar-duration) var(--ui-ease-out)}
   html body #workspace-sidebar :is(.sidebar-nav,.sidebar-brand,.sidebar-footer){width:var(--side-open);min-width:var(--side-open);box-sizing:border-box;flex-shrink:0}
-  html body #workspace-sidebar :is(.sidebar-brand-text,.workspace-menu-group>summary>span,.sidebar-footer button span){white-space:nowrap;transition:opacity var(--ui-sidebar-text-duration) var(--ui-ease-out)}
+  html body #workspace-sidebar :is(.sidebar-brand-text,.workspace-menu-group>summary>span,.sidebar-footer button span,.sidebar-footer .sidebar-help span){white-space:nowrap;transition:opacity var(--ui-sidebar-text-duration) var(--ui-ease-out)}
   html body #workspace-sidebar .sidebar-nav .workspace-submenu{display:flex !important;max-height:var(--side-submenu-height,none);overflow:hidden;opacity:1;visibility:visible;transition:max-height var(--ui-sidebar-duration) var(--ui-ease-out),opacity var(--ui-sidebar-text-duration) var(--ui-ease-out)}
   html body #workspace-sidebar:not(.pinned) .sidebar-nav .workspace-submenu{display:flex !important;max-height:0;opacity:0;visibility:hidden;margin-block:0 !important;pointer-events:none}
   html body .rail-flyout{width:var(--side-open);box-sizing:border-box}
@@ -110,6 +119,7 @@ body .task-panel>.ui-subtabs{width:auto!important}
   html.pre-pinned body #workspace-sidebar.app-sidebar{width:var(--side-open)!important}
 }
 @media(prefers-reduced-motion:reduce){
- html body #workspace-sidebar :is(.sidebar-brand-text,.workspace-menu-group>summary>span,.sidebar-footer button span,.sidebar-nav .workspace-submenu){transition:none !important}
+ html body #sidebar-overlay.sidebar-overlay{transition:none}
+ html body #workspace-sidebar :is(.sidebar-brand-text,.workspace-menu-group>summary>span,.sidebar-footer button span,.sidebar-footer .sidebar-help span,.sidebar-nav .workspace-submenu){transition:none !important}
 }
 </style>

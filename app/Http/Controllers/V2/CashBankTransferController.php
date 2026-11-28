@@ -21,11 +21,16 @@ class CashBankTransferController extends Controller
             'amount' => ['required', 'numeric', 'gt:0', 'decimal:0,2'],
             'description' => ['required', 'string', 'max:200'],
             'password' => ['required', 'string', 'max:255'],
+            'idempotency_key' => ['nullable', 'string', 'min:8', 'max:100', 'regex:/^[\x20-\x7E]+$/'],
+            'confirm_duplicate' => ['nullable', 'boolean'],
         ], [
             'from_account_code.in' => 'Akun sumber harus Kas (1101) atau Rekening Bank yang aktif.',
             'to_account_code.in' => 'Akun tujuan harus Kas (1101) atau Rekening Bank yang aktif.',
             'to_account_code.different' => 'Akun tujuan harus berbeda dari akun sumber.',
             'amount.gt' => 'Nominal pindah dana harus lebih dari nol.',
+            'idempotency_key.min' => 'Kunci transaksi tidak valid.',
+            'idempotency_key.max' => 'Kunci transaksi tidak valid.',
+            'idempotency_key.regex' => 'Kunci transaksi tidak valid.',
         ]);
 
         return response()->json(

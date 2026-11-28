@@ -124,7 +124,8 @@ save.addEventListener('click',async()=>{
     if(selected==='new'&&!newName.value.trim()){fail('Isi nama supplier baru.');return;}
     const payload={product_id:product.id,confirmed:true,...(selected==='new'?{name:newName.value.trim(),notes:newNotes.value.trim()||null}:{supplier_id:selected})};
     const fingerprint=JSON.stringify(payload);
-    if(!writeRequest||writeRequest.fingerprint!==fingerprint)writeRequest={fingerprint,key:crypto.randomUUID()};
+    const safeKey=()=>{if(typeof window.v2Uuid==='function')return window.v2Uuid();if(typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function')return crypto.randomUUID();if(typeof crypto!=='undefined'&&typeof crypto.getRandomValues==='function'){const b=new Uint8Array(16);crypto.getRandomValues(b);return Array.from(b,x=>('0'+x.toString(16)).slice(-2)).join('');}return 'rst-'+Date.now()+'-'+Math.random().toString(16).slice(2);};
+    if(!writeRequest||writeRequest.fingerprint!==fingerprint)writeRequest={fingerprint,key:safeKey()};
     payload.idempotency_key=writeRequest.key;
     writing=true;form.dataset.busy='1';editor.dataset.busy='1';save.disabled=true;cancel.disabled=true;editorError.hidden=true;updateActions();
     let saved=null;
